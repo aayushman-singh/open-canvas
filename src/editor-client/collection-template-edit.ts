@@ -22,9 +22,30 @@
 // state cleanly.
 
 import type { CanvasElement } from '../canvas/schema.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
-import { publishLocalPresenceImmediate } from './co-edit.js';
+import { type CoEditPresencePublishContext, publishLocalPresenceImmediate } from './co-edit.js';
+
+// ADR 0064 — Collection custom-template edit verbs touch five canonical
+// clusters (state lookup, selection re-target on exit, render fan-out,
+// debounced persistence, loud status) plus the discrete co-edit presence
+// flush. `CoEditPresencePublishContext` already folds in the non-canonical
+// `editingCollectionTemplate` field both verbs read/write, so this alias
+// just unions it with the five canonical views — no extra inline `Pick`
+// needed. Both `enter` and `exit` share the same surface; one alias keeps
+// the signatures aligned and the export honest.
+export type CollectionTemplateEditContext = StateContext &
+  SelectionContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext &
+  CoEditPresencePublishContext;
 
 /**
  * Whether `targetId` resolves to an element living anywhere inside the
@@ -82,7 +103,7 @@ function isInsideTemplateSubtree(
  * without mutating any state.
  */
 export function enterCollectionTemplateEditImpl(
-  ctx: EditorContext,
+  ctx: CollectionTemplateEditContext,
   collectionId: string,
 ): void {
   const found = ctx.findElement(collectionId);
@@ -168,7 +189,7 @@ export function enterCollectionTemplateEditImpl(
  * `isInsideTemplateSubtree`). One O(template-size) walk per exit; covers
  * both direct children and any depth of nesting.
  */
-export function exitCollectionTemplateEditImpl(ctx: EditorContext): void {
+export function exitCollectionTemplateEditImpl(ctx: CollectionTemplateEditContext): void {
   // Re-target a stale child selection BEFORE flipping the edit-mode
   // field. findElement's customTemplate recursion (added in pass 1 F1)
   // resolves regardless of the field's state — the lookup is structural,

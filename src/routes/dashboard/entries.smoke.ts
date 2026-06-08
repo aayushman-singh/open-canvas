@@ -14,25 +14,35 @@
 //      shows the "Save changes" button.
 //   5. The shell sidebar wiring exposes an 'Entries' nav entry between
 //      Forms and Versions.
-//   6. The form/list client scripts compile and embed the site id verbatim.
-//   7. ADR 0063 d7: the folder chip row renders when folders exist, and
+//   6. ADR 0063 d7: the folder chip row renders when folders exist, and
 //      filtering by chip narrows the visible rows.
+//   7. ADR 0021 migration source-level pins:
+//        * route handler emits the boot blob + dashboard bundle <script>,
+//          no longer emits inline `formClientScript` / `listClientScript`
+//          IIFEs.
+//        * mount module (src/dashboard-client/entries.ts) carries the
+//          kebab + validateFolder helpers and the
+//          empty-string-→-null folder serialisation invariant.
+//   8. ADR 0021 runtime — drive a hand-rolled DOM stub (resize-handles +
+//      site-settings precedent) through `mountEntries()` to assert the
+//      submit pipeline issues the right PATCH/POST URL with the
+//      serialised payload (siteId from the boot blob, folder='' → null).
 //
-// The route is otherwise driven by Clerk-auth middleware + Postgres; this
-// smoke targets the pure render functions to keep the assertion surface
-// honest. The orchestrator's integration step still has to mount the route
-// in src/index.ts (the brief forbids that file from being edited here).
+// The route is otherwise driven by Clerk-auth middleware + Postgres; the
+// view-level checks target the pure render functions so the assertion
+// surface stays honest. The orchestrator's integration step still has to
+// mount the route in src/index.ts (the brief forbids that file from being
+// edited here).
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import {
-  EntriesListView,
-  EntryFormView,
-  formClientScript,
-  listClientScript,
-} from './entries';
+import { EntriesListView, EntryFormView } from './entries';
 import type { CollectionEntry } from '../../db/schema';
+
+declare const Bun: {
+  file(input: URL): { text(): Promise<string> };
+};
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[entries:smoke] ${message}`);
@@ -321,30 +331,7 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
 }
 
 // ---------------------------------------------------------------------------
-// (6) Client scripts compile and embed the site id verbatim
-// ---------------------------------------------------------------------------
-
-{
-  const fs = formClientScript(SITE_ID);
-  assert(fs.includes(`"${SITE_ID}"`), '(6) form client script embeds the site id');
-  assert(fs.includes('PATCH') && fs.includes('POST'), '(6) form client script targets both API verbs');
-  assert(fs.includes("'/api/sites/'"), '(6) form client script hits /api/sites/...');
-  assert(fs.includes('function kebab'), '(6) form client script ships a kebab() helper');
-
-  const ls = listClientScript(SITE_ID);
-  assert(ls.includes('__opencanvasModal'), '(6) list client script uses the shared confirm modal');
-  assert(ls.includes("method: 'DELETE'"), '(6) list client script issues DELETE on confirm');
-
-  // ADR 0063 d7 — form client script learns about the folder field. It
-  // validates the shape inline (UX) and serialises empty → null before
-  // sending so the server only ever sees null or a valid non-empty
-  // string.
-  assert(fs.includes('validateFolder'), '(6) form client script ships a validateFolder() helper');
-  assert(fs.includes('folder: folderRaw.length > 0 ? folderRaw : null'), '(6) form client script serialises empty input → null');
-}
-
-// ---------------------------------------------------------------------------
-// (7) ADR 0063 d7 — folder chip row + filter narrowing.
+// (6) ADR 0063 d7 — folder chip row + filter narrowing.
 //     With a mix of folder values present, the chip row renders [All,
 //     Ungrouped, <each distinct folder>]. Selecting a chip narrows the
 //     visible rows in the rendered HTML.
@@ -369,22 +356,22 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
       entries: fixtures,
     }),
   );
-  assert(allHtml.includes('class="folder-chips"'), '(7-all) folder chip row renders when folders exist');
-  assert(allHtml.includes('data-folder-chip="all"'), '(7-all) All chip emitted with stable hook');
-  assert(allHtml.includes('data-folder-chip=""'), '(7-all) Ungrouped chip emitted (empty value)');
-  assert(allHtml.includes('data-folder-chip="tech"'), '(7-all) tech chip present');
-  assert(allHtml.includes('data-folder-chip="design"'), '(7-all) design chip present');
+  assert(allHtml.includes('class="folder-chips"'), '(6-all) folder chip row renders when folders exist');
+  assert(allHtml.includes('data-folder-chip="all"'), '(6-all) All chip emitted with stable hook');
+  assert(allHtml.includes('data-folder-chip=""'), '(6-all) Ungrouped chip emitted (empty value)');
+  assert(allHtml.includes('data-folder-chip="tech"'), '(6-all) tech chip present');
+  assert(allHtml.includes('data-folder-chip="design"'), '(6-all) design chip present');
   assert(
     allHtml.includes('Tech post 1') &&
       allHtml.includes('Tech post 2') &&
       allHtml.includes('Design post') &&
       allHtml.includes('Plain entry'),
-    '(7-all) all entries visible when activeFolder=undefined',
+    '(6-all) all entries visible when activeFolder=undefined',
   );
   // Active chip carries the .on marker class.
   assert(
     /data-folder-chip="all"[^>]*class="on"|class="on"[^>]*data-folder-chip="all"/.test(allHtml),
-    '(7-all) All chip is the active one',
+    '(6-all) All chip is the active one',
   );
 
   // "Ungrouped" — only the folder=null row remains.
@@ -398,12 +385,12 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
       entries: fixtures,
     }),
   );
-  assert(ungroupedHtml.includes('Plain entry'), '(7-ungrouped) folder=null row is shown');
+  assert(ungroupedHtml.includes('Plain entry'), '(6-ungrouped) folder=null row is shown');
   assert(
     !ungroupedHtml.includes('Tech post 1') &&
       !ungroupedHtml.includes('Tech post 2') &&
       !ungroupedHtml.includes('Design post'),
-    '(7-ungrouped) foldered rows are filtered out',
+    '(6-ungrouped) foldered rows are filtered out',
   );
 
   // "tech" — only the two tech rows remain.
@@ -419,27 +406,27 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
   );
   assert(
     techHtml.includes('Tech post 1') && techHtml.includes('Tech post 2'),
-    '(7-tech) tech rows visible',
+    '(6-tech) tech rows visible',
   );
   assert(
     !techHtml.includes('Design post') && !techHtml.includes('Plain entry'),
-    '(7-tech) non-tech rows filtered out',
+    '(6-tech) non-tech rows filtered out',
   );
   // Folder chip hrefs hit the same /entries route with the right query.
   // Hono escapes `&` to `&amp;` inside HTML attributes — assert against the
   // escaped form (the browser unescapes it on click).
   assert(
     techHtml.includes(`/dashboard/sites/${SITE_ID}/entries?collection=blog&amp;folder=tech`),
-    '(7-tech) tech chip href encodes the folder filter',
+    '(6-tech) tech chip href encodes the folder filter',
   );
   assert(
     techHtml.includes(`/dashboard/sites/${SITE_ID}/entries?collection=blog&amp;folder=`),
-    '(7-tech) Ungrouped chip href uses empty folder value',
+    '(6-tech) Ungrouped chip href uses empty folder value',
   );
   // The active folder is recorded on the table for client tooling.
   assert(
     techHtml.includes('data-active-folder="tech"'),
-    '(7-tech) table records the active folder for downstream tooling',
+    '(6-tech) table records the active folder for downstream tooling',
   );
 
   // No matches in the active folder → renders the per-folder empty state.
@@ -455,8 +442,359 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
   );
   assert(
     noMatchHtml.includes('No entries in folder'),
-    '(7-empty) per-folder empty-state copy when filter narrows to zero',
+    '(6-empty) per-folder empty-state copy when filter narrows to zero',
   );
 }
+
+// ---------------------------------------------------------------------------
+// (7) ADR 0021 migration — source-level pins.
+//
+// The three legacy inline `<script>` blocks (formClientScript +
+// listClientScript) were collapsed into the dashboard bundle. We grep
+// both the route handler (the emission side) and the mount module (the
+// runtime side) so a regression that re-inlines the JS — or quietly
+// flips the folder serialisation — fails loudly here.
+// ---------------------------------------------------------------------------
+
+const routeSource = await Bun.file(
+  new URL('./entries.tsx', import.meta.url),
+).text();
+
+// Route handler must emit the ADR 0021 boot blob + dashboard bundle script,
+// not the legacy inline `formClientScript` / `listClientScript` IIFEs.
+assert(
+  routeSource.includes('clientBoot(siteId)') &&
+    routeSource.includes("JSON.stringify({ route: 'entries', siteId })"),
+  '(7-route) route handler must emit the ADR 0021 boot blob calling { route: "entries", siteId }',
+);
+assert(
+  routeSource.includes('EDITOR_CLIENT_MANIFEST.dashboardClientUrl'),
+  '(7-route) route handler must reference the dashboard bundle URL from the editor-client manifest',
+);
+assert(
+  !routeSource.includes('export function formClientScript(') &&
+    !routeSource.includes('function formClientScript(') &&
+    !routeSource.includes('export function listClientScript(') &&
+    !routeSource.includes('function listClientScript('),
+  '(7-route) legacy formClientScript / listClientScript must be deleted — mountEntries owns the runtime logic now',
+);
+assert(
+  !/<script>\{raw\((?:list|form)ClientScript\(/.test(routeSource),
+  '(7-route) route handler must no longer inline raw(formClientScript|listClientScript) — the bundle owns it',
+);
+// The route emits the three render surfaces (list, new form, edit form);
+// each must still render the DashboardShell + EntriesListView/EntryFormView
+// the mount module hooks into.
+assert(
+  routeSource.match(/<EntriesListView\b/g) !== null,
+  '(7-route) route handler must still render <EntriesListView>',
+);
+assert(
+  (routeSource.match(/<EntryFormView\b/g) ?? []).length >= 2,
+  '(7-route) route handler must still render <EntryFormView> for both new + edit modes',
+);
+
+// Mount module — source pins on the runtime surface. The previous
+// `formClientScript` IIFE shipped a kebab() helper and a validateFolder()
+// helper inline; both must remain inline in the mount module so any
+// regression that swaps in a different slug normaliser (or drops the
+// folder shape check) shows up here. The empty-string-→-null
+// serialisation rule is the most load-bearing invariant — the API write
+// boundary rejects `''` loudly, so a regression that posts `''` would
+// turn every "ungrouped" submit into a 400.
+const mountSource = await Bun.file(
+  new URL('../../dashboard-client/entries.ts', import.meta.url),
+).text();
+
+assert(
+  mountSource.includes('export function mountEntries(): void'),
+  '(7-mount) mount module must export mountEntries(): void',
+);
+assert(
+  /function readSiteId\(\)/.test(mountSource) &&
+    mountSource.includes("boot.route !== 'entries'") &&
+    mountSource.includes('typeof boot.siteId !== \'string\''),
+  '(7-mount) mount module must read siteId from the boot blob with loud-throw on missing/wrong route',
+);
+assert(
+  /function kebab\(/.test(mountSource),
+  '(7-mount) mount module must ship a kebab() helper inline',
+);
+assert(
+  /function validateFolder\(/.test(mountSource),
+  '(7-mount) mount module must ship a validateFolder() helper inline',
+);
+assert(
+  mountSource.includes('folder: folderRaw.length > 0 ? folderRaw : null'),
+  '(7-mount) mount module must serialise empty folder input → null at the submit boundary',
+);
+// Fetch path + verbs the route+API contracts depend on. The two helpers
+// concatenate `'/api/sites/'` + encodeURIComponent(siteId) + `'/entries'`,
+// so the string `/api/sites/` is the most resilient sentinel.
+assert(
+  mountSource.includes("'/api/sites/'"),
+  '(7-mount) mount module must hit /api/sites/... endpoints',
+);
+assert(
+  /mode === 'edit' \? 'PATCH' : 'POST'/.test(mountSource),
+  '(7-mount) mount module must branch PATCH (edit) / POST (new) off form.data-mode',
+);
+assert(
+  mountSource.includes("method: 'DELETE'"),
+  '(7-mount) mount module must issue DELETE on per-row delete confirmation',
+);
+// Delete confirmation must still funnel through the shared
+// `window.__opencanvasModal` shell modal, matching the legacy IIFE.
+assert(
+  mountSource.includes('__opencanvasModal'),
+  '(7-mount) mount module must use the shared __opencanvasModal global',
+);
+
+// ---------------------------------------------------------------------------
+// (8) ADR 0021 runtime — drive `mountEntries()` through a hand-rolled DOM
+//     stub (resize-handles / site-settings precedent). We model only the
+//     edit-form surface: when the form is submitted with mode='edit', the
+//     mount must issue a PATCH to
+//     /api/sites/<siteId>/entries/<entryId> with a JSON payload whose
+//     `folder` field serialises empty input → null. That's the most
+//     load-bearing invariant the old `new Function(formClientScript)`
+//     smoke would have asserted; replicating it here gives the migration
+//     a runtime-level safety net without a real DOM.
+//
+// We install globals (document/window/fetch) BEFORE dynamic-importing the
+// compiled mount module, set `window.__opencanvasDashboardBoot` so
+// `readSiteId()` resolves, and drive `submit` through the registered
+// handler. The list-surface hooks (`[data-new-collection]`,
+// `[data-delete-entry]`) return null/empty from our stub's
+// querySelector(All), so the list-wire helpers early-return cleanly.
+// ---------------------------------------------------------------------------
+
+type Handler = (event: { preventDefault(): void }) => void | Promise<void>;
+type QueuedResponse = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  json: () => Promise<unknown>;
+  text: () => Promise<string>;
+};
+type QueuedFetch = {
+  url: string;
+  init: { method?: string; body?: string };
+  body: unknown;
+  resolve: (response: QueuedResponse) => void;
+};
+
+const queuedFetches: QueuedFetch[] = [];
+
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+}
+
+// Form input stubs — minimal shape for the mount's form.<name>.value reads
+// and form.querySelector lookups. The mount also calls
+// `form.querySelector('input[name="title"]')` / `'input[name="slug"]'` to
+// wire the auto-kebab side effect, so we expose those via querySelector.
+function makeInput(value: string): { value: string; addEventListener(): void } {
+  return {
+    value,
+    addEventListener(): void {
+      /* noop — we never drive the kebab `input` event in this smoke */
+    },
+  };
+}
+
+const titleInput = makeInput('Migrated title');
+const slugInput = makeInput('migrated-title');
+const folderInput = makeInput(''); // empty → must serialise to null
+const collectionInput = makeInput('blog');
+const excerptInput = makeInput('summary');
+const bodyInput = makeInput('# body');
+const publishedDateInput = makeInput('2026-06-07');
+const authorInput = makeInput('Alice');
+const categoryInput = makeInput('engineering');
+const tagsInput = makeInput('launch, cms');
+const statusInput = makeInput('published');
+
+const msgEl = { textContent: '', className: '' };
+
+const formHandlers: { submit: Handler | null } = { submit: null };
+
+const form = {
+  // Named accessors the mount reads as `form.title.value` etc. These
+  // shadow the form element's standard property accessors and let us
+  // assert what the submit handler serialises.
+  collectionSlug: collectionInput,
+  title: titleInput,
+  slug: slugInput,
+  excerpt: excerptInput,
+  body: bodyInput,
+  publishedDate: publishedDateInput,
+  author: authorInput,
+  category: categoryInput,
+  tags: tagsInput,
+  status: statusInput,
+  folder: folderInput,
+  getAttribute(name: string): string | null {
+    const attrs: Record<string, string> = {
+      'data-mode': 'edit',
+      'data-entry-id': 'entry-1',
+    };
+    return attrs[name] ?? null;
+  },
+  querySelector(selector: string): unknown {
+    if (selector === '[data-form-msg]') return msgEl;
+    if (selector === 'input[name="title"]') return titleInput;
+    if (selector === 'input[name="slug"]') return slugInput;
+    return null;
+  },
+  addEventListener(type: string, handler: Handler): void {
+    if (type === 'submit') formHandlers.submit = handler;
+  },
+};
+
+const fakeDocument = {
+  querySelector(selector: string): unknown {
+    if (selector === 'form#entry-form') return form;
+    return null;
+  },
+  // The mount's `wireDeleteEntryButtons` reads
+  // `document.querySelectorAll('[data-delete-entry]')` — return an empty
+  // NodeList stand-in so the .forEach short-circuits without errors.
+  querySelectorAll(): readonly never[] {
+    return [];
+  },
+  addEventListener(): void {
+    /* noop */
+  },
+};
+
+const fakeFetch = (url: string, init: { method?: string; body?: string }) =>
+  new Promise<QueuedResponse>((resolve) => {
+    queuedFetches.push({
+      url,
+      init,
+      body: init.body ? (JSON.parse(init.body) as unknown) : null,
+      resolve,
+    });
+  });
+
+// Install globals BEFORE dynamic-importing the mount module so the
+// module's type guards and references resolve to our stubs.
+const g = globalThis as unknown as Record<string, unknown>;
+g.document = fakeDocument;
+g.window = {
+  __opencanvasDashboardBoot: { route: 'entries', siteId: SITE_ID },
+  __opencanvasModal: {
+    confirm: () => Promise.resolve(true),
+    alert: () => Promise.resolve(),
+    prompt: () => Promise.resolve(null),
+  },
+  location: { href: '' },
+};
+g.fetch = fakeFetch;
+g.HTMLElement = class HTMLElement {};
+g.HTMLInputElement = class HTMLInputElement {};
+g.HTMLButtonElement = class HTMLButtonElement {};
+g.HTMLFormElement = class HTMLFormElement {};
+g.HTMLTextAreaElement = class HTMLTextAreaElement {};
+g.HTMLSelectElement = class HTMLSelectElement {};
+g.Element = class Element {};
+
+// We dynamic-import the dashboard-client module to avoid the main
+// tsconfig pulling DOM types in transitively (the dashboard-client/
+// tsconfig.json owns its own DOM lib; the main project deliberately
+// excludes the directory). The cast threads a typed `mountEntries` out
+// without dragging the DOM-typed source file into the main project.
+const mod = (await import(
+  /* @vite-ignore */ '../../dashboard-client/entries.js' as string
+)) as { mountEntries: () => void };
+const { mountEntries } = mod;
+
+mountEntries();
+
+assert(
+  formHandlers.submit !== null,
+  '(8) expected mountEntries() to register a submit handler on form#entry-form',
+);
+
+// Drive the submit. The mount must:
+//   * POST/PATCH to the right URL based on data-mode + data-entry-id
+//   * serialise the empty folder input → null
+//   * call event.preventDefault() so the browser default submit is skipped
+let defaultPrevented = false;
+const event = {
+  preventDefault(): void {
+    defaultPrevented = true;
+  },
+};
+// Fire-and-forget: the submit handler awaits `fetch(...)`, which our
+// queue stub never resolves on its own (each queued response is meant
+// to be driven manually). We only need to observe the URL + body the
+// handler enqueued, not the full response cycle, so we don't await
+// the handler's promise — we just give it microtask turns to push
+// the fetch through `JSON.stringify` and onto the queue.
+void formHandlers.submit!(event);
+await flushMicrotasks();
+
+assert(defaultPrevented, '(8) submit handler must call event.preventDefault()');
+{
+  const firstSubmitFetchCount: number = queuedFetches.length;
+  assert(
+    firstSubmitFetchCount === 1,
+    `(8) expected exactly one fetch after submit; saw ${firstSubmitFetchCount}`,
+  );
+}
+const submitted = queuedFetches[0]!;
+assert(
+  submitted.url === `/api/sites/${SITE_ID}/entries/entry-1`,
+  `(8) edit-mode submit must PATCH /api/sites/<siteId>/entries/<entryId>; got ${submitted.url}`,
+);
+assert(
+  submitted.init.method === 'PATCH',
+  `(8) edit-mode submit must use PATCH method; got ${String(submitted.init.method)}`,
+);
+const payload = submitted.body as Record<string, unknown>;
+assert(
+  payload.collectionSlug === 'blog' &&
+    payload.title === 'Migrated title' &&
+    payload.slug === 'migrated-title' &&
+    payload.publishedDate === '2026-06-07' &&
+    payload.status === 'published',
+  '(8) serialised payload must round-trip the form values verbatim',
+);
+assert(
+  payload.folder === null,
+  `(8) empty folder input must serialise to null (not ''); got ${JSON.stringify(payload.folder)}`,
+);
+assert(
+  Array.isArray(payload.tags) &&
+    (payload.tags as unknown[]).length === 2 &&
+    (payload.tags as unknown[])[0] === 'launch' &&
+    (payload.tags as unknown[])[1] === 'cms',
+  '(8) tags input must split on comma + trim into a string[]',
+);
+
+// Sanity: a non-empty folder must round-trip verbatim too. Drive a second
+// submit with folder='design' to exercise the truthy branch.
+folderInput.value = 'design';
+const event2 = {
+  preventDefault(): void {
+    /* noop — already asserted above */
+  },
+};
+void formHandlers.submit!(event2);
+await flushMicrotasks();
+{
+  const secondSubmitFetchCount: number = queuedFetches.length;
+  assert(
+    secondSubmitFetchCount === 2,
+    `(8) expected exactly two fetches after second submit; saw ${secondSubmitFetchCount}`,
+  );
+}
+const secondPayload = queuedFetches[1]!.body as Record<string, unknown>;
+assert(
+  secondPayload.folder === 'design',
+  `(8) non-empty folder input must round-trip verbatim; got ${JSON.stringify(secondPayload.folder)}`,
+);
 
 console.log('[entries:smoke] OK');

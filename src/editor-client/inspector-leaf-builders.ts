@@ -27,7 +27,18 @@
 // shipped — bare Bun has no DOM and the repo carries no
 // happy-dom / jsdom dev dep.
 
-import type { EditorContext } from './editor-context.js';
+import type { DomContext, StateContext } from './editor-context.js';
+
+// ADR 0064 — leaf kit-summary reads two canonical clusters and nothing
+// else: ctx.mainEl off DomContext (for getComputedStyle on the editor
+// wrapper) and ctx.state off StateContext (for the active styleKit name).
+// No verbs, no status, no persist — the summary is pure read-side, so the
+// two canonical aliases cover it without an inline Pick. The sibling
+// `BuildKitSummaryContext` in sidebar.ts names the same surface for the
+// sidebar twin; they're intentionally separate exports because the twin
+// modules live on different cutover schedules (ADR 0058 Phase 3) and a
+// shared alias would couple their evolution.
+export type InspectorLeafKitSummaryContext = DomContext & StateContext;
 
 /**
  * Callback contract `buildColorRow` runs against. The row owns no
@@ -183,7 +194,7 @@ export function buildColorRow(opts: BuildColorRowOpts): HTMLDivElement {
  * ctx.state.styleKit is missing — the same defensive path the inline
  * IIFE takes during early renders before boot finishes.
  */
-export function buildKitSummary(ctx: EditorContext): HTMLDivElement {
+export function buildKitSummary(ctx: InspectorLeafKitSummaryContext): HTMLDivElement {
   const wrap = document.createElement('div');
   wrap.className = 'opencanvas-kit-summary';
   if (!ctx.mainEl || !ctx.state || !ctx.state.styleKit) {

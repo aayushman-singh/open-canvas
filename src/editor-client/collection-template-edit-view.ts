@@ -41,10 +41,25 @@
 // own per-element body has already settled. Idempotent — re-running the
 // mount strips prior chrome before re-mounting.
 
-import type { EditorContext } from './editor-context.js';
+import type { DomContext, EditorContext } from './editor-context.js';
 import { cssEscape } from './css-escape.js';
-import { panToElementImpl } from './section-toolbar.js';
+import { panToElementImpl, type PanToElementContext } from './section-toolbar.js';
 import { applyCameraTransform } from './render.js';
+
+// ADR 0064 — narrow Pick-based contexts for the in-place template-edit
+// chrome mount. The module reads `root` for the canvas-root DOM scope,
+// forwards `ctx` to `panToElementImpl` (PanToElementContext already
+// folds in StateContext + viewport + CameraTransformContext +
+// getPagePosition) and to `applyCameraTransform` (CameraTransformContext,
+// already inside PanToElementContext), and touches the pin verbs
+// `editingCollectionTemplate` + `exitCollectionTemplateEdit` directly.
+// `buildDoneButton` rides a one-field surface so the click closure does
+// not retain anything beyond the exit verb it actually fires.
+export type DoneButtonContext = Pick<EditorContext, 'exitCollectionTemplateEdit'>;
+
+export type MountTemplateEditChromeContext = PanToElementContext &
+  Pick<DomContext, 'root'> &
+  Pick<EditorContext, 'editingCollectionTemplate' | 'exitCollectionTemplateEdit'>;
 
 /** Class on the editor-only scrim/banner/done DOM. Used as the idempotency
  *  marker — re-running the mount strips any prior chrome first. */
@@ -151,7 +166,7 @@ function buildBanner(): HTMLDivElement {
  *  ctx.exitCollectionTemplateEdit() — same verb the inspector's "Done
  *  editing template" button drives, so the two affordances are mutually
  *  exclusive states of the same single source of truth. */
-function buildDoneButton(ctx: EditorContext): HTMLButtonElement {
+function buildDoneButton(ctx: DoneButtonContext): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = CHROME_CLASS + ' ' + CHROME_CLASS + '-done';
@@ -241,7 +256,7 @@ function applyDimmingToOtherWrappers(root: HTMLElement, activeWrapper: HTMLEleme
  *   * on transition active → inactive, restores camera from the snapshot
  *     and clears it.
  */
-export function mountTemplateEditChromeImpl(ctx: EditorContext): void {
+export function mountTemplateEditChromeImpl(ctx: MountTemplateEditChromeContext): void {
   if (!ctx.root) return;
 
   const active = ctx.editingCollectionTemplate;

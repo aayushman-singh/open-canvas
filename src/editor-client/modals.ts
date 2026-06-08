@@ -80,6 +80,26 @@
 
 import type { EditorContext } from './editor-context.js';
 
+// ---- ADR 0064 — narrow contexts ---------------------------------------
+
+// All six openers share exactly one ctx field: the synchronous `modalOpen`
+// gate they read on entry and reset in close(). One named alias is cheaper
+// than six inline `Pick<EditorContext, 'modalOpen'>` repetitions and
+// asserts the boundary at the signature: nothing in a modal opener reaches
+// into selection, render, persistence, or DOM-cluster state. Exported so
+// downstream tests can mint a `{ modalOpen: false }` object literal.
+export type ModalGateContext = Pick<EditorContext, 'modalOpen'>;
+
+// installOpencanvasModalGlobalImpl forwards three of the bound opener
+// verbs onto `window.__opencanvasModal`. It does NOT touch `modalOpen`
+// itself — the bound openers re-enter through ctx and gate themselves.
+// Inline-Pick would be fine (single consumer), but the name reads at the
+// signature and keeps the surface auditable next to ModalGateContext.
+export type InstallModalGlobalContext = Pick<
+  EditorContext,
+  'openConfirmModal' | 'openAlertModal' | 'openTextModal'
+>;
+
 // ---- Option shapes -----------------------------------------------------
 
 export interface TextModalOpts {
@@ -194,7 +214,7 @@ function errorToString(err: unknown): string {
 // ---- openTextModal -----------------------------------------------------
 
 export function openTextModalImpl(
-  ctx: EditorContext,
+  ctx: ModalGateContext,
   opts: TextModalOpts,
 ): Promise<string | null> {
   if (ctx.modalOpen) {
@@ -297,7 +317,7 @@ export function openTextModalImpl(
 // ---- openSelectModal ---------------------------------------------------
 
 export function openSelectModalImpl(
-  ctx: EditorContext,
+  ctx: ModalGateContext,
   opts: SelectModalOpts,
 ): Promise<string | null> {
   if (ctx.modalOpen) {
@@ -393,7 +413,7 @@ export function openSelectModalImpl(
 // ---- openConfirmModal --------------------------------------------------
 
 export function openConfirmModalImpl(
-  ctx: EditorContext,
+  ctx: ModalGateContext,
   opts: ConfirmModalOpts,
 ): Promise<boolean> {
   if (ctx.modalOpen) {
@@ -477,7 +497,7 @@ export function openConfirmModalImpl(
 // ---- openAiMediaModal --------------------------------------------------
 
 export function openAiMediaModalImpl(
-  ctx: EditorContext,
+  ctx: ModalGateContext,
   opts: AiMediaModalOpts,
 ): Promise<AiMediaModalResult | null> {
   if (ctx.modalOpen) {
@@ -759,7 +779,7 @@ export function openAiMediaModalImpl(
 // ---- openNewPageModal --------------------------------------------------
 
 export function openNewPageModalImpl(
-  ctx: EditorContext,
+  ctx: ModalGateContext,
   opts: NewPageModalOpts,
 ): Promise<NewPageModalResult | null> {
   if (ctx.modalOpen) {
@@ -1086,7 +1106,7 @@ export function openNewPageModalImpl(
 // ---- openAlertModal ----------------------------------------------------
 
 export function openAlertModalImpl(
-  ctx: EditorContext,
+  ctx: ModalGateContext,
   opts: AlertModalOpts,
 ): Promise<void> {
   if (ctx.modalOpen) {
@@ -1339,7 +1359,7 @@ export interface OpencanvasModalGlobal {
  *  dispatch, and rejects loudly when it isn't — see confirmStylized() in
  *  that file. Calling this from createEditor at boot keeps "Mark all read"
  *  working on the editor surface, parity with the inline IIFE behaviour. */
-export function installOpencanvasModalGlobalImpl(ctx: EditorContext): void {
+export function installOpencanvasModalGlobalImpl(ctx: InstallModalGlobalContext): void {
   window.__opencanvasModal = {
     confirm(msg, opts) {
       const o = opts || {};

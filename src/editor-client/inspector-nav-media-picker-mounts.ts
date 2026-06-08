@@ -26,14 +26,54 @@
 //     refresh paths re-fetch both rows so the picker can't show stale data
 //     after a mutation lands.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type { NavElement } from '../canvas/elements/nav.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import { field, selectInput } from './dom-builders.js';
 import { createInspectorEntry } from './inspector-leaf-builders.js';
 
+// ADR 0064 — nav-link list + nav primary-action share the same coupling
+// surface: re-render + persist on commit, plus status emission for the
+// `kind='anchor' && href[0]!=='#'` validation refusal. Same shape, one
+// alias; the two mounts have identical context needs because they edit
+// the same kind of `{label, href, kind}` row.
+export type MountNavLinkContext = RenderContext & PersistContext & StatusEmitterContext;
+
+// ADR 0064 — nav logo picker carve. The logo is a single brand asset
+// (not a slot history slot, so no `applyAssetIdToElement` or `siteId`-
+// scoped history URL), so it only needs the gallery-fetch + asset-CRUD
+// verbs alongside the canonical render/persist/status surfaces.
+// `buildPickerThumb`, `postAssetUpload`, and `runDeleteAsset` are the
+// three module-specific verbs declared inline.
+export type MountNavLogoContext = RenderContext &
+  PersistContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'buildPickerThumb' | 'postAssetUpload' | 'runDeleteAsset'>;
+
+// ADR 0064 — media-picker carve. Adds `applyAssetIdToElement` (write
+// path that updates element.assetId + upserts slot history) and
+// `uploadMediaForElement` (file-upload pipeline) to the gallery verbs
+// the nav-logo carve already needs. `siteId` rides PersistContext for
+// the slot-history GET. `setStatus` is unused here directly but the
+// downstream verbs surface their own toasts; this mount does not call
+// it inline, so StatusEmitterContext is omitted from the alias.
+export type MountMediaPickerContext = RenderContext &
+  PersistContext &
+  Pick<
+    EditorContext,
+    | 'buildPickerThumb'
+    | 'applyAssetIdToElement'
+    | 'runDeleteAsset'
+    | 'uploadMediaForElement'
+  >;
+
 export function mountNavLinks(
-  ctx: EditorContext,
+  ctx: MountNavLinkContext,
   element: NavElement,
   host: HTMLElement,
 ): void {
@@ -179,7 +219,7 @@ export function mountNavLinks(
 // NavElement is not — postAssetUpload returns { assetId, kind } and we
 // assign element.logoAssetId ourselves).
 export function mountNavLogo(
-  ctx: EditorContext,
+  ctx: MountNavLogoContext,
   element: NavElement,
   host: HTMLElement,
 ): void {
@@ -331,7 +371,7 @@ export function mountNavLogo(
 }
 
 export function mountNavPrimaryAction(
-  ctx: EditorContext,
+  ctx: MountNavLinkContext,
   element: NavElement,
   host: HTMLElement,
 ): void {
@@ -429,7 +469,7 @@ export function mountNavPrimaryAction(
 }
 
 export function mountMediaPicker(
-  ctx: EditorContext,
+  ctx: MountMediaPickerContext,
   element: MediaElement,
   host: HTMLElement,
 ): void {

@@ -63,12 +63,66 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  AiContext,
+  ChatContext,
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type { EditableSite } from '../canvas/schema.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
 import { cssEscape } from './css-escape.js';
+import type { CameraTransformContext } from './render.js';
 import { applyCameraTransform } from './render.js';
 import { migrateState } from './state-migration.js';
+
+// ADR 0064 — DOM-only context for the op→node resolver. Reads ctx.root
+// to scope a `querySelector` for the element/section wrapper. Shared by
+// the apply/revert flows that re-enter this resolver to repaint overlays.
+export type AiNodeFinderContext = DomContext;
+
+// ADR 0064 — focus-canvas-on-node touches the projection surface
+// (viewport + camera) and forwards ctx into applyCameraTransform, whose
+// CameraTransformContext (root + camera + zoom readout + reflow hooks)
+// folds in here so the forwarded call typechecks without a cast.
+export type AiFocusCanvasContext = CameraTransformContext &
+  Pick<EditorContext, 'viewport'>;
+
+// ADR 0064 — the AI accept-all banner reads pending suggestions + the
+// banner button ref, both members of the AiContext lazy-cluster. Named
+// alias kept for parity with the other AI verb contexts in this module.
+export type AiAcceptAllButtonContext = AiContext;
+
+// ADR 0064 — apply/revert share the same surface: AiContext for sidecar
+// state, StateContext for snapshot reads + reassign, SelectionContext
+// for the post-apply clear, RenderContext to repaint, PersistContext +
+// `flushPendingSave` for the save-before-apply guard, StatusEmitterContext
+// for the toast, and DomContext for `mainEl` (style-kit attr write) plus
+// the forwarded findCanvasNodeForOpImpl call.
+export type AiApplyContext = AiContext &
+  StateContext &
+  SelectionContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext &
+  DomContext &
+  Pick<EditorContext, 'flushPendingSave'>;
+
+// ADR 0064 — accept-all summary modal reads ctx.pendingAiSuggestions
+// (AiContext) and dispatches ctx.applyAgentOps (ChatContext, since the
+// chat-session bound the verb there). No DOM/state surface — the modal
+// is built against `document` directly.
+export type AiAcceptAllSummaryContext = AiContext & ChatContext;
+
+// ADR 0064 — set-AI-busy flips the busy flag while ORing in the two
+// session-lock flags so a busy=false call during a locked session keeps
+// the buttons disabled. All three live in AiContext.
+export type AiBusyContext = AiContext;
 
 /**
  * Inline IIFE twin reads `err.message || String(err)` — untyped JS. The
@@ -749,7 +803,7 @@ export function describeOp(op: AgentOp): string {
   return 'Unknown op';
 }
 
-export function findCanvasNodeForOpImpl(ctx: EditorContext, op: AgentOp | null): HTMLElement | null {
+export function findCanvasNodeForOpImpl(ctx: AiNodeFinderContext, op: AgentOp | null): HTMLElement | null {
   if (!ctx.root || !op) return null;
   // placeGeneratedImage stashes the target under op.target; unpack it
   // before falling through to the regular elementId / sectionId lookup so
@@ -773,7 +827,7 @@ export function findCanvasNodeForOpImpl(ctx: EditorContext, op: AgentOp | null):
   return null;
 }
 
-export function focusCanvasOnNodeImpl(ctx: EditorContext, node: HTMLElement | null): void {
+export function focusCanvasOnNodeImpl(ctx: AiFocusCanvasContext, node: HTMLElement | null): void {
   if (!node || !ctx.viewport) return;
   const nodeRect = node.getBoundingClientRect();
   const viewRect = ctx.viewport.getBoundingClientRect();
@@ -790,7 +844,7 @@ export function focusCanvasOnNodeImpl(ctx: EditorContext, node: HTMLElement | nu
   node.classList.add('opencanvas-ai-focus-pulse');
 }
 
-export function refreshAcceptAllButtonImpl(ctx: EditorContext): void {
+export function refreshAcceptAllButtonImpl(ctx: AiAcceptAllButtonContext): void {
   if (!ctx.chatAcceptAllBtn) return;
   const live = ctx.pendingAiSuggestions.filter(function (s) {
     return s.status === 'pending';
@@ -831,7 +885,7 @@ export function refreshAcceptAllButtonImpl(ctx: EditorContext): void {
  * status messages are surfaced from inside this function.
  */
 async function materialiseGeneratedImageOps(
-  ctx: EditorContext,
+  ctx: AiApplyContext,
   ops: unknown[],
   suggestions: SuggestionEntry[] | null,
 ): Promise<unknown[] | null> {
@@ -852,7 +906,7 @@ async function materialiseGeneratedImageOps(
 }
 
 async function materialiseOneGeneratedImage(
-  ctx: EditorContext,
+  ctx: AiApplyContext,
   op: AgentOp,
 ): Promise<unknown> {
   if (!op.target) {
@@ -952,7 +1006,7 @@ async function materialiseOneGeneratedImage(
 }
 
 export function applyAgentOpsImpl(
-  ctx: EditorContext,
+  ctx: AiApplyContext,
   ops: unknown[],
   suggestions: SuggestionEntry[] | null,
 ): Promise<boolean> {
@@ -970,7 +1024,7 @@ export function applyAgentOpsImpl(
 }
 
 function applyAgentOpsAfterMaterialise(
-  ctx: EditorContext,
+  ctx: AiApplyContext,
   ops: unknown[],
   suggestions: SuggestionEntry[] | null,
 ): Promise<boolean> {
@@ -1084,7 +1138,7 @@ function applyAgentOpsAfterMaterialise(
     });
 }
 
-export function revertAgentEntryImpl(ctx: EditorContext, entry: SuggestionEntry | null): Promise<boolean> {
+export function revertAgentEntryImpl(ctx: AiApplyContext, entry: SuggestionEntry | null): Promise<boolean> {
   if (!entry || !entry.inverseOp) {
     ctx.setStatus('Cannot revert this change', 'error');
     return Promise.resolve(false);
@@ -1166,7 +1220,7 @@ export function revertAgentEntryImpl(ctx: EditorContext, entry: SuggestionEntry 
     });
 }
 
-export function showAcceptAllSummaryImpl(ctx: EditorContext): void {
+export function showAcceptAllSummaryImpl(ctx: AiAcceptAllSummaryContext): void {
   const live = ctx.pendingAiSuggestions.filter(function (s) {
     return s.status === 'pending';
   });
@@ -1220,7 +1274,7 @@ export function showAcceptAllSummaryImpl(ctx: EditorContext): void {
   document.body.appendChild(modal);
 }
 
-export function setAiBusyImpl(ctx: EditorContext, busy: boolean): void {
+export function setAiBusyImpl(ctx: AiBusyContext, busy: boolean): void {
   ctx.aiBusy = busy || ctx.sessionExpired || ctx.accessRevoked;
   const buttons = document.querySelectorAll('[data-ai-button]');
   for (let i = 0; i < buttons.length; i++) {

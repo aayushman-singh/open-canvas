@@ -14,7 +14,12 @@
 // captureForUndo → renderAll → (optional renderSectionInspector for
 // re-renders that need updated derived state) → scheduleSave.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type {
   AccentBorder,
   BackgroundEffect,
@@ -25,7 +30,36 @@ import { MOTION_PRESETS } from '../canvas/schema.js';
 import { selectInput } from './dom-builders.js';
 import { buildColorRow } from './inspector-leaf-builders.js';
 
-export function renderSectionInspector(ctx: EditorContext): void {
+// ADR 0064 — narrow context for the section inspector. Three canonical
+// clusters fit cleanly: RenderContext (renderAll + preserveInspectorScrollFor),
+// PersistContext (captureForUndo + scheduleSave), StatusEmitterContext
+// (setStatus). The remaining surface is single-field-per-cluster
+// (`inspector` from DomContext, `findSection` from StateContext,
+// `selectedSectionId` from SelectionContext) plus six module-specific
+// verbs that no named cluster owns (`inspectorRenderSubject`,
+// `revokePendingPreviews`, `selectableSectionRoles`, `postAssetUpload`,
+// `aiBusy`, `aiCreateSection`); per Decision 2 those stay inline rather
+// than widening the signature to clusters where only one field is consumed.
+// `aiBusy` belongs to the lazy `AiContext` cluster but is the only field
+// of it the section inspector touches — inline `Pick` honours the cluster
+// while keeping the surface honest.
+export type SectionInspectorContext = RenderContext &
+  PersistContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    | 'inspector'
+    | 'findSection'
+    | 'selectedSectionId'
+    | 'inspectorRenderSubject'
+    | 'revokePendingPreviews'
+    | 'selectableSectionRoles'
+    | 'postAssetUpload'
+    | 'aiBusy'
+    | 'aiCreateSection'
+  >;
+
+export function renderSectionInspector(ctx: SectionInspectorContext): void {
   if (!ctx.inspector) return;
   const sectionLookup = ctx.findSection(ctx.selectedSectionId);
   if (!sectionLookup) {

@@ -27,11 +27,36 @@
 //     surfaces "Enter a prompt first" via ctx.setStatus when the prompt
 //     is empty.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 
+// ADR 0064 — media-asset stragglers carve. Both append-fns mount directly
+// into `ctx.inspector` (DomContext) and schedule a debounced save on
+// commit (PersistContext). `appendMediaUploader` additionally rebuilds the
+// element after alt-text changes (RenderContext) and routes the file
+// upload through `uploadMediaForElement` — a module-specific verb with no
+// named cluster, declared inline. `appendImageGenerator` surfaces the
+// "Enter a prompt first" refusal via `setStatus` (StatusEmitterContext)
+// and dispatches generation through `generateImageForElement` — also a
+// module-specific verb, declared inline. No overlap in module-specific
+// verbs, so each fn signs against its own narrow type.
+export type AppendMediaUploaderContext = DomContext &
+  RenderContext &
+  PersistContext &
+  Pick<EditorContext, 'uploadMediaForElement'>;
+
+export type AppendImageGeneratorContext = DomContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'generateImageForElement'>;
+
 export function appendMediaUploader(
-  ctx: EditorContext,
+  ctx: AppendMediaUploaderContext,
   element: MediaElement,
 ): void {
   if (!ctx.inspector) return;
@@ -76,7 +101,7 @@ export function appendMediaUploader(
 // Distinct from the agent-driven "AI media" button: this one creates a
 // brand-new asset shaped to the slot's aspect ratio without an LLM round-trip.
 export function appendImageGenerator(
-  ctx: EditorContext,
+  ctx: AppendImageGeneratorContext,
   element: MediaElement,
 ): void {
   if (element.mediaKind !== 'image') return;

@@ -25,6 +25,8 @@ import { mountVersionTimeline } from './version-timeline.js';
 import { mountSiteAddons } from './site-addons.js';
 import { mountPageSettings } from './page-settings.js';
 import { mountSettings } from './settings.js';
+import { mountSiteSettings } from './site-settings.js';
+import { mountEntries } from './entries.js';
 
 interface DashboardBoot {
   route:
@@ -34,7 +36,9 @@ interface DashboardBoot {
     | 'version-timeline'
     | 'site-addons'
     | 'page-settings'
-    | 'settings';
+    | 'settings'
+    | 'site-settings'
+    | 'entries';
   // Per-request keys — present only for routes that need them. The
   // `domains`, `version-timeline`, and `site-addons` routes ship the
   // site id whose resources they are editing so the mount module can
@@ -61,6 +65,8 @@ const DISPATCH: { [K in DashboardBoot['route']]: () => void } = {
   'site-addons': mountSiteAddons,
   'page-settings': mountPageSettings,
   settings: mountSettings,
+  'site-settings': mountSiteSettings,
+  entries: mountEntries,
 };
 
 function run(): void {
