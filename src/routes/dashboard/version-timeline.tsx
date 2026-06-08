@@ -30,6 +30,7 @@ import { site } from '../../db/schema.js';
 import { listSnapshots, type SnapshotListItem } from '../../version/list.js';
 import { DashboardShell, buildSiteNav } from './shell.js';
 import { Button, readThemeCookie } from '../../ui';
+import { EDITOR_CLIENT_MANIFEST } from '../../_assets/manifest.generated';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -249,110 +250,29 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
 
   const page = await listSnapshots(row.id, database, { limit: 50 });
 
-  const apiBase = `/api/sites/${row.id}/snapshots`;
-
-  // Inline script wires the three actions. Confirm dialogs gate the
-  // destructive restore action. Preview swaps the returned HTML into a
-  // sandboxed iframe via srcdoc so an Owner viewing a past snapshot never
-  // accidentally runs scripts against the live editor.
-  const inlineScript = `
-    (function () {
-      const apiBase = ${JSON.stringify(apiBase)};
-      const preview = document.querySelector('[data-timeline-preview]');
-      const list = document.querySelector('[data-timeline-list]');
-
-      function setActive(id) {
-        if (!list) return;
-        list.querySelectorAll('[data-timeline-entry]').forEach(function (el) {
-          el.classList.toggle('is-active', el.getAttribute('data-timeline-entry') === id);
-        });
-      }
-
-      async function doPreview(id) {
-        if (!preview) return;
-        preview.innerHTML = '<h2>Preview</h2><p class="empty-preview">Loading…</p>';
-        const res = await fetch(apiBase + '/' + encodeURIComponent(id) + '/preview', {
-          headers: { 'accept': 'application/json' },
-        });
-        if (!res.ok) {
-          const body = await res.text();
-          var errP = document.createElement('p');
-          errP.className = 'empty-preview';
-          errP.textContent = 'Preview failed: ' + body;
-          preview.innerHTML = '<h2>Preview</h2>';
-          preview.appendChild(errP);
-          return;
-        }
-        const data = await res.json();
-        const frame = document.createElement('iframe');
-        frame.setAttribute('sandbox', '');
-        frame.setAttribute('srcdoc', '<!doctype html><html><body>' + data.html + '</body></html>');
-        preview.innerHTML = '<h2>Preview</h2>';
-        preview.appendChild(frame);
-        setActive(id);
-      }
-
-      async function doRestore(id, label) {
-        if (!await __opencanvasModal.confirm('Restore "' + label + '"? This overwrites your current edits. A safety snapshot of your current state will be saved automatically.', { title: 'Restore version' })) {
-          return;
-        }
-        const res = await fetch(apiBase + '/' + encodeURIComponent(id) + '/restore', {
-          method: 'POST',
-          headers: { 'accept': 'application/json' },
-        });
-        if (!res.ok) {
-          const body = await res.text();
-          __opencanvasModal.alert('Restore failed: ' + body, 'Error');
-          return;
-        }
-        window.location.reload();
-      }
-
-      async function doManualCapture(form) {
-        const label = String(new FormData(form).get('label') || '').trim();
-        if (label.length === 0) {
-          __opencanvasModal.alert('Label is required.', 'Missing label');
-          return;
-        }
-        const res = await fetch(apiBase, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'accept': 'application/json' },
-          body: JSON.stringify({ label: label }),
-        });
-        if (!res.ok) {
-          const body = await res.text();
-          __opencanvasModal.alert('Capture failed: ' + body, 'Error');
-          return;
-        }
-        window.location.reload();
-      }
-
-      if (list) {
-        list.addEventListener('click', function (event) {
-          const target = event.target;
-          if (!(target instanceof HTMLElement)) return;
-          const actionTarget = target.closest('[data-timeline-action]');
-          if (!actionTarget) return;
-          const action = actionTarget.getAttribute('data-timeline-action');
-          if (!action) return;
-          const entry = actionTarget.closest('[data-timeline-entry]');
-          if (!entry) return;
-          const id = entry.getAttribute('data-timeline-entry') || '';
-          const label = entry.getAttribute('data-timeline-label') || '';
-          if (action === 'preview') doPreview(id);
-          if (action === 'restore') doRestore(id, label);
-        });
-      }
-
-      const form = document.querySelector('[data-timeline-form]');
-      if (form) {
-        form.addEventListener('submit', function (event) {
-          event.preventDefault();
-          doManualCapture(form);
-        });
-      }
-    })();
-  `;
+  // ADR 0021 — migrated to dashboard-client bundle. The three timeline
+  // actions (preview / restore / manual capture) now live in
+  // `src/dashboard-client/version-timeline.ts` and ship in the shared
+  // dashboard bundle (`EDITOR_CLIENT_MANIFEST.dashboardClientUrl`). The
+  // route emits a tiny boot blob with `route: 'version-timeline'` and
+  // the per-request `siteId`; the bundle's dispatcher reads it and
+  // calls `mountVersionTimeline()`. DOM contract unchanged — same
+  // `[data-timeline-preview]`, `[data-timeline-list]`,
+  // `[data-timeline-entry]`, `[data-timeline-label]`,
+  // `[data-timeline-action]`, and `[data-timeline-form]` hooks. API
+  // contract unchanged — same POST `/api/sites/:siteId/snapshots`, GET
+  // `/api/sites/:siteId/snapshots/:id/preview`, POST
+  // `/api/sites/:siteId/snapshots/:id/restore`. `siteId` flows through
+  // the boot blob via `JSON.stringify`, so quotes / braces in the value
+  // cannot break out of the inline script.
+  const clientBoot = raw(
+    '<script>window.__opencanvasDashboardBoot = ' +
+      JSON.stringify({ route: 'version-timeline', siteId: row.id }) +
+      ';</script>' +
+      '<script src="' +
+      EDITOR_CLIENT_MANIFEST.dashboardClientUrl +
+      '" defer></script>',
+  );
 
   // The first item in the timeline is treated as the "Live" version when
   // it carries reason=publish. This mirrors versions.html where the
@@ -451,7 +371,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
           Click &ldquo;Preview&rdquo; on a timeline entry to see how the site looked then.
         </p>
       </section>
-      <script>{raw(inlineScript)}</script>
+      {clientBoot}
     </DashboardShell>,
   );
 });
