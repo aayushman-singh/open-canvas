@@ -51,11 +51,23 @@ import type {
   StateContext,
   StatusEmitterContext,
 } from './editor-context.js';
+import type {
+  ApplyMarkImplContext,
+  BuildMarkToolbarContext,
+  RemoveMarkToolbarContext,
+} from './mark-toolbar.js';
 import {
   buildMarkToolbarImpl,
   removeMarkToolbar,
   applyMarkImpl,
 } from './mark-toolbar.js';
+import type {
+  OnLinkMouseEnterContext,
+  OnLinkMouseLeaveContext,
+  OnSelectionChangeForLinkPopoverContext,
+  RemoveLinkPopoverContext,
+  ShowLinkPopoverContext,
+} from './link-popover.js';
 import {
   onLinkMouseEnter,
   onLinkMouseLeave,
@@ -69,27 +81,34 @@ import { findElementWrapperInArtboardOf } from './selection.js';
 // and wires the edit lifecycle. It touches six canonical clusters
 // (StateContext for findElement, DomContext for root, SelectionContext for
 // editingElementId, RenderContext for rebuildElement, PersistContext for
-// scheduleSave, StatusEmitterContext for setStatus) plus a grab bag of
-// inline-edit-only verbs + DOM refs that no canonical alias owns yet:
-// the editingSnapshot latch, the activeEditFinish closure slot, the
-// markToolbar / linkPopover DOM refs the blur guard reads, the modalOpen
-// gate, the paste-normalisation helpers (normalizePastedHtml /
-// plainTextToFragmentHtml), the post-paste KaTeX rescan
-// (renderMathInScope), the serializer + emptiness check
-// (serializeContentToRuns / plainTextOf), and the wrapper resize helper
-// (setBoxStyle). The inline `Pick` enumerates that grab bag honestly.
+// scheduleSave, StatusEmitterContext for setStatus), folds in the narrow
+// types from mark-toolbar.ts and link-popover.ts so the eight forwarded
+// call sites typecheck without `ctx as EditorContext` scaffolding, and
+// finishes with a grab bag of inline-edit-only verbs + DOM refs that no
+// canonical alias owns yet: the editingSnapshot latch, the
+// activeEditFinish closure slot, the modalOpen gate, the paste-
+// normalisation helpers (normalizePastedHtml / plainTextToFragmentHtml),
+// the post-paste KaTeX rescan (renderMathInScope), the serializer +
+// emptiness check (serializeContentToRuns / plainTextOf), and the
+// wrapper resize helper (setBoxStyle).
 export type BeginTextEditContext = StateContext &
   DomContext &
   SelectionContext &
   RenderContext &
   PersistContext &
   StatusEmitterContext &
+  BuildMarkToolbarContext &
+  RemoveMarkToolbarContext &
+  ApplyMarkImplContext &
+  OnLinkMouseEnterContext &
+  OnLinkMouseLeaveContext &
+  OnSelectionChangeForLinkPopoverContext &
+  RemoveLinkPopoverContext &
+  ShowLinkPopoverContext &
   Pick<
     EditorContext,
     | 'editingSnapshot'
     | 'activeEditFinish'
-    | 'markToolbar'
-    | 'linkPopover'
     | 'modalOpen'
     | 'normalizePastedHtml'
     | 'plainTextToFragmentHtml'
@@ -113,14 +132,7 @@ export function beginTextEditImpl(
   elementId: string,
   clickedWrapper?: HTMLElement | null,
 ): void {
-  // ADR 0064 forward-cast scaffolding — `mark-toolbar.ts` and
-  // `link-popover.ts` still sign their exports as `ctx: EditorContext`.
-  // Reuse one alias for both modules' carve so the eight call sites below
-  // (build/remove/apply mark, link mouse enter/leave, link popover
-  // show/remove, selectionchange-for-link) stay readable. Retires when
-  // those two files carve to their own Pick-based contexts.
-  const wide = ctx as EditorContext;
-  const found = ctx.findElement(elementId);
+const found = ctx.findElement(elementId);
   if (!found || found.element.type !== 'text') return;
   if (!ctx.root) return;
   // Local alias so the text-narrowing survives closure capture in
@@ -157,13 +169,13 @@ export function beginTextEditImpl(
   inner.setAttribute('contenteditable', 'true');
   inner.focus();
 
-  buildMarkToolbarImpl(wide, wrapper);
+  buildMarkToolbarImpl(ctx, wrapper);
 
   inner.addEventListener('mouseover', function (ev) {
     let node: Node | null = ev.target as Node | null;
     while (node && node !== inner) {
       if (node.nodeType === 1 && (node as Element).tagName === 'A') {
-        onLinkMouseEnter(wide, { target: node });
+        onLinkMouseEnter(ctx, { target: node });
         return;
       }
       node = node.parentNode;
@@ -173,7 +185,7 @@ export function beginTextEditImpl(
     let node: Node | null = ev.target as Node | null;
     while (node && node !== inner) {
       if (node.nodeType === 1 && (node as Element).tagName === 'A') {
-        onLinkMouseLeave(wide, { target: node });
+        onLinkMouseLeave(ctx, { target: node });
         return;
       }
       node = node.parentNode;
@@ -196,7 +208,7 @@ export function beginTextEditImpl(
         (node as Element).classList.contains('opencanvas-inline-link')
       ) {
         ev.preventDefault();
-        showLinkPopoverImpl(wide, node as HTMLElement, { pinned: true });
+        showLinkPopoverImpl(ctx, node as HTMLElement, { pinned: true });
         return;
       }
       node = node.parentNode;
@@ -249,7 +261,7 @@ export function beginTextEditImpl(
   // duration of text edit and remove it in finish(). The handler
   // short-circuits when editingElementId is cleared, but removing keeps
   // the global listener set small.
-  const onSelectionChange = (): void => onSelectionChangeForLinkPopover(wide);
+  const onSelectionChange = (): void => onSelectionChangeForLinkPopover(ctx);
   document.addEventListener('selectionchange', onSelectionChange);
 
   function restoreFromSnapshot(): void {
@@ -266,8 +278,8 @@ export function beginTextEditImpl(
     inner!.removeEventListener('blur', onBlur);
     inner!.removeEventListener('keydown', onKey);
     document.removeEventListener('selectionchange', onSelectionChange);
-    removeMarkToolbar(wide);
-    removeLinkPopoverImpl(wide);
+    removeMarkToolbar(ctx);
+    removeLinkPopoverImpl(ctx);
     const snapshot = ctx.editingSnapshot;
     ctx.editingElementId = null;
     ctx.editingSnapshot = null;
@@ -320,27 +332,27 @@ export function beginTextEditImpl(
     const key = (ev.key || '').toLowerCase();
     if (key === 'b') {
       ev.preventDefault();
-      applyMarkImpl(wide, 'bold');
+      applyMarkImpl(ctx, 'bold');
       return;
     }
     if (key === 'i') {
       ev.preventDefault();
-      applyMarkImpl(wide, 'italic');
+      applyMarkImpl(ctx, 'italic');
       return;
     }
     if (key === 'u') {
       ev.preventDefault();
-      applyMarkImpl(wide, 'underline');
+      applyMarkImpl(ctx, 'underline');
       return;
     }
     if (ev.shiftKey && key === 'x') {
       ev.preventDefault();
-      applyMarkImpl(wide, 'strike');
+      applyMarkImpl(ctx, 'strike');
       return;
     }
     if (key === 'k') {
       ev.preventDefault();
-      applyMarkImpl(wide, 'link');
+      applyMarkImpl(ctx, 'link');
       return;
     }
   }
