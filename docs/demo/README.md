@@ -1,8 +1,8 @@
 # Open Canvas Demo Video — Script + Diagrams
 
-This directory holds the working artifacts for the YouTube demo video: a two-act script (product walkthrough, then engineering walkthrough), the feature-coverage ledger that drives it, and the diagram sources for Act 2.
+This directory holds the working artifacts for the YouTube demo video: a two-act script (product walkthrough, then engineering walkthrough) and the feature-coverage ledger that drives it.
 
-> **Status: in progress.** Drafted incrementally — see the per-file headers for which sessions/beats are draft-complete vs. still skeletal.
+> **Status:** Act 2 first-draft complete (consolidated 2026-06-08). Act 1 in progress.
 
 ---
 
@@ -12,9 +12,7 @@ This directory holds the working artifacts for the YouTube demo video: a two-act
 |---|---|
 | [feature-coverage.md](feature-coverage.md) | The single source of truth for what gets demoed where. Every shipped feature has an Act 1 home, an Act 2 home, or both. Pre-recording verification checklist. |
 | [act-1-script.md](act-1-script.md) | **Product Demo.** 13 sessions + 6 interludes, two-column voiceover-and-action format, ~90 minutes runtime. Single Owner spine (Maya, an indie founder rebranding the Apogee template into "Briar"). |
-| [act-2-script.md](act-2-script.md) | **Engineering Walkthrough.** Architecture explanations paired with 9 Excalidraw diagrams + 11 Mermaid sources. Walked through ADR by ADR. |
-| [diagrams/mermaid/](diagrams/mermaid/) | Mermaid sources for state machines, sequence diagrams, and the schema ER. Authored inline. |
-| [diagrams/excalidraw/SPECS.md](diagrams/excalidraw/SPECS.md) | Written specs for the 9 hand-drawn architecture diagrams. You draw from these. |
+| [act-2.md](act-2.md) | **Engineering Walkthrough.** Eight beats, twelve diagrams (D1–D12), ~28 minutes runtime. Mermaid + Excalidraw spec + ASCII pre-viz + voiceover all inline per beat. Trimmed to 5 non-obvious decisions; routine plumbing cut. |
 
 ---
 
@@ -37,6 +35,6 @@ Each Act 1 beat is one of:
 - **Session** — Maya alone, building or configuring. Numbered.
 - **Interlude** — camera leaves Maya to a Visitor, collaborator, or alternate Owner. Labelled I1–I6.
 
-Each beat opens with a banner block: target runtime, the features it drives, and the verification you do *before recording* (the fixture state, the dashboard state, any prerequisites). Then the script body alternates `VOICEOVER:` lines with `[ACTION:]` cues. Diagram references in Act 2 use `[DIAGRAM: name]` markers that map to files in `diagrams/`.
+Each beat opens with a banner block: target runtime, the features it drives, and the verification you do *before recording* (the fixture state, the dashboard state, any prerequisites). Then the script body alternates `VOICEOVER:` lines with `[ACTION:]` cues. Act 2 diagrams (D1–D12) are inline in [act-2.md](act-2.md) — Mermaid renders directly; Excalidraw specs sit alongside the spec block for each flagship beat.
 
 If a beat lists a feature you can't see on-screen during shooting, that's a planning bug — flag it in `feature-coverage.md`, don't paper over it on camera.

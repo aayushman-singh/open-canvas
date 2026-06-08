@@ -32,7 +32,16 @@ playwright-report/
 test-results/
 dfs/
 /*.png
+/*.jpg
+/*.jpeg
 e2e/live-driver/.profile/
+
+# Orchestration / session artifacts (kept local, not part of the product)
+/HANDOFF.md
+/STATE.md
+/DECISIONS.md
+/SESSION_SUMMARY.md
+/codex/
 e2e/live-driver/screenshots/
 
 # Demo recording-loop artefacts — contain operator email, site IDs, infra fingerprints.
