@@ -82,8 +82,9 @@
 //     don't fall through to the page-section branch.
 //
 //   - saveToLibraryImpl(ctx, section) — three-modal flow (name, optional
-//     description, visibility) then POST to /library/sections. Clears
-//     ctx.sectionsCatalog on success so the next picker open re-fetches.
+//     description, visibility) then POST to /library/sections. Calls
+//     invalidateSectionsCache (ctx.sectionsCatalog + the module-level
+//     prefetch promise) on success so the next picker open re-fetches.
 //     Errors are loud — every failure path writes a "Save failed: …"
 //     status line; no silent swallows. The error narrowing matches
 //     ai-integration.ts / chat-session.ts: catch (err: unknown) routed
@@ -110,6 +111,7 @@ import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
 import type { EditorContext } from './editor-context.js';
 import { applyCameraTransform } from './render.js';
 import { newElementId, newSectionId } from './ids.js';
+import { invalidateSectionsCache } from './sections-picker.js';
 import { nextZInArray } from './z-order.js';
 
 /**
@@ -450,7 +452,14 @@ export async function saveToLibraryImpl(
       ctx.setStatus('Save failed: ' + detail, 'error');
       return;
     }
-    ctx.sectionsCatalog = null;
+    // Drop ctx.sectionsCatalog AND the module-level prefetch promise so
+    // the next picker open re-fetches and surfaces the new entry. A bare
+    // `ctx.sectionsCatalog = null` (the pre-prefetch behaviour) would
+    // leave a stale resolved prefetch promise in place; the next
+    // ensureSectionsPanelLoaded would re-await it and skip the re-fetch,
+    // so the freshly-saved section wouldn't appear in the picker until
+    // a page reload.
+    invalidateSectionsCache(ctx);
     ctx.setStatus('Section saved to library', 'ok');
   } catch (err: unknown) {
     ctx.setStatus('Save failed: ' + errorToString(err), 'error');
