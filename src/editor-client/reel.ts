@@ -72,17 +72,86 @@
 // 3 cutover destination, not a live call site yet.
 
 import type { CanvasSection } from '../canvas/schema.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import { newSectionId } from './ids.js';
 import { beginReelDragImpl } from './section-drag.js';
 
-export function openReelImpl(ctx: EditorContext): void {
+// ADR 0064 — open-the-reel verb. Composes SelectionContext for the
+// "element selection clears when the reel opens" branch with an inline
+// Pick over the reel latch + re-render hook (no canonical alias owns them).
+export type OpenReelContext = SelectionContext & Pick<EditorContext, 'isReelOpen' | 'renderReel'>;
+
+// ADR 0064 — close-the-reel verb. Flips the reel latch and re-renders;
+// no selection touch, so SelectionContext is excluded. Inline Pick names
+// the two non-canonical fields the verb actually reads + writes.
+export type CloseReelContext = Pick<EditorContext, 'isReelOpen' | 'renderReel'>;
+
+// ADR 0064 — thumbnail builder. Reads `state.styleKit` (StateContext)
+// and `mainEl` for the kit-attribute gate (DomContext), plus the
+// `buildSectionNode` factory via an inline Pick. Exported so section-
+// drag.ts can retire its forward-cast at the ghost-build call sites.
+export type BuildSectionThumbnailContext = StateContext &
+  DomContext &
+  Pick<EditorContext, 'buildSectionNode'>;
+
+// ADR 0064 — insertBlankSectionAt mutates currentPage().sections,
+// re-selects the new section, then runs the renderAll → scheduleSave
+// → setStatus tail. Composes the canonical aliases that own each verb.
+export type InsertBlankSectionAtContext = StateContext &
+  SelectionContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext;
+
+// ADR 0064 — body section reorder. StateContext supplies currentPage;
+// RenderContext re-renders after the splice; PersistContext schedules
+// the save. Exported so section-drag.ts can retire its forward-cast at
+// the drop-commit call sites.
+export type MoveSectionToIndexContext = StateContext & RenderContext & PersistContext;
+
+// ADR 0064 — header/footer slot creator. StateContext exposes
+// `state.header` / `state.footer` for the slot assignment plus
+// currentPage; the rest reuses the action-tail cluster (selection
+// re-target, undo capture, render, save, status).
+export type BuildReelRoleSlotContext = StateContext &
+  SelectionContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext;
+
+// ADR 0064 — full reel re-render. Composes every helper this module
+// fans out to (thumbnail, slot, insert button) plus the BeginReelDrag
+// context that section-drag.ts demands at the mousedown forward-call,
+// then adds an inline Pick for the reel-only fields (`reelViewMode`,
+// `isReelOpen`) and the `selectSection` verb the header/footer tile
+// clicks fire.
+export type RenderReelContext = BuildSectionThumbnailContext &
+  BuildReelRoleSlotContext &
+  InsertBlankSectionAtContext &
+  Pick<EditorContext, 'isReelOpen' | 'reelViewMode'>;
+
+// ADR 0064 — boot-time reel chrome. Wires Tile/List/+/× buttons; the
+// `+` button calls `insertBlankSectionAt`, the `×` calls `closeReel`,
+// the Tile/List buttons flip `reelViewMode` and re-render. Composes
+// the insert context with an inline Pick for the three reel verbs.
+export type MountReelContext = InsertBlankSectionAtContext &
+  Pick<EditorContext, 'reelViewMode' | 'renderReel' | 'closeReel'>;
+
+export function openReelImpl(ctx: OpenReelContext): void {
   ctx.isReelOpen = true;
   ctx.selectElement(null);
   ctx.renderReel();
 }
 
-export function closeReelImpl(ctx: EditorContext): void {
+export function closeReelImpl(ctx: CloseReelContext): void {
   ctx.isReelOpen = false;
   ctx.renderReel();
 }
@@ -105,7 +174,7 @@ function wireframeTextNodes(clone: HTMLElement): void {
 }
 
 export function buildSectionThumbnail(
-  ctx: EditorContext,
+  ctx: BuildSectionThumbnailContext,
   section: CanvasSection,
   pageWidth: number,
   thumbWidth: number,
@@ -145,7 +214,10 @@ export function buildSectionThumbnail(
   return wrap;
 }
 
-function buildReelInsertButton(ctx: EditorContext, insertAt: number): HTMLButtonElement {
+function buildReelInsertButton(
+  ctx: InsertBlankSectionAtContext,
+  insertAt: number,
+): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'reel-insert-btn';
@@ -157,7 +229,7 @@ function buildReelInsertButton(ctx: EditorContext, insertAt: number): HTMLButton
   return btn;
 }
 
-export function insertBlankSectionAt(ctx: EditorContext, insertAt: number): void {
+export function insertBlankSectionAt(ctx: InsertBlankSectionAtContext, insertAt: number): void {
   const page = ctx.currentPage();
   if (!page) return;
   const clampedAt = Math.max(0, Math.min(insertAt, page.sections.length));
@@ -177,7 +249,7 @@ export function insertBlankSectionAt(ctx: EditorContext, insertAt: number): void
 }
 
 export function moveSectionToIndex(
-  ctx: EditorContext,
+  ctx: MoveSectionToIndexContext,
   fromIdx: number,
   toIdx: number,
 ): void {
@@ -194,7 +266,10 @@ export function moveSectionToIndex(
   ctx.scheduleSave();
 }
 
-function buildReelRoleSlot(ctx: EditorContext, role: 'header' | 'footer'): HTMLButtonElement {
+function buildReelRoleSlot(
+  ctx: BuildReelRoleSlotContext,
+  role: 'header' | 'footer',
+): HTMLButtonElement {
   const slot = document.createElement('button');
   slot.type = 'button';
   slot.className = 'reel-role-slot';
@@ -226,7 +301,7 @@ function buildReelRoleSlot(ctx: EditorContext, role: 'header' | 'footer'): HTMLB
   return slot;
 }
 
-export function renderReelImpl(ctx: EditorContext): void {
+export function renderReelImpl(ctx: RenderReelContext): void {
   const reelEl = document.getElementById('canvas-reel');
   if (!reelEl) return;
   if (!ctx.isReelOpen) {
@@ -393,7 +468,7 @@ export function renderReelImpl(ctx: EditorContext): void {
   }
 }
 
-export function mountReel(ctx: EditorContext): void {
+export function mountReel(ctx: MountReelContext): void {
   const reelEl = document.createElement('aside');
   reelEl.id = 'canvas-reel';
   reelEl.hidden = true;
