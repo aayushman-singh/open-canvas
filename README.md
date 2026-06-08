@@ -6,6 +6,82 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Live](https://img.shields.io/badge/live-opencanvas.aayushman.dev-cyan)](https://opencanvas.aayushman.dev)
 
+## Architecture at a glance
+
+One Cloudflare Worker. Three kinds of human (Owner, Collaborator, Visitor) converge on a single document model; AI mutates it through a validate-gate; publish is a column split that six parallel a11y checks can block at 422.
+
+```mermaid
+flowchart TB
+  Own((Owner))
+  Col((Collaborator))
+  Vis((Visitor))
+
+  subgraph DOC["§1 · Document model"]
+    direction LR
+    D1[EditableSite tree]
+    D2[14-atom union]
+  end
+
+  subgraph EDIT["§2 · Co-edit ★"]
+    direction LR
+    D3[Yjs CRDT]
+    D4[SiteRoom DO]
+  end
+
+  subgraph AI["§3 · AI surfaces ★"]
+    direction LR
+    D5[Agent validate-gate]
+    D6[Image preview-before-persist]
+  end
+
+  subgraph VER["§4 · Versioning"]
+    D7[Y.Doc snapshot]
+  end
+
+  subgraph REC["§5 · Recipes"]
+    D8[Regenerative factories]
+  end
+
+  subgraph COMP["§6 · Composition ★"]
+    direction LR
+    D9[Site Import]
+    D10[Template clone]
+  end
+
+  subgraph PUB1["§7 · Publish split"]
+    D11[editable ⇄ published]
+  end
+
+  subgraph PUB2["§8 · A11y blocks publish ★"]
+    D12[6-check audit]
+  end
+
+  Own ==> DOC
+  Col ==> EDIT
+  Own ==> AI
+
+  D2 --> D1
+  D1 <==> D3
+  D3 ==> D4
+  D4 -. fan-out .-> Vis
+  D3 ==> D7
+
+  D5 ==> D1
+  D6 ==> D1
+
+  D8 --> D1
+  D9 ==> D1
+  D10 ==> D1
+  D9 <-. same two-pass pattern .-> D10
+
+  D1 ==> D11
+  D11 ==> D12
+  D12 -- block 422 --> Own
+  D12 -- pass --> Vis
+```
+
+Bold arrows carry primary data flow; dotted arrows are cross-cutting relationships. ★ marks the five non-obvious decisions. Full contributor tour: [`docs/key-architecture.md`](docs/key-architecture.md) · canonical decisions: [`docs/adr/`](docs/adr/README.md).
+
 ## What it is
 
 Open the dashboard, name a site, and drop into a canvas pre-populated from one Template Seed. Drag positioned design primitives, ask the AI agent for a previewed edit, swap deterministic Style Kits live, and click Publish — the Published Address (`<subdomain>.opencanvas.aayushman.dev`) updates in every open Visitor tab within a few hundred milliseconds. One Cloudflare Worker hosts the dashboard, the editor, the canvas API, the AI agent endpoint, the publish snapshot store, and the public host that serves Visitors.
