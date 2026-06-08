@@ -47,6 +47,7 @@ import type { CollaboratorEventPayload } from '../notifications/kinds';
 import type { NotificationOwnerRoomMarker } from '../notifications/owner-room';
 // Wave 2 #8 — per-snapshot Content-Security-Policy frame-src allowlist.
 import { buildEmbedCsp, snapshotHasMathRun } from '../embed/csp';
+import { buildEditorCSP, generateNonce } from '../security/csp-nonce';
 // Wave 2 #9 — password-protected publish gate. Called per request after the
 // site row is resolved; returns a gate Response when the visitor must unlock,
 // or null to continue serving the snapshot.
@@ -386,6 +387,9 @@ export async function buildOnSiteEditorOptions(
     clerkFrontendApiHost: clerkFrontendApiHost(publishableKey, env.CLERK_FRONTEND_API_URL),
     wsToken,
     presenceUserId: payload.clerkUserId,
+    // ADR 0020 — minted per request and consumed by the on-site editor
+    // handler to set the `Content-Security-Policy` header before render.
+    cspNonce: generateNonce(),
   };
 }
 
@@ -559,6 +563,11 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   if (presenceName) opts.customerDisplayName = presenceName;
   const theme = readThemeCookie(c);
   if (theme) opts.theme = theme;
+  // ADR 0020 — emit the CSP header alongside the editor HTML using the
+  // nonce the builder minted. The two surfaces (header + inline script
+  // attributes) must carry the same value or the browser drops the
+  // inline scripts silently.
+  c.header('Content-Security-Policy', buildEditorCSP(opts.cspNonce));
   return c.html(editorPageJsx(opts));
 }
 

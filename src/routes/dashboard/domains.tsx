@@ -25,6 +25,7 @@ import { customDomain, site, type CustomDomain } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, readThemeCookie } from '../../ui';
 import { appDomain, type HostConfigEnv } from '../../host-config';
+import { EDITOR_CLIENT_MANIFEST } from '../../_assets/manifest.generated';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -334,83 +335,27 @@ function DomainRow({ domain, apex }: { domain: CustomDomain; apex: string }) {
   );
 }
 
-function clientScript(siteId: string): string {
-  const sid = JSON.stringify(siteId);
-  return String.raw`
-(() => {
-  const SITE_ID = ${sid};
-  const form = document.querySelector('form.add-domain');
-  const errorEl = document.querySelector('.form-error');
-  function showError(msg) {
-    if (errorEl) errorEl.textContent = msg;
-  }
-  if (form) {
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const input = form.querySelector('input[name="hostname"]');
-      const button = form.querySelector('button[type="submit"]');
-      const hostname = (input && input.value ? input.value : '').trim();
-      if (!hostname) {
-        showError('Hostname is required');
-        return;
-      }
-      showError('');
-      if (button) button.disabled = true;
-      try {
-        const response = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/domains', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'accept': 'application/json' },
-          body: JSON.stringify({ hostname }),
-        });
-        if (!response.ok) {
-          let detail = response.statusText;
-          try {
-            const body = await response.json();
-            if (body && body.error) detail = body.error;
-          } catch (_) { /* noop */ }
-          showError(detail);
-          if (button) button.disabled = false;
-          return;
-        }
-        location.reload();
-      } catch (err) {
-        showError('Network error: ' + (err && err.message ? err.message : String(err)));
-        if (button) button.disabled = false;
-      }
-    });
-  }
-  document.querySelectorAll('.drow[data-domain-id]').forEach((card) => {
-    const removeBtn = card.querySelector('button[data-action="delete"]');
-    if (!removeBtn) return;
-    removeBtn.addEventListener('click', async () => {
-      const hostname = card.getAttribute('data-hostname');
-      if (!hostname) return;
-      if (!await __opencanvasModal.confirm('Remove ' + hostname + '? This cannot be undone.', { title: 'Remove domain', confirmLabel: 'Remove', danger: true })) return;
-      removeBtn.disabled = true;
-      try {
-        const response = await fetch(
-          '/api/sites/' + encodeURIComponent(SITE_ID) + '/domains/' + encodeURIComponent(hostname),
-          { method: 'DELETE', headers: { 'accept': 'application/json' } },
-        );
-        if (!response.ok) {
-          let detail = response.statusText;
-          try {
-            const body = await response.json();
-            if (body && body.error) detail = body.error;
-          } catch (_) { /* noop */ }
-          showError('Could not remove: ' + detail);
-          removeBtn.disabled = false;
-          return;
-        }
-        location.reload();
-      } catch (err) {
-        showError('Network error: ' + (err && err.message ? err.message : String(err)));
-        removeBtn.disabled = false;
-      }
-    });
-  });
-})();
-`;
+// ADR 0021 — migrated to dashboard-client bundle. Add-domain submit +
+// per-row Remove logic now live in `src/dashboard-client/domains.ts`
+// and ship in the shared dashboard bundle
+// (`EDITOR_CLIENT_MANIFEST.dashboardClientUrl`). The route emits a tiny
+// boot blob with `route: 'domains'` and the per-request `siteId`; the
+// bundle's dispatcher reads it and calls `mountDomains()`. DOM
+// contract unchanged — same `form.add-domain`, `.form-error`,
+// `.drow[data-domain-id]`, and `[data-action="delete"]`. API contract
+// unchanged — same POST `/api/sites/:siteId/domains` and DELETE
+// `/api/sites/:siteId/domains/:hostname`. `siteId` flows through the
+// boot blob via `JSON.stringify`, so quotes / braces in the value
+// cannot break out of the inline script.
+function clientBoot(siteId: string) {
+  return raw(
+    '<script>window.__opencanvasDashboardBoot = ' +
+      JSON.stringify({ route: 'domains', siteId }) +
+      ';</script>' +
+      '<script src="' +
+      EDITOR_CLIENT_MANIFEST.dashboardClientUrl +
+      '" defer></script>',
+  );
 }
 
 domainsRoute.get('/sites/:siteId/domains', async (c) => {
@@ -516,7 +461,7 @@ domainsRoute.get('/sites/:siteId/domains', async (c) => {
           verified.
         </p>
       </div>
-      <script type="module">{raw(clientScript(siteId))}</script>
+      {clientBoot(siteId)}
     </DashboardShell>,
   );
 });

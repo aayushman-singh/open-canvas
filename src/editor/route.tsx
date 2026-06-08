@@ -26,8 +26,8 @@ import {
   readThemeCookie,
 } from '../ui/theme';
 import type { Theme } from '../ui/theme';
-import { CO_EDIT_BUNDLE } from '../live/co-edit/bundled';
 import { signEditToken } from '../auth/edit-token';
+import { buildEditorCSP, generateNonce } from '../security/csp-nonce';
 import { notificationsInboxScript } from '../notifications/dashboard-inbox-script';
 import { bellStyles } from '../notifications/bell-styles';
 import { opencanvasModalScript } from '../ui/opencanvas-modal-script';
@@ -106,6 +106,15 @@ export interface EditorPageOptions {
   // The `| undefined` keeps callers free of conditional spread under
   // exactOptionalPropertyTypes.
   theme?: Theme | undefined;
+  /**
+   * Per-request CSP nonce. ADR 0020 — every inline `<script>` on the
+   * editor route carries this attribute, and the
+   * `Content-Security-Policy` response header lists it in
+   * `script-src 'nonce-<v>'`. A mismatch between the inline attribute
+   * and the header silently drops the script, so the same value MUST
+   * flow from the route handler into both surfaces in one pass.
+   */
+  cspNonce: string;
 }
 
 async function lookupOwnedSite(
@@ -168,6 +177,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
     clerkFrontendApiHost: clerkHost,
     wsToken,
     theme,
+    cspNonce,
   } = opts;
   if (clerkPublishableKey && !clerkHost) {
     throw new Error('editorPageJsx requires clerkFrontendApiHost when clerkPublishableKey is set');
@@ -241,7 +251,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="dark" />
         <title>Open Canvas — editing {siteName}</title>
-        <script>{raw(themeBootScript)}</script>
+        <script nonce={cspNonce}>{raw(themeBootScript)}</script>
         {raw(themeFontHeadHtml)}
         {/* Text-inspector font-family picker — preload the 11 curated
             free fonts so selection in the dropdown is instant (no per-
@@ -257,7 +267,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <link rel="stylesheet" href={EDITOR_CLIENT_MANIFEST.canvasStylesUrl} />
         <style>{raw(bellStyles)}</style>
         {clerkPublishableKey &&
-          raw(`<script>
+          raw(`<script nonce="${cspNonce}">
 (function(){
   var pk = ${JSON.stringify(clerkPublishableKey)};
   var s = document.createElement("script");
@@ -653,13 +663,20 @@ export function editorPageJsx(opts: EditorPageOptions) {
             <span id="canvas-status">Saved</span>
           </footer>
         </main>
-        {raw(`<script>${CO_EDIT_BUNDLE}</script>`)}
-        {raw(`<script>window.__opencanvasEditorBoot = ${editorBootJson};</script>`)}
-        <script type="module" src={EDITOR_CLIENT_MANIFEST.canvasClientUrl}></script>
-        <script>{raw(themeToggleScript)}</script>
-        <script>{raw(opencanvasModalScript)}</script>
-        {raw(`<script>window.__opencanvasInboxApiBase = ${JSON.stringify(apiBase)};</script>`)}
-        <script>{raw(notificationsInboxScript)}</script>
+        {/* ADR 0020 — co-edit ships as a separately-fetched bundle via the
+            same manifest pattern as the editor client; its IIFE attaches
+            `window.__rev01CoEdit` synchronously on load, preserving the
+            same boot-time contract the editor-client module reads. The
+            `<script src>` (no defer, no module) blocks parsing the way
+            the inline form did, so subsequent inline scripts see the
+            global as before. */}
+        <script src={EDITOR_CLIENT_MANIFEST.coEditUrl}></script>
+        {raw(`<script nonce="${cspNonce}">window.__opencanvasEditorBoot = ${editorBootJson};</script>`)}
+        <script type="module" nonce={cspNonce} src={EDITOR_CLIENT_MANIFEST.canvasClientUrl}></script>
+        <script nonce={cspNonce}>{raw(themeToggleScript)}</script>
+        <script nonce={cspNonce}>{raw(opencanvasModalScript)}</script>
+        {raw(`<script nonce="${cspNonce}">window.__opencanvasInboxApiBase = ${JSON.stringify(apiBase)};</script>`)}
+        <script nonce={cspNonce}>{raw(notificationsInboxScript)}</script>
       </body>
     </html>
   );
@@ -698,6 +715,14 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
   );
 
   const { publishableKey } = resolveClerkKeys(c.env);
+
+  // ADR 0020 — per-request nonce gates every inline `<script>` and lands
+  // in the `Content-Security-Policy` header's `script-src` directive.
+  // Generated here so the same value flows into both the JSX (via
+  // editorPageJsx's `cspNonce` field) and the response header below.
+  const cspNonce = generateNonce();
+  c.header('Content-Security-Policy', buildEditorCSP(cspNonce));
+
   return c.html(
     editorPageJsx({
       siteId: owned.id,
@@ -713,6 +738,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
       clerkFrontendApiHost: clerkFrontendApiHost(publishableKey, c.env.CLERK_FRONTEND_API_URL),
       wsToken,
       theme: readThemeCookie(c),
+      cspNonce,
     }),
   );
 });

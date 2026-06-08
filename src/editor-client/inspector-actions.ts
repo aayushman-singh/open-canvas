@@ -5,9 +5,9 @@
 // remains the production source-of-truth until ADR 0015 Phase 3
 // atomic cutover.
 //
-// This module is verbs only — state-mutating functions that take
-// `ctx: EditorContext` and operate on the EditableSite. DOM builders
-// that wrap these verbs in HTMLElement scaffolding live in
+// This module is verbs only — state-mutating functions that take a
+// narrowed context (ADR 0064) and operate on the EditableSite. DOM
+// builders that wrap these verbs in HTMLElement scaffolding live in
 // inspector-action-buttons.ts (split because builders can't be smoke-
 // tested under bare Bun — no `document` global).
 //
@@ -17,18 +17,46 @@
 // → scheduleSave sequence is exactly the inline IIFE's order.
 
 import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+} from './editor-context.js';
 import { newElementId } from './ids.js';
 import { bringToFront, nextZInArray, nudgeZ, renormalizeZ, sendToBack } from './z-order.js';
 
 export type ZOrderAction = 'front' | 'back' | 'forward' | 'backward';
+
+// ADR 0064 — parentArrayFor only walks the section tree via
+// `findElement`, so it rides StateContext alone. Exported so the
+// downstream inspector-action-buttons carve can adopt the same alias.
+export type ParentArrayForContext = StateContext;
+
+// ADR 0064 — inspector element-action verbs (z-order + reading-order +
+// duplicate) share one cluster shape: StateContext for the parent-array
+// resolution, SelectionContext for the post-mutation re-select, and
+// RenderContext + PersistContext for the renderAll → renderInspector →
+// scheduleSave tail. Exported for inspector-action-buttons.ts reuse.
+export type InspectorActionContext = StateContext &
+  SelectionContext &
+  RenderContext &
+  PersistContext;
+
+// ADR 0064 — deleteElement extends the shared action surface with the
+// single non-canonical verb `closeElementMenu`, which dismisses the
+// per-element popover before the mutation lands. Exported so the
+// downstream button carve picks up the same shape.
+export type DeleteElementContext = InspectorActionContext &
+  Pick<EditorContext, 'closeElementMenu'>;
 
 /** Resolve the immediate elements array an element lives in. Exported
  *  so Phase 2h.1.b (buildElementMenu et al.) can reuse it instead of
  *  redeclaring. Throws loudly when the element is not in the section
  *  tree — same failure mode as the inline IIFE copy. */
 export function parentArrayFor(
-  ctx: EditorContext,
+  ctx: ParentArrayForContext,
   section: CanvasSection,
   element: CanvasElement,
 ): CanvasElement[] {
@@ -40,7 +68,7 @@ export function parentArrayFor(
 }
 
 export function applyZOrderAction(
-  ctx: EditorContext,
+  ctx: InspectorActionContext,
   section: CanvasSection,
   element: CanvasElement,
   action: ZOrderAction,
@@ -57,7 +85,7 @@ export function applyZOrderAction(
 }
 
 export function moveInReadingOrder(
-  ctx: EditorContext,
+  ctx: InspectorActionContext,
   section: CanvasSection,
   element: CanvasElement,
   direction: number,
@@ -76,7 +104,7 @@ export function moveInReadingOrder(
 }
 
 export function duplicateElement(
-  ctx: EditorContext,
+  ctx: InspectorActionContext,
   section: CanvasSection,
   element: CanvasElement,
 ): void {
@@ -99,7 +127,7 @@ export function duplicateElement(
 }
 
 export function deleteElement(
-  ctx: EditorContext,
+  ctx: DeleteElementContext,
   section: CanvasSection,
   element: CanvasElement,
 ): void {

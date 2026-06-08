@@ -23,7 +23,13 @@
 //      it without depending on `src/themes/`.
 
 import { renderCanvasSnapshot } from '../canvas/render.js';
-import type { EditableSite, PublishedSnapshot, StyleKitPreset } from '../canvas/schema.js';
+import { pickStyleKitField } from '../canvas/schema.js';
+import type {
+  EditableSite,
+  EditableSiteStyleKit,
+  PublishedSnapshot,
+  StyleKitPreset,
+} from '../canvas/schema.js';
 import { buildStyleKitCss, getStyleKitPreset, STYLE_KIT_PRESETS } from '../canvas/style-kits.js';
 
 import { checkKitContrast, BG_TEXT_AA_THRESHOLD } from './contrast-guard.js';
@@ -130,20 +136,20 @@ function buildCustomKit(): StyleKitPreset {
 }
 
 function makeSnapshot(state: EditableSite): PublishedSnapshot {
-  // Mirror the same fields the publish path mirrors over. The custom kit (if
-  // any) is carried separately so the renderer can resolve it.
+  // Mirror the same fields the publish path mirrors over. The styleKit DU
+  // (built-in or custom-with-preset) flows through `pickStyleKitField` so the
+  // snapshot satisfies the DU on the way out.
   return {
     version: 1,
     publishedAt: '2026-05-23T00:00:00.000Z',
-    styleKit: state.styleKit,
+    ...pickStyleKitField(state),
     pages: state.pages,
-    ...(state.customStyleKit !== undefined ? { customStyleKit: state.customStyleKit } : {}),
   };
 }
 
-function makeMinimalState(styleKit: EditableSite['styleKit']): EditableSite {
+function makeMinimalState(kit: EditableSiteStyleKit): EditableSite {
   return {
-    styleKit,
+    ...kit,
     pages: [
       {
         id: 'page-home',
@@ -180,10 +186,10 @@ function makeMinimalState(styleKit: EditableSite['styleKit']): EditableSite {
 // --------------------------------------------------------------------------
 
 const customKit = buildCustomKit();
-const customState: EditableSite = {
-  ...makeMinimalState('custom'),
+const customState: EditableSite = makeMinimalState({
+  styleKit: 'custom',
   customStyleKit: customKit,
-};
+});
 const resolved = resolveStyleKitWithCustom(customState);
 assert(
   resolved === customKit,
@@ -212,16 +218,7 @@ assert(
 // custom kits are per-site). Recovering the custom tokens at render time
 // happens via `resolveStyleKitWithCustom`. Verify the recovered preset
 // matches what we authored.
-const recovered = resolveStyleKitWithCustom({
-  styleKit: customSnapshot.styleKit,
-  // The published snapshot mirrors the editable state's customStyleKit, but
-  // its TS type is `StyleKitPreset | undefined`. Branch around the undefined
-  // case so the resolver call accepts `Pick<EditableSite, ...>` under
-  // exactOptionalPropertyTypes.
-  ...(customSnapshot.customStyleKit !== undefined
-    ? { customStyleKit: customSnapshot.customStyleKit }
-    : {}),
-});
+const recovered = resolveStyleKitWithCustom(customSnapshot);
 assert(
   recovered.accent === customKit.accent &&
     recovered.bg === customKit.bg &&
@@ -238,16 +235,23 @@ assert(
 
 // --------------------------------------------------------------------------
 // Test 3 — missing customStyleKit when styleKit='custom' throws loudly.
+//
+// ADR 0016 — the `EditableSiteStyleKit` DU makes this state unrepresentable
+// at the TS layer; constructing it requires an explicit cast. The runtime
+// validator at the JSONB boundary catches it on read. We exercise the cast
+// path here as defence-in-depth: even if the type is bypassed (e.g. a raw
+// DB write or a hand-rolled JSON edit), the resolver's structural check
+// still throws — the renderer never sees an incoherent state.
 // --------------------------------------------------------------------------
 
 let missingThrew = false;
 try {
-  resolveStyleKitWithCustom({ styleKit: 'custom' });
+  resolveStyleKitWithCustom({ styleKit: 'custom' } as unknown as EditableSiteStyleKit);
 } catch (err) {
   missingThrew = true;
   assert(
-    err instanceof Error && err.message.includes('customStyleKit is missing'),
-    `expected error to name customStyleKit as missing, got "${err instanceof Error ? err.message : String(err)}"`,
+    err instanceof Error && err.message.includes('customStyleKit'),
+    `expected error to name customStyleKit, got "${err instanceof Error ? err.message : String(err)}"`,
   );
 }
 assert(missingThrew, 'expected resolveStyleKitWithCustom to throw when customStyleKit is absent');
@@ -260,7 +264,7 @@ try {
       publishedAt: '2026-05-23T00:00:00.000Z',
       styleKit: 'custom',
       pages: customSnapshot.pages,
-    },
+    } as unknown as PublishedSnapshot,
     '/assets',
     'site-themes-smoke',
     { turnstileSiteKey: 'turnstile-test-key' },
@@ -268,8 +272,8 @@ try {
 } catch (err) {
   renderMissingThrew = true;
   assert(
-    err instanceof Error && err.message.includes('customStyleKit is missing'),
-    `expected renderer error to name customStyleKit as missing, got "${err instanceof Error ? err.message : String(err)}"`,
+    err instanceof Error && err.message.includes('customStyleKit'),
+    `expected renderer error to name customStyleKit, got "${err instanceof Error ? err.message : String(err)}"`,
   );
 }
 assert(renderMissingThrew, 'expected renderer to throw when styleKit=custom has no customStyleKit');
@@ -432,13 +436,15 @@ assert(
 // Test 6 — reset-to-built-in.
 // --------------------------------------------------------------------------
 
-const resetState: EditableSite = {
+// customStyleKit lingers on the in-memory state — the resolver MUST ignore
+// it because the selector says built-in. The DELETE route strips this on
+// the persistence side; the resolver's contract here is "selector wins".
+// ADR 0016 — the DU forbids this incoherent shape statically, so the cast
+// is required to construct the state-from-the-wild this test exercises.
+const resetState = {
   ...customState,
   styleKit: 'charcoal',
-  // customStyleKit lingers on the in-memory state — the resolver MUST ignore
-  // it because the selector says built-in. The DELETE route strips this on
-  // the persistence side; the resolver's contract here is "selector wins".
-};
+} as unknown as EditableSite;
 const charcoalResolved = resolveStyleKitWithCustom(resetState);
 assert(
   charcoalResolved === STYLE_KIT_PRESETS.charcoal,

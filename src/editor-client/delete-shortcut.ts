@@ -31,7 +31,22 @@
 //     shortcut did NOT apply (no selection, modifier held, editable
 //     focus) and the caller should leave the event alone.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  EditorContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
+
+// ADR 0064 — first narrow-context carve. The module touches three named
+// clusters (selection, state queries, status emission) plus four verbs
+// that don't yet have named contexts of their own; the inline `Pick`
+// declares the verb surface honestly without introducing aliases that
+// would have a single caller.
+export type DeleteShortcutContext = SelectionContext &
+  StateContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'isEditableShortcutTarget' | 'deleteElement' | 'handleSectionAction'>;
 
 export type DeleteShortcutOutcome =
   | 'none'           // shortcut did not apply — caller must NOT preventDefault
@@ -56,7 +71,7 @@ export interface DeleteShortcutEvent {
  * fire it whenever the return is anything other than `'none'`.
  */
 export function handleDeleteShortcut(
-  ctx: EditorContext,
+  ctx: DeleteShortcutContext,
   ev: DeleteShortcutEvent,
 ): DeleteShortcutOutcome {
   if (ev.key !== 'Delete' && ev.key !== 'Backspace') return 'none';

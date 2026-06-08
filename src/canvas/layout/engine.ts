@@ -21,6 +21,7 @@ import type {
   TextElement,
 } from '../schema.js';
 import type {
+  ActionProps,
   ColorToken,
   DesignSectionInput,
   DesignSectionResult,
@@ -170,58 +171,27 @@ interface ResolveContext {
   parentAlign: LayoutAlign;
 }
 
-function isBackgroundContainer(node: ElementNode): boolean {
+type ContainerElementNode = ElementNode & {
+  element: Extract<ElementNode['element'], { type: 'container' }>;
+};
+
+function isBackgroundContainer(node: ElementNode): node is ContainerElementNode {
   return node.element.type === 'container' && (node.size ?? 'hug') === 'fill';
 }
 
-function requireTextProps(node: ElementNode): NonNullable<ElementNode['element']['text']> {
-  const props = node.element.text;
-  if (!props) throw new Error('text element requires text props');
-  if (props.content.trim().length === 0) throw new Error('text element content must be non-empty');
-  return props;
-}
-
-function requireMediaProps(node: ElementNode): NonNullable<ElementNode['element']['media']> {
-  const props = node.element.media;
-  if (!props) throw new Error('media element requires media props');
-  if (props.imagePrompt.trim().length === 0) {
-    throw new Error('media element imagePrompt must be non-empty');
-  }
-  return props;
-}
-
-function requireActionProps(node: ElementNode): NonNullable<ElementNode['element']['action']> {
-  const props = node.element.action;
-  if (!props) throw new Error('action element requires action props');
-  const labelText = props.label.map((r) => r.text).join('').trim();
-  if (labelText.length === 0) throw new Error('action element label must be non-empty');
-  if (props.href.type === 'external') {
-    if (props.href.url.trim().length === 0) {
+function validateActionHref(href: ActionProps['href']): void {
+  if (href.type === 'external') {
+    if (href.url.trim().length === 0) {
       throw new Error('action element external href url must be non-empty');
     }
-  } else if (props.href.type === 'page') {
-    if (props.href.pageId.trim().length === 0) {
+  } else if (href.type === 'page') {
+    if (href.pageId.trim().length === 0) {
       throw new Error('action element page href pageId must be non-empty');
     }
   } else {
-    const href = props.href as { type?: unknown };
-    throw new Error(`action element href type is unsupported: ${String(href.type)}`);
+    const unsupported = href as { type?: unknown };
+    throw new Error(`action element href type is unsupported: ${String(unsupported.type)}`);
   }
-  return props;
-}
-
-function requireShapeProps(node: ElementNode): NonNullable<ElementNode['element']['shape']> {
-  const props = node.element.shape;
-  if (!props) throw new Error('shape element requires shape props');
-  return props;
-}
-
-function requireContainerProps(
-  node: ElementNode,
-): NonNullable<ElementNode['element']['container']> {
-  const props = node.element.container;
-  if (!props) throw new Error('container element requires container props');
-  return props;
 }
 
 function countElementNodes(node: LayoutNode | ElementNode): number {
@@ -243,7 +213,10 @@ function createCanvasElement(
 
   switch (el.type) {
     case 'text': {
-      const text = requireTextProps(node);
+      const text = el.text;
+      if (text.content.trim().length === 0) {
+        throw new Error('text element content must be non-empty');
+      }
       const fontSize = clamp(text.size, FONT_SIZE_MIN, FONT_SIZE_MAX);
       const fontWeight = text.role === 'heading' ? 700 : text.role === 'label' ? 500 : 400;
 
@@ -271,7 +244,10 @@ function createCanvasElement(
       return result;
     }
     case 'media': {
-      const media = requireMediaProps(node);
+      const media = el.media;
+      if (media.imagePrompt.trim().length === 0) {
+        throw new Error('media element imagePrompt must be non-empty');
+      }
       ctx.imagePrompts.set(id, media.imagePrompt);
       // mediaKind is hardcoded to 'image' because the layout tree has no
       // video affordance yet — the LLM cannot request a video element via
@@ -287,7 +263,12 @@ function createCanvasElement(
       };
     }
     case 'action': {
-      const action = requireActionProps(node);
+      const action = el.action;
+      const labelText = action.label.map((r) => r.text).join('').trim();
+      if (labelText.length === 0) {
+        throw new Error('action element label must be non-empty');
+      }
+      validateActionHref(action.href);
       return {
         id,
         type: 'action',
@@ -298,7 +279,7 @@ function createCanvasElement(
       };
     }
     case 'shape': {
-      const shape = requireShapeProps(node);
+      const shape = el.shape;
       return {
         id,
         type: 'shape',
@@ -307,7 +288,7 @@ function createCanvasElement(
       };
     }
     case 'container': {
-      const container = requireContainerProps(node);
+      const container = el.container;
       return {
         id,
         type: 'container',
@@ -363,7 +344,7 @@ function resolveStack(node: LayoutNode, box: LayoutBox, ctx: ResolveContext): vo
 
   withParentAlign(ctx, align, () => {
     // Separate background containers from flow children.
-    const bgContainers: ElementNode[] = [];
+    const bgContainers: ContainerElementNode[] = [];
     const flowChildren: (LayoutNode | ElementNode)[] = [];
     for (const child of children) {
       if (isElementNode(child) && isBackgroundContainer(child)) {
@@ -386,8 +367,7 @@ function resolveStack(node: LayoutNode, box: LayoutBox, ctx: ResolveContext): vo
     }
 
     // Compute padded content area if a background container defines padding.
-    const rawPadding =
-      bgContainers.length > 0 ? (bgContainers[0]!.element.container?.padding ?? 0) : 0;
+    const rawPadding = bgContainers.length > 0 ? bgContainers[0]!.element.container.padding : 0;
     const padding = clamp(rawPadding, 0, CONTAINER_PADDING_MAX);
     const contentBox: LayoutBox = {
       x: box.x + padding,

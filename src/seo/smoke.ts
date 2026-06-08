@@ -17,7 +17,11 @@
 // callers rely on (one head meta block per page, in render order).
 
 import type { CanvasPage, PublishedSnapshot } from '../canvas/schema.js';
-import { apogeeShowcaseTemplate, instantiateTemplate } from '../templates/registry.js';
+import {
+  allTemplateSeeds,
+  apogeeShowcaseTemplate,
+  instantiateTemplate,
+} from '../templates/registry.js';
 
 // ADR 0061 Phase D — TemplateSeeds are compositions; materialise once
 // and reuse across the SEO assertions below. The cached state behaves
@@ -460,17 +464,26 @@ assert(
 // references baked into the fixture's page SEO blocks.
 // ---------------------------------------------------------------------------
 
-// The fixture itself must not carry any per-page canonical or
-// ogImageAssetId — the runtime path is the single source of truth.
-for (const fixturePage of apogeeState.pages) {
-  assert(
-    fixturePage.canonical === undefined || fixturePage.canonical.length === 0,
-    `apogee fixture: page "${fixturePage.slug}" must not carry a pre-baked canonical (ADR 0040)`,
-  );
-  assert(
-    fixturePage.ogImageAssetId === undefined || fixturePage.ogImageAssetId.length === 0,
-    `apogee fixture: page "${fixturePage.slug}" must not carry a pre-baked ogImageAssetId (ADR 0041)`,
-  );
+// ADR 0040 Decision 2 + ADR 0041 — no built-in TemplateSeed page may
+// pre-bake a canonical URL or ogImageAssetId. The runtime path is the
+// single source of truth; a fixture-side literal recreates the leak
+// classes both ADRs closed. Iterating every TemplateSeed covers the
+// "any src/canvas/fixtures/*.json" rule the ADR's decision 2 phrases
+// in fixture-file terms — post-ADR-0061 the fixtures are composition
+// refs resolved through `instantiateTemplate`, so the SEO block lives
+// on the materialised page rather than the raw JSON.
+for (const seed of allTemplateSeeds) {
+  const state = instantiateTemplate(seed.id);
+  for (const page of state.pages) {
+    assert(
+      page.canonical === undefined || page.canonical.length === 0,
+      `template "${seed.id}": page "${page.slug}" must not carry a pre-baked canonical (ADR 0040)`,
+    );
+    assert(
+      page.ogImageAssetId === undefined || page.ogImageAssetId.length === 0,
+      `template "${seed.id}": page "${page.slug}" must not carry a pre-baked ogImageAssetId (ADR 0041)`,
+    );
+  }
 }
 
 // Render every page of the fixture and verify the emitted canonical points

@@ -16,7 +16,7 @@ import { eq } from 'drizzle-orm';
 import * as Y from 'yjs';
 
 import { renderCanvasSnapshot } from '../canvas/render.js';
-import type { PublishedSnapshot } from '../canvas/schema.js';
+import type { EditableSiteStyleKit, PublishedSnapshot } from '../canvas/schema.js';
 import { decodeYDoc } from '../canvas/yjs-projection.js';
 import type { Db } from '../db/client.js';
 import { siteSnapshot } from '../db/schema.js';
@@ -90,14 +90,17 @@ export async function renderSnapshotPreview(
   // (PublishedSnapshot, assetBasePath, siteId?) → HTML — and the preview
   // wants the exact same HTML the visitor sees, just rendered against
   // historical state.
+  const styleKitField: EditableSiteStyleKit =
+    state.styleKit === 'custom'
+      ? { styleKit: 'custom', customStyleKit: state.customStyleKit }
+      : { styleKit: state.styleKit };
   const publishedView: PublishedSnapshot = {
     version: row.publishedVersion ?? 0,
     publishedAt: row.capturedAt.toISOString(),
-    styleKit: state.styleKit,
+    ...styleKitField,
     pages: state.pages,
     ...(state.header !== undefined ? { header: state.header } : {}),
     ...(state.footer !== undefined ? { footer: state.footer } : {}),
-    ...(state.customStyleKit !== undefined ? { customStyleKit: state.customStyleKit } : {}),
     ...(state.defaultLocale !== undefined ? { defaultLocale: state.defaultLocale } : {}),
     ...(state.siteNoIndex !== undefined ? { siteNoIndex: state.siteNoIndex } : {}),
     ...(state.visitorTheme !== undefined ? { visitorTheme: state.visitorTheme } : {}),

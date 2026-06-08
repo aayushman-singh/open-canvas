@@ -8,6 +8,7 @@ import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, readThemeCookie } from '../../ui';
+import { EDITOR_CLIENT_MANIFEST } from '../../_assets/manifest.generated';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -178,53 +179,17 @@ const profileStyles = `
   }
 `;
 
-// Inline form-submit script. DOM hooks (#profile-form / #save-feedback /
-// #save-btn) preserved through the restyle — the API contract is the same
-// PATCH /api/profile call the previous chrome used.
-const profileScript = raw(`<script>
-(function() {
-  var form = document.getElementById('profile-form');
-  var feedback = document.getElementById('save-feedback');
-  var saveBtn = document.getElementById('save-btn');
-
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving...';
-    feedback.className = 'save-feedback';
-    feedback.textContent = '';
-
-    var data = {
-      displayName: form.displayName.value.trim(),
-      bio: form.bio.value.trim(),
-      timezone: form.timezone.value
-    };
-
-    fetch('/api/profile', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-    .then(function(r) {
-      return r.json().then(function(d) { return { ok: r.ok, data: d }; });
-    })
-    .then(function(result) {
-      if (!result.ok) throw new Error(result.data.error || 'Save failed');
-      feedback.textContent = 'Saved';
-      feedback.className = 'save-feedback visible';
-      saveBtn.textContent = 'Save changes';
-      saveBtn.disabled = false;
-      setTimeout(function() { feedback.className = 'save-feedback'; }, 2500);
-    })
-    .catch(function(err) {
-      feedback.textContent = err.message || 'Save failed';
-      feedback.className = 'save-feedback visible error';
-      saveBtn.textContent = 'Save changes';
-      saveBtn.disabled = false;
-    });
-  });
-})();
-</script>`);
+// ADR 0021 — first dashboard-client migration. The form-submit handler
+// lives in `src/dashboard-client/profile.ts` and ships in the shared
+// dashboard bundle (`EDITOR_CLIENT_MANIFEST.dashboardClientUrl`). The
+// route emits a tiny boot blob naming the route name; the bundle's
+// dispatcher reads it and calls `mountProfile()`. DOM contract is
+// unchanged — same `#profile-form` / `#save-feedback` / `#save-btn`
+// hooks, same `PATCH /api/profile` payload.
+const profileScript = raw(
+  `<script>window.__opencanvasDashboardBoot = { route: "profile" };</script>` +
+    `<script src="${EDITOR_CLIENT_MANIFEST.dashboardClientUrl}" defer></script>`,
+);
 
 profileRoute.get('/profile', async (c) => {
   const user = await getClerkUser(c);

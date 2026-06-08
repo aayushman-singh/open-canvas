@@ -25,12 +25,12 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0013 | Apex host is environment-driven; production code reads it through one helper | Accepted | [`docs/adr/0013-host-config-from-environment.md`](0013-host-config-from-environment.md) |
 | 0014 | Compile-time data substitution for template-literal-bound client scripts | Rejected (superseded by 0015 without implementation) | [`docs/adr/0014-template-literal-data-substitution.md`](0014-template-literal-data-substitution.md) |
 | 0015 | Editor client ships as a built, cached, separately-fetched asset | Accepted | [`docs/adr/0015-editor-client-asset-pipeline.md`](0015-editor-client-asset-pipeline.md) |
-| 0016 | Fake discriminated-union patterns become real TS discriminated unions | Proposed | [`docs/adr/0016-fake-discriminated-unions-to-real.md`](0016-fake-discriminated-unions-to-real.md) |
+| 0016 | Fake discriminated-union patterns become real TS discriminated unions | Accepted | [`docs/adr/0016-fake-discriminated-unions-to-real.md`](0016-fake-discriminated-unions-to-real.md) |
 | 0017 | Cookie name prefix is environment-driven | Accepted | [`docs/adr/0017-cookie-name-prefix-from-env.md`](0017-cookie-name-prefix-from-env.md) |
 | 0018 | Email sender address is environment-driven | Accepted | [`docs/adr/0018-email-sender-from-env.md`](0018-email-sender-from-env.md) |
 | 0019 | `SectionRecipeId 'custom'` is the sentinel for manually-designed sections | Accepted | [`docs/adr/0019-section-recipe-custom-sentinel.md`](0019-section-recipe-custom-sentinel.md) |
-| 0020 | Per-request CSP nonce gates the editor's inline boot blob | Proposed | [`docs/adr/0020-csp-nonce-for-editor-boot-blob.md`](0020-csp-nonce-for-editor-boot-blob.md) |
-| 0021 | Dashboard ships as one shared, browser-cached asset bundle | Proposed | [`docs/adr/0021-dashboard-shared-asset-bundle.md`](0021-dashboard-shared-asset-bundle.md) |
+| 0020 | Per-request CSP nonce gates the editor's inline boot blob | Accepted | [`docs/adr/0020-csp-nonce-for-editor-boot-blob.md`](0020-csp-nonce-for-editor-boot-blob.md) |
+| 0021 | Dashboard ships as one shared, browser-cached asset bundle | Accepted | [`docs/adr/0021-dashboard-shared-asset-bundle.md`](0021-dashboard-shared-asset-bundle.md) |
 | 0022 | Twelve-token OKLCH theme grammar derived from a single seed | Accepted | [`docs/adr/0022-twelve-token-oklch-theme-grammar.md`](0022-twelve-token-oklch-theme-grammar.md) |
 | 0023 | Seed asset bytes are stored as base64 text files in-repo | Accepted | [`docs/adr/0023-seed-asset-bytes-as-base64-text.md`](0023-seed-asset-bytes-as-base64-text.md) |
 | 0024 | Landing page is one locked Post-Aero surface with a checked-in preview artifact | Accepted | [`docs/adr/0024-landing-locked-post-aero-with-preview.md`](0024-landing-locked-post-aero-with-preview.md) |
@@ -60,13 +60,14 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0055 | Agent runs until budget exhausts, not until a fixed iteration count | Accepted | [`docs/adr/0055-agent-runs-until-budget-exhausts.md`](0055-agent-runs-until-budget-exhausts.md) |
 | 0056 | Summarisation and read-only inspection iterations run on Flash; planning iterations run on Pro | Accepted | [`docs/adr/0056-llm-tier-routing-flash-for-inspection-pro-for-planning.md`](0056-llm-tier-routing-flash-for-inspection-pro-for-planning.md) |
 | 0057 | Every canvas element dispatch shares one shape: mapped-type record, typed dispatcher, runtime guard | Accepted | [`docs/adr/0057-canvas-element-dispatch-shape.md`](0057-canvas-element-dispatch-shape.md) |
-| 0058 | EditorContext is a 1:1 mirror of the IIFE closure, populated incrementally | Proposed | [`docs/adr/0058-editor-context-as-iife-closure-mirror.md`](0058-editor-context-as-iife-closure-mirror.md) |
+| 0058 | EditorContext is a 1:1 mirror of the IIFE closure, populated incrementally | Accepted | [`docs/adr/0058-editor-context-as-iife-closure-mirror.md`](0058-editor-context-as-iife-closure-mirror.md) |
 | 0059 | Site header/footer is the only canonical pinned section; pages opt-in or opt-out | Accepted | [`docs/adr/0059-site-header-footer-is-only-canonical-pin.md`](0059-site-header-footer-is-only-canonical-pin.md) |
 | 0060 | CMS-style entries live in a dedicated table; the canvas holds template pages, not individual entries | Accepted | [`docs/adr/0060-cms-entries-table-and-template-pages.md`](0060-cms-entries-table-and-template-pages.md) |
-| 0061 | Section Library is the canonical pool; Template Seeds are compositions of Section Instances | Proposed | [`docs/adr/0061-section-library-is-canonical-pool-templates-are-compositions.md`](0061-section-library-is-canonical-pool-templates-are-compositions.md) |
-| 0062 | Section accent border is a single discriminated-union field with four mutually exclusive variants | Proposed | [`docs/adr/0062-section-accent-border.md`](0062-section-accent-border.md) |
+| 0061 | Section Library is the canonical pool; Template Seeds are compositions of Section Instances | Accepted | [`docs/adr/0061-section-library-is-canonical-pool-templates-are-compositions.md`](0061-section-library-is-canonical-pool-templates-are-compositions.md) |
+| 0062 | Section accent border is a single discriminated-union field with four mutually exclusive variants | Accepted | [`docs/adr/0062-section-accent-border.md`](0062-section-accent-border.md) |
 | 0063 | Collection element binds at element level, ships visible defaults, and groups entries by folder | Accepted | [`docs/adr/0063-collection-element-binds-at-element-level-and-ships-defaults.md`](0063-collection-element-binds-at-element-level-and-ships-defaults.md) |
-| 0065 | Custom Collection card template lives on the element, edited in-place via global editor state | Accepted | [`docs/adr/0065-custom-collection-card-template.md`](0065-custom-collection-card-template.md) |
+| 0064 | EditorContext decomposes into narrow named-Pick contexts per consumer | Accepted | [`docs/adr/0064-editor-context-decomposition.md`](0064-editor-context-decomposition.md) |
+| 0065 | Custom Collection card template lives on the element, edited in-place via global editor state | Proposed | [`docs/adr/0065-custom-collection-card-template.md`](0065-custom-collection-card-template.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

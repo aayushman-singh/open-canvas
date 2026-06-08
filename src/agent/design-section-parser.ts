@@ -18,9 +18,15 @@ import {
   LAYOUT_ALIGNS,
   SPLIT_RATIOS,
   STACK_DIRECTIONS,
+  type ActionProps,
+  type ContainerProps,
   type DesignSectionInput,
   type ElementNode,
+  type ElementNodeBody,
   type LayoutNode,
+  type MediaProps,
+  type ShapeProps,
+  type TextProps,
 } from '../canvas/layout/tree.js';
 
 const ELEMENT_PROP_KEYS = DESIGN_ELEMENT_TYPES;
@@ -218,52 +224,48 @@ function parseElementNode(value: Record<string, unknown>, path: string): Element
     }
   }
 
-  const node: ElementNode = { element: { type: el.type } };
+  let body: ElementNodeBody;
+  if (el.type === 'text') {
+    if (!isRecord(el.text)) return `${path}.element.text must be an object`;
+    const parsed = parseTextProps(el.text, path);
+    if (typeof parsed === 'string') return parsed;
+    body = { type: 'text', text: parsed };
+  } else if (el.type === 'media') {
+    if (!isRecord(el.media)) return `${path}.element.media must be an object`;
+    const parsed = parseMediaProps(el.media, path);
+    if (typeof parsed === 'string') return parsed;
+    body = { type: 'media', media: parsed };
+  } else if (el.type === 'action') {
+    if (!isRecord(el.action)) return `${path}.element.action must be an object`;
+    const parsed = parseActionProps(el.action, path);
+    if (typeof parsed === 'string') return parsed;
+    body = { type: 'action', action: parsed };
+  } else if (el.type === 'shape') {
+    if (!isRecord(el.shape)) return `${path}.element.shape must be an object`;
+    const parsed = parseShapeProps(el.shape, path);
+    if (typeof parsed === 'string') return parsed;
+    body = { type: 'shape', shape: parsed };
+  } else {
+    if (!isRecord(el.container)) return `${path}.element.container must be an object`;
+    const parsed = parseContainerProps(el.container, path);
+    if (typeof parsed === 'string') return parsed;
+    body = { type: 'container', container: parsed };
+  }
+
+  const node: ElementNode = { element: body };
   if (value.size !== undefined) {
     if (!isOneOf(value.size, ELEMENT_SIZES)) {
       return `${path}.size must be one of [${ELEMENT_SIZES.join(', ')}]`;
     }
     node.size = value.size;
   }
-
-  if (el.type === 'text') {
-    if (!isRecord(el.text)) return `${path}.element.text must be an object`;
-    const parsed = parseTextProps(el.text, path);
-    if (typeof parsed === 'string') return parsed;
-    node.element.text = parsed;
-  }
-  if (el.type === 'media') {
-    if (!isRecord(el.media)) return `${path}.element.media must be an object`;
-    const parsed = parseMediaProps(el.media, path);
-    if (typeof parsed === 'string') return parsed;
-    node.element.media = parsed;
-  }
-  if (el.type === 'action') {
-    if (!isRecord(el.action)) return `${path}.element.action must be an object`;
-    const parsed = parseActionProps(el.action, path);
-    if (typeof parsed === 'string') return parsed;
-    node.element.action = parsed;
-  }
-  if (el.type === 'shape') {
-    if (!isRecord(el.shape)) return `${path}.element.shape must be an object`;
-    const parsed = parseShapeProps(el.shape, path);
-    if (typeof parsed === 'string') return parsed;
-    node.element.shape = parsed;
-  }
-  if (el.type === 'container') {
-    if (!isRecord(el.container)) return `${path}.element.container must be an object`;
-    const parsed = parseContainerProps(el.container, path);
-    if (typeof parsed === 'string') return parsed;
-    node.element.container = parsed;
-  }
-
   return node;
 }
 
 function parseTextProps(
   value: Record<string, unknown>,
   path: string,
-): NonNullable<ElementNode['element']['text']> | string {
+): TextProps | string {
   if (!isNonEmptyString(value.content))
     return `${path}.element.text.content must be a non-empty string`;
   if (!isOneOf(value.role, ['heading', 'body', 'label'] as const)) {
@@ -290,7 +292,7 @@ function parseTextProps(
 function parseMediaProps(
   value: Record<string, unknown>,
   path: string,
-): NonNullable<ElementNode['element']['media']> | string {
+): MediaProps | string {
   if (!isNonEmptyString(value.imagePrompt)) {
     return `${path}.element.media.imagePrompt must be a non-empty string`;
   }
@@ -303,7 +305,7 @@ function parseMediaProps(
 function parseActionProps(
   value: Record<string, unknown>,
   path: string,
-): NonNullable<ElementNode['element']['action']> | string {
+): ActionProps | string {
   if (!isNonEmptyString(value.label))
     return `${path}.element.action.label must be a non-empty string`;
   if (!isOneOf(value.variant, ACTION_VARIANTS)) {
@@ -324,7 +326,7 @@ function parseActionProps(
 function parseShapeProps(
   value: Record<string, unknown>,
   path: string,
-): NonNullable<ElementNode['element']['shape']> | string {
+): ShapeProps | string {
   if (!isOneOf(value.variant, SHAPE_VARIANTS)) {
     return `${path}.element.shape.variant must be one of [${SHAPE_VARIANTS.join(', ')}]`;
   }
@@ -334,7 +336,7 @@ function parseShapeProps(
 function parseContainerProps(
   value: Record<string, unknown>,
   path: string,
-): NonNullable<ElementNode['element']['container']> | string {
+): ContainerProps | string {
   if (!isOneOf(value.variant, SURFACE_VARIANTS)) {
     return `${path}.element.container.variant must be one of [${SURFACE_VARIANTS.join(', ')}]`;
   }

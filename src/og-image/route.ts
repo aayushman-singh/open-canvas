@@ -186,17 +186,7 @@ export async function resolveOgRequest(
 
 function resolveStyleKitPreset(snapshot: PublishedSnapshot): StyleKitPreset {
   if (snapshot.styleKit === 'custom') {
-    const custom = snapshot.customStyleKit;
-    if (custom === undefined) {
-      // The publish path is supposed to carry `customStyleKit` when the
-      // selector is `'custom'`. If it didn't, fall back loudly to a
-      // built-in so the OG card still renders — but log the drift.
-      console.error(
-        '[og-image] published snapshot has styleKit=custom but no customStyleKit; falling back to charcoal preset',
-      );
-      return STYLE_KIT_PRESETS.charcoal;
-    }
-    return custom;
+    return snapshot.customStyleKit;
   }
   return getStyleKitPreset(snapshot.styleKit);
 }

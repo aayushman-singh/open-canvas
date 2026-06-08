@@ -18,7 +18,7 @@ import type {
   StyleKit,
   TextElement,
 } from './schema.js';
-import { BUILT_IN_STYLE_KITS } from './schema.js';
+import { BUILT_IN_STYLE_KITS, pickStyleKitField } from './schema.js';
 import { STYLE_KIT_PRESETS, buildAllStyleKitsCss, getStyleKitPreset } from './style-kits.js';
 import {
   validateEditableSite,
@@ -37,7 +37,7 @@ assert(editableResult.valid, editableResult.valid ? '' : editableResult.errors.j
 const snapshot: PublishedSnapshot = {
   version: 1,
   publishedAt: '2026-05-22T00:00:00.000Z',
-  styleKit: editable.styleKit,
+  ...pickStyleKitField(editable),
   pages: editable.pages,
 };
 const publishedResult = validatePublishedSnapshot(snapshot);
@@ -487,7 +487,7 @@ const pageLinkHtml = renderCanvasSnapshot(
   {
     version: 1,
     publishedAt: '2026-05-25T00:00:00.000Z',
-    styleKit: pageLinkState.styleKit,
+    ...pickStyleKitField(pageLinkState),
     pages: pageLinkState.pages,
   },
   '/assets',
@@ -513,7 +513,7 @@ assert(
         {
           version: 1,
           publishedAt: '2026-05-25T00:00:00.000Z',
-          styleKit: pageLinkState.styleKit,
+          ...pickStyleKitField(pageLinkState),
           pages: pageLinkState.pages,
         },
         '/assets',
@@ -1025,7 +1025,7 @@ assert(
 let rendererThrew = false;
 try {
   renderCanvasSnapshot(
-    { ...snapshot, styleKit: 'not-a-kit' as unknown as StyleKit },
+    { ...snapshot, styleKit: 'not-a-kit' } as unknown as PublishedSnapshot,
     '/assets',
     'smoke-site',
     {

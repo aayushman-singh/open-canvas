@@ -15,6 +15,7 @@ import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import { buildStyleKitCss } from '../../canvas/style-kits';
 import { resolveStyleKitWithCustom } from '../../themes/custom-resolve';
+import { pickStyleKitField } from '../../canvas/schema';
 import type { PublishedSnapshot, EditableSite } from '../../canvas/schema';
 import { appDomain, type HostConfigEnv } from '../../host-config';
 import { Timings } from '../../server-timing';
@@ -95,8 +96,7 @@ function buildThumbHtml(
   const snapshot: PublishedSnapshot = {
     version: 0,
     publishedAt: new Date().toISOString(),
-    styleKit: state.styleKit,
-    ...(state.customStyleKit !== undefined ? { customStyleKit: state.customStyleKit } : {}),
+    ...pickStyleKitField(state),
     pages: state.pages,
     ...(state.header ? { header: state.header } : {}),
     ...(state.footer ? { footer: state.footer } : {}),

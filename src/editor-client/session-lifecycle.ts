@@ -57,14 +57,32 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type { DomContext, EditorContext, StatusEmitterContext } from './editor-context.js';
 
-function setSaveBusy(ctx: EditorContext, busy: boolean): void {
+// ADR 0064 — setSaveBusy reads + writes the save-busy latch trio
+// (saveBusy / sessionExpired / accessRevoked) and mirrors the result
+// onto ctx.saveButton.disabled. None of the three latches ride a named
+// canonical context yet, so they sit inline alongside the DomContext
+// pick that supplies saveButton.
+export type SessionLifecycleSaveBusyContext = Pick<DomContext, 'saveButton'> &
+  Pick<EditorContext, 'saveBusy' | 'sessionExpired' | 'accessRevoked'>;
+
+// ADR 0064 — the 401 / 403 handlers + authFetchImpl share one cluster
+// shape: the save-busy latch surface (so the handler can call setSaveBusy
+// directly) plus setStatus for the toast, setAiBusy for the AI-control
+// lock, and publishButton for the publish lock. Exported for downstream
+// reuse if save-wiring or another module needs to thread the same shape.
+export type SessionLifecycleContext = SessionLifecycleSaveBusyContext &
+  StatusEmitterContext &
+  Pick<DomContext, 'publishButton'> &
+  Pick<EditorContext, 'setAiBusy'>;
+
+function setSaveBusy(ctx: SessionLifecycleSaveBusyContext, busy: boolean): void {
   ctx.saveBusy = busy || ctx.sessionExpired || ctx.accessRevoked;
   if (ctx.saveButton) (ctx.saveButton as HTMLButtonElement).disabled = ctx.saveBusy;
 }
 
-function handleSessionExpired(ctx: EditorContext): void {
+function handleSessionExpired(ctx: SessionLifecycleContext): void {
   if (ctx.sessionExpired) return;
   ctx.sessionExpired = true;
   ctx.setStatus('Session expired — reloading…', 'error');
@@ -78,7 +96,7 @@ function handleSessionExpired(ctx: EditorContext): void {
   }, 1500);
 }
 
-function handleAccessRevoked(ctx: EditorContext): void {
+function handleAccessRevoked(ctx: SessionLifecycleContext): void {
   if (ctx.accessRevoked) return;
   ctx.accessRevoked = true;
   ctx.setStatus('Access removed', 'error');
@@ -150,7 +168,7 @@ function showAccessRemovedModal(): void {
 }
 
 export async function authFetchImpl(
-  ctx: EditorContext,
+  ctx: SessionLifecycleContext,
   input: RequestInfo,
   init?: RequestInit,
 ): Promise<Response> {

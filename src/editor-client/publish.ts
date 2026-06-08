@@ -39,16 +39,58 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 
-export function updateVersionBadgeImpl(ctx: EditorContext, version: number): void {
+// ADR 0064 — updateVersionBadgeImpl only touches the cached `versionBadge`
+// DOM ref, so it rides DomContext alone. No verbs, no state queries, no
+// status emission — the narrowest surface in this module.
+export type UpdateVersionBadgeContext = DomContext;
+
+// ADR 0064 — publishSiteImpl is the wide one: DomContext for the cached
+// `publishButton` + `sidebar` + `versionBadge` refs, PersistContext for
+// the auth-wrapped POST identity (authFetch + apiBase + siteId), and
+// StatusEmitterContext for the in-flight + outcome status flashes. The
+// inline `Pick` carries the publish-specific verbs / flags (modal pair,
+// session-kill sentinels, save flush, versions-panel refresh, badge
+// update, versions cache flag) that have no canonical alias.
+export type PublishSiteContext = DomContext &
+  PersistContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    | 'flushPendingSave'
+    | 'accessRevoked'
+    | 'sessionExpired'
+    | 'openAlertModal'
+    | 'openConfirmModal'
+    | 'updateVersionBadge'
+    | 'versionsLoaded'
+    | 'renderVersionsPanel'
+  >;
+
+// ADR 0064 — attachPublishButtonImpl wires one DOM ref (`publishButton`)
+// to one verb (`publishSite`); DomContext + a single inline Pick is the
+// honest surface. Dispatching through ctx.publishSite (not the local
+// impl) preserves the cutover wrapper hook.
+export type AttachPublishButtonContext = DomContext &
+  Pick<EditorContext, 'publishSite'>;
+
+export function updateVersionBadgeImpl(
+  ctx: UpdateVersionBadgeContext,
+  version: number,
+): void {
   if (!ctx.versionBadge) return;
   const n = typeof version === 'number' && Number.isFinite(version) ? version : 0;
   ctx.versionBadge.setAttribute('data-version', String(n));
   ctx.versionBadge.textContent = n > 0 ? 'v' + n : 'Draft';
 }
 
-export async function publishSiteImpl(ctx: EditorContext): Promise<void> {
+export async function publishSiteImpl(ctx: PublishSiteContext): Promise<void> {
   if (!ctx.publishButton) return;
   ctx.publishButton.disabled = true;
   try {
@@ -174,7 +216,7 @@ export async function publishSiteImpl(ctx: EditorContext): Promise<void> {
   }
 }
 
-export function attachPublishButtonImpl(ctx: EditorContext): void {
+export function attachPublishButtonImpl(ctx: AttachPublishButtonContext): void {
   if (!ctx.publishButton) return;
   ctx.publishButton.addEventListener('click', () => {
     void ctx.publishSite();

@@ -27,7 +27,7 @@ import {
   MOTION_PRESETS,
   SURFACE_VARIANTS,
   type ActionVariant,
-  type EditableSite,
+  type EditableSiteStyleKit,
   type MotionPreset,
   type StyleKitPreset,
   type SurfaceVariant,
@@ -50,19 +50,11 @@ import { getStyleKitPreset } from '../canvas/style-kits.js';
  * default and no silent fallback. The caller picked `'custom'`; the caller
  * must have a `customStyleKit`.
  */
-export function resolveStyleKitWithCustom(
-  state: Pick<EditableSite, 'styleKit' | 'customStyleKit'>,
-): StyleKitPreset {
+export function resolveStyleKitWithCustom(state: EditableSiteStyleKit): StyleKitPreset {
   if (state.styleKit !== 'custom') {
     return getStyleKitPreset(state.styleKit);
   }
   const custom = state.customStyleKit;
-  if (custom === undefined) {
-    throw new Error(
-      'resolveStyleKitWithCustom: styleKit is "custom" but customStyleKit is missing — ' +
-        'site state is inconsistent. Pick a built-in kit or author a custom kit.',
-    );
-  }
   validateStyleKitPreset(custom, 'customStyleKit');
   return custom;
 }

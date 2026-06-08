@@ -28,6 +28,11 @@ import { CANONICAL_MARK_ORDER } from './editor-constants.js';
 import type { EditorContext } from './editor-context.js';
 import { findColorMark, findFontSizeMark, findLinkMark, hasMark } from './mark-queries.js';
 
+// ADR 0064 — run-builder carve. The only ctx member touched is
+// showLinkPopover (pinned on inline-link <a> click). No named canonical
+// cluster owns popover verbs yet, so an inline single-field Pick is honest.
+export type RunBuilderContext = Pick<EditorContext, 'showLinkPopover'>;
+
 declare global {
   interface Window {
     katex?: {
@@ -53,7 +58,7 @@ const MARK_TYPE_TO_TAG: Partial<Record<InlineMarkType, string>> = {
   code: 'code',
 };
 
-export function buildRunNodeImpl(ctx: EditorContext, run: InlineRun): HTMLElement {
+export function buildRunNodeImpl(ctx: RunBuilderContext, run: InlineRun): HTMLElement {
   let inner: Node;
   if (run && run.math && typeof run.math.tex === 'string') {
     // Math runs render via KaTeX (lazy-loaded in the editor head). When

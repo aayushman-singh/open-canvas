@@ -13,7 +13,12 @@
 //
 // Run with `bun.cmd run layout-primitives:smoke`.
 
-import type { EditableSite, PublishedSnapshot, TextElement } from './schema.js';
+import type {
+  EditableSite,
+  EditableSiteBase,
+  PublishedSnapshot,
+  TextElement,
+} from './schema.js';
 import type { CarouselElement } from './elements/carousel.js';
 import { renderCanvasSnapshot } from './render.js';
 import { validateEditableSite } from './validate.js';
@@ -39,7 +44,7 @@ function baseText(overrides: Partial<TextElement> = {}): TextElement {
   };
 }
 
-function siteWith(text: TextElement, opts: Partial<EditableSite> = {}): EditableSite {
+function siteWith(text: TextElement, opts: Partial<EditableSiteBase> = {}): EditableSite {
   return {
     styleKit: 'charcoal',
     pages: [

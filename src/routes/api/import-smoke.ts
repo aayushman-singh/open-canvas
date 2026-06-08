@@ -105,7 +105,7 @@ if (elements[0]?.type === 'media' && elements[1]?.type === 'media') {
   );
 }
 assert(
-  state.customStyleKit?.fontFamilyDisplay.startsWith('font:'),
+  state.styleKit === 'custom' && state.customStyleKit.fontFamilyDisplay.startsWith('font:'),
   'custom style kit display font must reference imported site font',
 );
 

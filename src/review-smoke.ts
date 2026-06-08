@@ -14,7 +14,7 @@ import { SIDEBAR_DISPATCH } from './canvas/elements';
 import { canvasPublishedStyles } from './canvas/public-styles';
 import { createSectionFromRecipe } from './canvas/recipes';
 import type { EditableSite, SectionRecipeId } from './canvas/schema';
-import { SECTION_RECIPE_IDS } from './canvas/schema';
+import { pickStyleKitField, SECTION_RECIPE_IDS } from './canvas/schema';
 import { SEED_ASSET_REGISTRY } from './canvas/seed-assets';
 import { STYLE_KIT_PRESETS } from './canvas/style-kits';
 import {
@@ -1301,7 +1301,7 @@ try {
   const publishedSnapshot = {
     version: 1,
     publishedAt: new Date().toISOString(),
-    styleKit: starterState.styleKit,
+    ...pickStyleKitField(starterState),
     pages: starterState.pages,
   };
   await smokeDb

@@ -100,6 +100,7 @@ import type {
   CanvasPage,
   CanvasSection,
   EditableSite,
+  EditableSiteStyleKit,
   ContainerElement,
   ElementStyle,
   InlineMark,
@@ -918,7 +919,7 @@ export function encodeYDoc(state: EditableSite): Y.Doc {
   doc.transact(() => {
     const root = doc.getMap<unknown>('state');
     root.set('styleKit', state.styleKit);
-    if (state.customStyleKit !== undefined) {
+    if (state.styleKit === 'custom') {
       root.set('customStyleKit', encodeCustomStyleKit(state.customStyleKit));
     }
     setIfDefined(root, 'defaultLocale', state.defaultLocale);
@@ -1607,13 +1608,18 @@ function decodeNestedTokenRecord(
 export function decodeYDoc(doc: Y.Doc): EditableSite {
   const root = doc.getMap<unknown>('state');
 
+  const rawStyleKit = root.get('styleKit') as StyleKit;
+  const styleKitField: EditableSiteStyleKit =
+    rawStyleKit === 'custom'
+      ? {
+          styleKit: 'custom',
+          customStyleKit: decodeCustomStyleKit(root.get('customStyleKit') as Y.Map<unknown>),
+        }
+      : { styleKit: rawStyleKit };
   const state: EditableSite = {
-    styleKit: root.get('styleKit') as StyleKit,
+    ...styleKitField,
     pages: (root.get('pages') as Y.Array<Y.Map<unknown>>).map(decodePage),
   };
-  if (root.has('customStyleKit')) {
-    state.customStyleKit = decodeCustomStyleKit(root.get('customStyleKit') as Y.Map<unknown>);
-  }
   if (root.has('defaultLocale')) state.defaultLocale = root.get('defaultLocale') as string;
   if (root.has('siteNoIndex')) state.siteNoIndex = root.get('siteNoIndex') as boolean;
   if (root.has('visitorTheme')) {

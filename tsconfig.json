@@ -20,5 +20,5 @@
     "allowSyntheticDefaultImports": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules", "dist", "src/editor-client"]
+  "exclude": ["node_modules", "dist", "src/editor-client", "src/dashboard-client"]
 }

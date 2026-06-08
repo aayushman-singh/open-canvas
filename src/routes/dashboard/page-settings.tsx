@@ -591,15 +591,12 @@ async function lookupOwnedPage(
   const page = state.pages.find((p) => p.id === pageId);
   if (!page) return null;
 
-  // Resolve the live preview colours. `custom` kits carry their preset inline;
-  // built-ins go through the lookup helper. Fall through to charcoal if a
-  // custom kit is selected without a preset payload (defensive — the publish
-  // path enforces this elsewhere).
+  // Resolve the live preview colours. `custom` kits carry their preset
+  // inline; built-ins go through the lookup helper. Per ADR 0016 the
+  // styleKit DU guarantees a custom kit always carries its preset.
   let preset: StyleKitPreset;
-  if (state.styleKit === 'custom' && state.customStyleKit !== undefined) {
+  if (state.styleKit === 'custom') {
     preset = state.customStyleKit;
-  } else if (state.styleKit === 'custom') {
-    preset = getStyleKitPreset('charcoal');
   } else {
     preset = getStyleKitPreset(state.styleKit);
   }

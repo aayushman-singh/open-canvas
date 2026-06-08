@@ -7,18 +7,36 @@
 // structural inability to cover them proves the responsibilities differ.
 
 import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
-import type { EditorContext } from './editor-context.js';
 import {
   applyZOrderAction,
   deleteElement,
   duplicateElement,
   moveInReadingOrder,
   parentArrayFor,
+  type DeleteElementContext,
+  type InspectorActionContext,
+  type ParentArrayForContext,
   type ZOrderAction,
 } from './inspector-actions.js';
 
+// ADR 0064 — buildReorderGroup forwards ctx to parentArrayFor
+// (ParentArrayForContext = StateContext) AND moveInReadingOrder
+// (InspectorActionContext). InspectorActionContext already includes
+// StateContext, so the intersection collapses to it.
+export type BuildReorderGroupContext = ParentArrayForContext & InspectorActionContext;
+
+// ADR 0064 — buildZOrderGroup forwards ctx only to applyZOrderAction,
+// so it rides the same InspectorActionContext alias as the verb. No
+// extra surface is needed at the builder layer.
+export type BuildZOrderGroupContext = InspectorActionContext;
+
+// ADR 0064 — buildElementActionsGroup forwards ctx to duplicateElement
+// (InspectorActionContext) AND deleteElement (DeleteElementContext).
+// DeleteElementContext is the superset (adds closeElementMenu).
+export type BuildElementActionsGroupContext = DeleteElementContext;
+
 export function buildReorderGroup(
-  ctx: EditorContext,
+  ctx: BuildReorderGroupContext,
   section: CanvasSection,
   element: CanvasElement,
 ): HTMLDivElement {
@@ -57,7 +75,7 @@ export function buildReorderGroup(
 }
 
 export function buildZOrderGroup(
-  ctx: EditorContext,
+  ctx: BuildZOrderGroupContext,
   section: CanvasSection,
   element: CanvasElement,
 ): HTMLDivElement {
@@ -88,7 +106,7 @@ export function buildZOrderGroup(
 // group surfaces the same verbs for elements so Owners don't have to
 // remember a keyboard shortcut (Delete still works for deletion).
 export function buildElementActionsGroup(
-  ctx: EditorContext,
+  ctx: BuildElementActionsGroupContext,
   section: CanvasSection,
   element: CanvasElement,
 ): HTMLDivElement {
