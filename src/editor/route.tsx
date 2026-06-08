@@ -665,7 +665,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
         </main>
         {/* ADR 0020 — co-edit ships as a separately-fetched bundle via the
             same manifest pattern as the editor client; its IIFE attaches
-            `window.__rev01CoEdit` synchronously on load, preserving the
+            `window.__opencanvasCoEdit` synchronously on load, preserving the
             same boot-time contract the editor-client module reads. The
             `<script src>` (no defer, no module) blocks parsing the way
             the inline form did, so subsequent inline scripts see the
