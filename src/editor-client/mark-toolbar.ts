@@ -38,19 +38,113 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type {
-  InlineMark,
-  InlineMarkType,
-  InlineRun,
-} from '../canvas/schema.js';
+import type { InlineMark, InlineMarkType, InlineRun } from '../canvas/schema.js';
 import { INLINE_COLOR_HEX_RE } from '../canvas/schema.js';
 import type { TextAlign } from '../canvas/elements/text.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  EditorContext,
+  PersistContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
+import type { LinkPopoverStateContext } from './link-popover.js';
 import { CANONICAL_MARK_ORDER } from './editor-constants.js';
-import {
-  INLINE_FONT_SIZE_PX_MIN,
-  INLINE_FONT_SIZE_PX_MAX,
-} from './shared-constants.js';
+import { INLINE_FONT_SIZE_PX_MIN, INLINE_FONT_SIZE_PX_MAX } from './shared-constants.js';
+
+// ADR 0064 — the run-mutation kernel shared by `setColorOnRuns`,
+// `setFontSizeOnRuns`, `setLinkOnRuns`, and `toggleMarkOnRuns`. All four
+// need `marksEqual` for the adjacent-run coalescing pass at the end.
+export type RunMutationContext = Pick<EditorContext, 'marksEqual'>;
+
+// ADR 0064 — the live-DOM mark-apply surface shared by every apply* /
+// toggle* function. They read the live Selection, serialise the editable
+// via `serializeContentToRuns`, mutate runs (RunMutationContext), rebuild
+// the editable with `buildRunNode`, and surface failures via setStatus.
+export type ApplyMarkBaseContext = RunMutationContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'serializeContentToRuns' | 'buildRunNode'>;
+
+// ADR 0064 — `refreshMarkToolbarFontSizeStateImpl` only reads the toolbar
+// root to find the <select>. No selection state, no mark application —
+// the narrowest signature in the module.
+export type RefreshMarkToolbarFontSizeStateContext = Pick<EditorContext, 'markToolbar'>;
+
+// ADR 0064 — `removeMarkToolbar` clears both DOM slots. Pure toolbar
+// state surface; no selection or persistence touched.
+export type RemoveMarkToolbarContext = Pick<EditorContext, 'markToolbar' | 'markToolbarAnchor'>;
+
+// ADR 0064 — `positionMarkToolbar` only reads `markToolbar` to measure
+// and place the floating bar. Mirrors link-popover.ts's PositionLinkPopover
+// alias — single-field shape.
+export type PositionMarkToolbarContext = Pick<EditorContext, 'markToolbar'>;
+
+// ADR 0064 — `onMarkToolbarReflowImpl` re-pins the toolbar AND the link
+// popover on scroll/resize. Folds in `markToolbarAnchor` for the toolbar
+// pin and `LinkPopoverStateContext` for the popover pin (the local
+// `positionLinkPopover` reads `linkPopover`; the reflow itself also reads
+// `linkPopoverAnchor` to decide whether to call it).
+export type OnMarkToolbarReflowContext = Pick<EditorContext, 'markToolbar' | 'markToolbarAnchor'> &
+  LinkPopoverStateContext;
+
+// ADR 0064 — local `positionLinkPopover` helper. Same single-field shape
+// as link-popover.ts's `PositionLinkPopoverContext`; we don't import that
+// alias to keep this file circular-dep-free (see the helper's comment).
+export type PositionLinkPopoverContext = Pick<EditorContext, 'linkPopover'>;
+
+// ADR 0064 — `applyLinkMark` opens the link modal then routes through
+// `setLinkOnRuns`. Adds `openLinkModal` to the shared apply base.
+export type ApplyLinkMarkContext = ApplyMarkBaseContext & Pick<EditorContext, 'openLinkModal'>;
+
+// ADR 0064 — `applyFontSizeMark` runs `setFontSizeOnRuns` on the serialised
+// runs of the current selection. Pure apply-base surface.
+export type ApplyFontSizeMarkContext = ApplyMarkBaseContext;
+
+// ADR 0064 — `toggleSimpleMarkInSelection` is the bool-mark toggle path
+// for strike/code/highlight. Pure apply-base surface.
+export type ToggleSimpleMarkContext = ApplyMarkBaseContext;
+
+// ADR 0064 — `applyMarkImpl` dispatches to `applyExecCommand` (no ctx),
+// `toggleSimpleMarkInSelection`, or `applyLinkMark`. `ApplyLinkMarkContext`
+// is the superset (its apply-base intersection already covers toggle).
+export type ApplyMarkImplContext = ApplyLinkMarkContext;
+
+// ADR 0064 — `applyAlignToEditing` mutates `element.align` for the text
+// being edited and mirrors the value into the live DOM. Reads selection
+// (editingElementId), state (findElement), the toolbar anchor wrapper,
+// persistence (scheduleSave), plus `markToolbar` via `refreshMarkToolbarAlignState`.
+export type ApplyAlignToEditingContext = SelectionContext &
+  StateContext &
+  PersistContext &
+  Pick<EditorContext, 'markToolbar' | 'markToolbarAnchor'>;
+
+// ADR 0064 — `applyColorMark` is the per-selection color path. Apply-base
+// surface plus `scheduleSave` for the post-apply persistence kick.
+export type ApplyColorMarkContext = ApplyMarkBaseContext & PersistContext;
+
+// ADR 0064 — `refreshMarkToolbarAlignState` refreshes the pressed-state
+// on the three align buttons. Reads `markToolbar` plus selection +
+// state (editingElementId + findElement).
+export type RefreshMarkToolbarAlignStateContext = SelectionContext &
+  StateContext &
+  Pick<EditorContext, 'markToolbar'>;
+
+// ADR 0064 — `buildMarkToolbarImpl` is the top-level builder. It folds in
+// every apply / refresh / remove surface above (each button wires into
+// one of the apply* paths), the toolbar's own DOM slots, plus the
+// drag-init verb (`beginDrag`) the drag handle calls and the AI-rewrite
+// verb (`aiRewriteText`) the AI button calls. SelectionContext arrives
+// via the apply / refresh intersections for `editingElementId`.
+export type BuildMarkToolbarContext = RemoveMarkToolbarContext &
+  PositionMarkToolbarContext &
+  ApplyMarkImplContext &
+  ApplyFontSizeMarkContext &
+  ApplyAlignToEditingContext &
+  ApplyColorMarkContext &
+  RefreshMarkToolbarAlignStateContext &
+  RefreshMarkToolbarFontSizeStateContext &
+  Pick<EditorContext, 'beginDrag' | 'aiRewriteText'>;
+
 // Standard preset list for the font-size select; mirrors the inline IIFE
 // twin verbatim. Owners rarely need a custom value — when they do, paste
 // from a styled source still lands a fresh px through normalizePastedHtml.
@@ -68,7 +162,9 @@ const TOOLBAR_ANCHOR_OFFSET_PX = 44;
 // Walks ancestors from the selection anchor; the innermost span carrying
 // an inline font-size wins (matches the buildRunNode and serializer rules).
 // No font-size in scope → select shows the "Size" placeholder.
-export function refreshMarkToolbarFontSizeStateImpl(ctx: EditorContext): void {
+export function refreshMarkToolbarFontSizeStateImpl(
+  ctx: RefreshMarkToolbarFontSizeStateContext,
+): void {
   if (!ctx.markToolbar) return;
   const sel = document.getSelection();
   const picker = ctx.markToolbar.querySelector<HTMLSelectElement>('[data-mark-fontsize]');
@@ -101,7 +197,7 @@ export function refreshMarkToolbarFontSizeStateImpl(ctx: EditorContext): void {
   picker.value = px === null ? '' : String(px);
 }
 
-export function removeMarkToolbar(ctx: EditorContext): void {
+export function removeMarkToolbar(ctx: RemoveMarkToolbarContext): void {
   if (ctx.markToolbar && ctx.markToolbar.parentNode) {
     ctx.markToolbar.parentNode.removeChild(ctx.markToolbar);
   }
@@ -109,7 +205,10 @@ export function removeMarkToolbar(ctx: EditorContext): void {
   ctx.markToolbarAnchor = null;
 }
 
-export function positionMarkToolbar(ctx: EditorContext, anchor: HTMLElement | null): void {
+export function positionMarkToolbar(
+  ctx: PositionMarkToolbarContext,
+  anchor: HTMLElement | null,
+): void {
   if (!ctx.markToolbar || !anchor) return;
   // The toolbar is appended to document.body and uses position: fixed,
   // so top/left are in viewport coordinates. getBoundingClientRect()
@@ -124,7 +223,7 @@ export function positionMarkToolbar(ctx: EditorContext, anchor: HTMLElement | nu
 
 // Listeners check markToolbarAnchor each call — they're cheap no-ops when
 // no text is in edit mode.
-export function onMarkToolbarReflowImpl(ctx: EditorContext): void {
+export function onMarkToolbarReflowImpl(ctx: OnMarkToolbarReflowContext): void {
   if (ctx.markToolbarAnchor) positionMarkToolbar(ctx, ctx.markToolbarAnchor);
   if (ctx.linkPopoverAnchor) positionLinkPopover(ctx, ctx.linkPopoverAnchor);
 }
@@ -134,7 +233,10 @@ export function onMarkToolbarReflowImpl(ctx: EditorContext): void {
 // modules ship in the same Phase 2q.g extraction and the renderer is
 // trivial. The link-popover.ts public `positionLinkPopover` mirrors this
 // implementation verbatim.
-function positionLinkPopover(ctx: EditorContext, anchorEl: HTMLElement | null): void {
+function positionLinkPopover(
+  ctx: PositionLinkPopoverContext,
+  anchorEl: HTMLElement | null,
+): void {
   if (!ctx.linkPopover || !anchorEl) return;
   const rect = anchorEl.getBoundingClientRect();
   const popoverHeight = ctx.linkPopover.offsetHeight || 32;
@@ -175,7 +277,7 @@ function closestEditableRoot(node: Node | null): HTMLElement | null {
 // highlight toggle unreliable). Setting the link mark at the run level
 // replaces any existing link on each run in the slice — overwriting one
 // href with another in a single click instead of nesting.
-async function applyLinkMark(ctx: EditorContext): Promise<void> {
+async function applyLinkMark(ctx: ApplyLinkMarkContext): Promise<void> {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
@@ -261,7 +363,7 @@ async function applyLinkMark(ctx: EditorContext): Promise<void> {
 // px=null removes the mark; otherwise replaces any existing fontSize in the
 // slice with the new px. Mirrors setLinkOnRuns but for the px-attr variant.
 function setFontSizeOnRuns(
-  ctx: EditorContext,
+  ctx: RunMutationContext,
   runs: InlineRun[],
   start: number,
   end: number,
@@ -315,7 +417,7 @@ function setFontSizeOnRuns(
   return merged;
 }
 
-function applyFontSizeMark(ctx: EditorContext, px: number | null): void {
+function applyFontSizeMark(ctx: ApplyFontSizeMarkContext, px: number | null): void {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
@@ -365,7 +467,7 @@ function applyFontSizeMark(ctx: EditorContext, px: number | null): void {
 // simple boolean mark doesn't apply because two different hrefs aren't
 // interchangeable like two highlights are.
 function setLinkOnRuns(
-  ctx: EditorContext,
+  ctx: RunMutationContext,
   runs: InlineRun[],
   start: number,
   end: number,
@@ -450,7 +552,10 @@ function setLinkOnRuns(
 // code). Bold/italic/underline still use execCommand because the browser-
 // native path handles their toggle correctly. Link marks go through their
 // own applyLinkMark flow because they need the URL modal.
-function toggleSimpleMarkInSelection(ctx: EditorContext, markType: InlineMarkType): void {
+function toggleSimpleMarkInSelection(
+  ctx: ToggleSimpleMarkContext,
+  markType: InlineMarkType,
+): void {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
@@ -494,7 +599,7 @@ function toggleSimpleMarkInSelection(ctx: EditorContext, markType: InlineMarkTyp
 // Apply a mark-set transformation on a serialized InlineRun[]. See
 // toggleSimpleMarkInSelection for the rationale; this is the pure step.
 function toggleMarkOnRuns(
-  ctx: EditorContext,
+  ctx: RunMutationContext,
   runs: InlineRun[],
   start: number,
   end: number,
@@ -625,7 +730,7 @@ export function selectByCharBounds(rootNode: Node, start: number, end: number): 
   sel.addRange(r);
 }
 
-export function applyMarkImpl(ctx: EditorContext, type: InlineMarkType): void {
+export function applyMarkImpl(ctx: ApplyMarkImplContext, type: InlineMarkType): void {
   if (type === 'bold') return applyExecCommand('bold');
   if (type === 'italic') return applyExecCommand('italic');
   if (type === 'underline') return applyExecCommand('underline');
@@ -654,7 +759,7 @@ export function applyMarkImpl(ctx: EditorContext, type: InlineMarkType): void {
 // the Owner is editing page 3. rebuildElement still touches every
 // instance on save, so the model is canonical; this preview-mirror
 // just keeps the caret-bearing page visually in sync.
-function applyAlignToEditing(ctx: EditorContext, direction: TextAlign): void {
+function applyAlignToEditing(ctx: ApplyAlignToEditingContext, direction: TextAlign): void {
   if (!ctx.editingElementId) return;
   const found = ctx.findElement(ctx.editingElementId);
   if (!found || found.element.type !== 'text') return;
@@ -677,7 +782,7 @@ function applyAlignToEditing(ctx: EditorContext, direction: TextAlign): void {
 // mark-replacement, and adjacent-run coalescing rules without spinning up
 // a fake DOM.
 export function setColorOnRuns(
-  ctx: EditorContext,
+  ctx: RunMutationContext,
   runs: InlineRun[],
   start: number,
   end: number,
@@ -740,7 +845,7 @@ export function setColorOnRuns(
 // `color=null` removes the color mark from the slice (matches the
 // fontSize=null code path). Caret-only selections short-circuit with the
 // same status message bold/italic use because there is no range to apply.
-function applyColorMark(ctx: EditorContext, color: string | null): void {
+function applyColorMark(ctx: ApplyColorMarkContext, color: string | null): void {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
@@ -823,7 +928,7 @@ function selectionCharBounds(inner: HTMLElement, range: Range): { start: number;
   };
 }
 
-function refreshMarkToolbarAlignState(ctx: EditorContext): void {
+function refreshMarkToolbarAlignState(ctx: RefreshMarkToolbarAlignStateContext): void {
   if (!ctx.markToolbar || !ctx.editingElementId) return;
   const found = ctx.findElement(ctx.editingElementId);
   if (!found || found.element.type !== 'text') return;
@@ -852,7 +957,7 @@ const MARK_BUTTON_LABELS: Readonly<Partial<Record<InlineMarkType, string>>> = {
   link: 'Link',
 };
 
-export function buildMarkToolbarImpl(ctx: EditorContext, anchor: HTMLElement): void {
+export function buildMarkToolbarImpl(ctx: BuildMarkToolbarContext, anchor: HTMLElement): void {
   removeMarkToolbar(ctx);
   const bar = document.createElement('div');
   bar.className = 'opencanvas-mark-toolbar';
