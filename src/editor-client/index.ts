@@ -192,10 +192,7 @@ import {
   setActivePageImpl,
   updatePageSidebarImpl,
 } from './page-crud.js';
-import {
-  attachCollectionScaffoldButtonImpl,
-  runCollectionScaffoldFlowImpl,
-} from './collection-scaffold.js';
+import { attachCollectionScaffoldButtonImpl } from './collection-scaffold.js';
 import { migrateLegacyCollectionIndexPagesImpl } from './site-load-migration.js';
 import {
   mountReel,
@@ -877,28 +874,17 @@ export function createEditor(boot: EditorBoot): void {
           void ctx.createPage();
         });
       }
-      // ADR 0060 F3 — "+ New Collection" scaffolds an index + template page
-      // and a sample entry in one POST. The wizard, refresh, and active-
-      // page switch live in collection-scaffold.ts; the wiring point is
-      // here so it sits alongside the other Pages-tab affordances.
+      // ADR 0063 dec 9 / dec 11 — Collection scaffold entry points live
+      // on the Add tab (standalone "+ New Collection" button + the
+      // Components grid "Collection" tile) and inside the new-page modal's
+      // kind selector. The Pages-tab "+ New Collection" was removed —
+      // creating a Collection goes through "+ New Page" → "Collection"
+      // there (see page-crud.ts createPageImpl). attachCollectionScaffold
+      // ButtonImpl wires every remaining [data-canvas-add-collection]
+      // element to the same wizard; element-level insertion without the
+      // scaffold leaves a half-built collection (no index page, no
+      // entries) showing the placeholder banner with nowhere to escape to.
       attachCollectionScaffoldButtonImpl(ctx);
-      // ADR 0063 dec 9 — Collection sidebar button (Add panel Components
-      // grid). The existing collection-scaffold module attaches to the
-      // Pages-tab `#canvas-add-collection` button by id; the new
-      // Components-grid button uses the `data-canvas-add-collection`
-      // attribute so the two wirings don't collide. Both fire the same
-      // wizard — element-level insertion without the scaffold leaves a
-      // half-built collection (no index page, no entries) that just
-      // shows the placeholder banner with nowhere to escape to.
-      const addCollectionButtons = document.querySelectorAll('[data-canvas-add-collection]');
-      for (let i = 0; i < addCollectionButtons.length; i++) {
-        const btn = addCollectionButtons[i];
-        if (btn instanceof HTMLElement && btn.id !== 'canvas-add-collection') {
-          btn.addEventListener('click', () => {
-            void runCollectionScaffoldFlowImpl(ctx);
-          });
-        }
-      }
       const pageListEl = document.getElementById('canvas-page-list');
       if (pageListEl) {
         pageListEl.addEventListener('click', function (ev) {

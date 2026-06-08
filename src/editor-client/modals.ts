@@ -142,7 +142,16 @@ export interface NewPageModalOpts {
   existingSlugs?: string[] | undefined;
 }
 
+/** Discriminator on the modal result so the caller can branch the create
+ *  path. `regular` flows through the existing single-page persistence;
+ *  `collection` chains into the collection-scaffold wizard (which opens
+ *  its own slug prompt and POSTs the multi-page index + template +
+ *  seed-entries scaffold). When `collection` is returned the modal has
+ *  already closed, but `title`, `slug`, and `locale` carry no meaning —
+ *  the scaffold endpoint derives its own page identity from the slug it
+ *  prompts for. */
 export interface NewPageModalResult {
+  kind: 'regular' | 'collection';
   title: string;
   slug: string;
   /** null when "Site default" is chosen; otherwise a BCP-47 tag. */
@@ -771,32 +780,92 @@ export function openNewPageModalImpl(
     h.textContent = 'New page';
     panel.appendChild(h);
 
+    // -- Page kind (regular vs. collection) ----------------------------
+    // Segmented control at the top of the modal. "Regular page" is the
+    // default and shows the title/slug/locale fields below. "Collection"
+    // hides those fields and routes Create through the collection
+    // scaffold wizard (which has its own slug prompt + multi-page POST).
+    // Per ADR 0063 + 0034 — the Pages-tab "+ New Collection" entry point
+    // moves into this kind selector so the modal is the single intake
+    // surface for new-page creation.
+    let kind: 'regular' | 'collection' = 'regular';
+    const kindLabel = document.createElement('label');
+    kindLabel.textContent = 'Page kind';
+    panel.appendChild(kindLabel);
+    // Segmented control. Inline styles keep the kind selector self-
+    // contained inside modals.ts rather than threading into styles.css,
+    // which carries a single shared modal stylesheet across the editor
+    // surface; the .active option carries the picked tone. Both options
+    // are <button type="button"> so neither submits the form on Enter
+    // (the modal handles Enter explicitly through the keydown handler).
+    const kindGroup = document.createElement('div');
+    kindGroup.setAttribute('role', 'radiogroup');
+    kindGroup.setAttribute('aria-label', 'Page kind');
+    kindGroup.style.cssText =
+      'display:flex;gap:6px;background:var(--surface);border:1.5px solid var(--line-2);border-radius:var(--r-sm);padding:4px;margin-bottom:4px';
+    function styleKindOption(btn: HTMLButtonElement, active: boolean): void {
+      btn.style.cssText =
+        'appearance:none;font:inherit;font-family:var(--sans);font-size:13px;font-weight:650;flex:1;padding:8px 10px;border-radius:calc(var(--r-sm) - 2px);cursor:pointer;border:none;transition:background-color 0.15s, color 0.15s;' +
+        (active
+          ? 'background:var(--ink);color:var(--surface)'
+          : 'background:transparent;color:var(--ink-2)');
+    }
+    const kindRegular = document.createElement('button');
+    kindRegular.type = 'button';
+    kindRegular.setAttribute('role', 'radio');
+    kindRegular.setAttribute('aria-checked', 'true');
+    kindRegular.setAttribute('data-kind', 'regular');
+    kindRegular.textContent = 'Regular page';
+    kindRegular.title = 'A single page with a title, slug, and optional locale';
+    styleKindOption(kindRegular, true);
+    const kindCollection = document.createElement('button');
+    kindCollection.type = 'button';
+    kindCollection.setAttribute('role', 'radio');
+    kindCollection.setAttribute('aria-checked', 'false');
+    kindCollection.setAttribute('data-kind', 'collection');
+    kindCollection.textContent = 'Collection';
+    kindCollection.title =
+      'A content collection (e.g. blog, case-studies) with index page + entries';
+    styleKindOption(kindCollection, false);
+    kindGroup.appendChild(kindRegular);
+    kindGroup.appendChild(kindCollection);
+    panel.appendChild(kindGroup);
+
+    // -- Regular-page fields wrapper -----------------------------------
+    // Wrap title/slug/locale together so the Collection branch can hide
+    // them in one toggle. Keeping them mounted (display:none vs. removed)
+    // preserves the existing input refs and validation flow without
+    // having to teardown + recreate when the user flips back to Regular.
+    const regularFields = document.createElement('div');
+    regularFields.className = 'opencanvas-modal-regular-fields';
+    panel.appendChild(regularFields);
+
     // -- Title ---------------------------------------------------------
     const titleLabel = document.createElement('label');
     titleLabel.textContent = 'Title';
-    panel.appendChild(titleLabel);
+    regularFields.appendChild(titleLabel);
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
     titleInput.placeholder = 'About us';
-    panel.appendChild(titleInput);
+    regularFields.appendChild(titleInput);
 
     // -- Slug ----------------------------------------------------------
     const slugLabel = document.createElement('label');
     slugLabel.textContent = 'Slug';
-    panel.appendChild(slugLabel);
+    regularFields.appendChild(slugLabel);
     const slugInput = document.createElement('input');
     slugInput.type = 'text';
     slugInput.placeholder = 'about-us';
-    panel.appendChild(slugInput);
+    regularFields.appendChild(slugInput);
     const slugHint = document.createElement('div');
     slugHint.style.cssText = 'font-size:11px;color:var(--opencanvas-fg-mute);margin:-6px 0 8px';
     slugHint.textContent = 'Auto-derived from title. Edit to override; clear to re-link.';
-    panel.appendChild(slugHint);
+    regularFields.appendChild(slugHint);
 
     // -- Locale --------------------------------------------------------
     const localeLabel = document.createElement('label');
     localeLabel.textContent = 'Locale';
-    panel.appendChild(localeLabel);
+    regularFields.appendChild(localeLabel);
     const localeSel = document.createElement('select');
     const localeOptions: Array<{ value: string; label: string }> = [
       { value: '', label: 'Site default' },
@@ -820,16 +889,28 @@ export function openNewPageModalImpl(
       localeOpt.textContent = lo.label;
       localeSel.appendChild(localeOpt);
     }
-    panel.appendChild(localeSel);
+    regularFields.appendChild(localeSel);
     const otherLocaleInput = document.createElement('input');
     otherLocaleInput.type = 'text';
     otherLocaleInput.placeholder = 'e.g. en-GB or fr-CA';
     otherLocaleInput.style.cssText = 'margin-top:6px;display:none';
-    panel.appendChild(otherLocaleInput);
+    regularFields.appendChild(otherLocaleInput);
     localeSel.addEventListener('change', () => {
       otherLocaleInput.style.display = localeSel.value === '__other__' ? 'block' : 'none';
       if (localeSel.value === '__other__') otherLocaleInput.focus();
     });
+
+    // -- Collection-mode hint -----------------------------------------
+    // When the user picks "Collection", the modal hides title/slug/locale
+    // and shows this explainer instead. Clicking Create chains into the
+    // collection-scaffold wizard which has its own slug prompt and POSTs
+    // a multi-page (index + template + seed entries) scaffold in one go.
+    const collectionHint = document.createElement('div');
+    collectionHint.style.cssText =
+      'display:none;font-size:13px;color:var(--ink-2);line-height:1.5;padding:10px 12px;background:var(--surface);border:1px dashed var(--line-2);border-radius:var(--r-sm)';
+    collectionHint.textContent =
+      'A Collection bundles an index page, a per-entry template, and a couple of starter entries. Click Create to pick a slug.';
+    panel.appendChild(collectionHint);
 
     // -- Inline error + actions ---------------------------------------
     const errorLine = document.createElement('div');
@@ -850,6 +931,35 @@ export function openNewPageModalImpl(
 
     backdrop.appendChild(panel);
 
+    // -- Kind selector wiring -----------------------------------------
+    function setKind(next: 'regular' | 'collection'): void {
+      kind = next;
+      const isRegular = next === 'regular';
+      regularFields.style.display = isRegular ? '' : 'none';
+      collectionHint.style.display = isRegular ? 'none' : '';
+      styleKindOption(kindRegular, isRegular);
+      styleKindOption(kindCollection, !isRegular);
+      kindRegular.setAttribute('aria-checked', isRegular ? 'true' : 'false');
+      kindCollection.setAttribute('aria-checked', isRegular ? 'false' : 'true');
+      // Collection mode bypasses the per-field validation — its slug is
+      // collected by the scaffold wizard's own prompt, so Create is
+      // always enabled once "Collection" is picked.
+      if (isRegular) {
+        validate();
+      } else {
+        errorLine.textContent = '';
+        ok.disabled = false;
+      }
+    }
+    kindRegular.addEventListener('click', () => {
+      setKind('regular');
+      titleInput.focus();
+    });
+    kindCollection.addEventListener('click', () => {
+      setKind('collection');
+      ok.focus();
+    });
+
     // -- Slug auto-derive + freeze/re-arm logic -----------------------
     let slugManuallyEdited = false;
     function slugify(str: string): string {
@@ -860,12 +970,14 @@ export function openNewPageModalImpl(
       return s.length === 0 ? 'page' : s;
     }
     titleInput.addEventListener('input', () => {
+      if (kind !== 'regular') return;
       if (!slugManuallyEdited) {
         slugInput.value = slugify(titleInput.value);
         validate();
       }
     });
     slugInput.addEventListener('input', () => {
+      if (kind !== 'regular') return;
       if (slugInput.value.length === 0) {
         slugManuallyEdited = false;
         slugInput.value = slugify(titleInput.value);
@@ -931,6 +1043,15 @@ export function openNewPageModalImpl(
       }
     }
     function submit(): void {
+      // Collection branch — close with kind:'collection' immediately;
+      // the caller chains into the scaffold wizard which collects the
+      // slug, POSTs the scaffold, and refreshes ctx.state. Title/slug/
+      // locale carry empty values because the scaffold endpoint derives
+      // its own page identity from the slug it prompts for separately.
+      if (kind === 'collection') {
+        close({ kind: 'collection', title: '', slug: '', locale: null });
+        return;
+      }
       let locale: string | null;
       if (localeSel.value === '') locale = null;
       else if (localeSel.value === '__other__') {
@@ -940,6 +1061,7 @@ export function openNewPageModalImpl(
         locale = localeSel.value;
       }
       close({
+        kind: 'regular',
         title: titleInput.value.trim(),
         slug: slugInput.value.trim(),
         locale: locale,
