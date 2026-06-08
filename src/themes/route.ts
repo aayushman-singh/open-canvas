@@ -16,9 +16,10 @@
 // `/api/sites/:siteId/*` mounts use. The main thread wires this up in
 // `src/index.ts` (`app.route('/api/sites/:siteId/custom-theme', themeRoute)`).
 
-import { and, eq, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 
+import { loadAccessibleSite } from '../auth/accessible-site.js';
 import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
 import { requireAuth } from '../auth/require-auth.js';
 import {
@@ -30,7 +31,7 @@ import {
 } from '../canvas/schema.js';
 import { validateEditableSite } from '../canvas/validate.js';
 import { db } from '../db/client.js';
-import { customer, site } from '../db/schema.js';
+import { site } from '../db/schema.js';
 
 import { validateStyleKitPreset } from './custom-resolve.js';
 
@@ -48,39 +49,30 @@ themeRoute.use('*', clerkAuth());
 themeRoute.use('*', requireAuth());
 
 // --------------------------------------------------------------------------
-// Ownership helper — same shape as the other Owner-scoped routes. Returning
-// `null` from either step maps to 404 so the API never leaks the existence
-// of a site to a stranger.
+// Access helper — both endpoints accept site owners and accepted
+// collaborators at the `editor` tier (theme work is content editing, not
+// billing or DNS). Returning null maps to 404 so the API never leaks the
+// existence of a site to a stranger.
 // --------------------------------------------------------------------------
 
-async function resolveCustomerId(c: Context<Env>): Promise<string | null> {
+async function loadEditableSite(
+  c: Context<Env>,
+  siteId: string,
+): Promise<{ id: string; editableState: EditableSite } | null> {
   const auth = c.get('auth');
   if (!auth.userId) {
     throw new Error('themes api reached without an authenticated user');
   }
   const database = db(c.env);
-  const rows = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  return rows[0]?.id ?? null;
-}
-
-async function loadOwnedSite(
-  c: Context<Env>,
-  siteId: string,
-  customerId: string,
-): Promise<{ id: string; editableState: EditableSite } | null> {
-  const database = db(c.env);
-  const rows = await database
-    .select({ id: site.id, editableState: site.editableState })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  const row = rows[0];
-  if (!row) return null;
-  return row;
+  const accessible = await loadAccessibleSite(
+    database,
+    auth.userId,
+    siteId,
+    'editor',
+    c.get('customer')?.id,
+  );
+  if (!accessible) return null;
+  return { id: accessible.id, editableState: accessible.editableState };
 }
 
 // --------------------------------------------------------------------------
@@ -91,10 +83,8 @@ themeRoute.put('/:siteId/custom-theme', async (c) => {
   const siteId = c.req.param('siteId');
   if (!siteId) return c.json({ error: 'siteId is required' }, 404);
 
-  const customerId = await resolveCustomerId(c);
-  if (!customerId) return c.json({ error: 'site not found' }, 404);
-  const owned = await loadOwnedSite(c, siteId, customerId);
-  if (!owned) return c.json({ error: 'site not found' }, 404);
+  const accessible = await loadEditableSite(c, siteId);
+  if (!accessible) return c.json({ error: 'site not found' }, 404);
 
   let body: unknown;
   try {
@@ -126,7 +116,7 @@ themeRoute.put('/:siteId/custom-theme', async (c) => {
   // here: the source might carry a stale customStyleKit slot, so the explicit
   // assignment after the spread wins.
   const nextState: EditableSite = {
-    ...owned.editableState,
+    ...accessible.editableState,
     styleKit: 'custom',
     customStyleKit: candidate as StyleKitPreset,
   };
@@ -146,7 +136,7 @@ themeRoute.put('/:siteId/custom-theme', async (c) => {
       editableState: nextState,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)));
+    .where(eq(site.id, accessible.id));
 
   return c.json({ ok: true });
 });
@@ -159,10 +149,8 @@ themeRoute.delete('/:siteId/custom-theme', async (c) => {
   const siteId = c.req.param('siteId');
   if (!siteId) return c.json({ error: 'siteId is required' }, 404);
 
-  const customerId = await resolveCustomerId(c);
-  if (!customerId) return c.json({ error: 'site not found' }, 404);
-  const owned = await loadOwnedSite(c, siteId, customerId);
-  if (!owned) return c.json({ error: 'site not found' }, 404);
+  const accessible = await loadEditableSite(c, siteId);
+  if (!accessible) return c.json({ error: 'site not found' }, 404);
 
   let body: unknown;
   try {
@@ -184,7 +172,7 @@ themeRoute.delete('/:siteId/custom-theme', async (c) => {
   // the publish path into thinking a custom kit is still in play. Per ADR
   // 0016 the styleKit DU is collapsed via the helper so the new branch
   // discriminator and the absence of `customStyleKit` are set together.
-  const base = pickEditableSiteBase(owned.editableState);
+  const base = pickEditableSiteBase(accessible.editableState);
   const nextState: EditableSite = { ...base, styleKit: styleKitRaw };
   const validation = validateEditableSite(nextState);
   if (!validation.valid) {
@@ -202,7 +190,7 @@ themeRoute.delete('/:siteId/custom-theme', async (c) => {
       editableState: nextState,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)));
+    .where(eq(site.id, accessible.id));
 
   return c.json({ ok: true });
 });

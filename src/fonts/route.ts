@@ -23,10 +23,11 @@ import { and, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 
 import { createR2Client } from '../assets/r2-client.js';
+import { loadAccessibleSite } from '../auth/accessible-site.js';
 import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
 import { requireAuth } from '../auth/require-auth.js';
 import { db } from '../db/client.js';
-import { customer, site, siteFont } from '../db/schema.js';
+import { siteFont } from '../db/schema.js';
 
 import { fontContentHashToR2Key, uploadSiteFont } from './upload.js';
 import { FontValidationError } from './validate.js';
@@ -81,28 +82,25 @@ export const fontsOwnerRouter = new Hono<Env>();
 fontsOwnerRouter.use('*', clerkAuth());
 fontsOwnerRouter.use('*', requireAuth());
 
-async function resolveCustomerId(c: Context<Env>): Promise<string | null> {
+// Access: both the GET (list site fonts) and the mutating verbs (upload,
+// delete) accept site owners and accepted collaborators at the `editor`
+// tier. Fonts are content-editing surface — they belong to the site, not
+// to billing — so a write-capable collaborator is authoritative here.
+// Returning null maps to 404 to avoid leaking site existence.
+async function canEditSite(c: Context<Env>, siteId: string): Promise<boolean> {
   const auth = c.get('auth');
   if (!auth.userId) {
     throw new Error('fonts api reached without an authenticated user');
   }
   const database = db(c.env);
-  const rows = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  return rows[0]?.id ?? null;
-}
-
-async function ownsSite(c: Context<Env>, siteId: string, customerId: string): Promise<boolean> {
-  const database = db(c.env);
-  const rows = await database
-    .select({ id: site.id })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  return rows.length > 0;
+  const accessible = await loadAccessibleSite(
+    database,
+    auth.userId,
+    siteId,
+    'editor',
+    c.get('customer')?.id,
+  );
+  return accessible !== null;
 }
 
 // ---- LIST ----------------------------------------------------------------
@@ -112,9 +110,7 @@ fontsOwnerRouter.get('/', async (c) => {
   if (typeof siteId !== 'string' || siteId.length === 0) {
     return c.json({ error: 'siteId is required' }, 400);
   }
-  const customerId = await resolveCustomerId(c);
-  if (!customerId) return c.json({ error: 'site not found' }, 404);
-  if (!(await ownsSite(c, siteId, customerId))) {
+  if (!(await canEditSite(c, siteId))) {
     return c.json({ error: 'site not found' }, 404);
   }
   const database = db(c.env);
@@ -142,9 +138,7 @@ fontsOwnerRouter.post('/', async (c) => {
   if (typeof siteId !== 'string' || siteId.length === 0) {
     return c.json({ error: 'siteId is required' }, 400);
   }
-  const customerId = await resolveCustomerId(c);
-  if (!customerId) return c.json({ error: 'site not found' }, 404);
-  if (!(await ownsSite(c, siteId, customerId))) {
+  if (!(await canEditSite(c, siteId))) {
     return c.json({ error: 'site not found' }, 404);
   }
 
@@ -220,9 +214,7 @@ fontsOwnerRouter.delete('/:id', async (c) => {
   if (typeof fontId !== 'string' || fontId.length === 0) {
     return c.json({ error: 'font not found' }, 404);
   }
-  const customerId = await resolveCustomerId(c);
-  if (!customerId) return c.json({ error: 'site not found' }, 404);
-  if (!(await ownsSite(c, siteId, customerId))) {
+  if (!(await canEditSite(c, siteId))) {
     return c.json({ error: 'site not found' }, 404);
   }
 

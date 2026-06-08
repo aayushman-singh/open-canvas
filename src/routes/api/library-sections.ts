@@ -14,6 +14,7 @@
 import { and, eq, isNull, or } from 'drizzle-orm';
 import { Hono } from 'hono';
 
+import { loadAccessibleSite } from '../../auth/accessible-site.js';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
@@ -28,7 +29,6 @@ import {
   ownerAsset,
   SECTION_CATEGORIES,
   type SectionCategory,
-  site,
   type AssetManifestEntry,
 } from '../../db/schema.js';
 import { buildSectionThumbnailSvg } from '../../templates/section-thumbnail.js';
@@ -132,24 +132,46 @@ async function resolveCustomerId(
   return row[0]?.id ?? null;
 }
 
-async function loadOwnedSection(
+/**
+ * Resolve `(section, state, siteOwnerCustomerId)` for a site the caller can
+ * reach at the `editor` tier — site owner OR accepted collaborator with
+ * role `editor`. The asset manifest later in the save flow is built against
+ * the SITE OWNER's customer.id (assets live on the owner's account), so the
+ * caller's customer.id is the wrong key there even when the caller IS the
+ * owner; we return both so the save handler can pick the right one.
+ *
+ * Returns null when the site does not exist OR the caller is below editor
+ * tier OR the section is not on the first page. The save handler maps null
+ * to 404 to avoid leaking site existence.
+ */
+async function loadEditableSiteSection(
   database: ReturnType<typeof db>,
-  customerId: string,
+  clerkUserId: string,
+  callerCustomerId: string,
   siteId: string,
   sectionId: string,
-): Promise<{ section: CanvasSection; state: EditableSite } | null> {
-  const siteRow = await database
-    .select({ editableState: site.editableState })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  const state = siteRow[0]?.editableState;
-  if (!state) return null;
+): Promise<
+  | {
+      section: CanvasSection;
+      state: EditableSite;
+      siteOwnerCustomerId: string;
+    }
+  | null
+> {
+  const accessible = await loadAccessibleSite(
+    database,
+    clerkUserId,
+    siteId,
+    'editor',
+    callerCustomerId,
+  );
+  if (!accessible) return null;
+  const state = accessible.editableState;
   const page = state.pages[0];
   if (!page) return null;
   const section = page.sections.find((s) => s.id === sectionId);
   if (!section) return null;
-  return { section, state };
+  return { section, state, siteOwnerCustomerId: accessible.customerId };
 }
 
 // ---------------------------------------------------------------------------
@@ -354,15 +376,27 @@ librarySectionsOwner.post('/sections', async (c) => {
     return c.json({ error: 'community (global) sections require admin access' }, 403);
   }
 
-  const loaded = await loadOwnedSection(database, customerId, parsed.siteId, parsed.sectionId);
-  if (!loaded) return c.json({ error: 'section not found in owned site' }, 404);
+  // Editor tier: a collaborator editing someone else's site can save one of
+  // its sections into THEIR own private library (or, with admin, global).
+  // The new `library_section` row is keyed to the caller's customer.id;
+  // only the SITE READ is widened. Asset manifest builds against the site
+  // owner's customer.id because the section's media lives on the owner's
+  // account.
+  const loaded = await loadEditableSiteSection(
+    database,
+    auth.userId,
+    customerId,
+    parsed.siteId,
+    parsed.sectionId,
+  );
+  if (!loaded) return c.json({ error: 'section not found in site' }, 404);
 
   const validation = validateSectionForLibrary(loaded.section);
   if (!validation.valid) {
     return c.json({ error: 'section invalid for library', details: validation.errors }, 400);
   }
 
-  const manifest = await buildAssetManifest(database, customerId, loaded.section);
+  const manifest = await buildAssetManifest(database, loaded.siteOwnerCustomerId, loaded.section);
   const heading = firstHeadingPreview(loaded.section);
 
   // ADR 0061 Decision 4 — save-as-new vs first-version.
@@ -525,15 +559,25 @@ librarySectionsAdmin.post('/sections', async (c) => {
   const parsed = parseSaveBody(raw);
   if ('error' in parsed) return c.json({ error: parsed.error }, 400);
 
-  const loaded = await loadOwnedSection(database, customerId, parsed.siteId, parsed.sectionId);
-  if (!loaded) return c.json({ error: 'section not found in owned site' }, 404);
+  // Admins promoting a section to global also use editor tier — they need
+  // write access to the site to be authoritative over its sections. Asset
+  // manifest builds against the site owner's customer.id (assets live on
+  // the owner's account).
+  const loaded = await loadEditableSiteSection(
+    database,
+    auth.userId,
+    customerId,
+    parsed.siteId,
+    parsed.sectionId,
+  );
+  if (!loaded) return c.json({ error: 'section not found in site' }, 404);
 
   const validation = validateSectionForLibrary(loaded.section);
   if (!validation.valid) {
     return c.json({ error: 'section invalid for library', details: validation.errors }, 400);
   }
 
-  const manifest = await buildAssetManifest(database, customerId, loaded.section);
+  const manifest = await buildAssetManifest(database, loaded.siteOwnerCustomerId, loaded.section);
   const heading = firstHeadingPreview(loaded.section);
 
   // Admin-promoted globals follow the same lineage rules as private rows

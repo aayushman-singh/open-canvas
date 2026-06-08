@@ -17,11 +17,12 @@
 
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { loadAccessibleSite } from '../../auth/accessible-site';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { signEditToken, buildEditTokenCookieHeader } from '../../auth/edit-token';
 import { db, type Db } from '../../db/client';
-import { customer, customDomain, site } from '../../db/schema';
+import { customer, customDomain } from '../../db/schema';
 import { appDomain, type HostConfigEnv } from '../../host-config';
 import { SITE_ID_RE } from '../../canvas/validate';
 
@@ -101,6 +102,15 @@ onSiteEditRoute.get('/', async (c) => {
   }
 
   const database = db(c.env);
+  // Resolve the caller's customer.id up-front so we can both seed
+  // `loadAccessibleSite`'s lookup optimisation and sign the edit token with
+  // the CALLER's customer.id (not the site owner's). A collaborator
+  // editing someone else's site gets an edit token bound to their own
+  // customer row — same identity Clerk middleware would resolve on every
+  // subsequent /__api/* request. The token's `siteId` plus the host check
+  // in `editTokenAuth()` is what binds the token to a specific site; the
+  // customer field is informational and used by routes that key per-caller
+  // state (e.g. chat_session rows).
   const customerRow = await database
     .select({ id: customer.id })
     .from(customer)
@@ -111,12 +121,19 @@ onSiteEditRoute.get('/', async (c) => {
     return c.text('site not found', 404);
   }
 
-  const siteRow = await database
-    .select({ id: site.id, subdomain: site.subdomain })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  if (!siteRow[0]) {
+  // Editor tier: collaborators with write access can pop the on-site editor
+  // open exactly like the site owner. Viewers cannot — the edit-token flow
+  // exists to MUTATE editableState, so read-only roles have no business
+  // here. Returning null falls through to 404 to avoid leaking the site's
+  // existence.
+  const accessible = await loadAccessibleSite(
+    database,
+    auth.userId,
+    siteId,
+    'editor',
+    customerId,
+  );
+  if (!accessible) {
     return c.text('site not found', 404);
   }
   if (
@@ -124,7 +141,7 @@ onSiteEditRoute.get('/', async (c) => {
       c.env,
       database,
       siteId,
-      siteRow[0].subdomain,
+      accessible.subdomain,
       returnOrigin,
     ))
   ) {
