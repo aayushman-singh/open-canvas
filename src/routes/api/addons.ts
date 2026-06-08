@@ -11,6 +11,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { loadAccessibleSite } from '../../auth/accessible-site';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
@@ -251,7 +252,10 @@ addonsApi.put('/sites/:siteId/:addonId', async (c) => {
 });
 
 // GET /sites/:siteId — List all site addon rows for the site.
-// Verifies site ownership first.
+// Viewer tier: accepted collaborators of any role can see which addons
+// (analytics, etc.) are running on a site they're editing. PUT stays
+// owner-only because enabling an addon may consume the OWNER's per-
+// customer entitlement (billing-relevant).
 addonsApi.get('/sites/:siteId', async (c) => {
   const auth = c.get('auth');
   if (!auth.userId) {
@@ -260,21 +264,15 @@ addonsApi.get('/sites/:siteId', async (c) => {
 
   const siteId = c.req.param('siteId');
 
-  const customerId = await resolveCustomerId(c.env, auth.userId);
-  if (!customerId) {
-    return c.json({ error: 'site not found' }, 404);
-  }
-
   const database = db(c.env);
-
-  // Verify site ownership.
-  const siteRow = await database
-    .select({ id: site.id })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-
-  if (!siteRow[0]) {
+  const accessible = await loadAccessibleSite(
+    database,
+    auth.userId,
+    siteId,
+    'viewer',
+    c.get('customer')?.id,
+  );
+  if (!accessible) {
     return c.json({ error: 'site not found' }, 404);
   }
 

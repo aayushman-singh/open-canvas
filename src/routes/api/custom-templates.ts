@@ -18,6 +18,7 @@
 import { and, eq, isNull, or } from 'drizzle-orm';
 import { Hono } from 'hono';
 
+import { loadAccessibleSite } from '../../auth/accessible-site.js';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
@@ -225,20 +226,28 @@ customTemplatesOwner.post('/', async (c) => {
     return c.json({ error: 'community (global) templates require admin access' }, 403);
   }
 
-  const siteRow = await database
-    .select({ editableState: site.editableState })
-    .from(site)
-    .where(and(eq(site.id, parsed.siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  const siteState = siteRow[0]?.editableState;
-  if (!siteState) return c.json({ error: 'site not found' }, 404);
+  // Editor tier: a collaborator editing someone else's site can save it
+  // into THEIR own private template library. The new `custom_template` row
+  // is keyed to the caller's customer.id; only the SITE READ is widened —
+  // the template row itself stays the caller's (private) or admin-owned
+  // (global). Assets referenced by the section live on the site owner's
+  // account, so the manifest builds against the site owner's customerId.
+  const accessible = await loadAccessibleSite(
+    database,
+    auth.userId,
+    parsed.siteId,
+    'editor',
+    customerId,
+  );
+  if (!accessible) return c.json({ error: 'site not found' }, 404);
+  const siteState = accessible.editableState;
 
   const validation = validateEditableSite(siteState);
   if (!validation.valid) {
     return c.json({ error: 'site state invalid', details: validation.errors }, 400);
   }
 
-  const manifest = await buildAssetManifest(database, customerId, siteState);
+  const manifest = await buildAssetManifest(database, accessible.customerId, siteState);
 
   const [row] = await database
     .insert(customTemplate)

@@ -24,9 +24,10 @@
 // `done`. The HTTP response itself stays 200 because SSE clients cannot
 // see status-codes after the first byte goes out.
 
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
+import { loadAccessibleSite } from '../../auth/accessible-site.js';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { GeminiAdapter } from '../llm-gemini.js';
@@ -34,7 +35,6 @@ import { db } from '../../db/client.js';
 import {
   customer,
   ownerAsset,
-  site,
   siteFont,
   type SiteFont,
 } from '../../db/schema.js';
@@ -69,12 +69,34 @@ chatApi.use('*', clerkAuth());
 chatApi.use('*', requireAuth());
 
 // ---------------------------------------------------------------------------
-// Ownership lookup — same shape as canvas-agent route.
+// Access lookup — both endpoints require the caller to reach the site at
+// the `editor` tier (site owner OR accepted collaborator with role
+// `editor`). Viewers cannot chat with the assistant because every turn can
+// emit `apply` tool-calls that mutate editableState.
+//
+// Two distinct customer ids matter inside a chat turn:
+//
+//   - `siteOwnerCustomerId` (= accessibleSite.customerId) — the owner's
+//     customer.id. Used to load the asset library, which lives on the
+//     OWNER's account; a collaborator chatting on someone else's site
+//     references the owner's assets, not their own.
+//
+//   - `callerCustomerId` — the calling Clerk user's customer.id. Used to
+//     scope chat sessions. Each collaborator has their own conversation
+//     history per site (chat_session is per (site_id, customer_id) — see
+//     `src/db/schema.ts` chatSession comment).
+//
+// `loadAccessibleSite` returns site state but not the caller's customer
+// row; the second SELECT below resolves it. Both fail with 404 to avoid
+// leaking the site's existence.
 // ---------------------------------------------------------------------------
 
 interface OwnedSiteRow {
   id: string;
-  customerId: string;
+  /** Caller's customer.id — scopes chat sessions per collaborator. */
+  callerCustomerId: string;
+  /** Site owner's customer.id — scopes the asset library load. */
+  siteOwnerCustomerId: string;
   styleKit: StyleKit;
   editableState: EditableSite;
   fonts: SiteFont[];
@@ -89,26 +111,29 @@ async function loadOwnedSiteWithFonts(
   if (!auth.userId) {
     throw new Error('chat api reached without an authenticated user');
   }
+  // Pin auth.userId locally so closure capture sees a non-null type (the
+  // narrowing on `auth.userId` is lost inside the inline lookup IIFE).
+  const clerkUserId = auth.userId;
   const database = db(c.env);
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) return null;
+  let callerCustomerId: string | undefined = c.get('customer')?.id;
+  if (!callerCustomerId) {
+    const rows = await database
+      .select({ id: customer.id })
+      .from(customer)
+      .where(eq(customer.clerkUserId, clerkUserId))
+      .limit(1);
+    callerCustomerId = rows[0]?.id;
+  }
+  if (!callerCustomerId) return null;
 
-  const siteRow = await database
-    .select({
-      id: site.id,
-      styleKit: site.styleKit,
-      editableState: site.editableState,
-    })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  const row = siteRow[0];
-  if (!row) return null;
+  const accessible = await loadAccessibleSite(
+    database,
+    clerkUserId,
+    siteId,
+    'editor',
+    callerCustomerId,
+  );
+  if (!accessible) return null;
 
   const fonts = await database
     .select()
@@ -125,14 +150,15 @@ async function loadOwnedSiteWithFonts(
       height: ownerAsset.height,
     })
     .from(ownerAsset)
-    .where(eq(ownerAsset.customerId, customerId))
+    .where(eq(ownerAsset.customerId, accessible.customerId))
     .limit(200);
 
   return {
-    id: row.id,
-    customerId,
-    styleKit: row.styleKit,
-    editableState: row.editableState,
+    id: accessible.id,
+    callerCustomerId,
+    siteOwnerCustomerId: accessible.customerId,
+    styleKit: accessible.styleKit,
+    editableState: accessible.editableState,
     fonts,
     assets: assetRows,
   };
@@ -176,17 +202,19 @@ chatApi.post('/:siteId/chat', async (c) => {
   }
 
   // Load or create the session row up-front so we can emit the sessionId as
-  // the first SSE event.
+  // the first SSE event. Sessions are scoped to (site, caller-customer) —
+  // collaborators get their own conversation history per site, not the
+  // owner's.
   const env = { DATABASE_URL: c.env.DATABASE_URL };
   let session: ChatSessionState | null = null;
   if (requestedSessionId) {
     session = await loadSession(env, requestedSessionId);
     if (!session) return c.json({ error: 'session not found' }, 404);
-    if (session.siteId !== row.id || session.customerId !== row.customerId) {
+    if (session.siteId !== row.id || session.customerId !== row.callerCustomerId) {
       return c.json({ error: 'session belongs to another (site, customer)' }, 403);
     }
   } else {
-    session = await createSession(env, row.id, row.customerId, []);
+    session = await createSession(env, row.id, row.callerCustomerId, []);
   }
 
   const sessionRef = session;
@@ -245,12 +273,12 @@ chatApi.get('/:siteId/chat/stream', async (c) => {
   const env = { DATABASE_URL: c.env.DATABASE_URL };
   let session: ChatSessionState | null;
   if (sessionId === 'latest') {
-    session = await loadLatestOpenSession(env, row.id, row.customerId);
+    session = await loadLatestOpenSession(env, row.id, row.callerCustomerId);
   } else {
     session = await loadSession(env, sessionId);
   }
   if (!session) return c.json({ error: 'session not found' }, 404);
-  if (session.siteId !== row.id || session.customerId !== row.customerId) {
+  if (session.siteId !== row.id || session.customerId !== row.callerCustomerId) {
     return c.json({ error: 'session belongs to another (site, customer)' }, 403);
   }
 

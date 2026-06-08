@@ -1,27 +1,37 @@
 // src/password/admin-route.ts
 //
-// Owner-facing CRUD for the password gate:
+// Editor-tier CRUD for the password gate:
 //
 //   PUT    /api/sites/:siteId/password   — enable + set/change the password.
 //   DELETE /api/sites/:siteId/password   — disable the gate. Leaves
 //                                          `passwordSetAt` untouched so
 //                                          any cookies issued under the
 //                                          old password remain invalid if
-//                                          the Owner later re-enables.
+//                                          the password gate is later
+//                                          re-enabled.
 //
-// Auth: Clerk-gated; the request must resolve to a customer row that owns
-// the site by `:siteId`. Other Owners' sites 404 to avoid leaking
-// existence.
+// Access: Clerk-gated; the request must resolve to a site the caller can
+// access at the `editor` tier via `loadAccessibleSite` (site owner OR
+// accepted collaborator with role `editor`). Lower-tier callers (viewers,
+// strangers) and missing sites both 404 to avoid leaking existence.
+//
+// Why `editor` (not `owner`): the password gate is a content-protection
+// affordance ("hide my unfinished site from the public") sibling to publish
+// gating. Collaborators who can edit the site can already see anything
+// behind the gate; letting them rotate or disable the shared secret matches
+// the same authority. The gate does NOT touch billing or DNS, so widening
+// here is in scope for the PR #43 sweep.
 //
 // Mounted by the main thread at `/api/sites/:siteId/password`.
 
-import { and, eq } from 'drizzle-orm';
-import { Hono, type Context } from 'hono';
+import { eq } from 'drizzle-orm';
+import { Hono } from 'hono';
 import { hashPassword } from './hash.js';
+import { loadAccessibleSite } from '../auth/accessible-site.js';
 import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
 import { requireAuth } from '../auth/require-auth.js';
 import { db } from '../db/client.js';
-import { customer, site } from '../db/schema.js';
+import { site } from '../db/schema.js';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -36,34 +46,6 @@ const router = new Hono<Env>();
 router.use('*', clerkAuth());
 router.use('*', requireAuth());
 
-async function resolveCustomerId(c: Context<Env>): Promise<string | null> {
-  const auth = c.get('auth');
-  if (!auth.userId) {
-    throw new Error('password admin route reached without an authenticated user');
-  }
-  const database = db(c.env);
-  const rows = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  return rows[0]?.id ?? null;
-}
-
-async function resolveOwnedSiteId(
-  c: Context<Env>,
-  customerId: string,
-  siteId: string,
-): Promise<string | null> {
-  const database = db(c.env);
-  const rows = await database
-    .select({ id: site.id })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  return rows[0]?.id ?? null;
-}
-
 // Validation: passwords must be a string of >=4 and <=200 chars. Lower
 // bound is intentionally loose for the POC — Owners are setting a shared
 // secret for a publish-gated site, not a per-user credential, so the
@@ -77,13 +59,23 @@ interface PutBody {
 }
 
 router.put('/', async (c) => {
-  const customerId = await resolveCustomerId(c);
+  const auth = c.get('auth');
+  if (!auth.userId) {
+    throw new Error('password admin route reached without an authenticated user');
+  }
   const siteId = c.req.param('siteId');
-  if (!customerId || !siteId) {
+  if (!siteId) {
     return c.json({ error: 'site not found' }, 404);
   }
-  const ownedSiteId = await resolveOwnedSiteId(c, customerId, siteId);
-  if (!ownedSiteId) {
+  const database = db(c.env);
+  const accessible = await loadAccessibleSite(
+    database,
+    auth.userId,
+    siteId,
+    'editor',
+    c.get('customer')?.id,
+  );
+  if (!accessible) {
     return c.json({ error: 'site not found' }, 404);
   }
 
@@ -113,7 +105,6 @@ router.put('/', async (c) => {
 
   const hashed = await hashPassword(password);
   const now = new Date();
-  const database = db(c.env);
   await database
     .update(site)
     .set({
@@ -122,25 +113,34 @@ router.put('/', async (c) => {
       passwordSetAt: now,
       updatedAt: now,
     })
-    .where(eq(site.id, ownedSiteId));
+    .where(eq(site.id, accessible.id));
 
   return c.json({ ok: true, passwordEnabled: true, passwordSetAt: now.toISOString() });
 });
 
 router.delete('/', async (c) => {
-  const customerId = await resolveCustomerId(c);
+  const auth = c.get('auth');
+  if (!auth.userId) {
+    throw new Error('password admin route reached without an authenticated user');
+  }
   const siteId = c.req.param('siteId');
-  if (!customerId || !siteId) {
+  if (!siteId) {
     return c.json({ error: 'site not found' }, 404);
   }
-  const ownedSiteId = await resolveOwnedSiteId(c, customerId, siteId);
-  if (!ownedSiteId) {
+  const database = db(c.env);
+  const accessible = await loadAccessibleSite(
+    database,
+    auth.userId,
+    siteId,
+    'editor',
+    c.get('customer')?.id,
+  );
+  if (!accessible) {
     return c.json({ error: 'site not found' }, 404);
   }
   const now = new Date();
-  const database = db(c.env);
   // Disable flag + clear hash. We intentionally LEAVE `passwordSetAt`
-  // untouched so that if the Owner re-enables later with a new password,
+  // untouched so that if the gate is re-enabled later with a new password,
   // the `passwordSetAt` advance still invalidates any previously-issued
   // cookies (per the plan: "On disable, clear hash + leave passwordSetAt
   // as-is so old cookies remain invalid").
@@ -151,7 +151,7 @@ router.delete('/', async (c) => {
       passwordHash: null,
       updatedAt: now,
     })
-    .where(eq(site.id, ownedSiteId));
+    .where(eq(site.id, accessible.id));
 
   return c.json({ ok: true, passwordEnabled: false });
 });
