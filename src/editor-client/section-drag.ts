@@ -54,20 +54,31 @@ import type {
   StateContext,
 } from './editor-context.js';
 import { cssEscape } from './css-escape.js';
+import type {
+  BuildSectionThumbnailContext,
+  MoveSectionToIndexContext,
+} from './reel.js';
 import { buildSectionThumbnail, moveSectionToIndex } from './reel.js';
 
-// ADR 0064 — canvas-side section drag. StateContext supplies `currentPage`
-// for the source-index lookup; DomContext supplies `root` for the section
-// query. The reel callees (`buildSectionThumbnail`, `moveSectionToIndex`)
-// still demand the full `EditorContext`, so this module forward-casts at
-// those four call sites until reel.ts carves under ADR 0064.
-export type BeginSectionDragContext = StateContext & DomContext;
+// ADR 0064 — canvas-side section drag. Composes the local source-lookup
+// surface (StateContext + DomContext) with the narrow contexts the
+// reel.ts callees demand (`buildSectionThumbnail` for the ghost,
+// `moveSectionToIndex` for the drop commit). Folding both in lets the
+// four forwarded call sites typecheck without `ctx as EditorContext`
+// scaffolding now that reel.ts has carved.
+export type BeginSectionDragContext = StateContext &
+  DomContext &
+  BuildSectionThumbnailContext &
+  MoveSectionToIndexContext;
 
-// ADR 0064 — reel-tile drag. StateContext for `currentPage`; the inline
-// `Pick` adds `reelViewMode` (no canonical alias owns the reel display
-// mode yet). Same reel.ts forward-cast applies on the ghost build and
-// the drop commit.
-export type BeginReelDragContext = StateContext & Pick<EditorContext, 'reelViewMode'>;
+// ADR 0064 — reel-tile drag. Same composition as the canvas-side drag
+// (so the two ghost/drop call sites are honest about the same callees)
+// plus the inline `Pick` for `reelViewMode` (no canonical alias owns
+// the reel display mode yet).
+export type BeginReelDragContext = StateContext &
+  BuildSectionThumbnailContext &
+  MoveSectionToIndexContext &
+  Pick<EditorContext, 'reelViewMode'>;
 
 // ADR 0064 — grip mousedown delegate. Composes the canvas-side drag
 // surface (so the `beginSectionDragImpl(ctx, …)` forward call typechecks
@@ -129,10 +140,7 @@ export function beginSectionDragImpl(
     sectionElCandidate instanceof HTMLElement ? sectionElCandidate : null;
   if (sectionEl) sectionEl.style.opacity = '0.5';
 
-  // ADR 0064 forward-cast — reel.ts has not carved yet, so its helpers
-  // still demand the full `EditorContext`. The cast retires when reel.ts
-  // adopts a narrow context.
-  const ghost = buildSectionThumbnail(ctx as EditorContext, section, page.width, 200);
+  const ghost = buildSectionThumbnail(ctx, section, page.width, 200);
   ghost.style.position = 'fixed';
   ghost.style.pointerEvents = 'none';
   ghost.style.opacity = '0.7';
@@ -249,8 +257,7 @@ export function beginSectionDragImpl(
     setReelDragging(false);
     if (sectionEl) sectionEl.style.opacity = '';
     if (dropTarget) {
-      // ADR 0064 forward-cast — see buildSectionThumbnail above.
-      moveSectionToIndex(ctx as EditorContext, fromIdx, dropTarget.insertAt);
+      moveSectionToIndex(ctx, fromIdx, dropTarget.insertAt);
     }
   }
 
@@ -285,8 +292,7 @@ export function beginReelDragImpl(
     if (!hasMoved) {
       hasMoved = true;
       const isTile = ctx.reelViewMode === 'tile';
-      // ADR 0064 forward-cast — see beginSectionDragImpl.
-      ghost = buildSectionThumbnail(ctx as EditorContext, sectionForGhost, pageWidth, isTile ? 200 : 64);
+      ghost = buildSectionThumbnail(ctx, sectionForGhost, pageWidth, isTile ? 200 : 64);
       ghost.style.position = 'fixed';
       ghost.style.pointerEvents = 'none';
       ghost.style.opacity = '0.7';
@@ -361,8 +367,7 @@ export function beginReelDragImpl(
     if (dropLine) dropLine.remove();
     if (hasMoved) setReelDragging(false);
     if (hasMoved && dropTarget) {
-      // ADR 0064 forward-cast — see beginSectionDragImpl.
-      moveSectionToIndex(ctx as EditorContext, fromIdx, dropTarget.insertAt);
+      moveSectionToIndex(ctx, fromIdx, dropTarget.insertAt);
     }
   }
 
