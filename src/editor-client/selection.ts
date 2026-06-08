@@ -41,11 +41,49 @@
 // Owner can navigate to the linked page without hunting for the
 // inspector's href field. Non-action elements get nothing.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+} from './editor-context.js';
 import { cssEscape } from './css-escape.js';
 import { mountResizeHandles, unmountResizeHandles } from './element-menu.js';
 
-export function selectElement(ctx: EditorContext, elementId: string | null): void {
+// ADR 0064 — selectSection touches three named clusters (DomContext for
+// the root querySelectorAll scope, SelectionContext for the selected-id
+// latches + re-entrant selectSection, RenderContext for renderInspector)
+// plus the film-reel pair that no canonical alias owns yet. Exported so
+// downstream selection callers can adopt the same alias.
+export type SelectSectionContext = DomContext &
+  SelectionContext &
+  RenderContext &
+  Pick<EditorContext, 'isReelOpen' | 'renderReel'>;
+
+// ADR 0064 — selectElement extends the section surface with StateContext
+// (findElement walks the section tree), the chat-selection chip pair, the
+// link-popover trio, and closeReel from the film-reel cluster. Exported
+// so downstream callers (selection-click dispatcher, keyboard handlers)
+// can pick up the same shape.
+export type SelectElementContext = SelectSectionContext &
+  StateContext &
+  Pick<
+    EditorContext,
+    | 'chatSelectionDropped'
+    | 'linkPopoverPinned'
+    | 'removeLinkPopover'
+    | 'closeReel'
+    | 'showLinkPopover'
+    | 'updateChatSelectionChip'
+  >;
+
+// ADR 0064 — findElementWrapperInArtboardOf only reads ctx.root, so it
+// rides DomContext alone. Exported for downstream affordance-anchoring
+// callers (RTE toolbar, drag handlers) that already import this helper.
+export type FindElementWrapperContext = DomContext;
+
+export function selectElement(ctx: SelectElementContext, elementId: string | null): void {
   if (ctx.selectedElementId === elementId) return;
   if (ctx.selectedElementId) {
     // Site-pinned sections (header/footer) materialise one DOM wrapper per
@@ -128,7 +166,7 @@ export function selectElement(ctx: EditorContext, elementId: string | null): voi
 // outside the canvas (e.g. a sidebar control re-selecting an element by
 // id without a click event to scope to).
 export function findElementWrapperInArtboardOf(
-  ctx: EditorContext,
+  ctx: FindElementWrapperContext,
   elementId: string,
   contextEl: Element | null,
 ): HTMLElement | null {
@@ -198,7 +236,7 @@ export function resolveCollectionAncestorForClick(
   return null;
 }
 
-export function selectSection(ctx: EditorContext, sectionId: string | null): void {
+export function selectSection(ctx: SelectSectionContext, sectionId: string | null): void {
   if (ctx.selectedSectionId === sectionId) return;
   if (ctx.selectedSectionId) {
     const prev = ctx.root?.querySelectorAll(
