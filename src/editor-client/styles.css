@@ -3646,38 +3646,12 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   cursor: pointer;
 }
 
-/* Inspector reading-order group (above the z-order group). Two compact
-   buttons plus a "Reading order: N of M" caption. The caption is the only
-   place owners see the section.elements[] index, which is what visitors
-   hear via assistive tech. */
-.opencanvas-reorder-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 6px;
-}
-.opencanvas-reorder-buttons button {
-  appearance: none;
-  background: var(--opencanvas-bg-panel);
-  border: 1px solid var(--opencanvas-hairline);
-  color: var(--opencanvas-fg);
-  font: inherit;
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  flex: 1 1 auto;
-}
-.opencanvas-reorder-buttons button:hover {
-  border-color: var(--opencanvas-accent);
-}
-.opencanvas-reorder-caption {
-  font-family: var(--opencanvas-font-mono);
-  font-size: 11px;
-  color: var(--opencanvas-fg-mute);
-  margin-bottom: 4px;
-}
-
-/* Inspector z-order group: four buttons that mutate element.box.z. */
+/* Inspector compact button group: flex-row of small uniform buttons.
+   Used by the collection custom-template controls (Edit / Done /
+   Reset) \u2014 historically called z-order-buttons because the inspector
+   exposed bring-forward / send-back rows here; those moved to the
+   element menu (refactor/element-inspector-dedupe-block-menu), but
+   the class lives on as a generic compact-button-group container. */
 .opencanvas-zorder-buttons {
   display: flex;
   flex-wrap: wrap;
