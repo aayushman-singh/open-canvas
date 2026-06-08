@@ -49,6 +49,7 @@ import {
 
 import { DashboardShell, buildSiteNav } from './shell';
 import { readThemeCookie } from '../../ui';
+import { EDITOR_CLIENT_MANIFEST } from '../../_assets/manifest.generated';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -845,204 +846,38 @@ export function EntryFormView({ siteId, siteName, mode, entry }: EntryFormViewPr
 }
 
 // --------------------------------------------------------------------------
-// Client scripts — kebab slug suggestion, form submit, delete confirmation.
-// Exported (for smoke + readability); only included via <script> tags inline.
-// --------------------------------------------------------------------------
-
-export function formClientScript(siteId: string): string {
-  const sid = JSON.stringify(siteId);
-  return String.raw`
-(() => {
-  const SITE_ID = ${sid};
-  const form = document.querySelector('#entry-form');
-  if (!form) return;
-  const msg = form.querySelector('[data-form-msg]');
-  const titleInput = form.querySelector('input[name="title"]');
-  const slugInput = form.querySelector('input[name="slug"]');
-
-  function kebab(s) {
-    return String(s).toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
-  }
-
-  // Auto-suggest the slug from the title until the user touches the slug
-  // field. Once they type into the slug, we stop auto-syncing — their value
-  // wins, even if they later edit the title.
-  let slugTouched = (slugInput && slugInput.value.length > 0) || form.getAttribute('data-mode') === 'edit';
-  if (slugInput) slugInput.addEventListener('input', () => { slugTouched = true; });
-  if (titleInput) titleInput.addEventListener('input', () => {
-    if (!slugTouched && slugInput) slugInput.value = kebab(titleInput.value);
-  });
-
-  function showMsg(text, kind) {
-    if (!msg) return;
-    msg.textContent = text;
-    msg.className = 'msg ' + (kind || '');
-  }
-
-  // ADR 0063 dec 7 — same shape rule the server enforces, mirrored on the
-  // client so the Owner gets immediate feedback before the round trip.
-  // The server is still the source of truth (fails loud with 400 on
-  // identical inputs); this is just a UX nicety.
-  function validateFolder(value) {
-    if (value.length === 0) return null; // empty = ungrouped, valid
-    if (value.length > 64) return 'Folder must be 64 characters or fewer.';
-    if (value.indexOf('/') >= 0 || value.indexOf('\\') >= 0) {
-      return 'Folder must not contain "/" or "\\".';
-    }
-    return null;
-  }
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    showMsg('Saving…', 'ok');
-    const mode = form.getAttribute('data-mode');
-    const entryId = form.getAttribute('data-entry-id') || '';
-    const tagsRaw = form.tags.value.trim();
-    const folderRaw = form.folder ? form.folder.value.trim() : '';
-    const folderError = validateFolder(folderRaw);
-    if (folderError) { showMsg(folderError, 'err'); return; }
-    const payload = {
-      collectionSlug: form.collectionSlug.value,
-      title: form.title.value.trim(),
-      slug: kebab(form.slug.value.trim()),
-      excerpt: form.excerpt.value,
-      body: form.body.value,
-      publishedDate: form.publishedDate.value,
-      author: form.author.value.trim(),
-      category: form.category.value.trim(),
-      tags: tagsRaw.length > 0 ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : [],
-      status: form.status.value,
-      // Empty input means "ungrouped" — serialise to null so the API never
-      // sees an empty-string folder. Server rejects '' loudly; we filter
-      // here so the round trip succeeds for the natural empty-input case.
-      folder: folderRaw.length > 0 ? folderRaw : null,
-    };
-    if (payload.title.length === 0) { showMsg('Title is required.', 'err'); return; }
-    if (payload.slug.length === 0) { showMsg('Slug is required.', 'err'); return; }
-    if (payload.publishedDate.length === 0) { showMsg('Published date is required.', 'err'); return; }
-
-    const url = mode === 'edit'
-      ? '/api/sites/' + encodeURIComponent(SITE_ID) + '/entries/' + encodeURIComponent(entryId)
-      : '/api/sites/' + encodeURIComponent(SITE_ID) + '/entries';
-    const method = mode === 'edit' ? 'PATCH' : 'POST';
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'content-type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        let detail = response.statusText;
-        try { const body = await response.json(); if (body && body.error) detail = body.error; } catch (_) {}
-        showMsg('Save failed: ' + detail, 'err');
-        return;
-      }
-      // On success, return to the list filtered to this collection.
-      const collection = encodeURIComponent(payload.collectionSlug);
-      window.location.href = '/dashboard/sites/' + encodeURIComponent(SITE_ID) + '/entries?collection=' + collection;
-    } catch (e) {
-      showMsg('Network error: ' + (e && e.message ? e.message : String(e)), 'err');
-    }
-  });
-})();
-`;
+// Client boot — ADR 0021 migration. The three inline `<script>` blocks
+// (listClientScript + two formClientScript emissions) collapsed into the
+// shared dashboard bundle (`EDITOR_CLIENT_MANIFEST.dashboardClientUrl`).
+// The route emits a tiny boot blob with `route: 'entries'` and the
+// per-request `siteId`; the bundle's dispatcher reads it and calls
+// `mountEntries()`. DOM contract unchanged (`form#entry-form`,
+// `ul.entries-list` + per-row hooks `[data-new-collection]`,
+// `[data-delete-entry]`, `[data-entry-id]`, `[data-entry-title]`,
+// `[data-form-msg]`, `[data-folder-input]`, the form's `data-mode` +
+// `data-entry-id` attributes, and the named form inputs). API contract
+// unchanged (POST `/api/sites/:siteId/entries`, PATCH
+// `/api/sites/:siteId/entries/:id`, DELETE
+// `/api/sites/:siteId/entries/:id`, POST `/api/sites/:siteId/collections`).
+// `siteId` flows through the boot blob via `JSON.stringify`, so quotes /
+// braces in the value cannot break out of the inline script.
+function clientBoot(siteId: string) {
+  return raw(
+    '<script>window.__opencanvasDashboardBoot = ' +
+      JSON.stringify({ route: 'entries', siteId }) +
+      ';</script>' +
+      '<script src="' +
+      EDITOR_CLIENT_MANIFEST.dashboardClientUrl +
+      '" defer></script>',
+  );
 }
 
-export function listClientScript(siteId: string): string {
-  const sid = JSON.stringify(siteId);
-  return String.raw`
-(() => {
-  const SITE_ID = ${sid};
-  // ADR 0060 F3 — "+ New collection" wizard. Prompt for a slug via the shared
-  // modal, POST it to /api/sites/:siteId/collections, then navigate to the
-  // new collection's entries view. Server validates slug shape and collision
-  // and returns 409 with an error message on conflict.
-  function slugify(s) {
-    return String(s).toLowerCase().normalize('NFKD')
-      .replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
-  }
-  const newCollectionBtn = document.querySelector('[data-new-collection]');
-  if (newCollectionBtn) {
-    newCollectionBtn.addEventListener('click', async () => {
-      const raw = await window.__opencanvasModal.prompt(
-        'Pick a slug for this collection (e.g. "blog", "case-studies"). One word, lowercase.',
-        '',
-        'New collection',
-      );
-      if (raw === null) return;
-      const slug = slugify(raw);
-      if (slug.length === 0) {
-        await window.__opencanvasModal.alert(
-          'Slug must contain at least one lowercase letter or digit.',
-          'New collection',
-        );
-        return;
-      }
-      try {
-        const response = await fetch(
-          '/api/sites/' + encodeURIComponent(SITE_ID) + '/collections',
-          {
-            method: 'POST',
-            headers: { 'content-type': 'application/json', accept: 'application/json' },
-            body: JSON.stringify({ slug }),
-          },
-        );
-        if (!response.ok) {
-          let detail = response.statusText;
-          try { const body = await response.json(); if (body && body.error) detail = body.error; } catch (_) {}
-          await window.__opencanvasModal.alert('Could not create collection: ' + detail, 'New collection');
-          return;
-        }
-        const data = await response.json().catch(() => null);
-        const redirect = data && typeof data.redirectTo === 'string'
-          ? data.redirectTo
-          : '/dashboard/sites/' + encodeURIComponent(SITE_ID) + '/entries?collection=' + encodeURIComponent(slug);
-        window.location.href = redirect;
-      } catch (e) {
-        await window.__opencanvasModal.alert(
-          'Network error: ' + (e && e.message ? e.message : String(e)),
-          'New collection',
-        );
-      }
-    });
-  }
-
-  // Per-row delete buttons. The shared shell defines window.__opencanvasModal
-  // (see shell.tsx) — we use its .confirm to gate the destructive call.
-  document.querySelectorAll('[data-delete-entry]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-delete-entry');
-      const title = btn.getAttribute('data-entry-title') || 'this entry';
-      if (!id) return;
-      const ok = await window.__opencanvasModal.confirm(
-        'Delete "' + title + '"? This cannot be undone.',
-        { title: 'Delete entry', confirmLabel: 'Delete', danger: true },
-      );
-      if (!ok) return;
-      try {
-        const response = await fetch(
-          '/api/sites/' + encodeURIComponent(SITE_ID) + '/entries/' + encodeURIComponent(id),
-          { method: 'DELETE' },
-        );
-        if (!response.ok && response.status !== 204) {
-          let detail = response.statusText;
-          try { const body = await response.json(); if (body && body.error) detail = body.error; } catch (_) {}
-          await window.__opencanvasModal.alert('Delete failed: ' + detail, 'Delete entry');
-          return;
-        }
-        const row = btn.closest('[data-entry-id]');
-        if (row && row.parentNode) row.parentNode.removeChild(row);
-      } catch (e) {
-        await window.__opencanvasModal.alert(
-          'Network error: ' + (e && e.message ? e.message : String(e)),
-          'Delete entry',
-        );
-      }
-    });
-  });
-})();
-`;
-}
+// Legacy `formClientScript(siteId)` and `listClientScript(siteId)` exports
+// removed in the ADR 0021 migration — their three IIFE emissions moved
+// verbatim into `mountEntries()` in src/dashboard-client/entries.ts (with
+// the kebab + validateFolder + slugify helpers preserved inline so the
+// smoke can pin them as source-level invariants). Same DOM hooks, same
+// fetch URLs, same event handlers; the deletion is mechanical.
 
 // --------------------------------------------------------------------------
 // Route handlers
@@ -1132,7 +967,7 @@ entriesDashboardRoute.get('/sites/:siteId/entries', async (c) => {
         activeFolder={activeFolder}
         entries={entries}
       />
-      <script>{raw(listClientScript(siteId))}</script>
+      {clientBoot(siteId)}
     </DashboardShell>,
   );
 });
@@ -1206,7 +1041,7 @@ entriesDashboardRoute.get('/sites/:siteId/entries/new', async (c) => {
           folder: null,
         }}
       />
-      <script>{raw(formClientScript(siteId))}</script>
+      {clientBoot(siteId)}
     </DashboardShell>,
   );
 });
@@ -1270,7 +1105,7 @@ entriesDashboardRoute.get('/sites/:siteId/entries/:entryId', async (c) => {
           folder: row.folder,
         }}
       />
-      <script>{raw(formClientScript(siteId))}</script>
+      {clientBoot(siteId)}
     </DashboardShell>,
   );
 });
