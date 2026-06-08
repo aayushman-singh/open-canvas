@@ -291,7 +291,8 @@ g.setTimeout = (): number => 0;
 // excludes the directory). The cast threads a typed `mountSiteSettings`
 // out without dragging the DOM-typed source file into the main project.
 const mod = (await import(
-  /* @vite-ignore */ '../../dashboard-client/site-settings.js' as string
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  /* @vite-ignore */ ('../../dashboard-client/site-settings.js' as string)
 )) as { mountSiteSettings: () => void };
 const { mountSiteSettings } = mod;
 

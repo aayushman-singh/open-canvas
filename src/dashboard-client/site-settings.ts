@@ -176,73 +176,77 @@ function wirePasswordForm(siteId: string): void {
     return bodyText || response.statusText;
   }
   if (form) {
-    form.addEventListener('submit', async (event) => {
+    form.addEventListener('submit', (event) => {
       event.preventDefault();
-      const input = form.querySelector<HTMLInputElement>('input[name="password"]');
-      const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
-      const password = input && input.value ? input.value : '';
-      if (password.length < 4) {
-        showError('Password must be at least 4 characters');
-        return;
-      }
-      clearStatus();
-      if (button) button.disabled = true;
-      try {
-        const response = await fetch(
-          '/api/sites/' + encodeURIComponent(siteId) + '/password',
-          {
-            method: 'PUT',
-            headers: {
-              'content-type': 'application/json',
-              accept: 'application/json',
-            },
-            body: JSON.stringify({ password }),
-          },
-        );
-        if (!response.ok) {
-          const detail = await responseDetail(response);
-          showError(detail);
-          if (button) button.disabled = false;
+      void (async (): Promise<void> => {
+        const input = form.querySelector<HTMLInputElement>('input[name="password"]');
+        const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+        const password = input && input.value ? input.value : '';
+        if (password.length < 4) {
+          showError('Password must be at least 4 characters');
           return;
         }
-        showOk('Password updated.');
-        setTimeout(() => location.reload(), 600);
-      } catch (e: unknown) {
-        const msg = e instanceof Error && e.message ? e.message : String(e);
-        showError('Network error: ' + msg);
-        if (button) button.disabled = false;
-      }
+        clearStatus();
+        if (button) button.disabled = true;
+        try {
+          const response = await fetch(
+            '/api/sites/' + encodeURIComponent(siteId) + '/password',
+            {
+              method: 'PUT',
+              headers: {
+                'content-type': 'application/json',
+                accept: 'application/json',
+              },
+              body: JSON.stringify({ password }),
+            },
+          );
+          if (!response.ok) {
+            const detail = await responseDetail(response);
+            showError(detail);
+            if (button) button.disabled = false;
+            return;
+          }
+          showOk('Password updated.');
+          setTimeout(() => location.reload(), 600);
+        } catch (e: unknown) {
+          const msg = e instanceof Error && e.message ? e.message : String(e);
+          showError('Network error: ' + msg);
+          if (button) button.disabled = false;
+        }
+      })();
     });
   }
   if (disableBtn) {
-    disableBtn.addEventListener('click', async () => {
-      const confirmed = await window.__opencanvasModal.confirm(
-        'Disable password protection? Visitors will be able to view this site without a password.',
-        { title: 'Disable protection' },
-      );
-      if (!confirmed) return;
-      disableBtn.disabled = true;
-      try {
-        const response = await fetch(
-          '/api/sites/' + encodeURIComponent(siteId) + '/password',
-          {
-            method: 'DELETE',
-            headers: { accept: 'application/json' },
-          },
+    disableBtn.addEventListener('click', () => {
+      void (async (): Promise<void> => {
+        const confirmed = await window.__opencanvasModal.confirm(
+          'Disable password protection? Visitors will be able to view this site without a password.',
+          { title: 'Disable protection' },
         );
-        if (!response.ok) {
-          const detail = await responseDetail(response);
-          showError('Could not disable: ' + detail);
+        if (!confirmed) return;
+        disableBtn.disabled = true;
+        try {
+          const response = await fetch(
+            '/api/sites/' + encodeURIComponent(siteId) + '/password',
+            {
+              method: 'DELETE',
+              headers: { accept: 'application/json' },
+            },
+          );
+          if (!response.ok) {
+            const detail = await responseDetail(response);
+            showError('Could not disable: ' + detail);
+            disableBtn.disabled = false;
+            return;
+          }
+          showOk('Password protection disabled.');
+          setTimeout(() => location.reload(), 600);
+        } catch (e: unknown) {
+          const msg = e instanceof Error && e.message ? e.message : String(e);
+          showError('Network error: ' + msg);
           disableBtn.disabled = false;
-          return;
         }
-        showOk('Password protection disabled.');
-        setTimeout(() => location.reload(), 600);
-      } catch (e: unknown) {
-        const msg = e instanceof Error && e.message ? e.message : String(e);
-        showError('Network error: ' + msg);
-        disableBtn.disabled = false;
-      }
+      })();
     });
   }
 }
@@ -272,69 +276,147 @@ function wireCollaborators(siteId: string): void {
   }
 
   if (collabForm) {
-    collabForm.addEventListener('submit', async (event) => {
+    collabForm.addEventListener('submit', (event) => {
       event.preventDefault();
-      const emailInput = collabForm.querySelector<HTMLInputElement>(
-        'input[name="email"]',
-      );
-      const roleSelect = collabForm.querySelector<HTMLSelectElement>(
-        'select[name="role"]',
-      );
-      const submitBtn = collabForm.querySelector<HTMLButtonElement>(
-        'button[type="submit"]',
-      );
-      const email = emailInput ? emailInput.value.trim() : '';
-      const role = roleSelect ? roleSelect.value : 'editor';
-      if (!email) return;
-      clearCollabStatus();
-      if (submitBtn) submitBtn.disabled = true;
-      try {
-        const response = await fetch(
-          '/api/sites/' + encodeURIComponent(siteId) + '/collaborators',
-          {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              accept: 'application/json',
-            },
-            body: JSON.stringify({ email, role }),
-          },
+      void (async (): Promise<void> => {
+        const emailInput = collabForm.querySelector<HTMLInputElement>(
+          'input[name="email"]',
         );
-        if (!response.ok) {
-          const detail = await responseDetail(response);
-          if (collabErr) collabErr.textContent = detail;
+        const roleSelect = collabForm.querySelector<HTMLSelectElement>(
+          'select[name="role"]',
+        );
+        const submitBtn = collabForm.querySelector<HTMLButtonElement>(
+          'button[type="submit"]',
+        );
+        const email = emailInput ? emailInput.value.trim() : '';
+        const role = roleSelect ? roleSelect.value : 'editor';
+        if (!email) return;
+        clearCollabStatus();
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+          const response = await fetch(
+            '/api/sites/' + encodeURIComponent(siteId) + '/collaborators',
+            {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                accept: 'application/json',
+              },
+              body: JSON.stringify({ email, role }),
+            },
+          );
+          if (!response.ok) {
+            const detail = await responseDetail(response);
+            if (collabErr) collabErr.textContent = detail;
+            if (submitBtn) submitBtn.disabled = false;
+            return;
+          }
+          if (collabOk) collabOk.textContent = 'Invitation sent to ' + email;
+          if (emailInput) emailInput.value = '';
+          setTimeout(() => location.reload(), 1200);
+        } catch (e: unknown) {
+          const msg = e instanceof Error && e.message ? e.message : String(e);
+          if (collabErr) collabErr.textContent = 'Network error: ' + msg;
           if (submitBtn) submitBtn.disabled = false;
-          return;
         }
-        if (collabOk) collabOk.textContent = 'Invitation sent to ' + email;
-        if (emailInput) emailInput.value = '';
-        setTimeout(() => location.reload(), 1200);
-      } catch (e: unknown) {
-        const msg = e instanceof Error && e.message ? e.message : String(e);
-        if (collabErr) collabErr.textContent = 'Network error: ' + msg;
-        if (submitBtn) submitBtn.disabled = false;
-      }
+      })();
     });
   }
 
   if (collabList) {
-    collabList.addEventListener('click', async (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const removeBtn = target.closest('button.remove-btn');
-      const resendBtn = target.closest('button.resend-btn');
-      if (removeBtn instanceof HTMLButtonElement) {
-        const item = removeBtn.closest('.collab-item');
-        const collabId =
-          removeBtn.getAttribute('data-remove-collab') ||
-          (item ? item.getAttribute('data-collab-id') : null);
+    collabList.addEventListener('click', (event) => {
+      void (async (): Promise<void> => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const removeBtn = target.closest('button.remove-btn');
+        const resendBtn = target.closest('button.resend-btn');
+        if (removeBtn instanceof HTMLButtonElement) {
+          const item = removeBtn.closest('.collab-item');
+          const collabId =
+            removeBtn.getAttribute('data-remove-collab') ||
+            (item ? item.getAttribute('data-collab-id') : null);
+          if (!collabId) return;
+          const confirmed = await window.__opencanvasModal.confirm(
+            'Remove this collaborator?',
+            { title: 'Remove collaborator', confirmLabel: 'Remove', danger: true },
+          );
+          if (!confirmed) return;
+          removeBtn.disabled = true;
+          clearCollabStatus();
+          try {
+            const response = await fetch(
+              '/api/sites/' +
+                encodeURIComponent(siteId) +
+                '/collaborators/' +
+                encodeURIComponent(collabId),
+              {
+                method: 'DELETE',
+                headers: { accept: 'application/json' },
+              },
+            );
+            if (!response.ok) {
+              const detail = await responseDetail(response);
+              if (collabErr) collabErr.textContent = detail;
+              removeBtn.disabled = false;
+              return;
+            }
+            if (item) item.remove();
+          } catch (e: unknown) {
+            const msg = e instanceof Error && e.message ? e.message : String(e);
+            if (collabErr) collabErr.textContent = 'Network error: ' + msg;
+            removeBtn.disabled = false;
+          }
+          return;
+        }
+        if (resendBtn instanceof HTMLButtonElement) {
+          const collabId = resendBtn.getAttribute('data-resend-collab');
+          if (!collabId) return;
+          resendBtn.disabled = true;
+          clearCollabStatus();
+          try {
+            const response = await fetch(
+              '/api/sites/' +
+                encodeURIComponent(siteId) +
+                '/collaborators/' +
+                encodeURIComponent(collabId) +
+                '/resend',
+              {
+                method: 'POST',
+                headers: { accept: 'application/json' },
+              },
+            );
+            if (!response.ok) {
+              const detail = await responseDetail(response);
+              if (collabErr) collabErr.textContent = detail;
+              resendBtn.disabled = false;
+              return;
+            }
+            if (collabOk) collabOk.textContent = 'Invitation resent.';
+          } catch (e: unknown) {
+            const msg = e instanceof Error && e.message ? e.message : String(e);
+            if (collabErr) collabErr.textContent = 'Network error: ' + msg;
+          } finally {
+            resendBtn.disabled = false;
+          }
+          return;
+        }
+      })();
+    });
+
+    // Role change — fires PATCH on each change. On failure, revert to the
+    // previously persisted value (stashed in data-prev-role) so the dropdown
+    // doesn't visually claim a state the server didn't accept.
+    collabList.addEventListener('change', (event) => {
+      void (async (): Promise<void> => {
+        const target = event.target;
+        if (!(target instanceof HTMLSelectElement)) return;
+        if (!target.classList.contains('role-select')) return;
+        const collabId = target.getAttribute('data-role-collab');
         if (!collabId) return;
-        const confirmed = await window.__opencanvasModal.confirm(
-          'Remove this collaborator?',
-          { title: 'Remove collaborator', confirmLabel: 'Remove', danger: true },
-        );
-        if (!confirmed) return;
-        removeBtn.disabled = true;
+        const newRole = target.value;
+        const prevRole = target.getAttribute('data-prev-role') || 'editor';
+        if (newRole === prevRole) return;
+        target.disabled = true;
         clearCollabStatus();
         try {
           const response = await fetch(
@@ -343,102 +425,30 @@ function wireCollaborators(siteId: string): void {
               '/collaborators/' +
               encodeURIComponent(collabId),
             {
-              method: 'DELETE',
-              headers: { accept: 'application/json' },
+              method: 'PATCH',
+              headers: {
+                'content-type': 'application/json',
+                accept: 'application/json',
+              },
+              body: JSON.stringify({ role: newRole }),
             },
           );
           if (!response.ok) {
             const detail = await responseDetail(response);
             if (collabErr) collabErr.textContent = detail;
-            removeBtn.disabled = false;
+            target.value = prevRole;
             return;
           }
-          if (item) item.remove();
+          target.setAttribute('data-prev-role', newRole);
+          if (collabOk) collabOk.textContent = 'Role updated.';
         } catch (e: unknown) {
           const msg = e instanceof Error && e.message ? e.message : String(e);
           if (collabErr) collabErr.textContent = 'Network error: ' + msg;
-          removeBtn.disabled = false;
-        }
-        return;
-      }
-      if (resendBtn instanceof HTMLButtonElement) {
-        const collabId = resendBtn.getAttribute('data-resend-collab');
-        if (!collabId) return;
-        resendBtn.disabled = true;
-        clearCollabStatus();
-        try {
-          const response = await fetch(
-            '/api/sites/' +
-              encodeURIComponent(siteId) +
-              '/collaborators/' +
-              encodeURIComponent(collabId) +
-              '/resend',
-            {
-              method: 'POST',
-              headers: { accept: 'application/json' },
-            },
-          );
-          if (!response.ok) {
-            const detail = await responseDetail(response);
-            if (collabErr) collabErr.textContent = detail;
-            resendBtn.disabled = false;
-            return;
-          }
-          if (collabOk) collabOk.textContent = 'Invitation resent.';
-        } catch (e: unknown) {
-          const msg = e instanceof Error && e.message ? e.message : String(e);
-          if (collabErr) collabErr.textContent = 'Network error: ' + msg;
-        } finally {
-          resendBtn.disabled = false;
-        }
-        return;
-      }
-    });
-
-    // Role change — fires PATCH on each change. On failure, revert to the
-    // previously persisted value (stashed in data-prev-role) so the dropdown
-    // doesn't visually claim a state the server didn't accept.
-    collabList.addEventListener('change', async (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLSelectElement)) return;
-      if (!target.classList.contains('role-select')) return;
-      const collabId = target.getAttribute('data-role-collab');
-      if (!collabId) return;
-      const newRole = target.value;
-      const prevRole = target.getAttribute('data-prev-role') || 'editor';
-      if (newRole === prevRole) return;
-      target.disabled = true;
-      clearCollabStatus();
-      try {
-        const response = await fetch(
-          '/api/sites/' +
-            encodeURIComponent(siteId) +
-            '/collaborators/' +
-            encodeURIComponent(collabId),
-          {
-            method: 'PATCH',
-            headers: {
-              'content-type': 'application/json',
-              accept: 'application/json',
-            },
-            body: JSON.stringify({ role: newRole }),
-          },
-        );
-        if (!response.ok) {
-          const detail = await responseDetail(response);
-          if (collabErr) collabErr.textContent = detail;
           target.value = prevRole;
-          return;
+        } finally {
+          target.disabled = false;
         }
-        target.setAttribute('data-prev-role', newRole);
-        if (collabOk) collabOk.textContent = 'Role updated.';
-      } catch (e: unknown) {
-        const msg = e instanceof Error && e.message ? e.message : String(e);
-        if (collabErr) collabErr.textContent = 'Network error: ' + msg;
-        target.value = prevRole;
-      } finally {
-        target.disabled = false;
-      }
+      })();
     });
   }
 }
@@ -596,34 +606,36 @@ function wireFaviconPicker(
     }
   });
   if (modalUpload) {
-    modalUpload.addEventListener('change', async () => {
-      const file = modalUpload.files && modalUpload.files[0];
-      if (!file) return;
-      setStatus('Uploading ' + file.name + '…', false);
-      const fd = new FormData();
-      fd.append('file', file);
-      try {
-        const r = await fetch('/api/owner/assets', { method: 'POST', body: fd });
-        if (!r.ok) {
-          let detail = r.statusText;
-          try {
-            const b = (await r.json()) as AssetUploadResponse;
-            if (b && b.error) detail = b.error;
-          } catch {
-            /* noop */
+    modalUpload.addEventListener('change', () => {
+      void (async (): Promise<void> => {
+        const file = modalUpload.files && modalUpload.files[0];
+        if (!file) return;
+        setStatus('Uploading ' + file.name + '…', false);
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+          const r = await fetch('/api/owner/assets', { method: 'POST', body: fd });
+          if (!r.ok) {
+            let detail = r.statusText;
+            try {
+              const b = (await r.json()) as AssetUploadResponse;
+              if (b && b.error) detail = b.error;
+            } catch {
+              /* noop */
+            }
+            setStatus('Upload failed: ' + detail, true);
+            modalUpload.value = '';
+            return;
           }
-          setStatus('Upload failed: ' + detail, true);
+          const body = (await r.json()) as AssetUploadResponse;
           modalUpload.value = '';
-          return;
+          if (body && body.id) await commit(body.id);
+        } catch (e: unknown) {
+          const msg = e instanceof Error && e.message ? e.message : String(e);
+          setStatus('Network error: ' + msg, true);
+          modalUpload.value = '';
         }
-        const body = (await r.json()) as AssetUploadResponse;
-        modalUpload.value = '';
-        if (body && body.id) await commit(body.id);
-      } catch (e: unknown) {
-        const msg = e instanceof Error && e.message ? e.message : String(e);
-        setStatus('Network error: ' + msg, true);
-        modalUpload.value = '';
-      }
+      })();
     });
   }
 }
@@ -795,33 +807,35 @@ function wireDeleteSiteModal(siteId: string): void {
     });
   }
   if (confirmBtn)
-    confirmBtn.addEventListener('click', async () => {
-      if (input && input.value.trim() !== siteName) return;
-      confirmBtn.disabled = true;
-      if (errEl) errEl.textContent = '';
-      try {
-        const r = await fetch('/api/sites/' + encodeURIComponent(siteId), {
-          method: 'DELETE',
-          headers: { accept: 'application/json' },
-        });
-        if (r.ok) {
-          window.location.href = '/dashboard';
-          return;
-        }
-        let msg = 'Delete failed (' + r.status + ').';
+    confirmBtn.addEventListener('click', () => {
+      void (async (): Promise<void> => {
+        if (input && input.value.trim() !== siteName) return;
+        confirmBtn.disabled = true;
+        if (errEl) errEl.textContent = '';
         try {
-          const b = (await r.json()) as DeleteSiteResponse;
-          if (b && typeof b.error === 'string') msg = 'Delete failed: ' + b.error;
-        } catch {
-          /* noop */
+          const r = await fetch('/api/sites/' + encodeURIComponent(siteId), {
+            method: 'DELETE',
+            headers: { accept: 'application/json' },
+          });
+          if (r.ok) {
+            window.location.href = '/dashboard';
+            return;
+          }
+          let msg = 'Delete failed (' + r.status + ').';
+          try {
+            const b = (await r.json()) as DeleteSiteResponse;
+            if (b && typeof b.error === 'string') msg = 'Delete failed: ' + b.error;
+          } catch {
+            /* noop */
+          }
+          if (errEl) errEl.textContent = msg;
+          confirmBtn.disabled = false;
+        } catch (e: unknown) {
+          const msg = e instanceof Error && e.message ? e.message : String(e);
+          if (errEl) errEl.textContent = 'Network error: ' + msg;
+          confirmBtn.disabled = false;
         }
-        if (errEl) errEl.textContent = msg;
-        confirmBtn.disabled = false;
-      } catch (e: unknown) {
-        const msg = e instanceof Error && e.message ? e.message : String(e);
-        if (errEl) errEl.textContent = 'Network error: ' + msg;
-        confirmBtn.disabled = false;
-      }
+      })();
     });
 }
 

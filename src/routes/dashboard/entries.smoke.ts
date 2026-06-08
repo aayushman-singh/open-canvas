@@ -706,7 +706,8 @@ g.Element = class Element {};
 // excludes the directory). The cast threads a typed `mountEntries` out
 // without dragging the DOM-typed source file into the main project.
 const mod = (await import(
-  /* @vite-ignore */ '../../dashboard-client/entries.js' as string
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  /* @vite-ignore */ ('../../dashboard-client/entries.js' as string)
 )) as { mountEntries: () => void };
 const { mountEntries } = mod;
 
@@ -733,6 +734,7 @@ const event = {
 // handler enqueued, not the full response cycle, so we don't await
 // the handler's promise — we just give it microtask turns to push
 // the fetch through `JSON.stringify` and onto the queue.
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
 void formHandlers.submit!(event);
 await flushMicrotasks();
 
@@ -782,6 +784,7 @@ const event2 = {
     /* noop — already asserted above */
   },
 };
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
 void formHandlers.submit!(event2);
 await flushMicrotasks();
 {

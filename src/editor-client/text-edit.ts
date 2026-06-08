@@ -65,8 +65,6 @@ import type {
   OnLinkMouseEnterContext,
   OnLinkMouseLeaveContext,
   OnSelectionChangeForLinkPopoverContext,
-  RemoveLinkPopoverContext,
-  ShowLinkPopoverContext,
 } from './link-popover.js';
 import {
   onLinkMouseEnter,
@@ -103,8 +101,6 @@ export type BeginTextEditContext = StateContext &
   OnLinkMouseEnterContext &
   OnLinkMouseLeaveContext &
   OnSelectionChangeForLinkPopoverContext &
-  RemoveLinkPopoverContext &
-  ShowLinkPopoverContext &
   Pick<
     EditorContext,
     | 'editingSnapshot'
