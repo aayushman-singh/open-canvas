@@ -98,15 +98,30 @@ export function mountFormFields(
         });
         card.appendChild(field('Kind', kindSel));
 
+        const reqRow = document.createElement('div');
+        reqRow.className = 'field field--toggle';
+        const reqLabel = document.createElement('label');
+        reqLabel.className = 'opencanvas-toggle';
         const reqCheck = document.createElement('input');
         reqCheck.type = 'checkbox';
+        reqCheck.className = 'opencanvas-toggle-input';
         reqCheck.checked = !!f.required;
+        const reqTrack = document.createElement('span');
+        reqTrack.className = 'opencanvas-toggle-track';
+        reqTrack.setAttribute('aria-hidden', 'true');
+        const reqText = document.createElement('span');
+        reqText.className = 'opencanvas-toggle-text';
+        reqText.textContent = 'Required';
         reqCheck.addEventListener('change', function () {
           f.required = reqCheck.checked;
           ctx.rebuildElement(element.id);
           ctx.scheduleSave();
         });
-        card.appendChild(field('Required', reqCheck));
+        reqLabel.appendChild(reqCheck);
+        reqLabel.appendChild(reqTrack);
+        reqLabel.appendChild(reqText);
+        reqRow.appendChild(reqLabel);
+        card.appendChild(reqRow);
 
         if (f.kind !== 'checkbox') {
           const phInput = document.createElement('input');
@@ -333,17 +348,29 @@ export function mountFormStyle(
 
   function checkboxRowFor(key: keyof FormStyle, label: string): HTMLDivElement {
     const row = document.createElement('div');
-    row.className = 'style-row';
+    row.className = 'field field--toggle';
+    const lbl = document.createElement('label');
+    lbl.className = 'opencanvas-toggle';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
+    cb.className = 'opencanvas-toggle-input';
     cb.checked = !!fs[key];
+    const track = document.createElement('span');
+    track.className = 'opencanvas-toggle-track';
+    track.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.className = 'opencanvas-toggle-text';
+    text.textContent = label;
     cb.addEventListener('change', function () {
       if (cb.checked) (fs as Record<string, unknown>)[key as string] = true;
       else delete (fs as Record<string, unknown>)[key as string];
       commit();
     });
-    row.appendChild(cb);
-    return field(label, row);
+    lbl.appendChild(cb);
+    lbl.appendChild(track);
+    lbl.appendChild(text);
+    row.appendChild(lbl);
+    return row;
   }
 
   function section(title: string, rows: HTMLElement[]): HTMLDetailsElement {

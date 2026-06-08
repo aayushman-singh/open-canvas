@@ -204,6 +204,23 @@ label.lbl {
 .switch input:checked + .track { background: var(--red); }
 .switch input:checked + .track::after { transform: translateX(19px); }
 
+/* ---------- compact toggle pill (.opencanvas-toggle) ----------
+   Smaller cousin of .switch (32x18 vs 46x27) for inline use inside
+   inspectors, form rows and any settings list where the row already
+   carries the label and the pill is the trailing affordance.
+   The native input stays in the DOM (semantics + form submission +
+   focus ring) but is visually hidden; track + thumb give the user
+   the on/off cue. Whole label is the click target. */
+.opencanvas-toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+input.opencanvas-toggle-input { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; appearance: none; }
+.opencanvas-toggle-track { position: relative; display: inline-block; width: 32px; height: 18px; background: var(--line-2); border-radius: 999px; transition: background-color .15s ease; flex-shrink: 0; }
+.opencanvas-toggle-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: var(--surface); border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2); transition: transform .15s ease; }
+input.opencanvas-toggle-input:checked + .opencanvas-toggle-track { background: var(--red); }
+input.opencanvas-toggle-input:checked + .opencanvas-toggle-track::after { transform: translateX(14px); }
+input.opencanvas-toggle-input:focus-visible + .opencanvas-toggle-track { box-shadow: var(--ring); }
+input.opencanvas-toggle-input:disabled + .opencanvas-toggle-track { opacity: 0.5; cursor: not-allowed; }
+.opencanvas-toggle-text { font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--ink); }
+
 /* ---------- toggle (light/dark) ---------- */
 .theme-toggle {
   width: 40px; height: 40px;

@@ -391,16 +391,19 @@ export function renderPageInspector(ctx: EditorContext): void {
   h404.textContent = 'Custom 404 page';
   group404.appendChild(h404);
   const toggle404Row = document.createElement('label');
-  toggle404Row.style.display = 'flex';
-  toggle404Row.style.alignItems = 'center';
-  toggle404Row.style.gap = '8px';
-  toggle404Row.style.cursor = 'pointer';
+  toggle404Row.className = 'opencanvas-toggle';
   const toggle404Input = document.createElement('input');
   toggle404Input.type = 'checkbox';
+  toggle404Input.className = 'opencanvas-toggle-input';
   toggle404Input.checked = page.slug === '_404';
+  const toggle404Track = document.createElement('span');
+  toggle404Track.className = 'opencanvas-toggle-track';
+  toggle404Track.setAttribute('aria-hidden', 'true');
   const toggle404Text = document.createElement('span');
+  toggle404Text.className = 'opencanvas-toggle-text';
   toggle404Text.textContent = 'Use this page as the custom 404';
   toggle404Row.appendChild(toggle404Input);
+  toggle404Row.appendChild(toggle404Track);
   toggle404Row.appendChild(toggle404Text);
   function nextFreeSlugFor(targetPage: CanvasPage): string {
     let base = (targetPage.title || 'page')
