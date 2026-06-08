@@ -18,7 +18,6 @@ import type { DesignSectionInput, ElementNode } from './layout/tree.js';
 import {
   pickStyleKitField,
   type EditableSite,
-  type EditableSiteStyleKit,
   type PublishedSnapshot,
   type StyleKitPreset,
 } from './schema.js';

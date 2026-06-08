@@ -15,7 +15,6 @@ import type {
   CanvasSection,
   EditableSite,
   PublishedSnapshot,
-  StyleKit,
   TextElement,
 } from './schema.js';
 import { BUILT_IN_STYLE_KITS, pickStyleKitField } from './schema.js';

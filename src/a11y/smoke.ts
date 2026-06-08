@@ -31,7 +31,6 @@ import type {
   EditableSite,
   ContainerElement,
   MediaElement,
-  StyleKit,
   StyleKitPreset,
   TextElement,
 } from '../canvas/schema.js';
