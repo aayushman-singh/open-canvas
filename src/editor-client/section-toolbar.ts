@@ -16,7 +16,7 @@
 //   :11635-11721  handleSectionAction (the central toolbar dispatcher:
 //                  delete / duplicate / move-up / move-down / add-X /
 //                  save-to-library, with header/footer pinning rules)
-//   :11725-11770  saveToLibrary (POST /library/sections, three-modal flow)
+//   :11725-11770  saveToLibrary (POST /library/sections, single-modal flow)
 //   :11774-11820  saveSiteAsTemplate (POST /custom-templates, three-modal flow)
 //
 // Twins retire on ADR 0015 Phase 3 atomic cutover; until then, the
@@ -81,19 +81,22 @@
 //     paths are handled before the page lookup so site-level deletes
 //     don't fall through to the page-section branch.
 //
-//   - saveToLibraryImpl(ctx, section) — three-modal flow (name, optional
-//     description, visibility) then POST to /library/sections. Calls
-//     invalidateSectionsCache (ctx.sectionsCatalog + the module-level
-//     prefetch promise) on success so the next picker open re-fetches.
-//     Errors are loud — every failure path writes a "Save failed: …"
-//     status line; no silent swallows. The error narrowing matches
-//     ai-integration.ts / chat-session.ts: catch (err: unknown) routed
-//     through errorToString().
+//   - saveToLibraryImpl(ctx, section) — single-modal flow via
+//     ctx.openSaveFormModal (name, description, visibility on one screen)
+//     then POST to /library/sections. Clears ctx.sectionsCatalog (plus
+//     the module-level prefetch promise via invalidateSectionsCache) on
+//     success so the next picker open re-fetches. Errors are loud — every
+//     failure path writes a "Save failed: …" status line; no silent
+//     swallows. The error narrowing matches ai-integration.ts /
+//     chat-session.ts: catch (err: unknown) routed through
+//     errorToString(). Empty name falls back to the section's current
+//     name (or "Untitled") — never silently rejected — matching the
+//     prior chain's behaviour.
 //
-//   - saveSiteAsTemplateImpl(ctx) — three-modal flow (name, description,
-//     visibility) then POST to /custom-templates. Same error narrowing
-//     contract as saveToLibrary; refuses empty names with a status line
-//     instead of POSTing.
+//   - saveSiteAsTemplateImpl(ctx) — single-modal flow via
+//     ctx.openSaveFormModal then POST to /custom-templates. Name is
+//     required (nameRequired: true) so the Save button stays disabled
+//     until non-empty; a successful submit guarantees a valid name.
 //
 // Pure helpers reused from siblings:
 //   - nextZInArray / nextZ are already in ./z-order.ts (Phase 2d). The
@@ -403,29 +406,24 @@ export async function saveToLibraryImpl(
   ctx: EditorContext,
   section: CanvasSection,
 ): Promise<void> {
-  let name = await ctx.openTextModal({
+  const result = await ctx.openSaveFormModal({
     title: 'Save to library',
-    label: 'Section name',
-    defaultValue: section.name || '',
-  });
-  if (name === null) return;
-  if (name.trim().length === 0) name = section.name || 'Untitled';
-  const description = await ctx.openTextModal({
-    title: 'Save to library',
-    label: 'Description (optional)',
-    defaultValue: '',
-  });
-  if (description === null) return;
-  const visibility = await ctx.openSelectModal({
-    title: 'Save to library',
-    label: 'Where can this section be reused?',
-    options: [
+    nameLabel: 'Section name',
+    nameDefault: section.name || '',
+    descriptionLabel: 'Description (optional)',
+    visibilityLabel: 'Where can this section be reused?',
+    visibilityOptions: [
       { value: 'private', label: 'Private — only my sites' },
       { value: 'global', label: 'Community — shared with everyone' },
     ],
-    defaultValue: 'private',
+    visibilityDefault: 'private',
+    submitLabel: 'Save to library',
   });
-  if (visibility === null) return;
+  if (result === null) return;
+  // Match the prior three-modal flow's behaviour: an empty name falls back
+  // to the section's current name (or "Untitled"), never to a silent
+  // rejection.
+  const name = result.name.length > 0 ? result.name : section.name || 'Untitled';
   try {
     const saved = await ctx.flushPendingSave();
     if (!saved) return;
@@ -436,9 +434,9 @@ export async function saveToLibraryImpl(
       body: JSON.stringify({
         siteId: ctx.siteId,
         sectionId: section.id,
-        name: name.trim(),
-        description: description.trim(),
-        visibility: visibility,
+        name: name,
+        description: result.description,
+        visibility: result.visibility,
       }),
     });
     if (!response.ok) {
@@ -471,32 +469,23 @@ export async function saveToLibraryImpl(
 export async function saveSiteAsTemplateImpl(ctx: EditorContext): Promise<void> {
   const firstPageTitle =
     ctx.state && ctx.state.pages && ctx.state.pages[0] ? ctx.state.pages[0].title : '';
-  const name = await ctx.openTextModal({
+  const result = await ctx.openSaveFormModal({
     title: 'Save as template',
-    label: 'Template name',
-    defaultValue: firstPageTitle,
-  });
-  if (name === null) return;
-  if (name.trim().length === 0) {
-    ctx.setStatus('Template name is required', 'error');
-    return;
-  }
-  const tagline = await ctx.openTextModal({
-    title: 'Save as template',
-    label: 'Description',
-    defaultValue: '',
-  });
-  if (tagline === null) return;
-  const visibility = await ctx.openSelectModal({
-    title: 'Save as template',
-    label: 'Who can use this template?',
-    options: [
+    nameLabel: 'Template name',
+    nameDefault: firstPageTitle,
+    nameRequired: true,
+    descriptionLabel: 'Description',
+    visibilityLabel: 'Who can use this template?',
+    visibilityOptions: [
       { value: 'private', label: 'Private — only me' },
       { value: 'global', label: 'Community — anyone on Open Canvas' },
     ],
-    defaultValue: 'private',
+    visibilityDefault: 'private',
+    submitLabel: 'Save as template',
   });
-  if (visibility === null) return;
+  if (result === null) return;
+  // nameRequired keeps the Save button disabled until non-empty, so a
+  // successful submit guarantees result.name is non-empty here.
   try {
     const saved = await ctx.flushPendingSave();
     if (!saved) return;
@@ -506,9 +495,9 @@ export async function saveSiteAsTemplateImpl(ctx: EditorContext): Promise<void> 
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         siteId: ctx.siteId,
-        name: name.trim(),
-        tagline: tagline.trim(),
-        visibility: visibility,
+        name: result.name,
+        tagline: result.description,
+        visibility: result.visibility,
       }),
     });
     if (!response.ok) {

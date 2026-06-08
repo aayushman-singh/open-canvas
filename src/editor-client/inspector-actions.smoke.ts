@@ -180,6 +180,9 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     openNewPageModal: () => {
       throw new Error('openNewPageModal stub: smoke does not exercise modals');
     },
+    openSaveFormModal: () => {
+      throw new Error('openSaveFormModal stub: smoke does not exercise modals');
+    },
     applyPageMotionAttributes: () => {},
     applyPageStyleProperties: () => {},
     pageRenderWidth: () => {

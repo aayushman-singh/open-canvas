@@ -1,38 +1,49 @@
 // src/editor-client/modals.ts
 //
 // ADR 0058 Phase 2q.a — modal cluster.
-// canvas-client.ts:1194-1957 carries the inline twin for the six modal
-// openers (openTextModal, openSelectModal, openConfirmModal,
-// openAlertModal, openAiMediaModal, openNewPageModal) plus the shared
-// modalOpen flag and the window.__opencanvasModal global registration
-// that wraps three of them as confirm/alert/prompt helpers. All retire
-// on ADR 0015 Phase 3 atomic cutover; until then, the inline IIFE is
-// the production source-of-truth and this module is dead code.
+// Module-of-record for the editor surface's modal openers. The inline
+// twin in canvas-client.ts has retired; consumers route through ctx
+// bindings owned by this file.
 //
-// Six openers live here, each enforcing the same hard sync gate against
+// Dismissal model — backdrop click is inert across every opener. Modals
+// dismiss only through explicit affordances: the Cancel / × button, the
+// Escape key, or the OK / Enter commit path. The earlier click-off-to-
+// dismiss behaviour ate in-progress data on long-form modals (Save to
+// library, AI brief, snapshot label) — restricting dismissal to explicit
+// affordances eliminates that footgun for every modal at once.
+//
+// Seven openers live here, each enforcing the same hard sync gate against
 // ctx.modalOpen and each restoring the flag in their close() path:
 //
 //   - openTextModalImpl(ctx, opts) — single- or multi-line text prompt.
 //     Resolves to the input value on OK/Enter (Ctrl/Cmd+Enter when
-//     multiline), null on Cancel/Escape/backdrop click. Used for rename,
-//     "Save to library" name + description, AI brief prompts, snapshot
-//     labels, and the rest of the prompt-style modal callers.
+//     multiline), null on Cancel/Escape. Used for rename, AI brief
+//     prompts, snapshot labels, and the rest of the prompt-style modal
+//     callers.
 //
 //   - openSelectModalImpl(ctx, opts) — single-pick from a fixed option
 //     list. Resolves to the chosen value on OK/Enter, null on Cancel/
-//     Escape. Used for visibility pickers ("public" / "private") in the
-//     "Save to library" / "Save as template" flows.
+//     Escape.
 //
 //   - openConfirmModalImpl(ctx, opts) — OK/Cancel confirmation with
 //     optional danger styling on the confirm button. Resolves true on
-//     OK/Enter, false on Cancel/Escape/backdrop click. Drives the
-//     destructive-action confirms (delete page, delete asset, delete
-//     snapshot) and the "open the live site after publish" prompt.
+//     OK/Enter, false on Cancel/Escape. Drives the destructive-action
+//     confirms (delete page, delete asset, delete snapshot) and the
+//     "open the live site after publish" prompt.
 //
 //   - openAlertModalImpl(ctx, opts) — single-button OK acknowledgement,
 //     wired with role="alertdialog" so AT announces it as an alert. Both
 //     OK/Enter and Escape close. Resolves to void. Used for AI preview
 //     failures, publish failures, and the publish-error toast escape.
+//
+//   - openSaveFormModalImpl(ctx, opts) — consolidated save-form modal
+//     carrying name + description + visibility on one screen. Replaces
+//     the prior three-modal chain used by "Save to library" and "Save as
+//     template". Carries an explicit × close button in the header in
+//     addition to the Cancel button. Resolves to {name, description,
+//     visibility} on Save or null on Cancel / × / Escape. The name field
+//     is required when opts.nameRequired is true; the Save button stays
+//     disabled until the field is non-empty.
 //
 //   - openAiMediaModalImpl(ctx, opts) — prompt textarea + aspect-ratio
 //     radio row + 4-up preview gallery. requestFn(prompt, aspectRatio)
@@ -53,11 +64,11 @@
 //     to {title, slug, locale} on submit or null on cancel.
 //
 // CRITICAL — modal stacking semantics: every opener throws synchronously
-// if ctx.modalOpen is already true. Callers serialise modals themselves
-// (e.g. saveToLibrary chains name → description → visibility through
-// three sequential awaits). The throw is preserved verbatim from the
-// inline twin so a forgotten serialisation surfaces as a loud error
-// rather than two stacked dialogs.
+// if ctx.modalOpen is already true. Callers serialise modals themselves;
+// the throw surfaces a forgotten serialisation as a loud error rather
+// than two stacked dialogs. (Historical note: saveToLibrary used to chain
+// name → description → visibility through three sequential awaits, which
+// is what motivated openSaveFormModalImpl below.)
 //
 // The window.__opencanvasModal global registration (canvas-client.ts:
 // 1953-1957 in the pre-cutover IIFE) is now performed by
@@ -136,6 +147,27 @@ export interface NewPageModalResult {
   slug: string;
   /** null when "Site default" is chosen; otherwise a BCP-47 tag. */
   locale: string | null;
+}
+
+/** Options for the consolidated "Save to library" / "Save as template" form
+ *  modal. Replaces the prior three-modal chain (name → description →
+ *  visibility) with a single screen carrying all three fields. */
+export interface SaveFormModalOpts {
+  title: string;
+  nameLabel: string;
+  nameDefault?: string | undefined;
+  nameRequired?: boolean | undefined;
+  descriptionLabel: string;
+  visibilityLabel: string;
+  visibilityOptions: SelectModalOption[];
+  visibilityDefault?: string | undefined;
+  submitLabel?: string | undefined;
+}
+
+export interface SaveFormModalResult {
+  name: string;
+  description: string;
+  visibility: string;
 }
 
 // ---- Error narrowing helper -------------------------------------------
@@ -234,9 +266,11 @@ export function openTextModalImpl(
         close(input.value);
       }
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close(null);
-    });
+    // Backdrop click is intentionally inert — modals close only via the
+    // Cancel button, Escape key, or OK / Enter commit. The earlier
+    // click-off-to-dismiss behaviour caused accidental data loss during
+    // long-form edits ("Save to library" name, AI brief, snapshot label),
+    // so the dismiss surface is now restricted to explicit affordances.
     cancel.addEventListener('click', () => close(null));
     ok.addEventListener('click', () => close(input.value));
     document.addEventListener('keydown', onKey, true);
@@ -336,9 +370,7 @@ export function openSelectModalImpl(
         close(select.value);
       }
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close(null);
-    });
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
     cancel.addEventListener('click', () => close(null));
     ok.addEventListener('click', () => close(select.value));
     document.addEventListener('keydown', onKey, true);
@@ -419,9 +451,7 @@ export function openConfirmModalImpl(
         close(true);
       }
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close(false);
-    });
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
     cancel.addEventListener('click', () => {
       close(false);
     });
@@ -705,9 +735,7 @@ export function openAiMediaModalImpl(
         close(null);
       }
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close(null);
-    });
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
     cancel.addEventListener('click', () => {
       close(null);
     });
@@ -917,9 +945,7 @@ export function openNewPageModalImpl(
         locale: locale,
       });
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close(null);
-    });
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
     cancel.addEventListener('click', () => {
       close(null);
     });
@@ -987,14 +1013,187 @@ export function openAlertModalImpl(
         close();
       }
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close();
-    });
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
     ok.addEventListener('click', close);
     document.addEventListener('keydown', onKey, true);
     document.body.classList.add('opencanvas-modal-open');
     document.body.appendChild(backdrop);
     ok.focus();
+  });
+}
+
+// ---- openSaveFormModal -------------------------------------------------
+
+/** Consolidated "Save to library" / "Save as template" form modal.
+ *  Carries name, description, and visibility on a single screen, replacing
+ *  the prior three-modal chain. Header includes an explicit × close button
+ *  (aria-label "Close") in addition to the Cancel button so the dismiss
+ *  affordance is visually obvious — the backdrop is inert. Save stays
+ *  disabled until the name field is non-empty when opts.nameRequired is
+ *  true. Resolves with the field bundle on Save and null on every cancel
+ *  path (×, Cancel, Escape). */
+export function openSaveFormModalImpl(
+  ctx: EditorContext,
+  opts: SaveFormModalOpts,
+): Promise<SaveFormModalResult | null> {
+  if (ctx.modalOpen) {
+    throw new Error('openSaveFormModal: another modal is already open');
+  }
+  const title = opts.title;
+  const nameLabel = opts.nameLabel;
+  const nameDefault = typeof opts.nameDefault === 'string' ? opts.nameDefault : '';
+  const nameRequired = opts.nameRequired === true;
+  const descriptionLabel = opts.descriptionLabel;
+  const visibilityLabel = opts.visibilityLabel;
+  const visibilityOptions = Array.isArray(opts.visibilityOptions) ? opts.visibilityOptions : [];
+  const visibilityDefault =
+    typeof opts.visibilityDefault === 'string' ? opts.visibilityDefault : '';
+  const submitLabel = typeof opts.submitLabel === 'string' ? opts.submitLabel : 'Save';
+  ctx.modalOpen = true;
+  return new Promise<SaveFormModalResult | null>((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'opencanvas-modal-backdrop';
+    const panel = document.createElement('div');
+    panel.className = 'opencanvas-modal';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-label', title);
+
+    // Header row: title + × close button.
+    const header = document.createElement('div');
+    header.className = 'opencanvas-modal-header';
+    const h = document.createElement('h3');
+    h.textContent = title;
+    header.appendChild(h);
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'opencanvas-modal-close';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.textContent = '×';
+    header.appendChild(closeBtn);
+    panel.appendChild(header);
+
+    // Name field.
+    const nameLbl = document.createElement('label');
+    nameLbl.textContent = nameLabel;
+    panel.appendChild(nameLbl);
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = nameDefault;
+    panel.appendChild(nameInput);
+
+    // Description field.
+    const descLbl = document.createElement('label');
+    descLbl.textContent = descriptionLabel;
+    panel.appendChild(descLbl);
+    const descInput = document.createElement('textarea');
+    descInput.rows = 3;
+    panel.appendChild(descInput);
+
+    // Visibility field.
+    const visLbl = document.createElement('label');
+    visLbl.textContent = visibilityLabel;
+    panel.appendChild(visLbl);
+    const visSelect = document.createElement('select');
+    let matched = false;
+    for (let i = 0; i < visibilityOptions.length; i++) {
+      const opt = visibilityOptions[i];
+      if (!opt || typeof opt.value !== 'string') continue;
+      const optEl = document.createElement('option');
+      optEl.value = opt.value;
+      optEl.textContent = typeof opt.label === 'string' ? opt.label : opt.value;
+      if (opt.value === visibilityDefault) {
+        optEl.selected = true;
+        matched = true;
+      }
+      visSelect.appendChild(optEl);
+    }
+    if (!matched && visibilityOptions.length > 0) {
+      visSelect.selectedIndex = 0;
+    }
+    panel.appendChild(visSelect);
+
+    // Inline error region (kept short — the actual save POST surfaces
+    // server errors via ctx.setStatus on the caller side).
+    const errorLine = document.createElement('div');
+    errorLine.style.cssText = 'min-height:18px;font-size:12px;color:#ef4444;margin:8px 0';
+    panel.appendChild(errorLine);
+
+    const actions = document.createElement('div');
+    actions.className = 'opencanvas-modal-actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel';
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.textContent = submitLabel;
+    actions.appendChild(cancel);
+    actions.appendChild(ok);
+    panel.appendChild(actions);
+
+    backdrop.appendChild(panel);
+
+    function validate(): void {
+      if (nameRequired) {
+        const trimmed = nameInput.value.trim();
+        if (trimmed.length === 0) {
+          ok.disabled = true;
+          return;
+        }
+      }
+      errorLine.textContent = '';
+      ok.disabled = false;
+    }
+    nameInput.addEventListener('input', validate);
+
+    function close(value: SaveFormModalResult | null): void {
+      document.removeEventListener('keydown', onKey, true);
+      if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+      document.body.classList.remove('opencanvas-modal-open');
+      ctx.modalOpen = false;
+      resolve(value);
+    }
+    function onKey(ev: KeyboardEvent): void {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        close(null);
+        return;
+      }
+      if (ev.key === 'Enter') {
+        // Ignore Enter from the description textarea so multi-line input
+        // works naturally.
+        if (document.activeElement === descInput) return;
+        if (ok.disabled) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        submit();
+      }
+    }
+    function submit(): void {
+      const name = nameInput.value.trim();
+      if (nameRequired && name.length === 0) {
+        errorLine.textContent = nameLabel + ' is required.';
+        nameInput.focus();
+        return;
+      }
+      close({
+        name: name,
+        description: descInput.value.trim(),
+        visibility: visSelect.value,
+      });
+    }
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
+    closeBtn.addEventListener('click', () => close(null));
+    cancel.addEventListener('click', () => close(null));
+    ok.addEventListener('click', submit);
+    document.addEventListener('keydown', onKey, true);
+
+    document.body.classList.add('opencanvas-modal-open');
+    document.body.appendChild(backdrop);
+    nameInput.focus();
+    if (typeof nameInput.select === 'function') nameInput.select();
+    validate();
   });
 }
 

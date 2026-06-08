@@ -3856,6 +3856,44 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   text-transform: none;
   color: var(--ink);
 }
+.opencanvas-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px -4px 0 0;
+}
+.opencanvas-modal-header h3 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.opencanvas-modal-close {
+  appearance: none;
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 22px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.opencanvas-modal-close:hover,
+.opencanvas-modal-close:focus-visible {
+  background: var(--surface-2, var(--surface));
+  border-color: var(--line-2);
+  color: var(--ink);
+  outline: none;
+}
 .opencanvas-modal label {
   font-family: var(--sans);
   font-size: 12.5px;
