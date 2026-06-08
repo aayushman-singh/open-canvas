@@ -61,13 +61,7 @@ import {
   removeMarkToolbar,
   applyMarkImpl,
 } from './mark-toolbar.js';
-import type {
-  OnLinkMouseEnterContext,
-  OnLinkMouseLeaveContext,
-  OnSelectionChangeForLinkPopoverContext,
-  RemoveLinkPopoverContext,
-  ShowLinkPopoverContext,
-} from './link-popover.js';
+import type { OnSelectionChangeForLinkPopoverContext } from './link-popover.js';
 import {
   onLinkMouseEnter,
   onLinkMouseLeave,
@@ -100,11 +94,7 @@ export type BeginTextEditContext = StateContext &
   BuildMarkToolbarContext &
   RemoveMarkToolbarContext &
   ApplyMarkImplContext &
-  OnLinkMouseEnterContext &
-  OnLinkMouseLeaveContext &
   OnSelectionChangeForLinkPopoverContext &
-  RemoveLinkPopoverContext &
-  ShowLinkPopoverContext &
   Pick<
     EditorContext,
     | 'editingSnapshot'

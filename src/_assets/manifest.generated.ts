@@ -11,5 +11,5 @@ export const EDITOR_CLIENT_MANIFEST = {
   canvasClientUrl: "/_assets/index-kpy386xk.js",
   canvasStylesUrl: "/_assets/index-gg21wpz7.css",
   coEditUrl: "/_assets/co-edit-4yhpsm2m.js",
-  dashboardClientUrl: "/_assets/dashboard-7fqrp81s.js",
+  dashboardClientUrl: "/_assets/dashboard-9xbjjk2w.js",
 } as const;

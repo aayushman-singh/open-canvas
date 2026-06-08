@@ -132,120 +132,124 @@ function slugify(value: string): string {
 function wireNewCollectionButton(siteId: string): void {
   const button = document.querySelector<HTMLButtonElement>('[data-new-collection]');
   if (!button) return;
-  button.addEventListener('click', async () => {
-    // `prompt` is registered by the shell but not exposed on the merged
-    // `OpencanvasModalGlobal` Window interface (the other dashboard
-    // mounts don't need it and adding it there would trip TS2717). Cast
-    // locally so the call stays typed without polluting the shared
-    // global. Loud failure if the shell didn't register prompt: the
-    // resulting TypeError surfaces as a runtime error in the wizard
-    // click handler, matching the all-or-nothing failure posture.
-    const modal = window.__opencanvasModal as OpencanvasModalGlobalWithPrompt;
-    const raw = await modal.prompt(
-      'Pick a slug for this collection (e.g. "blog", "case-studies"). One word, lowercase.',
-      '',
-      'New collection',
-    );
-    if (raw === null) return;
-    const slug = slugify(raw);
-    if (slug.length === 0) {
-      await window.__opencanvasModal.alert(
-        'Slug must contain at least one lowercase letter or digit.',
+  button.addEventListener('click', () => {
+    void (async (): Promise<void> => {
+      // `prompt` is registered by the shell but not exposed on the merged
+      // `OpencanvasModalGlobal` Window interface (the other dashboard
+      // mounts don't need it and adding it there would trip TS2717). Cast
+      // locally so the call stays typed without polluting the shared
+      // global. Loud failure if the shell didn't register prompt: the
+      // resulting TypeError surfaces as a runtime error in the wizard
+      // click handler, matching the all-or-nothing failure posture.
+      const modal = window.__opencanvasModal as OpencanvasModalGlobalWithPrompt;
+      const raw = await modal.prompt(
+        'Pick a slug for this collection (e.g. "blog", "case-studies"). One word, lowercase.',
+        '',
         'New collection',
       );
-      return;
-    }
-    try {
-      const response = await fetch(
-        '/api/sites/' + encodeURIComponent(siteId) + '/collections',
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            accept: 'application/json',
-          },
-          body: JSON.stringify({ slug }),
-        },
-      );
-      if (!response.ok) {
-        let detail = response.statusText;
-        try {
-          const body = (await response.json()) as CollectionCreateResponse;
-          if (body && typeof body.error === 'string') detail = body.error;
-        } catch {
-          /* not JSON — fall back to statusText */
-        }
+      if (raw === null) return;
+      const slug = slugify(raw);
+      if (slug.length === 0) {
         await window.__opencanvasModal.alert(
-          'Could not create collection: ' + detail,
+          'Slug must contain at least one lowercase letter or digit.',
           'New collection',
         );
         return;
       }
-      let redirect: string =
-        '/dashboard/sites/' +
-        encodeURIComponent(siteId) +
-        '/entries?collection=' +
-        encodeURIComponent(slug);
       try {
-        const data = (await response.json()) as CollectionCreateResponse;
-        if (data && typeof data.redirectTo === 'string') redirect = data.redirectTo;
-      } catch {
-        /* not JSON — keep the derived default redirect */
+        const response = await fetch(
+          '/api/sites/' + encodeURIComponent(siteId) + '/collections',
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              accept: 'application/json',
+            },
+            body: JSON.stringify({ slug }),
+          },
+        );
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = (await response.json()) as CollectionCreateResponse;
+            if (body && typeof body.error === 'string') detail = body.error;
+          } catch {
+            /* not JSON — fall back to statusText */
+          }
+          await window.__opencanvasModal.alert(
+            'Could not create collection: ' + detail,
+            'New collection',
+          );
+          return;
+        }
+        let redirect: string =
+          '/dashboard/sites/' +
+          encodeURIComponent(siteId) +
+          '/entries?collection=' +
+          encodeURIComponent(slug);
+        try {
+          const data = (await response.json()) as CollectionCreateResponse;
+          if (data && typeof data.redirectTo === 'string') redirect = data.redirectTo;
+        } catch {
+          /* not JSON — keep the derived default redirect */
+        }
+        window.location.href = redirect;
+      } catch (e: unknown) {
+        const msg = e instanceof Error && e.message ? e.message : String(e);
+        await window.__opencanvasModal.alert(
+          'Network error: ' + msg,
+          'New collection',
+        );
       }
-      window.location.href = redirect;
-    } catch (e: unknown) {
-      const msg = e instanceof Error && e.message ? e.message : String(e);
-      await window.__opencanvasModal.alert(
-        'Network error: ' + msg,
-        'New collection',
-      );
-    }
+    })();
   });
 }
 
 function wireDeleteEntryButtons(siteId: string): void {
   const buttons = document.querySelectorAll<HTMLButtonElement>('[data-delete-entry]');
   buttons.forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-delete-entry');
-      const title = btn.getAttribute('data-entry-title') || 'this entry';
-      if (!id) return;
-      const ok = await window.__opencanvasModal.confirm(
-        'Delete "' + title + '"? This cannot be undone.',
-        { title: 'Delete entry', confirmLabel: 'Delete', danger: true },
-      );
-      if (!ok) return;
-      try {
-        const response = await fetch(
-          '/api/sites/' +
-            encodeURIComponent(siteId) +
-            '/entries/' +
-            encodeURIComponent(id),
-          { method: 'DELETE' },
+    btn.addEventListener('click', () => {
+      void (async (): Promise<void> => {
+        const id = btn.getAttribute('data-delete-entry');
+        const title = btn.getAttribute('data-entry-title') || 'this entry';
+        if (!id) return;
+        const ok = await window.__opencanvasModal.confirm(
+          'Delete "' + title + '"? This cannot be undone.',
+          { title: 'Delete entry', confirmLabel: 'Delete', danger: true },
         );
-        if (!response.ok && response.status !== 204) {
-          let detail = response.statusText;
-          try {
-            const body = (await response.json()) as EntryDeleteResponse;
-            if (body && typeof body.error === 'string') detail = body.error;
-          } catch {
-            /* not JSON — fall back to statusText */
+        if (!ok) return;
+        try {
+          const response = await fetch(
+            '/api/sites/' +
+              encodeURIComponent(siteId) +
+              '/entries/' +
+              encodeURIComponent(id),
+            { method: 'DELETE' },
+          );
+          if (!response.ok && response.status !== 204) {
+            let detail = response.statusText;
+            try {
+              const body = (await response.json()) as EntryDeleteResponse;
+              if (body && typeof body.error === 'string') detail = body.error;
+            } catch {
+              /* not JSON — fall back to statusText */
+            }
+            await window.__opencanvasModal.alert(
+              'Delete failed: ' + detail,
+              'Delete entry',
+            );
+            return;
           }
+          const row = btn.closest('[data-entry-id]');
+          if (row && row.parentNode) row.parentNode.removeChild(row);
+        } catch (e: unknown) {
+          const msg = e instanceof Error && e.message ? e.message : String(e);
           await window.__opencanvasModal.alert(
-            'Delete failed: ' + detail,
+            'Network error: ' + msg,
             'Delete entry',
           );
-          return;
         }
-        const row = btn.closest('[data-entry-id]');
-        if (row && row.parentNode) row.parentNode.removeChild(row);
-      } catch (e: unknown) {
-        const msg = e instanceof Error && e.message ? e.message : String(e);
-        await window.__opencanvasModal.alert(
-          'Network error: ' + msg,
-          'Delete entry',
-        );
-      }
+      })();
     });
   });
 }
@@ -320,93 +324,95 @@ function wireEntryFormIfPresent(siteId: string): void {
     msg.className = 'msg ' + kind;
   }
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    showMsg('Saving…', 'ok');
-    const mode = form.getAttribute('data-mode');
-    const entryId = form.getAttribute('data-entry-id') || '';
-    const tagsRaw = form.tags.value.trim();
-    const folderRaw = form.folder ? form.folder.value.trim() : '';
-    const folderError = validateFolder(folderRaw);
-    if (folderError) {
-      showMsg(folderError, 'err');
-      return;
-    }
-    const payload = {
-      collectionSlug: form.collectionSlug.value,
-      title: form.title.value.trim(),
-      slug: kebab(form.slug.value.trim()),
-      excerpt: form.excerpt.value,
-      body: form.body.value,
-      publishedDate: form.publishedDate.value,
-      author: form.author.value.trim(),
-      category: form.category.value.trim(),
-      tags:
-        tagsRaw.length > 0
-          ? tagsRaw
-              .split(',')
-              .map((t) => t.trim())
-              .filter(Boolean)
-          : [],
-      status: form.status.value,
-      // Empty input means "ungrouped" — serialise to null so the API
-      // never sees an empty-string folder. Server rejects '' loudly; we
-      // filter here so the round trip succeeds for the natural
-      // empty-input case.
-      folder: folderRaw.length > 0 ? folderRaw : null,
-    };
-    if (payload.title.length === 0) {
-      showMsg('Title is required.', 'err');
-      return;
-    }
-    if (payload.slug.length === 0) {
-      showMsg('Slug is required.', 'err');
-      return;
-    }
-    if (payload.publishedDate.length === 0) {
-      showMsg('Published date is required.', 'err');
-      return;
-    }
-
-    const url =
-      mode === 'edit'
-        ? '/api/sites/' +
-          encodeURIComponent(siteId) +
-          '/entries/' +
-          encodeURIComponent(entryId)
-        : '/api/sites/' + encodeURIComponent(siteId) + '/entries';
-    const method = mode === 'edit' ? 'PATCH' : 'POST';
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'content-type': 'application/json',
-          accept: 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        let detail = response.statusText;
-        try {
-          const body = (await response.json()) as EntrySaveResponse;
-          if (body && typeof body.error === 'string') detail = body.error;
-        } catch {
-          /* not JSON — fall back to statusText */
-        }
-        showMsg('Save failed: ' + detail, 'err');
+  form.addEventListener('submit', (event) => {
+    void (async (): Promise<void> => {
+      event.preventDefault();
+      showMsg('Saving…', 'ok');
+      const mode = form.getAttribute('data-mode');
+      const entryId = form.getAttribute('data-entry-id') || '';
+      const tagsRaw = form.tags.value.trim();
+      const folderRaw = form.folder ? form.folder.value.trim() : '';
+      const folderError = validateFolder(folderRaw);
+      if (folderError) {
+        showMsg(folderError, 'err');
         return;
       }
-      // On success, return to the list filtered to this collection.
-      const collection = encodeURIComponent(payload.collectionSlug);
-      window.location.href =
-        '/dashboard/sites/' +
-        encodeURIComponent(siteId) +
-        '/entries?collection=' +
-        collection;
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error && e.message ? e.message : String(e);
-      showMsg('Network error: ' + errMsg, 'err');
-    }
+      const payload = {
+        collectionSlug: form.collectionSlug.value,
+        title: form.title.value.trim(),
+        slug: kebab(form.slug.value.trim()),
+        excerpt: form.excerpt.value,
+        body: form.body.value,
+        publishedDate: form.publishedDate.value,
+        author: form.author.value.trim(),
+        category: form.category.value.trim(),
+        tags:
+          tagsRaw.length > 0
+            ? tagsRaw
+                .split(',')
+                .map((t) => t.trim())
+                .filter(Boolean)
+            : [],
+        status: form.status.value,
+        // Empty input means "ungrouped" — serialise to null so the API
+        // never sees an empty-string folder. Server rejects '' loudly; we
+        // filter here so the round trip succeeds for the natural
+        // empty-input case.
+        folder: folderRaw.length > 0 ? folderRaw : null,
+      };
+      if (payload.title.length === 0) {
+        showMsg('Title is required.', 'err');
+        return;
+      }
+      if (payload.slug.length === 0) {
+        showMsg('Slug is required.', 'err');
+        return;
+      }
+      if (payload.publishedDate.length === 0) {
+        showMsg('Published date is required.', 'err');
+        return;
+      }
+
+      const url =
+        mode === 'edit'
+          ? '/api/sites/' +
+            encodeURIComponent(siteId) +
+            '/entries/' +
+            encodeURIComponent(entryId)
+          : '/api/sites/' + encodeURIComponent(siteId) + '/entries';
+      const method = mode === 'edit' ? 'PATCH' : 'POST';
+      try {
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'content-type': 'application/json',
+            accept: 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = (await response.json()) as EntrySaveResponse;
+            if (body && typeof body.error === 'string') detail = body.error;
+          } catch {
+            /* not JSON — fall back to statusText */
+          }
+          showMsg('Save failed: ' + detail, 'err');
+          return;
+        }
+        // On success, return to the list filtered to this collection.
+        const collection = encodeURIComponent(payload.collectionSlug);
+        window.location.href =
+          '/dashboard/sites/' +
+          encodeURIComponent(siteId) +
+          '/entries?collection=' +
+          collection;
+      } catch (e: unknown) {
+        const errMsg = e instanceof Error && e.message ? e.message : String(e);
+        showMsg('Network error: ' + errMsg, 'err');
+      }
+    })();
   });
 }
 

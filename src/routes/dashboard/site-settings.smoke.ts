@@ -288,10 +288,11 @@ g.setTimeout = (): number => 0;
 // We dynamic-import the dashboard-client module to avoid the main
 // tsconfig pulling DOM types in transitively (the dashboard-client/
 // tsconfig.json owns its own DOM lib; the main project deliberately
-// excludes the directory). The cast threads a typed `mountSiteSettings`
-// out without dragging the DOM-typed source file into the main project.
+// excludes the directory). Keep the import specifier behind a string
+// variable so TypeScript does not statically resolve the DOM-only source.
+const siteSettingsClientPath = '../../dashboard-client/site-settings.js';
 const mod = (await import(
-  /* @vite-ignore */ '../../dashboard-client/site-settings.js' as string
+  /* @vite-ignore */ siteSettingsClientPath
 )) as { mountSiteSettings: () => void };
 const { mountSiteSettings } = mod;
 

@@ -703,10 +703,11 @@ g.Element = class Element {};
 // We dynamic-import the dashboard-client module to avoid the main
 // tsconfig pulling DOM types in transitively (the dashboard-client/
 // tsconfig.json owns its own DOM lib; the main project deliberately
-// excludes the directory). The cast threads a typed `mountEntries` out
-// without dragging the DOM-typed source file into the main project.
+// excludes the directory). Keep the import specifier behind a string
+// variable so TypeScript does not statically resolve the DOM-only source.
+const entriesClientPath = '../../dashboard-client/entries.js';
 const mod = (await import(
-  /* @vite-ignore */ '../../dashboard-client/entries.js' as string
+  /* @vite-ignore */ entriesClientPath
 )) as { mountEntries: () => void };
 const { mountEntries } = mod;
 
@@ -733,7 +734,7 @@ const event = {
 // handler enqueued, not the full response cycle, so we don't await
 // the handler's promise — we just give it microtask turns to push
 // the fetch through `JSON.stringify` and onto the queue.
-void formHandlers.submit!(event);
+void formHandlers.submit(event);
 await flushMicrotasks();
 
 assert(defaultPrevented, '(8) submit handler must call event.preventDefault()');
@@ -782,7 +783,7 @@ const event2 = {
     /* noop — already asserted above */
   },
 };
-void formHandlers.submit!(event2);
+void formHandlers.submit(event2);
 await flushMicrotasks();
 {
   const secondSubmitFetchCount: number = queuedFetches.length;
