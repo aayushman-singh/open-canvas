@@ -1,7 +1,7 @@
 // scripts/bundle-co-edit.ts
 //
 // Bundles src/live/co-edit/browser-entry.ts (which re-exports connectCoEdit
-// and attaches it to `window.__rev01CoEdit`) plus its Yjs / y-protocols deps
+// and attaches it to `window.__opencanvasCoEdit`) plus its Yjs / y-protocols deps
 // into a single IIFE. The output is written to src/live/co-edit/bundled.ts as
 // a string constant that the editor route injects via a <script> tag.
 //
@@ -10,7 +10,7 @@
 // ADR 0015 follow-up: moved from esbuild (reaching into Wrangler's hoisted
 // transitive) to Bun.build (built into the runtime, declared dependency
 // surface, single bundler answer for the repo). Bun.build's IIFE format does
-// not have an `esbuild --global-name` equivalent, so the `window.__rev01CoEdit
+// not have an `esbuild --global-name` equivalent, so the `window.__opencanvasCoEdit
 // = { connectCoEdit }` assignment lives in src/live/co-edit/browser-entry.ts
 // rather than being injected by the bundler.
 

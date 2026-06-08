@@ -293,7 +293,6 @@ for (let i = 0; i < allDots.length; i++) {
 const canvasRoot = new StubElement('div');
 canvasRoot.appendChild(wrap);
 
- 
 hydrateInteractives(canvasRoot, { skipPopups: true });
 assert(
   wrap.getAttribute('data-opencanvas-hydrated') === 'true',
@@ -345,7 +344,6 @@ assert(
 
 // (4) Idempotent re-hydration ------------------------------------------
 
- 
 hydrateInteractives(canvasRoot, { skipPopups: true });
 fireClick(nextBtn);
 assert(
@@ -422,7 +420,7 @@ popupSec.setAttribute('data-opencanvas-trigger-type', 'delay');
 popupSec.setAttribute('data-opencanvas-trigger-value', '60000');
 const popupRoot = new StubElement('div');
 popupRoot.appendChild(popupSec);
- 
+
 hydrateInteractives(popupRoot, { skipPopups: true });
 assert(
   popupSec.getAttribute('data-opencanvas-popup-hydrated') === null,

@@ -128,7 +128,7 @@ async function main(): Promise<void> {
   // ADR 0021 owns) or genuinely request-specific blobs that cannot
   // bundle. All seven get a CSP nonce per ADR 0020 decisions 1 and 2.
   // IIFE format mirrors scripts/bundle-co-edit.ts so the browser entry's
-  // `window.__rev01CoEdit = { connectCoEdit }` assignment still lands at
+  // `window.__opencanvasCoEdit = { connectCoEdit }` assignment still lands at
   // load time without an ESM consumer.
   const coEditBuild = await Bun.build({
     entrypoints: [resolve(ROOT, 'src/live/co-edit/browser-entry.ts')],

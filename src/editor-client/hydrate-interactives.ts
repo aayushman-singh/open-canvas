@@ -63,13 +63,12 @@ export function hydrateInteractives(
       // Unknown interactive kind. Per the no-fallback rule, log loudly so
       // a future interactive added without a TS hydrator surfaces here
       // instead of silently no-oping in the editor.
-       
       console.error(
         '[hydrateInteractives] unknown interactive kind "' +
           String(kind) +
           '" on element ' +
           (wrapper.id || '<no id>') +
-          '; add a hydrator to src/interactive/hydrate.ts',
+          '; add a hydrator to src/editor-client/hydrate-interactives.ts',
       );
     }
   }
@@ -256,7 +255,6 @@ function hydratePopups(root: ParentNode): void {
       } catch {
         // localStorage may throw in privacy mode; fail loudly via console
         // but still allow the popup to show — the dismissal is best-effort.
-         
         console.error('[hydratePopups] localStorage.getItem failed for key=' + key);
       }
       const originalStyle = capturedSec.getAttribute('style');

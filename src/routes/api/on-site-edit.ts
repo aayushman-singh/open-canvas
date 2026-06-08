@@ -9,7 +9,7 @@
 // Flow:
 //   1. Clerk auth — if not signed in, requireAuth redirects to Clerk sign-in
 //      (which works fine inside a popup; Clerk redirects back after sign-in).
-//   2. Verify the authenticated user owns the requested site.
+//   2. Verify the authenticated user can edit the requested site.
 //   3. Sign an edit token JWT (HMAC-SHA256, 4-hour TTL).
 //   4. Set the token as an httpOnly cookie scoped to the configured apex so
 //      all subdomains can read it.
