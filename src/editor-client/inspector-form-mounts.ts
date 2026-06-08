@@ -29,7 +29,7 @@ import type { PersistContext, RenderContext } from './editor-context.js';
 import type { FormElement, FormFieldDef, FormStyle } from '../canvas/elements/form.js';
 import { field, selectInput } from './dom-builders.js';
 import { newElementId } from './ids.js';
-import { buildColorRow } from './inspector-leaf-builders.js';
+import { buildColorRow, createInspectorEntry } from './inspector-leaf-builders.js';
 
 // ADR 0064 — form inspector mounts share one tiny surface: rebuildElement
 // after each field/style mutation (RenderContext) and scheduleSave to
@@ -74,8 +74,19 @@ export function mountFormFields(
     for (let fi = 0; fi < element.fields.length; fi++) {
       (function (idx: number) {
         const f = element.fields[idx] as FormFieldDef;
-        const card = document.createElement('div');
-        card.className = 'inspector-list-card';
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'opencanvas-inspector-remove';
+        removeBtn.textContent = '×';
+        removeBtn.title = 'Remove field';
+        removeBtn.setAttribute('aria-label', 'Remove field');
+        removeBtn.addEventListener('click', function () {
+          element.fields.splice(idx, 1);
+          renderFieldList();
+          ctx.rebuildElement(element.id);
+          ctx.scheduleSave();
+        });
+        const card = createInspectorEntry('Field ' + (idx + 1), removeBtn);
 
         const labelInput = document.createElement('input');
         labelInput.type = 'text';
@@ -103,15 +114,30 @@ export function mountFormFields(
         });
         card.appendChild(field('Kind', kindSel));
 
+        const reqRow = document.createElement('div');
+        reqRow.className = 'field field--toggle';
+        const reqLabel = document.createElement('label');
+        reqLabel.className = 'opencanvas-toggle';
         const reqCheck = document.createElement('input');
         reqCheck.type = 'checkbox';
+        reqCheck.className = 'opencanvas-toggle-input';
         reqCheck.checked = !!f.required;
+        const reqTrack = document.createElement('span');
+        reqTrack.className = 'opencanvas-toggle-track';
+        reqTrack.setAttribute('aria-hidden', 'true');
+        const reqText = document.createElement('span');
+        reqText.className = 'opencanvas-toggle-text';
+        reqText.textContent = 'Required';
         reqCheck.addEventListener('change', function () {
           f.required = reqCheck.checked;
           ctx.rebuildElement(element.id);
           ctx.scheduleSave();
         });
-        card.appendChild(field('Required', reqCheck));
+        reqLabel.appendChild(reqCheck);
+        reqLabel.appendChild(reqTrack);
+        reqLabel.appendChild(reqText);
+        reqRow.appendChild(reqLabel);
+        card.appendChild(reqRow);
 
         if (f.kind !== 'checkbox') {
           const phInput = document.createElement('input');
@@ -152,7 +178,7 @@ export function mountFormFields(
                 const rmOpt = document.createElement('button');
                 rmOpt.type = 'button';
                 rmOpt.className = 'opencanvas-inspector-remove';
-                rmOpt.textContent = '\\u00d7';
+                rmOpt.textContent = '×';
                 rmOpt.title = 'Remove option';
                 rmOpt.setAttribute('aria-label', 'Remove option');
                 rmOpt.addEventListener('click', function () {
@@ -180,20 +206,6 @@ export function mountFormFields(
           renderOpts();
           card.appendChild(field('Options', optHost));
         }
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '\\u00d7';
-        removeBtn.title = 'Remove field';
-        removeBtn.setAttribute('aria-label', 'Remove field');
-        removeBtn.addEventListener('click', function () {
-          element.fields.splice(idx, 1);
-          renderFieldList();
-          ctx.rebuildElement(element.id);
-          ctx.scheduleSave();
-        });
-        card.appendChild(removeBtn);
 
         fieldListHost.appendChild(card);
       })(fi);
@@ -338,17 +350,29 @@ export function mountFormStyle(
 
   function checkboxRowFor(key: keyof FormStyle, label: string): HTMLDivElement {
     const row = document.createElement('div');
-    row.className = 'style-row';
+    row.className = 'field field--toggle';
+    const lbl = document.createElement('label');
+    lbl.className = 'opencanvas-toggle';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
+    cb.className = 'opencanvas-toggle-input';
     cb.checked = !!fs[key];
+    const track = document.createElement('span');
+    track.className = 'opencanvas-toggle-track';
+    track.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.className = 'opencanvas-toggle-text';
+    text.textContent = label;
     cb.addEventListener('change', function () {
       if (cb.checked) (fs as Record<string, unknown>)[key as string] = true;
       else delete (fs as Record<string, unknown>)[key as string];
       commit();
     });
-    row.appendChild(cb);
-    return field(label, row);
+    lbl.appendChild(cb);
+    lbl.appendChild(track);
+    lbl.appendChild(text);
+    row.appendChild(lbl);
+    return row;
   }
 
   function section(title: string, rows: HTMLElement[]): HTMLDetailsElement {

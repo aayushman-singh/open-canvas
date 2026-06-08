@@ -62,11 +62,12 @@ function wireAddDomainForm(siteId: string, showError: (msg: string) => void): vo
   const form = document.querySelector<HTMLFormElement>('form.add-domain');
   if (!form) return;
 
-  form.addEventListener('submit', async (event) => {
+  form.addEventListener('submit', (event) => {
     event.preventDefault();
     const input = form.querySelector<HTMLInputElement>('input[name="hostname"]');
     const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
     const hostname = (input && input.value ? input.value : '').trim();
+    void (async (): Promise<void> => {
     if (!hostname) {
       showError('Hostname is required');
       return;
@@ -103,6 +104,7 @@ function wireAddDomainForm(siteId: string, showError: (msg: string) => void): vo
       showError('Network error: ' + msg);
       if (button) button.disabled = false;
     }
+    })();
   });
 }
 
@@ -116,7 +118,8 @@ function wireRemoveDomainButtons(
       'button[data-action="delete"]',
     );
     if (!removeBtn) return;
-    removeBtn.addEventListener('click', async () => {
+    removeBtn.addEventListener('click', () => {
+      void (async (): Promise<void> => {
       const hostname = card.getAttribute('data-hostname');
       if (!hostname) return;
       const ok = await window.__opencanvasModal.confirm(
@@ -151,6 +154,7 @@ function wireRemoveDomainButtons(
         showError('Network error: ' + msg);
         removeBtn.disabled = false;
       }
+      })();
     });
   });
 }

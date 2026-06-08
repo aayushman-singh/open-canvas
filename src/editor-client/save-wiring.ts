@@ -45,13 +45,9 @@
 // Phase 3 cutover destination, not a live call site yet.
 
 import type { DeleteShortcutContext } from './delete-shortcut.js';
-import type {
-  DomContext,
-  EditorContext,
-  SelectionContext,
-} from './editor-context.js';
+import type { DomContext, EditorContext, SelectionContext } from './editor-context.js';
 import type { FitAllPagesContext, FitToPageContext } from './render.js';
-import type { RedoContext, UndoContext } from './persist.js';
+import type { UndoContext } from './persist.js';
 import { fitToPage, fitAllPages } from './render.js';
 import { undo, redo } from './persist.js';
 import { handleDeleteShortcut } from './delete-shortcut.js';
@@ -63,7 +59,7 @@ import { handleDeleteShortcut } from './delete-shortcut.js';
 // alias owns yet. The inline `Pick` enumerates the local grab bag,
 // `DeleteShortcutContext` is folded in so the forwarded
 // `handleDeleteShortcut(ctx, ev)` call typechecks without a cast, and
-// `UndoContext` / `RedoContext` / `FitToPageContext` / `FitAllPagesContext`
+// `UndoContext` / `FitToPageContext` / `FitAllPagesContext`
 // fold in the narrow surfaces of the four forwarded callees in persist.ts
 // and render.ts so the four keyboard-shortcut call sites typecheck
 // without `ctx as EditorContext`. (Earlier carves of this file retained
@@ -73,7 +69,6 @@ export type AttachSaveButtonContext = DomContext &
   SelectionContext &
   DeleteShortcutContext &
   UndoContext &
-  RedoContext &
   FitToPageContext &
   FitAllPagesContext &
   Pick<
@@ -130,8 +125,7 @@ export function attachSaveButtonImpl(ctx: AttachSaveButtonContext): void {
     }
     if (
       mod &&
-      ((ev.key === 'y' || ev.key === 'Y') ||
-        ((ev.key === 'z' || ev.key === 'Z') && ev.shiftKey))
+      (ev.key === 'y' || ev.key === 'Y' || ((ev.key === 'z' || ev.key === 'Z') && ev.shiftKey))
     ) {
       ev.preventDefault();
       redo(ctx);

@@ -156,6 +156,20 @@ export function attachPointerHandlersImpl(ctx: AttachPointerHandlersContext): vo
     // round-trip) or — on a second click — start a drag that jitters the
     // wrapper before the button's click handler can swap tabs.
     if (ev.target instanceof Element && ev.target.closest('[data-opencanvas-tab-id]')) return;
+    // Carousel arrows + dots (hydrated by ./hydrate-interactives.ts) own
+    // their own click semantics — advance / rewind the slide cursor — and
+    // call stopPropagation so the root click listener doesn't also fire.
+    // mousedown bubbles BEFORE the hydrator's stopPropagation can intervene,
+    // so we have to bail here explicitly: without this guard, a click on an
+    // already-selected carousel's arrow would start a drag of the whole
+    // carousel before the click handler runs.
+    if (
+      ev.target instanceof Element &&
+      ev.target.closest(
+        '[data-opencanvas-carousel-prev], [data-opencanvas-carousel-next], [data-opencanvas-carousel-dot]',
+      )
+    )
+      return;
     const handle =
       ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
     if (handle) {

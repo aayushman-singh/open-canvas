@@ -49,12 +49,29 @@ export function decodeByteaDriverValue(value: unknown): Uint8Array {
   throw new Error(`bytea fromDriver: unsupported driver type ${typeof value}`);
 }
 
+// Ambient declaration for node's Buffer — only used by the bytea customType
+// below. We can't pull in `@types/node` for one usage, and `BufferSource`
+// (workers-types) isn't enough because postgres.js detects binary writes via
+// the runtime `Buffer.isBuffer` check, which only returns true for the real
+// thing.
+declare const Buffer: {
+  from(buffer: ArrayBufferLike, byteOffset?: number, length?: number): Uint8Array;
+};
+
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | string }>({
   dataType() {
     return 'bytea';
   },
   fromDriver(value: unknown): Uint8Array {
     return decodeByteaDriverValue(value);
+  },
+  // postgres.js needs a Buffer (or any nodejs_compat Buffer-tagged value) to
+  // encode bytea as binary on the wire — we run with `fetch_types: false`
+  // (db/client.ts) so postgres.js never resolves the bytea OID and otherwise
+  // falls back to text-encoding the Uint8Array, which mangles the snapshot
+  // bytes. The Worker has `nodejs_compat` so Buffer is available.
+  toDriver(value: Uint8Array): Uint8Array {
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
   },
 });
 
@@ -66,10 +83,19 @@ export const customer = pgTable('customer', {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   clerkUserId: text('clerk_user_id').notNull().unique(),
-  // Denormalized cache of the Clerk-owned email — Clerk is the source of truth
-  // for uniqueness, so no unique index here. Used by collaborator-invite flows
-  // to look up an existing customer by email before they sign in.
-  email: text('email').notNull(),
+  // Local source of truth for "one opencanvas customer per email". Clerk can
+  // mint multiple users for the same email (e.g. password sign-up then later
+  // "Continue with Google" creates a second Clerk user with a different id),
+  // so deferring email uniqueness to Clerk forked our customer rows: the new
+  // Clerk session insert-failed nothing, so a fresh row was created with the
+  // new clerk_user_id and the original Owner's sites/assets/plan orphaned
+  // behind the previous identity. The application-layer dedupe in
+  // `src/auth/customer-upsert.ts` reuses the existing row by rebinding
+  // clerk_user_id when this case is detected; this constraint is the physical
+  // backstop so a bug, a manual SQL insert, or a future regression cannot
+  // re-introduce the duplicate. Drizzle 0020 backfills the merge of the
+  // historical dupes and then adds the constraint.
+  email: text('email').notNull().unique(),
   displayName: text('display_name'),
   bio: text('bio'),
   timezone: text('timezone').notNull().default('UTC'),

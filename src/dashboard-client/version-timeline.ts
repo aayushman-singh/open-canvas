@@ -100,10 +100,7 @@ export function mountVersionTimeline(): void {
     const data = (await res.json()) as PreviewResponse;
     const frame = document.createElement('iframe');
     frame.setAttribute('sandbox', '');
-    frame.setAttribute(
-      'srcdoc',
-      '<!doctype html><html><body>' + data.html + '</body></html>',
-    );
+    frame.setAttribute('srcdoc', '<!doctype html><html><body>' + data.html + '</body></html>');
     preview.innerHTML = '<h2>Preview</h2>';
     preview.appendChild(frame);
     setActive(id);
@@ -126,16 +123,17 @@ export function mountVersionTimeline(): void {
     });
     if (!res.ok) {
       const body = await res.text();
-      window.__opencanvasModal.alert('Restore failed: ' + body, 'Error');
+      await window.__opencanvasModal.alert('Restore failed: ' + body, 'Error');
       return;
     }
     window.location.reload();
   }
 
   async function doManualCapture(form: HTMLFormElement): Promise<void> {
-    const label = String(new FormData(form).get('label') ?? '').trim();
+    const rawLabel = new FormData(form).get('label');
+    const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
     if (label.length === 0) {
-      window.__opencanvasModal.alert('Label is required.', 'Missing label');
+      await window.__opencanvasModal.alert('Label is required.', 'Missing label');
       return;
     }
     const res = await fetch(apiBase, {
@@ -145,7 +143,7 @@ export function mountVersionTimeline(): void {
     });
     if (!res.ok) {
       const body = await res.text();
-      window.__opencanvasModal.alert('Capture failed: ' + body, 'Error');
+      await window.__opencanvasModal.alert('Capture failed: ' + body, 'Error');
       return;
     }
     window.location.reload();
@@ -163,8 +161,8 @@ export function mountVersionTimeline(): void {
       if (!entry) return;
       const id = entry.getAttribute('data-timeline-entry') ?? '';
       const label = entry.getAttribute('data-timeline-label') ?? '';
-      if (action === 'preview') doPreview(id);
-      if (action === 'restore') doRestore(id, label);
+      if (action === 'preview') void doPreview(id);
+      if (action === 'restore') void doRestore(id, label);
     });
   }
 
@@ -172,7 +170,7 @@ export function mountVersionTimeline(): void {
   if (form) {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
-      doManualCapture(form);
+      void doManualCapture(form);
     });
   }
 }

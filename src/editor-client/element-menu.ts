@@ -41,19 +41,24 @@
 
 import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
 
+import { hydrateInteractives } from './hydrate-interactives.js';
+
 import { augmentCollectionPreviewForElementImpl } from './collection-preview.js';
 import { cssEscape } from './css-escape.js';
 import type {
   DomContext,
   EditorContext,
-  PersistContext,
   RenderContext,
   SelectionContext,
   StateContext,
   StatusEmitterContext,
 } from './editor-context.js';
 import { newElementId } from './ids.js';
-import { applyZOrderAction, type InspectorActionContext, parentArrayFor } from './inspector-actions.js';
+import {
+  applyZOrderAction,
+  type InspectorActionContext,
+  parentArrayFor,
+} from './inspector-actions.js';
 import { nextZInArray } from './z-order.js';
 
 // ADR 0064 — `findMenuOwnerWrapper` + `closeElementMenuImpl` only walk the
@@ -82,7 +87,10 @@ export type ToggleElementMenuContext = StateContext &
 // appliers, body builder, plus a SelectionContext read so the wrapper can
 // stamp `data-selected` and mount resize handles on the active element.
 export type BuildElementNodeContext = SelectionContext &
-  Pick<EditorContext, 'setBoxStyle' | 'applyElementStyle' | 'applyPinnedStyle' | 'buildElementBody'>;
+  Pick<
+    EditorContext,
+    'setBoxStyle' | 'applyElementStyle' | 'applyPinnedStyle' | 'buildElementBody'
+  >;
 
 // ADR 0064 — `rebuildElementImpl` re-renders a single element in place. It
 // walks the section tree (StateContext), reads the live DOM (DomContext.root),
@@ -199,12 +207,20 @@ export function buildElementMenuImpl(
   menu.className = 'element-menu';
   menu.setAttribute('data-element-menu', 'true');
 
-  const zItems: Array<{ label: string; action: 'front' | 'back' }> = [
+  // Full z-order axis lives in the menu: front/back span the whole stack,
+  // forward/backward nudge by one slot. Owners used to reach for the
+  // inspector's z-order group to step through neighbours; folding those
+  // verbs in here keeps the menu the single source of truth for stack
+  // manipulation.
+  type ZItem = { label: string; action: 'front' | 'back' | 'forward' | 'backward' };
+  const zItems: Array<ZItem> = [
     { label: 'Bring to front', action: 'front' },
+    { label: 'Forward', action: 'forward' },
+    { label: 'Backward', action: 'backward' },
     { label: 'Send to back', action: 'back' },
   ];
   for (let i = 0; i < zItems.length; i++) {
-    (function (item: { label: string; action: 'front' | 'back' }) {
+    (function (item: ZItem) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'menu-item';
@@ -214,7 +230,7 @@ export function buildElementMenuImpl(
         ctx.closeElementMenu();
       });
       menu.appendChild(btn);
-    })(zItems[i] as { label: string; action: 'front' | 'back' });
+    })(zItems[i] as ZItem);
   }
 
   const div2 = document.createElement('div');
@@ -296,7 +312,10 @@ export function toggleElementMenuImpl(
   ctx.openMenuElementId = elementId;
 }
 
-export function buildElementNodeImpl(ctx: BuildElementNodeContext, element: CanvasElement): HTMLElement {
+export function buildElementNodeImpl(
+  ctx: BuildElementNodeContext,
+  element: CanvasElement,
+): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'opencanvas-element';
   wrapper.setAttribute('data-opencanvas-element', element.id);
@@ -404,5 +423,22 @@ export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string
     // ADR 0064 — collection-preview.ts has not carved yet; forward-cast
     // until augmentCollectionPreviewForElementImpl narrows its parameter.
     augmentCollectionPreviewForElementImpl(ctx as EditorContext, elementId);
+  }
+  // Re-hydrate the visitor interactive runtime against the replaced
+  // wrapper(s). A carousel rebuilt via the inspector (slide added /
+  // removed / reordered) emits a fresh `.opencanvas-carousel` subtree
+  // with no `data-opencanvas-hydrated="true"` flag; without this call
+  // its arrows + dots would render but never advance. `skipPopups: true`
+  // matches the editor's renderAll() contract — popup chrome is visitor-
+  // only. Re-query for the fresh replacement nodes since the references
+  // captured in `existingNodes` above point at the now-detached originals.
+  const freshNodes = ctx.root.querySelectorAll(
+    '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
+  );
+  for (let i = 0; i < freshNodes.length; i++) {
+    const node = freshNodes[i];
+    if (node instanceof HTMLElement) {
+      hydrateInteractives(node, { skipPopups: true });
+    }
   }
 }

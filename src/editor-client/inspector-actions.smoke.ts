@@ -10,16 +10,16 @@
 // wired into the ci:smoke chain — per-phase manual smoke (per ADR 0058
 // Decision 4 / Task 2 protocol P.5).
 //
-// DOM builders live in a sibling module (./inspector-action-buttons.ts)
-// precisely because bare Bun has no `document`. The inline IIFE twin's
-// DOM-building behaviour is pinned by `src/editor/inspector-smoke.ts`
-// on the production path. Behavioural assertions the existing inspector
-// smoke must continue to satisfy:
+// The verbs are now called only from the 3-dot element menu
+// (./element-menu.ts); the inspector's old z-order / duplicate /
+// delete / reading-order rows were deleted as visual duplicates of
+// the menu. The verbs themselves stay covered here so any future
+// caller (shortcut, agent op) inherits the same behavioural pin.
+// Behavioural assertions still satisfied:
 //   - `parentArrayFor` throws loudly on missing parents
 //   - `duplicateElement` uses `nextZInArray(arr)` for clone z
 //   - The element context-menu duplicate inserts into the immediate
 //     parent array, not always section.elements
-// Those are already pinned at inspector-smoke.ts lines 142-166.
 
 import type { CanvasElement, CanvasSection, TextElement } from '../canvas/schema.js';
 import type { EditorContext } from './editor-context.js';
@@ -180,6 +180,9 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     openNewPageModal: () => {
       throw new Error('openNewPageModal stub: smoke does not exercise modals');
     },
+    openSaveFormModal: () => {
+      throw new Error('openSaveFormModal stub: smoke does not exercise modals');
+    },
     applyPageMotionAttributes: () => {},
     applyPageStyleProperties: () => {},
     pageRenderWidth: () => {
@@ -196,6 +199,7 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     undoTimer: null,
     undoRedoing: false,
     undoPersistenceFailed: false,
+    fontLoadRemeasureWired: false,
     saveTimer: null,
     saveQueue: Promise.resolve(true),
     coEditConnection: null,

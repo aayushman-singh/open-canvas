@@ -93,12 +93,10 @@ function wireAddonForm(form: HTMLFormElement, siteId: string): void {
         if (!pattern) continue;
         const value = input.value.trim();
         if (value.length === 0 || !new RegExp('^(?:' + pattern + ')$').test(value)) {
-          const parent = input.parentNode as ParentNode | null;
-          const hintBlock = parent
-            ? parent.querySelector<HTMLElement>('.field-hint')
-            : null;
+          const parent = input.parentNode;
+          const hintBlock = parent ? parent.querySelector<HTMLElement>('.field-hint') : null;
           const hint = hintBlock
-            ? hintBlock.textContent ?? 'Value does not match required format'
+            ? (hintBlock.textContent ?? 'Value does not match required format')
             : 'Value does not match required format';
           if (msgEl) {
             msgEl.textContent = hint;
@@ -123,9 +121,7 @@ function wireAddonForm(form: HTMLFormElement, siteId: string): void {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled, config }),
     })
-      .then((r) =>
-        r.json().then((d: SaveResponseBody) => ({ ok: r.ok, data: d })),
-      )
+      .then((r) => r.json().then((d: SaveResponseBody) => ({ ok: r.ok, data: d })))
       .then((result) => {
         saveBtn.disabled = false;
         saveBtn.textContent = prev;
@@ -134,12 +130,9 @@ function wireAddonForm(form: HTMLFormElement, siteId: string): void {
           // Surface the hint both in the toast AND inline (replace the
           // static field-hint text) and focus the offending input so the
           // Owner can fix without scrolling back through the form.
-          const serverError =
-            result.data && result.data.error ? result.data.error : 'Save failed';
-          const serverHint =
-            result.data && result.data.hint ? result.data.hint : null;
-          const serverField =
-            result.data && result.data.field ? result.data.field : null;
+          const serverError = result.data && result.data.error ? result.data.error : 'Save failed';
+          const serverHint = result.data && result.data.hint ? result.data.hint : null;
+          const serverField = result.data && result.data.field ? result.data.field : null;
           if (serverField) {
             const fieldInput = formEl.querySelector<HTMLInputElement>(
               '[data-config-key="' + serverField + '"]',
@@ -147,7 +140,7 @@ function wireAddonForm(form: HTMLFormElement, siteId: string): void {
             if (fieldInput) {
               fieldInput.focus();
               if (serverHint && fieldInput.parentNode) {
-                const parent = fieldInput.parentNode as ParentNode;
+                const parent = fieldInput.parentNode;
                 const inlineHint = parent.querySelector<HTMLElement>('.field-hint');
                 if (inlineHint) {
                   inlineHint.textContent = serverHint;

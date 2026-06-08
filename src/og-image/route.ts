@@ -22,7 +22,7 @@ import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { createR2Client } from '../assets/r2-client.js';
 import type { PublishedSnapshot, StyleKitPreset } from '../canvas/schema.js';
-import { getStyleKitPreset, STYLE_KIT_PRESETS } from '../canvas/style-kits.js';
+import { getStyleKitPreset } from '../canvas/style-kits.js';
 import { db, type Db } from '../db/client.js';
 import { ownerAsset, site } from '../db/schema.js';
 import { readCached, writeCached, OG_CONTENT_TYPE } from './cache.js';

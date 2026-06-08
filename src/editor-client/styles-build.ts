@@ -2488,6 +2488,35 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   margin-bottom: 8px;
   background: var(--surface-2);
 }
+#canvas-inspector .opencanvas-inspector-entry {
+  padding-block: 12px;
+}
+#canvas-inspector .opencanvas-inspector-entry + .opencanvas-inspector-entry {
+  border-top: 2px solid var(--red);
+}
+#canvas-inspector .opencanvas-inspector-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+#canvas-inspector .opencanvas-inspector-entry-header-label::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  margin-right: 6px;
+  vertical-align: middle;
+}
 #canvas-inspector .inspector-section-heading {
   margin-top: 16px;
   padding-top: 12px;
@@ -3288,38 +3317,12 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   cursor: pointer;
 }
 
-/* Inspector reading-order group (above the z-order group). Two compact
-   buttons plus a "Reading order: N of M" caption. The caption is the only
-   place owners see the section.elements[] index, which is what visitors
-   hear via assistive tech. */
-.opencanvas-reorder-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 6px;
-}
-.opencanvas-reorder-buttons button {
-  appearance: none;
-  background: var(--opencanvas-bg-panel);
-  border: 1px solid var(--opencanvas-hairline);
-  color: var(--opencanvas-fg);
-  font: inherit;
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  flex: 1 1 auto;
-}
-.opencanvas-reorder-buttons button:hover {
-  border-color: var(--opencanvas-accent);
-}
-.opencanvas-reorder-caption {
-  font-family: var(--opencanvas-font-mono);
-  font-size: 11px;
-  color: var(--opencanvas-fg-mute);
-  margin-bottom: 4px;
-}
-
-/* Inspector z-order group: four buttons that mutate element.box.z. */
+/* Inspector compact button group: flex-row of small uniform buttons.
+   Used by the collection custom-template controls (Edit / Done /
+   Reset) — historically called z-order-buttons because the inspector
+   exposed bring-forward / send-back rows here; those moved to the
+   element menu (refactor/element-inspector-dedupe-block-menu), but
+   the class lives on as a generic compact-button-group container. */
 .opencanvas-zorder-buttons {
   display: flex;
   flex-wrap: wrap;
@@ -3523,6 +3526,44 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   letter-spacing: -0.01em;
   text-transform: none;
   color: var(--ink);
+}
+.opencanvas-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px -4px 0 0;
+}
+.opencanvas-modal-header h3 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.opencanvas-modal-close {
+  appearance: none;
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 22px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.opencanvas-modal-close:hover,
+.opencanvas-modal-close:focus-visible {
+  background: var(--surface-2, var(--surface));
+  border-color: var(--line-2);
+  color: var(--ink);
+  outline: none;
 }
 .opencanvas-modal label {
   font-family: var(--sans);

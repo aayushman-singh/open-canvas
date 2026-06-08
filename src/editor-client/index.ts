@@ -65,6 +65,7 @@ import {
   openAlertModalImpl,
   openConfirmModalImpl,
   openNewPageModalImpl,
+  openSaveFormModalImpl,
   openSelectModalImpl,
   openTextModalImpl,
   type OpencanvasModalGlobal,
@@ -138,6 +139,7 @@ import {
   ensureSectionsPanelLoaded,
   enterPlacementModeImpl,
   importPendingSectionAt,
+  prefetchSectionsCatalog,
   renderPlacementSlotsImpl,
   renderSectionsPanelImpl,
 } from './sections-picker.js';
@@ -190,10 +192,7 @@ import {
   setActivePageImpl,
   updatePageSidebarImpl,
 } from './page-crud.js';
-import {
-  attachCollectionScaffoldButtonImpl,
-  runCollectionScaffoldFlowImpl,
-} from './collection-scaffold.js';
+import { attachCollectionScaffoldButtonImpl } from './collection-scaffold.js';
 import { migrateLegacyCollectionIndexPagesImpl } from './site-load-migration.js';
 import {
   mountReel,
@@ -222,6 +221,7 @@ import {
   targetSectionForSidebarImpl,
 } from './section-toolbar.js';
 import { beginTextEditImpl } from './text-edit.js';
+import { wireFontLoadRemeasureImpl } from './fontload-remeasure.js';
 import type { EditorBoot, EditorContext, RemoteCursorEntry } from './editor-context.js';
 import {
   attachChromeToggles,
@@ -251,6 +251,7 @@ void openConfirmModalImpl;
 void openAlertModalImpl;
 void openAiMediaModalImpl;
 void openNewPageModalImpl;
+void openSaveFormModalImpl;
 // body-builder dispatch targets are kept void-referenced — the per-type
 // builders are consumed only inside buildElementBodyImpl, so the tree-shaker
 // needs an explicit liveness mark from the entry module.
@@ -398,6 +399,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     undoTimer: null,
     undoRedoing: false,
     undoPersistenceFailed: false,
+    fontLoadRemeasureWired: false,
     saveTimer: null,
     saveQueue: Promise.resolve(true),
     coEditConnection: null,
@@ -555,6 +557,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     openAlertModal: (opts) => openAlertModalImpl(ctx, opts),
     openAiMediaModal: (opts) => openAiMediaModalImpl(ctx, opts),
     openNewPageModal: (opts) => openNewPageModalImpl(ctx, opts),
+    openSaveFormModal: (opts) => openSaveFormModalImpl(ctx, opts),
 
     // ---- Asset reel + section drag -------------------------------------
     reelViewMode: 'tile',
@@ -747,6 +750,21 @@ export function createEditor(boot: EditorBoot): void {
     });
   }
 
+  // ---- Sections-picker prefetch -------------------------------------
+  // The Owner's first Sections-tab open used to fire GET /library/sections
+  // synchronously, which spent ~5s server-side populating the 88-entry
+  // catalog from `library_section`. Most Owners click Sections within
+  // the first few seconds of the editor mounting, so we kick the catalog
+  // request in parallel with the site-load fetch below; by the time the
+  // Owner switches tabs the response has already landed and the picker
+  // renders microtask-fast off the cached array. Fire-and-forget — the
+  // module-level singleton inside prefetchSectionsCatalog converts
+  // rejections to a `{kind:'failure'}` outcome (no unhandled rejection)
+  // and resets the singleton so a later tab-open retries; the visible
+  // "Failed to load sections." error renders on the awaiter path
+  // (ensureSectionsPanelLoaded), never silently here.
+  prefetchSectionsCatalog(ctx);
+
   // ---- Boot async block (mirror canvas-client.ts:13913-14405) -------
   void (async () => {
     try {
@@ -822,6 +840,18 @@ export function createEditor(boot: EditorBoot): void {
       // final DOM position when sections render in.
       mountViewportImpl(ctx);
       ctx.renderAll();
+      // Webfont swap remeasure: the initial paint uses the fallback face
+      // because `@font-face` declarations carry `font-display: swap`
+      // (see src/fonts/face-emit.ts). Once the authored face lands the
+      // text re-flows — a heading authored at `box.h = 120` under the
+      // loaded font may now overflow the wrapper because the fallback
+      // and loaded faces have different vertical metrics. Combined with
+      // the text-wrapper `overflow: hidden` default (text-overflow-hidden
+      // smoke), the bottom line clips until the user clicks the element
+      // (which triggers `beginTextEdit`'s scrollHeight pass). Wire a
+      // one-shot listener on `document.fonts.ready` so the grow pass
+      // runs after every webfont in the initial set has loaded.
+      wireFontLoadRemeasureImpl(ctx);
       // Math rendering: re-run once KaTeX resolves so deferred equations
       // catch up.
       window.addEventListener('opencanvas-katex-ready', function () {
@@ -850,28 +880,19 @@ export function createEditor(boot: EditorBoot): void {
           void ctx.createPage();
         });
       }
-      // ADR 0060 F3 — "+ New Collection" scaffolds an index + template page
-      // and a sample entry in one POST. The wizard, refresh, and active-
-      // page switch live in collection-scaffold.ts; the wiring point is
-      // here so it sits alongside the other Pages-tab affordances.
+      // ADR 0063 dec 9 / dec 11 — Collection scaffold entry points live
+      // on the Add tab (standalone "+ New Collection" button in the
+      // dedicated Collections group above the Components grid) and inside
+      // the new-page modal's kind selector. The duplicate Components-grid
+      // "Collection" tile was dropped (chore/editor-remove-duplicate-
+      // collection-tile) and the Pages-tab "+ New Collection" was removed
+      // — creating a Collection goes through "+ New Page" → "Collection"
+      // there (see page-crud.ts createPageImpl). attachCollectionScaffold
+      // ButtonImpl wires every remaining [data-canvas-add-collection]
+      // element to the same wizard; element-level insertion without the
+      // scaffold leaves a half-built collection (no index page, no
+      // entries) showing the placeholder banner with nowhere to escape to.
       attachCollectionScaffoldButtonImpl(ctx);
-      // ADR 0063 dec 9 — Collection sidebar button (Add panel Components
-      // grid). The existing collection-scaffold module attaches to the
-      // Pages-tab `#canvas-add-collection` button by id; the new
-      // Components-grid button uses the `data-canvas-add-collection`
-      // attribute so the two wirings don't collide. Both fire the same
-      // wizard — element-level insertion without the scaffold leaves a
-      // half-built collection (no index page, no entries) that just
-      // shows the placeholder banner with nowhere to escape to.
-      const addCollectionButtons = document.querySelectorAll('[data-canvas-add-collection]');
-      for (let i = 0; i < addCollectionButtons.length; i++) {
-        const btn = addCollectionButtons[i];
-        if (btn instanceof HTMLElement && btn.id !== 'canvas-add-collection') {
-          btn.addEventListener('click', () => {
-            void runCollectionScaffoldFlowImpl(ctx);
-          });
-        }
-      }
       const pageListEl = document.getElementById('canvas-page-list');
       if (pageListEl) {
         pageListEl.addEventListener('click', function (ev) {

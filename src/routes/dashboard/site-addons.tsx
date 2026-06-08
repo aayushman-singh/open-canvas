@@ -400,14 +400,16 @@ siteAddonsRoute.get('/sites/:siteId/addons', async (c) => {
                 </p>
               ) : (
                 <div class="addon-config">
-                  <label class="toggle-row" for={`toggle-${addon.id}`}>
+                  <label class="opencanvas-toggle" for={`toggle-${addon.id}`}>
                     <input
                       type="checkbox"
+                      class="opencanvas-toggle-input"
                       name="enabled"
                       id={`toggle-${addon.id}`}
                       checked={isEnabled}
                     />
-                    <span>Enable on this site</span>
+                    <span class="opencanvas-toggle-track" aria-hidden="true" />
+                    <span class="opencanvas-toggle-text">Enable on this site</span>
                   </label>
 
                   {addon.id === 'addon_custom_scripts' && (

@@ -265,6 +265,24 @@ export function editorPageJsx(opts: EditorPageOptions) {
             '<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous" onload="window.dispatchEvent(new Event(\'opencanvas-katex-ready\'))"></script>',
         )}
         <link rel="stylesheet" href={EDITOR_CLIENT_MANIFEST.canvasStylesUrl} />
+        {/* Sections-picker prefetch — GET /library/sections is server-
+            bound (~5s for the 88-entry catalog as of 2026-06-07).
+            Starting the request via <link rel="preload" as="fetch"> in
+            <head> lets the browser issue the request in parallel with
+            the editor JS bundle download/parse and the boot-time site
+            fetch, so by the time the Owner clicks the Sections tab the
+            response has already landed.
+
+            The endpoint is Clerk / edit-token cookie gated. We omit the
+            `crossorigin` attribute on purpose: the editor route is
+            served from the same origin as the `/api/library/sections`
+            and `/__api/library/sections` endpoints, so the browser
+            sends cookies by default (matching the credentials mode that
+            the later `fetch()` call from editor-client will use). Adding
+            `crossorigin="anonymous"` would strip cookies and the
+            preloaded response would not match the cookied fetch, so the
+            cache entry would be unused. */}
+        <link rel="preload" as="fetch" href={apiBase + '/library/sections'} />
         <style>{raw(bellStyles)}</style>
         {clerkPublishableKey &&
           raw(`<script nonce="${cspNonce}">
@@ -478,28 +496,6 @@ export function editorPageJsx(opts: EditorPageOptions) {
                         {cmd.sidebarLabel}
                       </button>
                     ))}
-                  {/* ADR 0063 dec 9 — Collection sidebar button. The
-                      collectionSidebarSpec entry intentionally has zero
-                      commands (Collection insertion goes through the
-                      full scaffolding wizard rather than a bare element
-                      insert, because a Collection without an index page
-                      + entries is half-built and shows the placeholder
-                      banner the Owner can't escape from). Surfacing the
-                      button here, outside the dispatch-driven loop, keeps
-                      the Components grid discoverable without forcing
-                      collectionSidebarSpec to declare a fake bare-insert
-                      command that doesn't match the wizard semantics.
-                      The data-canvas-add-collection attribute is the wiring
-                      hook collection-scaffold.ts (D) and index.ts both
-                      key on. */}
-                  <button
-                    type="button"
-                    class="opencanvas-sidebar-command"
-                    data-canvas-add-collection
-                    title="Add a content collection (e.g. blog, case-studies) with index page + entries"
-                  >
-                    Collection
-                  </button>
                 </div>
               </section>
               <section class="opencanvas-sidebar-group">
@@ -544,23 +540,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
                 class="opencanvas-sidebar-action"
                 id="canvas-add-page"
                 type="button"
-                title="Create a new page for your site"
+                title="Create a new page or collection for your site"
               >
                 + New Page
-              </button>
-              {/* ADR 0060 F3 — scaffold a new collection (index page +
-                  template page + sample entry) in one POST. The wizard
-                  prompts for a slug only; the endpoint derives the display
-                  title from the slug. See collection-scaffold.ts for the
-                  click handler. */}
-              <button
-                class="opencanvas-sidebar-action"
-                id="canvas-add-collection"
-                type="button"
-                data-canvas-add-collection
-                title="Create a new content collection (e.g. blog, case-studies)"
-              >
-                + New Collection
               </button>
             </div>
           </aside>
@@ -665,10 +647,10 @@ export function editorPageJsx(opts: EditorPageOptions) {
         </main>
         {/* ADR 0020 — co-edit ships as a separately-fetched bundle via the
             same manifest pattern as the editor client; its IIFE attaches
-            `window.__opencanvasCoEdit` synchronously on load, preserving the
-            same boot-time contract the editor-client module reads. The
-            `<script src>` (no defer, no module) blocks parsing the way
-            the inline form did, so subsequent inline scripts see the
+            `window.__opencanvasCoEdit` synchronously on load, preserving
+            the same boot-time contract the editor-client module reads.
+            The `<script src>` (no defer, no module) blocks parsing the
+            way the inline form did, so subsequent inline scripts see the
             global as before. */}
         <script src={EDITOR_CLIENT_MANIFEST.coEditUrl}></script>
         {raw(`<script nonce="${cspNonce}">window.__opencanvasEditorBoot = ${editorBootJson};</script>`)}

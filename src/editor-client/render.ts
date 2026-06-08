@@ -80,6 +80,7 @@ import {
 import { applyCustomKitCss } from './custom-kit-css.js';
 import { augmentCollectionPreviewsImpl } from './collection-preview.js';
 import { mountTemplateEditChromeImpl } from './collection-template-edit-view.js';
+import { hydrateInteractives } from './hydrate-interactives.js';
 
 // ADR 0064 — narrow Pick-based contexts for render.ts. The camera +
 // pagePositions cluster has no canonical alias yet; per-function shapes
@@ -506,6 +507,16 @@ export function renderAllImpl(ctx: RenderAllContext): void {
   // ADR 0064 — mountTemplateEditChromeImpl still takes the wide
   // EditorContext; cast until collection-template-edit-view.ts narrows.
   mountTemplateEditChromeImpl(ctx as EditorContext);
+
+  // Hydrate the visitor interactive runtime against every newly-rendered
+  // carousel / accordion. The `data-opencanvas-hydrated="true"` idempotence
+  // flag means re-running this on a redraw that re-uses some wrappers (none
+  // today — renderAll replaces the canvas-root subtree entirely) is a cheap
+  // no-op. `skipPopups: true` keeps popup chrome from hijacking the canvas
+  // while editing; popups are visitor-only behaviour.
+  if (ctx.root) {
+    hydrateInteractives(ctx.root, { skipPopups: true });
+  }
 
   if (ctx.pendingImport) {
     ctx.renderPlacementSlots();

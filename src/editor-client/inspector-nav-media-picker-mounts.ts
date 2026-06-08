@@ -30,6 +30,7 @@ import type { EditorContext } from './editor-context.js';
 import type { NavElement } from '../canvas/elements/nav.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import { field, selectInput } from './dom-builders.js';
+import { createInspectorEntry } from './inspector-leaf-builders.js';
 
 export function mountNavLinks(
   ctx: EditorContext,
@@ -52,8 +53,19 @@ export function mountNavLinks(
     for (let li = 0; li < element.links.length; li++) {
       (function (idx: number) {
         const lnk = element.links[idx]!;
-        const card = document.createElement('div');
-        card.className = 'inspector-list-card';
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'opencanvas-inspector-remove';
+        removeBtn.textContent = '×';
+        removeBtn.title = 'Remove link';
+        removeBtn.setAttribute('aria-label', 'Remove link');
+        removeBtn.addEventListener('click', function () {
+          element.links.splice(idx, 1);
+          renderLinkList();
+          ctx.rebuildElement(element.id);
+          ctx.scheduleSave();
+        });
+        const card = createInspectorEntry('Link ' + (idx + 1), removeBtn);
 
         const labelInput = document.createElement('input');
         labelInput.type = 'text';
@@ -94,17 +106,18 @@ export function mountNavLinks(
         });
         card.appendChild(field('Kind', kindSel));
 
-        // Reorder + remove row. Nav links flow inside a slot rather than
-        // sit at individual canvas coordinates, so there's no drag handle
-        // on the page — the up/down arrows are the only way to change
-        // the on-page link order. Hidden when there's only one link.
-        const actions = document.createElement('div');
-        actions.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
-
+        // Reorder row. Nav links flow inside a slot rather than sit at
+        // individual canvas coordinates, so there's no drag handle on the
+        // page — the up/down arrows are the only way to change the on-page
+        // link order. Hidden when there's only one link. The remove button
+        // lives in the entry header (top-right) via createInspectorEntry.
         if (element.links.length > 1) {
+          const actions = document.createElement('div');
+          actions.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
+
           const upBtn = document.createElement('button');
           upBtn.type = 'button';
-          upBtn.textContent = '\\u2191';
+          upBtn.textContent = '↑';
           upBtn.title = 'Move link up';
           upBtn.disabled = idx === 0;
           upBtn.addEventListener('click', function () {
@@ -120,7 +133,7 @@ export function mountNavLinks(
 
           const downBtn = document.createElement('button');
           downBtn.type = 'button';
-          downBtn.textContent = '\\u2193';
+          downBtn.textContent = '↓';
           downBtn.title = 'Move link down';
           downBtn.disabled = idx === element.links.length - 1;
           downBtn.addEventListener('click', function () {
@@ -133,22 +146,8 @@ export function mountNavLinks(
             ctx.scheduleSave();
           });
           actions.appendChild(downBtn);
+          card.appendChild(actions);
         }
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '\\u00d7';
-        removeBtn.title = 'Remove link';
-        removeBtn.setAttribute('aria-label', 'Remove link');
-        removeBtn.addEventListener('click', function () {
-          element.links.splice(idx, 1);
-          renderLinkList();
-          ctx.rebuildElement(element.id);
-          ctx.scheduleSave();
-        });
-        actions.appendChild(removeBtn);
-        card.appendChild(actions);
 
         linkListHost.appendChild(card);
       })(li);
@@ -411,7 +410,7 @@ export function mountNavPrimaryAction(
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'opencanvas-inspector-remove';
-    removeBtn.textContent = '\\u00d7';
+    removeBtn.textContent = '×';
     removeBtn.title = 'Remove primary action';
     removeBtn.setAttribute('aria-label', 'Remove primary action');
     removeBtn.addEventListener('click', function () {

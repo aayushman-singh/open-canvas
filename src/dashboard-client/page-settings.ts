@@ -51,12 +51,7 @@ function readBoot(): BootKeys {
 // Asset thumbnails on the dashboard host go through the owner-auth canvas
 // API. The bare /assets/<id> URL only resolves on a published-site host.
 function assetUrl(siteId: string, id: string): string {
-  return (
-    '/api/canvas/sites/' +
-    encodeURIComponent(siteId) +
-    '/assets/' +
-    encodeURIComponent(id)
-  );
+  return '/api/canvas/sites/' + encodeURIComponent(siteId) + '/assets/' + encodeURIComponent(id);
 }
 
 interface SeoSaveResponse {
@@ -106,9 +101,7 @@ function wireSeoForm(siteId: string, pageId: string): void {
     const input = form!.querySelector<HTMLInputElement | HTMLTextAreaElement>(
       '[name="' + inputName + '"]',
     );
-    const counter = form!.querySelector<HTMLElement>(
-      '[data-count-for="' + inputName + '"]',
-    );
+    const counter = form!.querySelector<HTMLElement>('[data-count-for="' + inputName + '"]');
     if (!input || !counter) return;
     function update(): void {
       const n = input!.value.length;
@@ -167,18 +160,14 @@ function wireSeoForm(siteId: string, pageId: string): void {
   // in by a template) or a deliberate cross-host canonical (umbrella site).
   // We don't auto-clear or block save; the field is the Owner's to control.
   const canonicalInput = form.querySelector<HTMLInputElement>('[name="canonical"]');
-  const canonicalPreviewNode = document.querySelector<HTMLElement>(
-    '[data-preview-canonical]',
-  );
+  const canonicalPreviewNode = document.querySelector<HTMLElement>('[data-preview-canonical]');
   const publishedUrlDefault = canonicalPreviewNode
     ? canonicalPreviewNode.getAttribute('data-published-url') || ''
     : '';
   const publishingHost = canonicalInput
     ? canonicalInput.getAttribute('data-publishing-host') || ''
     : '';
-  const canonicalWarningNode = document.querySelector<HTMLElement>(
-    '[data-canonical-warning]',
-  );
+  const canonicalWarningNode = document.querySelector<HTMLElement>('[data-canonical-warning]');
   const warningHostNode = document.querySelector<HTMLElement>('[data-warning-host]');
   function evaluateCanonicalState(): void {
     if (!canonicalInput) return;
@@ -220,10 +209,7 @@ function wireSeoForm(siteId: string, pageId: string): void {
     noIndexCb.addEventListener('change', () => {
       if (!serpEl) return;
       const siteBaseline = serpEl.getAttribute('data-site-noindex') === 'true';
-      serpEl.setAttribute(
-        'data-noindex',
-        siteBaseline || noIndexCb.checked ? 'true' : 'false',
-      );
+      serpEl.setAttribute('data-noindex', siteBaseline || noIndexCb.checked ? 'true' : 'false');
     });
   }
 
@@ -255,10 +241,7 @@ function wireSeoForm(siteId: string, pageId: string): void {
       const body = (await r.json()) as AssetListResponse;
       const assets = Array.isArray(body.assets) ? body.assets : [];
       renderAssetGrid(assets);
-      setStatus(
-        assets.length + ' image' + (assets.length === 1 ? '' : 's') + ' available',
-        false,
-      );
+      setStatus(assets.length + ' image' + (assets.length === 1 ? '' : 's') + ' available', false);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setStatus('Network error: ' + msg, true);
@@ -270,8 +253,7 @@ function wireSeoForm(siteId: string, pageId: string): void {
     modalGrid.innerHTML = '';
     const imageAssets = assets.filter(
       (a) =>
-        a.kind === 'image' ||
-        (typeof a.mediaType === 'string' && a.mediaType.startsWith('image/')),
+        a.kind === 'image' || (typeof a.mediaType === 'string' && a.mediaType.startsWith('image/')),
     );
     if (imageAssets.length === 0) {
       modalEmpty.hidden = false;
@@ -299,7 +281,7 @@ function wireSeoForm(siteId: string, pageId: string): void {
   function openPicker(picker: HTMLElement): void {
     activePicker = picker;
     if (modal) modal.setAttribute('data-open', 'true');
-    loadAssets();
+    void loadAssets();
   }
 
   function closePicker(): void {
@@ -309,9 +291,7 @@ function wireSeoForm(siteId: string, pageId: string): void {
 
   function selectAsset(assetId: string): void {
     if (!activePicker) return;
-    const hidden = activePicker.querySelector<HTMLInputElement>(
-      'input[type="hidden"]',
-    );
+    const hidden = activePicker.querySelector<HTMLInputElement>('input[type="hidden"]');
     const thumb = activePicker.querySelector<HTMLElement>('[data-picker-thumb]');
     const meta = activePicker.querySelector<HTMLElement>('[data-picker-meta]');
     const clearBtn = activePicker.querySelector<HTMLElement>('[data-picker-clear]');
@@ -333,10 +313,7 @@ function wireSeoForm(siteId: string, pageId: string): void {
       og.setAttribute('data-has-custom', 'true');
       og.style.backgroundImage = url;
     });
-    for (const sel of [
-      '[data-preview-img="twitter"]',
-      '[data-preview-img="linkedin"]',
-    ]) {
+    for (const sel of ['[data-preview-img="twitter"]', '[data-preview-img="linkedin"]']) {
       const img = document.querySelector<HTMLElement>(sel);
       if (!img) continue;
       img.style.backgroundImage = url;
@@ -367,10 +344,7 @@ function wireSeoForm(siteId: string, pageId: string): void {
       og.removeAttribute('data-has-custom');
       og.style.backgroundImage = '';
     });
-    for (const sel of [
-      '[data-preview-img="twitter"]',
-      '[data-preview-img="linkedin"]',
-    ]) {
+    for (const sel of ['[data-preview-img="twitter"]', '[data-preview-img="linkedin"]']) {
       const img = document.querySelector<HTMLElement>(sel);
       if (!img) continue;
       img.style.backgroundImage = '';
@@ -390,112 +364,107 @@ function wireSeoForm(siteId: string, pageId: string): void {
       if (ev.target === modal) closePicker();
     });
   document.addEventListener('keydown', (ev) => {
-    if (
-      ev.key === 'Escape' &&
-      modal &&
-      modal.getAttribute('data-open') === 'true'
-    )
-      closePicker();
+    if (ev.key === 'Escape' && modal && modal.getAttribute('data-open') === 'true') closePicker();
   });
 
   if (modalUpload) {
-    modalUpload.addEventListener('change', async () => {
-      const file = modalUpload.files && modalUpload.files[0];
-      if (!file) return;
-      setStatus('Uploading ' + file.name + '…', false);
-      const fd = new FormData();
-      fd.append('file', file);
-      try {
-        const r = await fetch('/api/owner/assets', { method: 'POST', body: fd });
-        if (!r.ok) {
-          let detail = r.statusText;
-          try {
-            const b = (await r.json()) as AssetUploadResponse;
-            if (b && b.error) detail = b.error;
-          } catch {
-            /* noop */
+    modalUpload.addEventListener('change', () => {
+      void (async (): Promise<void> => {
+        const file = modalUpload.files && modalUpload.files[0];
+        if (!file) return;
+        setStatus('Uploading ' + file.name + '…', false);
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+          const r = await fetch('/api/owner/assets', { method: 'POST', body: fd });
+          if (!r.ok) {
+            let detail = r.statusText;
+            try {
+              const b = (await r.json()) as AssetUploadResponse;
+              if (b && b.error) detail = b.error;
+            } catch {
+              /* noop */
+            }
+            setStatus('Upload failed: ' + detail, true);
+            modalUpload.value = '';
+            return;
           }
-          setStatus('Upload failed: ' + detail, true);
+          const body = (await r.json()) as AssetUploadResponse;
           modalUpload.value = '';
-          return;
+          if (body && body.id) {
+            await loadAssets();
+            selectAsset(body.id);
+          }
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          setStatus('Network error: ' + msg, true);
+          modalUpload.value = '';
         }
-        const body = (await r.json()) as AssetUploadResponse;
-        modalUpload.value = '';
-        if (body && body.id) {
-          await loadAssets();
-          selectAsset(body.id);
-        }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setStatus('Network error: ' + msg, true);
-        modalUpload.value = '';
-      }
+      })();
     });
   }
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    clearStatus();
-    const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
-    if (button) button.disabled = true;
-    const titleInput = form.querySelector<HTMLInputElement>('[name="title"]');
-    const descriptionInput = form.querySelector<HTMLTextAreaElement>(
-      '[name="description"]',
-    );
-    const ogImageAssetIdInput = form.querySelector<HTMLInputElement>(
-      '[name="ogImageAssetId"]',
-    );
-    const canonicalInput = form.querySelector<HTMLInputElement>('[name="canonical"]');
-    const noIndexInput = form.querySelector<HTMLInputElement>('[name="noIndex"]');
-    const localeInput = form.querySelector<HTMLInputElement>('[name="locale"]');
-    const data = {
-      title: titleInput ? titleInput.value.trim() : '',
-      description: descriptionInput ? descriptionInput.value.trim() : '',
-      ogImageAssetId: ogImageAssetIdInput ? ogImageAssetIdInput.value.trim() : '',
-      canonical: canonicalInput ? canonicalInput.value.trim() : '',
-      noIndex: noIndexInput ? noIndexInput.checked : false,
-      locale: localeInput ? localeInput.value.trim() : '',
-    };
-    if (data.title.length === 0) {
-      showError('Title is required.');
-      if (button) button.disabled = false;
-      return;
-    }
-    try {
-      const response = await fetch(
-        '/api/canvas/sites/' +
-          encodeURIComponent(siteId) +
-          '/pages/' +
-          encodeURIComponent(pageId) +
-          '/seo',
-        {
-          method: 'PUT',
-          headers: {
-            'content-type': 'application/json',
-            accept: 'application/json',
-          },
-          body: JSON.stringify(data),
-        },
-      );
-      if (!response.ok) {
-        let detail = response.statusText;
-        try {
-          const body = (await response.json()) as SeoSaveResponse;
-          if (body && body.error) detail = body.error;
-        } catch {
-          /* noop */
-        }
-        showError(detail);
+  form.addEventListener('submit', (event) => {
+    void (async (): Promise<void> => {
+      event.preventDefault();
+      clearStatus();
+      const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+      if (button) button.disabled = true;
+      const titleInput = form.querySelector<HTMLInputElement>('[name="title"]');
+      const descriptionInput = form.querySelector<HTMLTextAreaElement>('[name="description"]');
+      const ogImageAssetIdInput = form.querySelector<HTMLInputElement>('[name="ogImageAssetId"]');
+      const canonicalInput = form.querySelector<HTMLInputElement>('[name="canonical"]');
+      const noIndexInput = form.querySelector<HTMLInputElement>('[name="noIndex"]');
+      const localeInput = form.querySelector<HTMLInputElement>('[name="locale"]');
+      const data = {
+        title: titleInput ? titleInput.value.trim() : '',
+        description: descriptionInput ? descriptionInput.value.trim() : '',
+        ogImageAssetId: ogImageAssetIdInput ? ogImageAssetIdInput.value.trim() : '',
+        canonical: canonicalInput ? canonicalInput.value.trim() : '',
+        noIndex: noIndexInput ? noIndexInput.checked : false,
+        locale: localeInput ? localeInput.value.trim() : '',
+      };
+      if (data.title.length === 0) {
+        showError('Title is required.');
         if (button) button.disabled = false;
         return;
       }
-      showOk('Saved.');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      showError('Network error: ' + msg);
-    } finally {
-      if (button) button.disabled = false;
-    }
+      try {
+        const response = await fetch(
+          '/api/canvas/sites/' +
+            encodeURIComponent(siteId) +
+            '/pages/' +
+            encodeURIComponent(pageId) +
+            '/seo',
+          {
+            method: 'PUT',
+            headers: {
+              'content-type': 'application/json',
+              accept: 'application/json',
+            },
+            body: JSON.stringify(data),
+          },
+        );
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = (await response.json()) as SeoSaveResponse;
+            if (body && body.error) detail = body.error;
+          } catch {
+            /* noop */
+          }
+          showError(detail);
+          if (button) button.disabled = false;
+          return;
+        }
+        showOk('Saved.');
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        showError('Network error: ' + msg);
+      } finally {
+        if (button) button.disabled = false;
+      }
+    })();
   });
 }
 
@@ -517,74 +486,72 @@ function wireMetadataForm(siteId: string, pageId: string): void {
     if (ok) ok.textContent = msg;
   }
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    clearStatus();
-    const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
-    if (button) button.disabled = true;
-    const publishedDateInput = form.querySelector<HTMLInputElement>(
-      '[name="publishedDate"]',
-    );
-    const authorInput = form.querySelector<HTMLInputElement>('[name="author"]');
-    const tagsInput = form.querySelector<HTMLInputElement>('[name="tags"]');
-    const categoryInput = form.querySelector<HTMLInputElement>('[name="category"]');
-    const rawTags = tagsInput ? tagsInput.value.trim() : '';
-    const data = {
-      publishedDate:
-        publishedDateInput && publishedDateInput.value.trim().length > 0
-          ? publishedDateInput.value.trim()
-          : null,
-      author:
-        authorInput && authorInput.value.trim().length > 0
-          ? authorInput.value.trim()
-          : null,
-      tags:
-        rawTags.length > 0
-          ? rawTags
-              .split(',')
-              .map((t) => t.trim())
-              .filter(Boolean)
-          : null,
-      category:
-        categoryInput && categoryInput.value.trim().length > 0
-          ? categoryInput.value.trim()
-          : null,
-    };
-    try {
-      const response = await fetch(
-        '/api/canvas/sites/' +
-          encodeURIComponent(siteId) +
-          '/pages/' +
-          encodeURIComponent(pageId) +
-          '/metadata',
-        {
-          method: 'PUT',
-          headers: {
-            'content-type': 'application/json',
-            accept: 'application/json',
+  form.addEventListener('submit', (event) => {
+    void (async (): Promise<void> => {
+      event.preventDefault();
+      clearStatus();
+      const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+      if (button) button.disabled = true;
+      const publishedDateInput = form.querySelector<HTMLInputElement>('[name="publishedDate"]');
+      const authorInput = form.querySelector<HTMLInputElement>('[name="author"]');
+      const tagsInput = form.querySelector<HTMLInputElement>('[name="tags"]');
+      const categoryInput = form.querySelector<HTMLInputElement>('[name="category"]');
+      const rawTags = tagsInput ? tagsInput.value.trim() : '';
+      const data = {
+        publishedDate:
+          publishedDateInput && publishedDateInput.value.trim().length > 0
+            ? publishedDateInput.value.trim()
+            : null,
+        author:
+          authorInput && authorInput.value.trim().length > 0 ? authorInput.value.trim() : null,
+        tags:
+          rawTags.length > 0
+            ? rawTags
+                .split(',')
+                .map((t) => t.trim())
+                .filter(Boolean)
+            : null,
+        category:
+          categoryInput && categoryInput.value.trim().length > 0
+            ? categoryInput.value.trim()
+            : null,
+      };
+      try {
+        const response = await fetch(
+          '/api/canvas/sites/' +
+            encodeURIComponent(siteId) +
+            '/pages/' +
+            encodeURIComponent(pageId) +
+            '/metadata',
+          {
+            method: 'PUT',
+            headers: {
+              'content-type': 'application/json',
+              accept: 'application/json',
+            },
+            body: JSON.stringify(data),
           },
-          body: JSON.stringify(data),
-        },
-      );
-      if (!response.ok) {
-        let detail = response.statusText;
-        try {
-          const body = (await response.json()) as MetadataSaveResponse;
-          if (body && body.error) detail = body.error;
-        } catch {
-          /* noop */
+        );
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = (await response.json()) as MetadataSaveResponse;
+            if (body && body.error) detail = body.error;
+          } catch {
+            /* noop */
+          }
+          showError(detail);
+          if (button) button.disabled = false;
+          return;
         }
-        showError(detail);
+        showOk('Saved.');
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        showError('Network error: ' + msg);
+      } finally {
         if (button) button.disabled = false;
-        return;
       }
-      showOk('Saved.');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      showError('Network error: ' + msg);
-    } finally {
-      if (button) button.disabled = false;
-    }
+    })();
   });
 }
 

@@ -1,38 +1,49 @@
 // src/editor-client/modals.ts
 //
 // ADR 0058 Phase 2q.a — modal cluster.
-// canvas-client.ts:1194-1957 carries the inline twin for the six modal
-// openers (openTextModal, openSelectModal, openConfirmModal,
-// openAlertModal, openAiMediaModal, openNewPageModal) plus the shared
-// modalOpen flag and the window.__opencanvasModal global registration
-// that wraps three of them as confirm/alert/prompt helpers. All retire
-// on ADR 0015 Phase 3 atomic cutover; until then, the inline IIFE is
-// the production source-of-truth and this module is dead code.
+// Module-of-record for the editor surface's modal openers. The inline
+// twin in canvas-client.ts has retired; consumers route through ctx
+// bindings owned by this file.
 //
-// Six openers live here, each enforcing the same hard sync gate against
+// Dismissal model — backdrop click is inert across every opener. Modals
+// dismiss only through explicit affordances: the Cancel / × button, the
+// Escape key, or the OK / Enter commit path. The earlier click-off-to-
+// dismiss behaviour ate in-progress data on long-form modals (Save to
+// library, AI brief, snapshot label) — restricting dismissal to explicit
+// affordances eliminates that footgun for every modal at once.
+//
+// Seven openers live here, each enforcing the same hard sync gate against
 // ctx.modalOpen and each restoring the flag in their close() path:
 //
 //   - openTextModalImpl(ctx, opts) — single- or multi-line text prompt.
 //     Resolves to the input value on OK/Enter (Ctrl/Cmd+Enter when
-//     multiline), null on Cancel/Escape/backdrop click. Used for rename,
-//     "Save to library" name + description, AI brief prompts, snapshot
-//     labels, and the rest of the prompt-style modal callers.
+//     multiline), null on Cancel/Escape. Used for rename, AI brief
+//     prompts, snapshot labels, and the rest of the prompt-style modal
+//     callers.
 //
 //   - openSelectModalImpl(ctx, opts) — single-pick from a fixed option
 //     list. Resolves to the chosen value on OK/Enter, null on Cancel/
-//     Escape. Used for visibility pickers ("public" / "private") in the
-//     "Save to library" / "Save as template" flows.
+//     Escape.
 //
 //   - openConfirmModalImpl(ctx, opts) — OK/Cancel confirmation with
 //     optional danger styling on the confirm button. Resolves true on
-//     OK/Enter, false on Cancel/Escape/backdrop click. Drives the
-//     destructive-action confirms (delete page, delete asset, delete
-//     snapshot) and the "open the live site after publish" prompt.
+//     OK/Enter, false on Cancel/Escape. Drives the destructive-action
+//     confirms (delete page, delete asset, delete snapshot) and the
+//     "open the live site after publish" prompt.
 //
 //   - openAlertModalImpl(ctx, opts) — single-button OK acknowledgement,
 //     wired with role="alertdialog" so AT announces it as an alert. Both
 //     OK/Enter and Escape close. Resolves to void. Used for AI preview
 //     failures, publish failures, and the publish-error toast escape.
+//
+//   - openSaveFormModalImpl(ctx, opts) — consolidated save-form modal
+//     carrying name + description + visibility on one screen. Replaces
+//     the prior three-modal chain used by "Save to library" and "Save as
+//     template". Carries an explicit × close button in the header in
+//     addition to the Cancel button. Resolves to {name, description,
+//     visibility} on Save or null on Cancel / × / Escape. The name field
+//     is required when opts.nameRequired is true; the Save button stays
+//     disabled until the field is non-empty.
 //
 //   - openAiMediaModalImpl(ctx, opts) — prompt textarea + aspect-ratio
 //     radio row + 4-up preview gallery. requestFn(prompt, aspectRatio)
@@ -53,11 +64,11 @@
 //     to {title, slug, locale} on submit or null on cancel.
 //
 // CRITICAL — modal stacking semantics: every opener throws synchronously
-// if ctx.modalOpen is already true. Callers serialise modals themselves
-// (e.g. saveToLibrary chains name → description → visibility through
-// three sequential awaits). The throw is preserved verbatim from the
-// inline twin so a forgotten serialisation surfaces as a loud error
-// rather than two stacked dialogs.
+// if ctx.modalOpen is already true. Callers serialise modals themselves;
+// the throw surfaces a forgotten serialisation as a loud error rather
+// than two stacked dialogs. (Historical note: saveToLibrary used to chain
+// name → description → visibility through three sequential awaits, which
+// is what motivated openSaveFormModalImpl below.)
 //
 // The window.__opencanvasModal global registration (canvas-client.ts:
 // 1953-1957 in the pre-cutover IIFE) is now performed by
@@ -131,11 +142,41 @@ export interface NewPageModalOpts {
   existingSlugs?: string[] | undefined;
 }
 
+/** Discriminator on the modal result so the caller can branch the create
+ *  path. `regular` flows through the existing single-page persistence;
+ *  `collection` chains into the collection-scaffold wizard (which opens
+ *  its own slug prompt and POSTs the multi-page index + template +
+ *  seed-entries scaffold). When `collection` is returned the modal has
+ *  already closed, but `title`, `slug`, and `locale` carry no meaning —
+ *  the scaffold endpoint derives its own page identity from the slug it
+ *  prompts for. */
 export interface NewPageModalResult {
+  kind: 'regular' | 'collection';
   title: string;
   slug: string;
   /** null when "Site default" is chosen; otherwise a BCP-47 tag. */
   locale: string | null;
+}
+
+/** Options for the consolidated "Save to library" / "Save as template" form
+ *  modal. Replaces the prior three-modal chain (name → description →
+ *  visibility) with a single screen carrying all three fields. */
+export interface SaveFormModalOpts {
+  title: string;
+  nameLabel: string;
+  nameDefault?: string | undefined;
+  nameRequired?: boolean | undefined;
+  descriptionLabel: string;
+  visibilityLabel: string;
+  visibilityOptions: SelectModalOption[];
+  visibilityDefault?: string | undefined;
+  submitLabel?: string | undefined;
+}
+
+export interface SaveFormModalResult {
+  name: string;
+  description: string;
+  visibility: string;
 }
 
 // ---- Error narrowing helper -------------------------------------------
@@ -234,9 +275,11 @@ export function openTextModalImpl(
         close(input.value);
       }
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close(null);
-    });
+    // Backdrop click is intentionally inert — modals close only via the
+    // Cancel button, Escape key, or OK / Enter commit. The earlier
+    // click-off-to-dismiss behaviour caused accidental data loss during
+    // long-form edits ("Save to library" name, AI brief, snapshot label),
+    // so the dismiss surface is now restricted to explicit affordances.
     cancel.addEventListener('click', () => close(null));
     ok.addEventListener('click', () => close(input.value));
     document.addEventListener('keydown', onKey, true);
@@ -336,9 +379,7 @@ export function openSelectModalImpl(
         close(select.value);
       }
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close(null);
-    });
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
     cancel.addEventListener('click', () => close(null));
     ok.addEventListener('click', () => close(select.value));
     document.addEventListener('keydown', onKey, true);
@@ -419,9 +460,7 @@ export function openConfirmModalImpl(
         close(true);
       }
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close(false);
-    });
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
     cancel.addEventListener('click', () => {
       close(false);
     });
@@ -705,9 +744,7 @@ export function openAiMediaModalImpl(
         close(null);
       }
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close(null);
-    });
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
     cancel.addEventListener('click', () => {
       close(null);
     });
@@ -743,32 +780,92 @@ export function openNewPageModalImpl(
     h.textContent = 'New page';
     panel.appendChild(h);
 
+    // -- Page kind (regular vs. collection) ----------------------------
+    // Segmented control at the top of the modal. "Regular page" is the
+    // default and shows the title/slug/locale fields below. "Collection"
+    // hides those fields and routes Create through the collection
+    // scaffold wizard (which has its own slug prompt + multi-page POST).
+    // Per ADR 0063 + 0034 — the Pages-tab "+ New Collection" entry point
+    // moves into this kind selector so the modal is the single intake
+    // surface for new-page creation.
+    let kind: 'regular' | 'collection' = 'regular';
+    const kindLabel = document.createElement('label');
+    kindLabel.textContent = 'Page kind';
+    panel.appendChild(kindLabel);
+    // Segmented control. Inline styles keep the kind selector self-
+    // contained inside modals.ts rather than threading into styles.css,
+    // which carries a single shared modal stylesheet across the editor
+    // surface; the .active option carries the picked tone. Both options
+    // are <button type="button"> so neither submits the form on Enter
+    // (the modal handles Enter explicitly through the keydown handler).
+    const kindGroup = document.createElement('div');
+    kindGroup.setAttribute('role', 'radiogroup');
+    kindGroup.setAttribute('aria-label', 'Page kind');
+    kindGroup.style.cssText =
+      'display:flex;gap:6px;background:var(--surface);border:1.5px solid var(--line-2);border-radius:var(--r-sm);padding:4px;margin-bottom:4px';
+    function styleKindOption(btn: HTMLButtonElement, active: boolean): void {
+      btn.style.cssText =
+        'appearance:none;font:inherit;font-family:var(--sans);font-size:13px;font-weight:650;flex:1;padding:8px 10px;border-radius:calc(var(--r-sm) - 2px);cursor:pointer;border:none;transition:background-color 0.15s, color 0.15s;' +
+        (active
+          ? 'background:var(--ink);color:var(--surface)'
+          : 'background:transparent;color:var(--ink-2)');
+    }
+    const kindRegular = document.createElement('button');
+    kindRegular.type = 'button';
+    kindRegular.setAttribute('role', 'radio');
+    kindRegular.setAttribute('aria-checked', 'true');
+    kindRegular.setAttribute('data-kind', 'regular');
+    kindRegular.textContent = 'Regular page';
+    kindRegular.title = 'A single page with a title, slug, and optional locale';
+    styleKindOption(kindRegular, true);
+    const kindCollection = document.createElement('button');
+    kindCollection.type = 'button';
+    kindCollection.setAttribute('role', 'radio');
+    kindCollection.setAttribute('aria-checked', 'false');
+    kindCollection.setAttribute('data-kind', 'collection');
+    kindCollection.textContent = 'Collection';
+    kindCollection.title =
+      'A content collection (e.g. blog, case-studies) with index page + entries';
+    styleKindOption(kindCollection, false);
+    kindGroup.appendChild(kindRegular);
+    kindGroup.appendChild(kindCollection);
+    panel.appendChild(kindGroup);
+
+    // -- Regular-page fields wrapper -----------------------------------
+    // Wrap title/slug/locale together so the Collection branch can hide
+    // them in one toggle. Keeping them mounted (display:none vs. removed)
+    // preserves the existing input refs and validation flow without
+    // having to teardown + recreate when the user flips back to Regular.
+    const regularFields = document.createElement('div');
+    regularFields.className = 'opencanvas-modal-regular-fields';
+    panel.appendChild(regularFields);
+
     // -- Title ---------------------------------------------------------
     const titleLabel = document.createElement('label');
     titleLabel.textContent = 'Title';
-    panel.appendChild(titleLabel);
+    regularFields.appendChild(titleLabel);
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
     titleInput.placeholder = 'About us';
-    panel.appendChild(titleInput);
+    regularFields.appendChild(titleInput);
 
     // -- Slug ----------------------------------------------------------
     const slugLabel = document.createElement('label');
     slugLabel.textContent = 'Slug';
-    panel.appendChild(slugLabel);
+    regularFields.appendChild(slugLabel);
     const slugInput = document.createElement('input');
     slugInput.type = 'text';
     slugInput.placeholder = 'about-us';
-    panel.appendChild(slugInput);
+    regularFields.appendChild(slugInput);
     const slugHint = document.createElement('div');
     slugHint.style.cssText = 'font-size:11px;color:var(--opencanvas-fg-mute);margin:-6px 0 8px';
     slugHint.textContent = 'Auto-derived from title. Edit to override; clear to re-link.';
-    panel.appendChild(slugHint);
+    regularFields.appendChild(slugHint);
 
     // -- Locale --------------------------------------------------------
     const localeLabel = document.createElement('label');
     localeLabel.textContent = 'Locale';
-    panel.appendChild(localeLabel);
+    regularFields.appendChild(localeLabel);
     const localeSel = document.createElement('select');
     const localeOptions: Array<{ value: string; label: string }> = [
       { value: '', label: 'Site default' },
@@ -792,16 +889,28 @@ export function openNewPageModalImpl(
       localeOpt.textContent = lo.label;
       localeSel.appendChild(localeOpt);
     }
-    panel.appendChild(localeSel);
+    regularFields.appendChild(localeSel);
     const otherLocaleInput = document.createElement('input');
     otherLocaleInput.type = 'text';
     otherLocaleInput.placeholder = 'e.g. en-GB or fr-CA';
     otherLocaleInput.style.cssText = 'margin-top:6px;display:none';
-    panel.appendChild(otherLocaleInput);
+    regularFields.appendChild(otherLocaleInput);
     localeSel.addEventListener('change', () => {
       otherLocaleInput.style.display = localeSel.value === '__other__' ? 'block' : 'none';
       if (localeSel.value === '__other__') otherLocaleInput.focus();
     });
+
+    // -- Collection-mode hint -----------------------------------------
+    // When the user picks "Collection", the modal hides title/slug/locale
+    // and shows this explainer instead. Clicking Create chains into the
+    // collection-scaffold wizard which has its own slug prompt and POSTs
+    // a multi-page (index + template + seed entries) scaffold in one go.
+    const collectionHint = document.createElement('div');
+    collectionHint.style.cssText =
+      'display:none;font-size:13px;color:var(--ink-2);line-height:1.5;padding:10px 12px;background:var(--surface);border:1px dashed var(--line-2);border-radius:var(--r-sm)';
+    collectionHint.textContent =
+      'A Collection bundles an index page, a per-entry template, and a couple of starter entries. Click Create to pick a slug.';
+    panel.appendChild(collectionHint);
 
     // -- Inline error + actions ---------------------------------------
     const errorLine = document.createElement('div');
@@ -822,6 +931,35 @@ export function openNewPageModalImpl(
 
     backdrop.appendChild(panel);
 
+    // -- Kind selector wiring -----------------------------------------
+    function setKind(next: 'regular' | 'collection'): void {
+      kind = next;
+      const isRegular = next === 'regular';
+      regularFields.style.display = isRegular ? '' : 'none';
+      collectionHint.style.display = isRegular ? 'none' : '';
+      styleKindOption(kindRegular, isRegular);
+      styleKindOption(kindCollection, !isRegular);
+      kindRegular.setAttribute('aria-checked', isRegular ? 'true' : 'false');
+      kindCollection.setAttribute('aria-checked', isRegular ? 'false' : 'true');
+      // Collection mode bypasses the per-field validation — its slug is
+      // collected by the scaffold wizard's own prompt, so Create is
+      // always enabled once "Collection" is picked.
+      if (isRegular) {
+        validate();
+      } else {
+        errorLine.textContent = '';
+        ok.disabled = false;
+      }
+    }
+    kindRegular.addEventListener('click', () => {
+      setKind('regular');
+      titleInput.focus();
+    });
+    kindCollection.addEventListener('click', () => {
+      setKind('collection');
+      ok.focus();
+    });
+
     // -- Slug auto-derive + freeze/re-arm logic -----------------------
     let slugManuallyEdited = false;
     function slugify(str: string): string {
@@ -832,12 +970,14 @@ export function openNewPageModalImpl(
       return s.length === 0 ? 'page' : s;
     }
     titleInput.addEventListener('input', () => {
+      if (kind !== 'regular') return;
       if (!slugManuallyEdited) {
         slugInput.value = slugify(titleInput.value);
         validate();
       }
     });
     slugInput.addEventListener('input', () => {
+      if (kind !== 'regular') return;
       if (slugInput.value.length === 0) {
         slugManuallyEdited = false;
         slugInput.value = slugify(titleInput.value);
@@ -903,6 +1043,15 @@ export function openNewPageModalImpl(
       }
     }
     function submit(): void {
+      // Collection branch — close with kind:'collection' immediately;
+      // the caller chains into the scaffold wizard which collects the
+      // slug, POSTs the scaffold, and refreshes ctx.state. Title/slug/
+      // locale carry empty values because the scaffold endpoint derives
+      // its own page identity from the slug it prompts for separately.
+      if (kind === 'collection') {
+        close({ kind: 'collection', title: '', slug: '', locale: null });
+        return;
+      }
       let locale: string | null;
       if (localeSel.value === '') locale = null;
       else if (localeSel.value === '__other__') {
@@ -912,14 +1061,13 @@ export function openNewPageModalImpl(
         locale = localeSel.value;
       }
       close({
+        kind: 'regular',
         title: titleInput.value.trim(),
         slug: slugInput.value.trim(),
         locale: locale,
       });
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close(null);
-    });
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
     cancel.addEventListener('click', () => {
       close(null);
     });
@@ -987,14 +1135,187 @@ export function openAlertModalImpl(
         close();
       }
     }
-    backdrop.addEventListener('click', (ev) => {
-      if (ev.target === backdrop) close();
-    });
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
     ok.addEventListener('click', close);
     document.addEventListener('keydown', onKey, true);
     document.body.classList.add('opencanvas-modal-open');
     document.body.appendChild(backdrop);
     ok.focus();
+  });
+}
+
+// ---- openSaveFormModal -------------------------------------------------
+
+/** Consolidated "Save to library" / "Save as template" form modal.
+ *  Carries name, description, and visibility on a single screen, replacing
+ *  the prior three-modal chain. Header includes an explicit × close button
+ *  (aria-label "Close") in addition to the Cancel button so the dismiss
+ *  affordance is visually obvious — the backdrop is inert. Save stays
+ *  disabled until the name field is non-empty when opts.nameRequired is
+ *  true. Resolves with the field bundle on Save and null on every cancel
+ *  path (×, Cancel, Escape). */
+export function openSaveFormModalImpl(
+  ctx: EditorContext,
+  opts: SaveFormModalOpts,
+): Promise<SaveFormModalResult | null> {
+  if (ctx.modalOpen) {
+    throw new Error('openSaveFormModal: another modal is already open');
+  }
+  const title = opts.title;
+  const nameLabel = opts.nameLabel;
+  const nameDefault = typeof opts.nameDefault === 'string' ? opts.nameDefault : '';
+  const nameRequired = opts.nameRequired === true;
+  const descriptionLabel = opts.descriptionLabel;
+  const visibilityLabel = opts.visibilityLabel;
+  const visibilityOptions = Array.isArray(opts.visibilityOptions) ? opts.visibilityOptions : [];
+  const visibilityDefault =
+    typeof opts.visibilityDefault === 'string' ? opts.visibilityDefault : '';
+  const submitLabel = typeof opts.submitLabel === 'string' ? opts.submitLabel : 'Save';
+  ctx.modalOpen = true;
+  return new Promise<SaveFormModalResult | null>((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'opencanvas-modal-backdrop';
+    const panel = document.createElement('div');
+    panel.className = 'opencanvas-modal';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-label', title);
+
+    // Header row: title + × close button.
+    const header = document.createElement('div');
+    header.className = 'opencanvas-modal-header';
+    const h = document.createElement('h3');
+    h.textContent = title;
+    header.appendChild(h);
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'opencanvas-modal-close';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.textContent = '×';
+    header.appendChild(closeBtn);
+    panel.appendChild(header);
+
+    // Name field.
+    const nameLbl = document.createElement('label');
+    nameLbl.textContent = nameLabel;
+    panel.appendChild(nameLbl);
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = nameDefault;
+    panel.appendChild(nameInput);
+
+    // Description field.
+    const descLbl = document.createElement('label');
+    descLbl.textContent = descriptionLabel;
+    panel.appendChild(descLbl);
+    const descInput = document.createElement('textarea');
+    descInput.rows = 3;
+    panel.appendChild(descInput);
+
+    // Visibility field.
+    const visLbl = document.createElement('label');
+    visLbl.textContent = visibilityLabel;
+    panel.appendChild(visLbl);
+    const visSelect = document.createElement('select');
+    let matched = false;
+    for (let i = 0; i < visibilityOptions.length; i++) {
+      const opt = visibilityOptions[i];
+      if (!opt || typeof opt.value !== 'string') continue;
+      const optEl = document.createElement('option');
+      optEl.value = opt.value;
+      optEl.textContent = typeof opt.label === 'string' ? opt.label : opt.value;
+      if (opt.value === visibilityDefault) {
+        optEl.selected = true;
+        matched = true;
+      }
+      visSelect.appendChild(optEl);
+    }
+    if (!matched && visibilityOptions.length > 0) {
+      visSelect.selectedIndex = 0;
+    }
+    panel.appendChild(visSelect);
+
+    // Inline error region (kept short — the actual save POST surfaces
+    // server errors via ctx.setStatus on the caller side).
+    const errorLine = document.createElement('div');
+    errorLine.style.cssText = 'min-height:18px;font-size:12px;color:#ef4444;margin:8px 0';
+    panel.appendChild(errorLine);
+
+    const actions = document.createElement('div');
+    actions.className = 'opencanvas-modal-actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel';
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.textContent = submitLabel;
+    actions.appendChild(cancel);
+    actions.appendChild(ok);
+    panel.appendChild(actions);
+
+    backdrop.appendChild(panel);
+
+    function validate(): void {
+      if (nameRequired) {
+        const trimmed = nameInput.value.trim();
+        if (trimmed.length === 0) {
+          ok.disabled = true;
+          return;
+        }
+      }
+      errorLine.textContent = '';
+      ok.disabled = false;
+    }
+    nameInput.addEventListener('input', validate);
+
+    function close(value: SaveFormModalResult | null): void {
+      document.removeEventListener('keydown', onKey, true);
+      if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+      document.body.classList.remove('opencanvas-modal-open');
+      ctx.modalOpen = false;
+      resolve(value);
+    }
+    function onKey(ev: KeyboardEvent): void {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        close(null);
+        return;
+      }
+      if (ev.key === 'Enter') {
+        // Ignore Enter from the description textarea so multi-line input
+        // works naturally.
+        if (document.activeElement === descInput) return;
+        if (ok.disabled) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        submit();
+      }
+    }
+    function submit(): void {
+      const name = nameInput.value.trim();
+      if (nameRequired && name.length === 0) {
+        errorLine.textContent = nameLabel + ' is required.';
+        nameInput.focus();
+        return;
+      }
+      close({
+        name: name,
+        description: descInput.value.trim(),
+        visibility: visSelect.value,
+      });
+    }
+    // Backdrop click is inert; see openTextModalImpl for the rationale.
+    closeBtn.addEventListener('click', () => close(null));
+    cancel.addEventListener('click', () => close(null));
+    ok.addEventListener('click', submit);
+    document.addEventListener('keydown', onKey, true);
+
+    document.body.classList.add('opencanvas-modal-open');
+    document.body.appendChild(backdrop);
+    nameInput.focus();
+    if (typeof nameInput.select === 'function') nameInput.select();
+    validate();
   });
 }
 

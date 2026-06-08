@@ -7,12 +7,29 @@
 // canvas-client.ts is UNCHANGED — this module is the Phase 3 cutover
 // destination, not a live call site yet.
 //
-// Six functions live here:
+// Eight functions live here:
 //
-//   - ensureSectionsPanelLoaded(ctx) — fetch /library/sections once
-//     (memoised via ctx.sectionsCatalog === null sentinel), then call
-//     renderSectionsPanelImpl. Surfaces "Failed to load sections." into
-//     the picker root on a non-OK response or network error.
+//   - prefetchSectionsCatalog(ctx) — fire-and-forget GET /library/sections
+//     called from the editor boot block as soon as ctx.authFetch is
+//     bound. Module-level singleton promise so repeat calls share the
+//     in-flight request; resolution writes ctx.sectionsCatalog so a later
+//     Sections-tab open renders microtask-fast off the cached array. The
+//     /api/library/sections endpoint is server-bound (~5s for the 88-
+//     entry catalog as of 2026-06-07) so kicking the request at editor
+//     mount masks the latency behind the rest of the boot work; by the
+//     time the Owner clicks the Sections tab the response has already
+//     landed. On rejection the singleton resets to null so the next open
+//     retries — no silent fallback to an empty list.
+//
+//   - invalidateSectionsCache(ctx) — clear ctx.sectionsCatalog AND the
+//     module-level prefetch promise. Called by saveToLibraryImpl after a
+//     successful POST /library/sections so the next picker open re-
+//     fetches and surfaces the newly-saved row.
+//
+//   - ensureSectionsPanelLoaded(ctx) — await the prefetch promise (or
+//     start one if the editor never called prefetchSectionsCatalog), then
+//     call renderSectionsPanelImpl. Surfaces "Failed to load sections."
+//     into the picker root on a rejected fetch.
 //
 //   - renderSectionsPanelImpl(ctx) — split-render: builds the controls
 //     shell (search + filter) once via the inner renderSectionsPickerShell
@@ -151,22 +168,100 @@ export type SectionsPickerContext = StateContext &
     | 'flushPendingSave'
   >;
 
+type SectionsCatalogCacheContext = Pick<EditorContext, 'sectionsCatalog'>;
+type SectionsCatalogFetchContext = Pick<EditorContext, 'apiBase' | 'authFetch' | 'sectionsCatalog'>;
+
+// Module-level singleton for the in-flight prefetch. Tracks two states:
+//   - `null` = no prefetch attempted (or last attempt failed/invalidated;
+//     the next caller will start a fresh request).
+//   - `Promise<PrefetchOutcome>` = an attempt is in-flight OR has resolved.
+//     Success outcomes write the catalog onto `ctx.sectionsCatalog`;
+//     failure outcomes surface the error message so awaiters can render
+//     a visible "Failed to load sections." row instead of an empty grid.
+//
+// Singleton at module scope (not a per-ctx field) because only one editor
+// instance lives per page load and the endpoint is Owner-gated by the
+// same Clerk/edit-token cookies for both prefetch and tab-open. The
+// promise resolves (never rejects) so the boot-time fire-and-forget call
+// doesn't surface as an unhandled rejection when the Owner mounts the
+// editor and never opens the Sections tab; awaiters distinguish the two
+// outcomes via the discriminant. On `kind:'failure'` the singleton
+// resets to `null` so the next tab-open retries the fetch instead of
+// replaying the cached failure. No silent fallback to an empty catalog,
+// per the all-or-nothing failure rule.
+type PrefetchOutcome = { kind: 'success' } | { kind: 'failure'; message: string };
+
+let prefetchPromise: Promise<PrefetchOutcome> | null = null;
+
+/**
+ * Kick off the `GET /library/sections` request as early as the editor
+ * knows it needs the catalog. Idempotent — repeat calls during the same
+ * page load share the single in-flight promise. The Sections-tab open
+ * path (`ensureSectionsPanelLoaded`) awaits the same promise; if the
+ * prefetch already resolved, that path renders the cached catalog
+ * synchronously (microtask-fast) instead of issuing a fresh request.
+ *
+ * Failure mode: rejections from the underlying fetch are converted to a
+ * `{ kind: 'failure' }` outcome here so the boot-time fire-and-forget
+ * call doesn't surface as an unhandled rejection. The `kind:'failure'`
+ * branch also resets the singleton so a later open retries the fetch;
+ * the visible "Failed to load sections." error renders on the awaiter
+ * path (`ensureSectionsPanelLoaded`) reading the outcome — NOT silently
+ * here, NOT as a fallback to an empty catalog.
+ */
+export function prefetchSectionsCatalog(ctx: SectionsCatalogFetchContext): void {
+  if (prefetchPromise !== null) return;
+  if (ctx.sectionsCatalog !== null) return;
+  prefetchPromise = (async (): Promise<PrefetchOutcome> => {
+    try {
+      const response = await ctx.authFetch(ctx.apiBase + '/library/sections');
+      if (!response.ok) {
+        prefetchPromise = null;
+        return { kind: 'failure', message: 'sections fetch failed: ' + String(response.status) };
+      }
+      const body = (await response.json()) as { sections?: SectionsCatalogEntry[] };
+      const catalog = Array.isArray(body.sections) ? body.sections : [];
+      ctx.sectionsCatalog = catalog;
+      return { kind: 'success' };
+    } catch (err: unknown) {
+      prefetchPromise = null;
+      const message = err instanceof Error ? err.message : String(err);
+      return { kind: 'failure', message: message };
+    }
+  })();
+}
+
+/**
+ * Drop any cached catalog so the next `ensureSectionsPanelLoaded` re-
+ * fetches. Called by saveToLibraryImpl after a successful POST
+ * /library/sections so the picker reflects the new entry on the next
+ * open.
+ */
+export function invalidateSectionsCache(ctx: SectionsCatalogCacheContext): void {
+  ctx.sectionsCatalog = null;
+  prefetchPromise = null;
+}
+
 export async function ensureSectionsPanelLoaded(ctx: SectionsPickerContext): Promise<void> {
   const root = document.querySelector('[data-section-picker-root]');
   if (!root) return;
   if (ctx.sectionsCatalog === null) {
-    try {
-      const response = await ctx.authFetch(ctx.apiBase + '/library/sections');
-      if (!response.ok) {
-        root.innerHTML =
-          '<p class="opencanvas-section-picker-empty">Failed to load sections.</p>';
-        return;
-      }
-      const body = (await response.json()) as { sections?: SectionsCatalogEntry[] };
-      ctx.sectionsCatalog = Array.isArray(body.sections) ? body.sections : [];
-    } catch (_err) {
-      root.innerHTML =
-        '<p class="opencanvas-section-picker-empty">Failed to load sections.</p>';
+    // Reuse the in-flight prefetch promise when one exists, otherwise
+    // kick a fresh one. The success path lands the catalog on
+    // ctx.sectionsCatalog; the failure path surfaces a visible error
+    // (no silent fallback to an empty grid).
+    prefetchSectionsCatalog(ctx);
+    // prefetchPromise is non-null after the call above unless
+    // ctx.sectionsCatalog was already populated (race with a parallel
+    // ensureSectionsPanelLoaded call), in which case the render below
+    // picks up the cached array.
+    const outcome = prefetchPromise !== null ? await prefetchPromise : null;
+    if (outcome && outcome.kind === 'failure') {
+      root.innerHTML = '<p class="opencanvas-section-picker-empty">Failed to load sections.</p>';
+      return;
+    }
+    if (ctx.sectionsCatalog === null) {
+      root.innerHTML = '<p class="opencanvas-section-picker-empty">Failed to load sections.</p>';
       return;
     }
   }
@@ -196,7 +291,9 @@ function renderSectionsPickerShell(ctx: SectionsPickerContext, root: Element): v
   // so reading order stays Header → Hero → Features → … → Footer → Other.
   const filterOptions = [
     `<option value="all">${CATEGORY_LABEL.all}</option>`,
-    ...SECTION_CATEGORIES.map((category) => `<option value="${category}">${CATEGORY_LABEL[category]}</option>`),
+    ...SECTION_CATEGORIES.map(
+      (category) => `<option value="${category}">${CATEGORY_LABEL[category]}</option>`,
+    ),
   ].join('');
 
   // ADR 0061 Decision 11 — sort toggle: A-Z (default) vs Recently added.

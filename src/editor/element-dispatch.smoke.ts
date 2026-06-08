@@ -26,10 +26,11 @@ const source = readFileSync(
 
 const dispatchStart = source.indexOf('export function buildElementBodyImpl(');
 assert(dispatchStart >= 0, 'buildElementBodyImpl not found in body-builders-data.ts');
-const dispatchEnd = source.indexOf(
-  "throw new Error('unsupported editor element type: '",
-  dispatchStart,
+const dispatchSlice = source.slice(dispatchStart);
+const throwMatch = /throw\s+new\s+Error\(\s*['"]unsupported editor element type: /.exec(
+  dispatchSlice,
 );
+const dispatchEnd = throwMatch ? dispatchStart + throwMatch.index : -1;
 // Lower-bound the dispatch body so a quote-style flip on the throw sentence
 // (e.g. Prettier config drift switching single → double quotes) cannot
 // shrink dispatchBody to an empty slice and silently pass the missing-case
@@ -37,7 +38,7 @@ const dispatchEnd = source.indexOf(
 // ~1.5 KB and shrinking past 500 means at least half the cases vanished.
 assert(
   dispatchEnd > dispatchStart + 500,
-  "buildElementBodyImpl throw-on-unknown sentinel missing or dispatch body shrank below 500 chars — quote style flipped, switch was gutted, or the source shape changed; update this smoke",
+  'buildElementBodyImpl throw-on-unknown sentinel missing or dispatch body shrank below 500 chars — quote style flipped, switch was gutted, or the source shape changed; update this smoke',
 );
 const dispatchBody = source.slice(dispatchStart, dispatchEnd);
 

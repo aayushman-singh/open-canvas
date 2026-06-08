@@ -37,6 +37,7 @@ import type { TableElement } from '../canvas/elements/table.js';
 import type { InlineRun } from '../canvas/schema.js';
 import { field } from './dom-builders.js';
 import { newElementId } from './ids.js';
+import { createInspectorEntry } from './inspector-leaf-builders.js';
 
 // ADR 0064 — accordion-items mount carve. Render (rebuildElement after each
 // title/body/add/remove) + persist (scheduleSave on the same writes) +
@@ -103,8 +104,19 @@ export function mountAccordionItems(
     for (let ii = 0; ii < element.items.length; ii++) {
       (function (idx: number) {
         const item = element.items[idx]!;
-        const card = document.createElement('div');
-        card.className = 'inspector-list-card';
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'opencanvas-inspector-remove';
+        removeBtn.textContent = '×';
+        removeBtn.title = 'Remove item';
+        removeBtn.setAttribute('aria-label', 'Remove item');
+        removeBtn.addEventListener('click', function () {
+          element.items.splice(idx, 1);
+          renderItemList();
+          ctx.rebuildElement(element.id);
+          ctx.scheduleSave();
+        });
+        const card = createInspectorEntry('Item ' + (idx + 1), removeBtn);
 
         const titleInput = document.createElement('input');
         titleInput.type = 'text';
@@ -158,20 +170,6 @@ export function mountAccordionItems(
 
         card.appendChild(field('Body', bodyWrap));
 
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '\\u00d7';
-        removeBtn.title = 'Remove item';
-        removeBtn.setAttribute('aria-label', 'Remove item');
-        removeBtn.addEventListener('click', function () {
-          element.items.splice(idx, 1);
-          renderItemList();
-          ctx.rebuildElement(element.id);
-          ctx.scheduleSave();
-        });
-        card.appendChild(removeBtn);
-
         itemListHost.appendChild(card);
       })(ii);
     }
@@ -205,8 +203,19 @@ export function mountCarouselSlides(
     for (let si = 0; si < element.slides.length; si++) {
       (function (idx: number) {
         const slide = element.slides[idx]!;
-        const card = document.createElement('div');
-        card.className = 'inspector-list-card';
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'opencanvas-inspector-remove';
+        removeBtn.textContent = '×';
+        removeBtn.title = 'Remove slide';
+        removeBtn.setAttribute('aria-label', 'Remove slide');
+        removeBtn.addEventListener('click', function () {
+          element.slides.splice(idx, 1);
+          renderSlideList();
+          ctx.rebuildElement(element.id);
+          ctx.scheduleSave();
+        });
+        const card = createInspectorEntry('Slide ' + (idx + 1), removeBtn);
 
         const thumbWrap = document.createElement('div');
         thumbWrap.style.cssText = 'margin-bottom:4px;';
@@ -264,20 +273,6 @@ export function mountCarouselSlides(
           ctx.scheduleSave();
         });
         card.appendChild(field('Link', hrefInput));
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '\\u00d7';
-        removeBtn.title = 'Remove slide';
-        removeBtn.setAttribute('aria-label', 'Remove slide');
-        removeBtn.addEventListener('click', function () {
-          element.slides.splice(idx, 1);
-          renderSlideList();
-          ctx.rebuildElement(element.id);
-          ctx.scheduleSave();
-        });
-        card.appendChild(removeBtn);
 
         slideListHost.appendChild(card);
       })(si);
@@ -338,7 +333,7 @@ export function mountTableGrid(
 
         const rmColBtn = document.createElement('button');
         rmColBtn.type = 'button';
-        rmColBtn.textContent = '\\u00d7';
+        rmColBtn.textContent = '×';
         rmColBtn.title = 'Remove column';
         rmColBtn.setAttribute('aria-label', 'Remove column');
         rmColBtn.style.cssText = 'font-size:13px;line-height:1;padding:1px 5px;margin-left:2px;color:var(--ink-3);border:1px solid var(--line-2);border-radius:4px;background:transparent;cursor:pointer;';
@@ -417,7 +412,7 @@ export function mountTableGrid(
         rmCell.style.cssText = 'padding:2px;border:1px solid var(--opencanvas-hairline);';
         const rmRowBtn = document.createElement('button');
         rmRowBtn.type = 'button';
-        rmRowBtn.textContent = '\\u00d7';
+        rmRowBtn.textContent = '×';
         rmRowBtn.title = 'Remove row';
         rmRowBtn.setAttribute('aria-label', 'Remove row');
         rmRowBtn.style.cssText = 'font-size:13px;line-height:1;padding:1px 5px;color:var(--ink-3);border:1px solid var(--line-2);border-radius:4px;background:transparent;cursor:pointer;';
