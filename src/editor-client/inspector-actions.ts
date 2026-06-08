@@ -5,11 +5,15 @@
 // remains the production source-of-truth until ADR 0015 Phase 3
 // atomic cutover.
 //
-// This module is verbs only — state-mutating functions that take a
-// narrowed context (ADR 0064) and operate on the EditableSite. DOM
-// builders that wrap these verbs in HTMLElement scaffolding live in
-// inspector-action-buttons.ts (split because builders can't be smoke-
-// tested under bare Bun — no `document` global).
+// This module is verbs only — state-mutating functions that take
+// `ctx: EditorContext` (narrowed per ADR 0064) and operate on the
+// EditableSite. The DOM surface that calls them is the 3-dot element
+// menu (./element-menu.ts); the inspector itself no longer carries
+// z-order / duplicate / delete / reading-order rows for elements
+// — those duplicated the menu and cluttered the panel. The verbs
+// stay separate from the menu so any future caller (keyboard
+// shortcut, command palette, agent op) can reuse them without
+// pulling the menu builder.
 //
 // Failure contract preserved: parentArrayFor throws loudly when an
 // element is not present in the section tree; the verbs do not wrap
@@ -30,15 +34,15 @@ import { bringToFront, nextZInArray, nudgeZ, renormalizeZ, sendToBack } from './
 export type ZOrderAction = 'front' | 'back' | 'forward' | 'backward';
 
 // ADR 0064 — parentArrayFor only walks the section tree via
-// `findElement`, so it rides StateContext alone. Exported so the
-// downstream inspector-action-buttons carve can adopt the same alias.
+// `findElement`, so it rides StateContext alone. Exported so other
+// callers (element-menu builders, agent ops) can adopt the same alias.
 export type ParentArrayForContext = StateContext;
 
 // ADR 0064 — inspector element-action verbs (z-order + reading-order +
 // duplicate) share one cluster shape: StateContext for the parent-array
 // resolution, SelectionContext for the post-mutation re-select, and
 // RenderContext + PersistContext for the renderAll → renderInspector →
-// scheduleSave tail. Exported for inspector-action-buttons.ts reuse.
+// scheduleSave tail. Exported for element-menu builders to reuse.
 export type InspectorActionContext = StateContext &
   SelectionContext &
   RenderContext &

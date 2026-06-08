@@ -9,9 +9,13 @@
 // Orchestration shape:
 //   1. Reel-open / no-selection / missing-element early returns.
 //   2. Inspector header (heading + close button) + id meta.
-//   3. Read-only kit summary, reading-order group, z-order group, and
-//      element-actions group (verbs delegate to ./inspector-actions.js
-//      builders).
+//   3. Read-only kit summary. Z-order (front/forward/backward/back),
+//      Duplicate, and Delete live in the 3-dot element menu
+//      (./element-menu.ts); surfacing them in the inspector duplicated
+//      the menu's affordances and cluttered the panel. Per-element
+//      reading-order has no semantic weight either — element ordering
+//      inside a section doesn't change the page outline — so it stays
+//      scoped to sections (./section-inspector.ts) where it does matter.
 //   4. Per-element-type spec table lookup (INSPECTOR_DISPATCH) → call
 //      ctx.renderInspectorSpec to walk the spec into DOM.
 //   5. The big inline `buildStyleSection` IIFE — element-level visual
@@ -37,11 +41,6 @@ import { renderSectionInspector } from './section-inspector.js';
 import { renderPageInspector, replayAnimations } from './page-inspector.js';
 import { field, selectInput } from './dom-builders.js';
 import { buildColorRow, buildKitSummary } from './inspector-leaf-builders.js';
-import {
-  buildReorderGroup,
-  buildZOrderGroup,
-  buildElementActionsGroup,
-} from './inspector-action-buttons.js';
 
 export function renderInspector(ctx: EditorContext): void {
   if (!ctx.inspector) return;
@@ -69,7 +68,7 @@ export function renderInspector(ctx: EditorContext): void {
     return;
   }
   ctx.inspector.hidden = false;
-  const { element, section } = found;
+  const { element } = found;
   ctx.preserveInspectorScrollFor('element:' + element.id);
   ctx.revokePendingPreviews();
   ctx.inspector.replaceChildren();
@@ -100,13 +99,6 @@ export function renderInspector(ctx: EditorContext): void {
   // whatever kit is active without the client having to ship a duplicate
   // copy of STYLE_KIT_PRESETS. Hidden if the wrapper isn't there yet.
   ctx.inspector.appendChild(buildKitSummary(ctx));
-
-  // Reading-order group sits ABOVE the z-order group per the plan. The
-  // caption is part of the group so it lives next to the buttons that
-  // change it.
-  ctx.inspector.appendChild(buildReorderGroup(ctx, section, element));
-  ctx.inspector.appendChild(buildZOrderGroup(ctx, section, element));
-  ctx.inspector.appendChild(buildElementActionsGroup(ctx, section, element));
 
   // ADR 0011 Step 1 cutover: INSPECTOR_DISPATCH is now
   // Record<Exclude<ElementType, 'collection'>, InspectorSpec> — every
