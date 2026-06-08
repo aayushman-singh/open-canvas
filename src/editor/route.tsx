@@ -496,28 +496,6 @@ export function editorPageJsx(opts: EditorPageOptions) {
                         {cmd.sidebarLabel}
                       </button>
                     ))}
-                  {/* ADR 0063 dec 9 — Collection sidebar button. The
-                      collectionSidebarSpec entry intentionally has zero
-                      commands (Collection insertion goes through the
-                      full scaffolding wizard rather than a bare element
-                      insert, because a Collection without an index page
-                      + entries is half-built and shows the placeholder
-                      banner the Owner can't escape from). Surfacing the
-                      button here, outside the dispatch-driven loop, keeps
-                      the Components grid discoverable without forcing
-                      collectionSidebarSpec to declare a fake bare-insert
-                      command that doesn't match the wizard semantics.
-                      The data-canvas-add-collection attribute is the wiring
-                      hook collection-scaffold.ts's attachCollectionScaffold
-                      ButtonImpl keys on. */}
-                  <button
-                    type="button"
-                    class="opencanvas-sidebar-command"
-                    data-canvas-add-collection
-                    title="Add a content collection (e.g. blog, case-studies) with index page + entries"
-                  >
-                    Collection
-                  </button>
                 </div>
               </section>
               <section class="opencanvas-sidebar-group">

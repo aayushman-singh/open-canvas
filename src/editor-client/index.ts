@@ -875,10 +875,12 @@ export function createEditor(boot: EditorBoot): void {
         });
       }
       // ADR 0063 dec 9 / dec 11 — Collection scaffold entry points live
-      // on the Add tab (standalone "+ New Collection" button + the
-      // Components grid "Collection" tile) and inside the new-page modal's
-      // kind selector. The Pages-tab "+ New Collection" was removed —
-      // creating a Collection goes through "+ New Page" → "Collection"
+      // on the Add tab (standalone "+ New Collection" button in the
+      // dedicated Collections group above the Components grid) and inside
+      // the new-page modal's kind selector. The duplicate Components-grid
+      // "Collection" tile was dropped (chore/editor-remove-duplicate-
+      // collection-tile) and the Pages-tab "+ New Collection" was removed
+      // — creating a Collection goes through "+ New Page" → "Collection"
       // there (see page-crud.ts createPageImpl). attachCollectionScaffold
       // ButtonImpl wires every remaining [data-canvas-add-collection]
       // element to the same wizard; element-level insertion without the
