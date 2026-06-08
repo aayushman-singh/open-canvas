@@ -293,34 +293,35 @@ function IssueCard({ issue, editorHref }: { issue: AuditIssue; editorHref: strin
   );
 }
 
-// Friendly name for the issue a remediation resolves.
+// Friendly name for the issue a remediation resolves. Only `heading-skip` is
+// auto-fixable today (everything else is validator-prevented or manual).
 const REMEDIATION_LABEL: Readonly<Record<string, string>> = {
   'heading-skip': 'Heading hierarchy',
-  'missing-page-title': 'Page title',
-  'missing-action-label': 'Button label',
 };
 
-// A computed/suggested auto-fix surfaced from the remediation engine. Every
-// remediation here is self-verified: applying its op and re-running the audit
-// already confirmed (server-side) that the issue clears — hence the badge.
+// A computed auto-fix surfaced from the remediation engine. Each was
+// self-verified server-side at audit time: applying its op alone and re-running
+// the audit cleared the finding with no new issue. This card is READ-ONLY — it
+// shows the exact change and the value to set; the Owner opens the element to
+// apply it (one-click apply is a follow-up; the engine's applyRemediationOps is
+// ready for it).
 function RemediationCard({ fix, editorHref }: { fix: Remediation; editorHref: string }) {
   const label = REMEDIATION_LABEL[fix.kind] ?? fix.kind;
   const params = new URLSearchParams();
   if (fix.pageSlug !== undefined) params.set('focusPage', fix.pageSlug);
   if (fix.elementId !== undefined) params.set('focusElement', fix.elementId);
   const fixHref = params.toString().length > 0 ? `${editorHref}?${params.toString()}` : editorHref;
-  const badge = fix.confidence === 'computed' ? 'Computed' : 'Suggested';
   return (
     <div class="issue">
-      <span class="sev chip chip-ok">{badge} ✓</span>
+      <span class="sev chip chip-ok">Computed ✓</span>
       <div class="it">
         <b>{label}</b>
         <p>
           {fix.before} → <strong>{fix.after}</strong>
         </p>
-        <span class="where">Verified against the audit — applying this clears the finding.</span>
+        <span class="where">Verified against this audit run. Review layout after changing the size.</span>
         <a href={fixHref} class="fix">
-          Apply in editor <ArrowIcon />
+          Open in editor <ArrowIcon />
         </a>
       </div>
     </div>
@@ -442,10 +443,10 @@ a11yReportRoute.get('/sites/:siteId/a11y', async (c) => {
 
       {plan.remediations.length > 0 && (
         <>
-          <h2 class="fixes-h">Suggested fixes</h2>
+          <h2 class="fixes-h">Computed fixes</h2>
           <p class="sub">
-            Each fix is verified server-side — applying it and re-running the audit already cleared
-            the finding. Open the element to apply.
+            Each fix below was verified against this audit — applying it alone clears its finding
+            with no new issue. Open the element to apply the change.
           </p>
           <div class="issues">
             {plan.remediations.map((fix) => (

@@ -88,6 +88,12 @@ assert(
   'an unrelated issue must not flag the Colour-contrast tile',
 );
 
+// Tile copy must stay advisory — no "publish" gate language (cd16102).
+assert(
+  !summariseCategory(cat('Image descriptions'), [altIssue]).copy.includes('publish'),
+  'category tile copy must not reference publish gating (findings are advisory)',
+);
+
 // --- remediation surfacing is wired ----------------------------------------
 assert(
   source.includes('computeRemediations') && source.includes('RemediationCard'),

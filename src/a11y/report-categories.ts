@@ -44,8 +44,9 @@ export function summariseCategory(
   }
   const blocking = matches.filter((issue) => issue.severity === 'blocking').length;
   if (blocking > 0) {
-    const word = blocking === 1 ? 'block' : 'blocks';
-    return { variant: 'red', copy: `${blocking} ${word} publish` };
+    // Advisory copy only — a11y findings no longer block publish (cd16102).
+    const word = blocking === 1 ? 'issue' : 'issues';
+    return { variant: 'red', copy: `${blocking} ${word} to fix` };
   }
   const word = matches.length === 1 ? 'area' : 'areas';
   return { variant: 'warn', copy: `${matches.length} ${word} to review` };

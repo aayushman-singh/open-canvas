@@ -253,15 +253,85 @@ function test3BatchApply(): void {
   );
 
   const ops = plan.remediations.map((r) => r.op);
-  const { state: fixed, validation } = applyRemediationOps(site, ops);
+  const { state: fixed, validation, verified } = applyRemediationOps(site, ops);
   assert(validation.valid, '3.2 batched apply validates', validation.valid ? '' : validation.errors.join('; '));
+  assert(verified, '3.3 batch self-verifies (no new issue introduced)');
 
   const after = runAudit(fixed);
   assert(
     after.issues.length < baseline.issues.length,
-    '3.3 re-audit has strictly fewer issues after batch',
+    '3.4 re-audit has strictly fewer issues after batch',
     `${String(baseline.issues.length)} -> ${String(after.issues.length)}`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Test 6 — soundness: a fix that would TRADE one skip for another is rejected.
+// H1(64) → H4(24) → H5(20): the only baseline skip is H1→H4 on the middle
+// heading. Demoting it to H2 would make the third heading an H2→H5 skip — same
+// issue count, different element. A count-only check would bless it; the
+// engine must reject it (no auto-fix) and classify it manual instead.
+// ---------------------------------------------------------------------------
+
+function test6SoundnessRejectsTrade(): void {
+  const site = mkSite('charcoal', [
+    mkPage('p-home', 'home', 'Home', [
+      mkSection('sec', [
+        mkHeading('h-1', 'Big', 64, { x: 40, y: 40, w: 700, h: 90, z: 3 }),
+        mkHeading('h-2', 'Mid', 24, { x: 40, y: 150, w: 700, h: 40, z: 2 }),
+        mkHeading('h-3', 'Small', 20, { x: 40, y: 210, w: 700, h: 36, z: 1 }),
+      ]),
+    ]),
+  ]);
+  const baseline = runAudit(site);
+  assert(
+    baseline.issues.filter((i) => i.kind === 'heading-skip').length === 1,
+    '6.1 baseline has exactly one heading-skip (H1→H4)',
+    JSON.stringify(baseline.issues.map((i) => `${i.kind}:${i.elementId ?? ''}`)),
+  );
+
+  const plan = computeRemediations(site, baseline);
+  assert(
+    plan.remediations.every((r) => r.kind !== 'heading-skip'),
+    '6.2 the trade-one-skip-for-another fix is NOT offered',
+    JSON.stringify(plan.remediations.map((r) => r.kind)),
+  );
+  const manual = plan.manual.find((m) => m.kind === 'heading-skip');
+  assert(manual !== undefined, '6.3 it is classified manual instead', JSON.stringify(plan.manual.map((m) => m.kind)));
+  assert(/new issue/i.test(manual.reason), '6.4 the manual reason names the introduced issue', manual.reason);
+}
+
+// ---------------------------------------------------------------------------
+// Test 7 — fractional headingScale: the computed font size must still derive to
+// the target level (guards the ceil-not-round choice). A skip on a kit with a
+// non-integer headingScale must still produce a verified fix.
+// ---------------------------------------------------------------------------
+
+function test7FractionalScale(): void {
+  const kit: StyleKitPreset = { ...getStyleKitPreset('charcoal'), headingScale: 1.1 };
+  const site: EditableSite = {
+    styleKit: 'custom',
+    customStyleKit: kit,
+    pages: [
+      mkPage('p-home', 'home', 'Home', [
+        mkSection('sec', [
+          mkHeading('h-1', 'Welcome', 72, { x: 40, y: 40, w: 700, h: 90, z: 2 }),
+          mkHeading('h-2', 'Details', 26, { x: 40, y: 160, w: 700, h: 40, z: 2 }),
+        ]),
+      ]),
+    ],
+  };
+  const baseline = runAudit(site);
+  assert(
+    baseline.issues.some((i) => i.kind === 'heading-skip'),
+    '7.1 fractional-scale fixture has a heading-skip',
+    JSON.stringify(baseline.issues.map((i) => i.kind)),
+  );
+  const plan = computeRemediations(site, baseline);
+  const fix = plan.remediations.find((r) => r.kind === 'heading-skip');
+  assert(fix !== undefined, '7.2 a verified fix is offered despite the fractional scale', JSON.stringify(plan.manual));
+  const { validation } = applyRemediationOps(site, [fix.op]);
+  assert(validation.valid, '7.3 fractional-scale fix validates', validation.valid ? '' : validation.errors.join('; '));
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +379,8 @@ async function main(): Promise<void> {
   test3BatchApply();
   await test4CleanFixture();
   test5Purity();
+  test6SoundnessRejectsTrade();
+  test7FractionalScale();
   process.stdout.write(`[a11y-remediation:smoke] ${String(passed)} assertions passed\n`);
 }
 

@@ -12,30 +12,28 @@
 // ---------------------------------------------------------------------------
 // Honesty posture (per global CLAUDE.md — no silent fallbacks, no guessing)
 // ---------------------------------------------------------------------------
-// Every remediation is labelled by how it was derived:
+// Every remediation is `computed` — mechanically correct, not a guess. Today
+// the only computed auto-fix is `heading-skip`: the target font size is the
+// inverse of the level-derivation ladder, so the heading lands on the level
+// that removes the skip. (The `confidence` field is kept for future
+// lower-certainty fix classes; nothing emits anything but `computed` yet.)
 //
-//   - `computed`   — the fix is mechanically correct, not a guess. Today this
-//                    is `heading-skip`: the target font size is the exact
-//                    inverse of the level-derivation ladder, so the heading
-//                    lands on the level that removes the skip.
-//   - `suggested`  — a sensible, deterministic starting value the Owner should
-//                    confirm (a page title title-cased from its slug; a generic
-//                    button label). Non-empty, so it clears the blocker, but the
-//                    Owner owns the final words.
-//
-// Issues a machine should NOT silently answer — alt text, colour contrast (the
-// audit measures the Style Kit `text` token, not a per-element colour, so no
-// element-level op can move it), empty form-field labels, and audit crashes —
-// are returned as `manual`: surfaced with the audit's own `fixHint` and a
-// deep-link to the editor, never auto-filled.
+// Issues a machine should NOT answer are returned as `manual`, never auto-
+// filled — either because the validator already prevents them (an empty page
+// title is rejected outright; an empty action label is coerced to "Button") or
+// because they need human judgement: alt text, colour contrast (the audit
+// measures the Style Kit `text` token, not a per-element colour, so no
+// element-level op can move it), form-field labels, page descriptions, and
+// audit crashes. Manual items carry the audit's `fixHint` + a deep-link.
 //
 // ---------------------------------------------------------------------------
 // Self-verification (the load-bearing guarantee)
 // ---------------------------------------------------------------------------
 // A candidate op is only promoted to a `Remediation` if, applied *alone* to the
 // site, it (a) passes `validateEditableSite` and (b) re-running `runAudit`
-// confirms the targeted issue is gone AND the total issue count did not grow.
-// A fix that fails either check is downgraded to `manual` with the reason. This
+// confirms the targeted issue is gone AND no NEW issue key appeared (a count
+// check is insufficient — a fix can swap one skip for another). A fix that
+// fails either check is downgraded to `manual` with the reason. This
 // means a `Remediation` is never a claim — it is a proof against the same audit
 // that raised the complaint.
 
@@ -55,7 +53,9 @@ import type {
   TextElement,
 } from '../canvas/schema.js';
 
-export type RemediationConfidence = 'computed' | 'suggested';
+// Only `computed` is emitted today; the union is a forward extension point for
+// lower-certainty fix classes (none of which silently guess).
+export type RemediationConfidence = 'computed';
 
 export interface Remediation {
   kind: IssueKind;
@@ -168,7 +168,10 @@ function buildCandidate(
         return { manual: 'No valid heading level to demote to.' };
       }
       const oldLevel = deriveHeadingLevel(el.fontSize, styleKit.headingScale);
-      const newFontSize = Math.round(targetFontSizeForLevel(targetLevel, styleKit.headingScale));
+      // ceil, never round: the target is the *minimum* font size that derives to
+      // `targetLevel`, so rounding down (fractional headingScale) would fall
+      // below the rung and derive a different level.
+      const newFontSize = Math.ceil(targetFontSizeForLevel(targetLevel, styleKit.headingScale));
       if (newFontSize === el.fontSize) {
         return { manual: 'Computed font size matches the current size.' };
       }
@@ -236,9 +239,12 @@ export function computeRemediations(
   let styleKit: StyleKitPreset;
   try {
     styleKit = resolveStyleKitWithCustom(state);
-  } catch {
-    // If the kit cannot resolve, every issue is manual — the audit itself will
-    // have surfaced an `audit-crash`. Mirror that posture rather than guess.
+  } catch (err) {
+    // Loud, not silent: a kit that won't resolve is a real failure. We can't
+    // compute heading levels without it, so every issue becomes manual — but we
+    // log the cause first (the audit itself separately surfaces an
+    // `audit-crash` for the same root cause).
+    console.error('[a11y/remediation] style kit resolution failed — all issues classified manual', err);
     for (const issue of audit.issues) {
       manual.push({
         kind: issue.kind,
@@ -303,10 +309,19 @@ export function computeRemediations(
   return { remediations, manual };
 }
 
+/** Issues in `after` whose key did not exist in `before` — i.e. NEW problems. */
+function newlyIntroduced(before: AuditReport, after: AuditReport): AuditIssue[] {
+  const beforeKeys = new Set(before.issues.map((i) => issueKey(i)));
+  return after.issues.filter((i) => !beforeKeys.has(issueKey(i)));
+}
+
 /**
- * Apply `op` alone to a clone of `state` and confirm it (a) validates and
- * (b) removes the targeted issue without growing the total issue count. The
- * proof that a remediation is real, not a claim.
+ * Apply `op` alone and confirm it (a) keeps the site valid and (b) removes the
+ * targeted issue WITHOUT introducing any new issue key. The "no new key" check
+ * (not a mere count check) is load-bearing: a heading fix can clear one skip
+ * while creating a different one (H1→H4→H5: demoting H4 to H2 makes H2→H5) —
+ * the count stays flat but the page is still broken, so that fix must be
+ * rejected, not blessed. The proof that a remediation is real, not a claim.
  */
 function verifyCandidate(
   state: EditableSite,
@@ -321,34 +336,49 @@ function verifyCandidate(
     const detail = err instanceof Error ? err.message : String(err);
     return { ok: false, reason: `Fix op threw: ${detail}` };
   }
-  const validation = validateEditableSite(next);
+  // Validate a CLONE: `validateEditableSite` mutates in place (it coerces empty
+  // action labels to "Button"), and we must audit the exact state the op
+  // produced — not a validator-mutated variant — so the verdict reflects the op
+  // alone.
+  const validation = validateEditableSite(structuredClone(next));
   if (!validation.valid) {
     return { ok: false, reason: `Fix produced an invalid site: ${validation.errors[0] ?? 'unknown'}` };
   }
   const after = runAudit(next);
   const targetKey = issueKey(issue);
-  const stillPresent = after.issues.some((i) => issueKey(i) === targetKey);
-  if (stillPresent) {
+  if (after.issues.some((i) => issueKey(i) === targetKey)) {
     return { ok: false, reason: 'Fix did not clear the issue on re-audit.' };
   }
-  if (after.issues.length > baseline.issues.length) {
-    return { ok: false, reason: 'Fix introduced new a11y issues.' };
+  const introduced = newlyIntroduced(baseline, after);
+  if (introduced.length > 0) {
+    return { ok: false, reason: `Fix introduced a new issue: ${introduced[0]!.kind}.` };
   }
   return { ok: true };
 }
 
 /**
- * Fold a list of remediation ops onto a site in order and validate once at the
- * end. Used by the dashboard "apply" route. Pure — returns the new state and
- * the validation verdict; the caller persists only when `validation.valid`.
+ * Fold a list of remediation ops onto a site in order, then VERIFY the whole
+ * batch by re-auditing: individual ops were each verified against the original
+ * state, but applying several can interact (two heading fixes on one page), so
+ * the batch is only sound if the final state introduces no new issue key. Pure
+ * — returns the folded state (not validator-mutated), the validation verdict,
+ * and `verified` (true iff the batch added no new a11y issues). The caller
+ * persists only when `validation.valid` (and should refuse on `!verified`).
  */
 export function applyRemediationOps(
   state: EditableSite,
   ops: ReadonlyArray<CanvasAgentOp>,
-): { state: EditableSite; validation: ReturnType<typeof validateEditableSite> } {
+): {
+  state: EditableSite;
+  validation: ReturnType<typeof validateEditableSite>;
+  verified: boolean;
+} {
+  const before = runAudit(state);
   let working = state;
   for (const op of ops) {
     working = applyCanvasAgentOp(working, op);
   }
-  return { state: working, validation: validateEditableSite(working) };
+  const validation = validateEditableSite(structuredClone(working));
+  const verified = newlyIntroduced(before, runAudit(working)).length === 0;
+  return { state: working, validation, verified };
 }
