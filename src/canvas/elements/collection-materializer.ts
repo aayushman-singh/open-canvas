@@ -115,6 +115,56 @@ const PLACEHOLDER_FIELDS: readonly PlaceholderField[] = [
   'ogImageAssetId',
 ];
 
+/** ADR 0065 F1-substitution-warning — does any string field anywhere in the
+ *  template contain at least one `{{<placeholder>}}` token from the known
+ *  PLACEHOLDER_FIELDS set?
+ *
+ *  Walks every property recursively (objects, arrays, strings); for a
+ *  Tabs element this naturally descends into `tabs[].elements[]` because
+ *  those are just nested object/array properties on the element. The
+ *  recursion is structural rather than type-aware — every string field
+ *  on every nested element is scanned uniformly. This matches the
+ *  substitution semantics the materializer applies at publish time
+ *  (`substituteInValue` walks the same shape).
+ *
+ *  The inspector calls this to flag a `customTemplate` that would
+ *  materialize N identical static cards (no per-entry variation). v1
+ *  surfaces the result as a one-line warning under the template
+ *  controls — non-blocking (the Owner may genuinely want N identical
+ *  cards), informational only. ADR 0065 §Out-of-scope explicitly
+ *  states the validator does NOT enforce substitution presence.
+ *
+ *  Empty template (`length === 0`) returns false — vacuously, there is
+ *  no string field to scan; the empty-template path renders a distinct
+ *  chrome in the editor + emits its own publish warning (decision 8
+ *  failure path), so a redundant "no placeholders" warning would just
+ *  add noise. */
+export function templateHasAnyPlaceholder(template: readonly CanvasElement[]): boolean {
+  return valueHasPlaceholder(template);
+}
+
+function valueHasPlaceholder(value: unknown): boolean {
+  if (typeof value === 'string') {
+    for (const field of PLACEHOLDER_FIELDS) {
+      if (value.includes(`{{${field}}}`)) return true;
+    }
+    return false;
+  }
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      if (valueHasPlaceholder(value[i])) return true;
+    }
+    return false;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const v of Object.values(value)) {
+      if (valueHasPlaceholder(v)) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
 function placeholderValue(entry: MaterializerEntry, field: PlaceholderField): string {
   switch (field) {
     case 'title':
