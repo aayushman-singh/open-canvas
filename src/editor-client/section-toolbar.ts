@@ -107,10 +107,110 @@
 // against the inline twin.
 
 import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
+import type { CameraTransformContext } from './render.js';
 import { applyCameraTransform } from './render.js';
 import { newElementId, newSectionId } from './ids.js';
 import { nextZInArray } from './z-order.js';
+
+// ADR 0064 — defaultBox only reads the active page off state, so it
+// rides StateContext alone. Exported because addElementToSection +
+// other element-insertion callers share the same need.
+export type DefaultBoxContext = StateContext;
+
+// ADR 0064 — addElementToSection's surface: StateContext for the page-
+// default-motion lookup, SelectionContext to re-select the freshly-
+// inserted element, RenderContext + PersistContext for the renderAll
+// → scheduleSave tail, plus the panToElement verb which lives on the
+// wide EditorContext (no canonical alias owns it yet).
+export type AddElementToSectionContext = StateContext &
+  SelectionContext &
+  RenderContext &
+  PersistContext &
+  Pick<EditorContext, 'panToElement'>;
+
+// ADR 0064 — targetSectionForSidebar walks state + selection to pick
+// a section, then falls back to the viewport-centre hit-test. DomContext
+// covers the viewport ref; the other two clusters cover the lookup.
+export type TargetSectionForSidebarContext = StateContext &
+  SelectionContext &
+  Pick<DomContext, 'viewport'>;
+
+// ADR 0064 — panToElement centres the camera on a named element. It
+// reads selection-less state (findElement / currentPage / state.header),
+// the viewport ref, and ctx.getPagePosition (verb on EditorContext);
+// the camera-write tail rides CameraTransformContext so the forwarded
+// applyCameraTransform(ctx) call typechecks without a cast.
+export type PanToElementContext = StateContext &
+  Pick<DomContext, 'viewport'> &
+  CameraTransformContext &
+  Pick<EditorContext, 'getPagePosition'>;
+
+// ADR 0064 — addBlankSectionFromSidebar mutates the page sections array
+// and surfaces a "Section added" toast. State + selection + render +
+// persist + status — all canonical, no inline Pick.
+export type AddBlankSectionFromSidebarContext = StateContext &
+  SelectionContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext;
+
+// ADR 0064 — componentActionForSidebar is a pure dispatch-table lookup;
+// it only reads the SIDEBAR_COMMANDS table off ctx, no canonical cluster
+// applies, so an inline single-field Pick is the honest shape.
+export type ComponentActionForSidebarContext = Pick<EditorContext, 'SIDEBAR_COMMANDS'>;
+
+// ADR 0064 — addComponentFromSidebar routes through three sibling verbs
+// (targetSectionForSidebar / componentActionForSidebar / handleSectionAction)
+// and surfaces "Add a section first" / "Unknown component" on failure.
+// All four members live on the wide EditorContext (no canonical alias
+// owns the section-toolbar verbs), so inline Pick + StatusEmitter.
+export type AddComponentFromSidebarContext = StatusEmitterContext &
+  Pick<
+    EditorContext,
+    'targetSectionForSidebar' | 'componentActionForSidebar' | 'handleSectionAction'
+  >;
+
+// ADR 0064 — handleSectionAction is the central section-toolbar
+// dispatcher. It touches every cluster except DOM: state read +
+// mutation, selection updates, render + persist for every branch tail,
+// status emission for the header/footer/last-section error branches,
+// and three sibling verbs (insertElementForSidebarCommand +
+// saveToLibrary) plus SIDEBAR_COMMANDS for the add-* branch.
+export type HandleSectionActionContext = StateContext &
+  SelectionContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    'SIDEBAR_COMMANDS' | 'insertElementForSidebarCommand' | 'saveToLibrary'
+  >;
+
+// ADR 0064 — saveToLibrary drives the three-modal flow then POSTs to
+// /library/sections. PersistContext supplies authFetch / apiBase /
+// siteId; StatusEmitter covers every error toast; the modal verbs +
+// sectionsCatalog (cleared on success) live on EditorContext directly.
+export type SaveToLibraryContext = PersistContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'openTextModal' | 'openSelectModal' | 'flushPendingSave' | 'sectionsCatalog'>;
+
+// ADR 0064 — saveSiteAsTemplate mirrors saveToLibrary but reads the
+// first page title off state for the default name and POSTs to
+// /custom-templates. Same persist + status + modal surface; adds
+// StateContext for the title default; no sectionsCatalog clear.
+export type SaveSiteAsTemplateContext = StateContext &
+  PersistContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'openTextModal' | 'openSelectModal' | 'flushPendingSave'>;
 
 /**
  * Inline IIFE twin reads `err.message || String(err)` — untyped JS. The
@@ -138,7 +238,7 @@ function nextZ(section: CanvasSection): number {
 }
 
 export function defaultBoxImpl(
-  ctx: EditorContext,
+  ctx: DefaultBoxContext,
   section: CanvasSection,
   w: number,
   h: number,
@@ -159,7 +259,7 @@ export function defaultBoxImpl(
 }
 
 export function addElementToSectionImpl(
-  ctx: EditorContext,
+  ctx: AddElementToSectionContext,
   section: CanvasSection,
   element: CanvasElement,
 ): void {
@@ -187,7 +287,9 @@ export function addElementToSectionImpl(
 //   2. The section under the viewport centre (what the user is editing).
 //   3. The first body section (skip pinned header/footer roles).
 //   4. The first section of any kind.
-export function targetSectionForSidebarImpl(ctx: EditorContext): CanvasSection | null {
+export function targetSectionForSidebarImpl(
+  ctx: TargetSectionForSidebarContext,
+): CanvasSection | null {
   const page = ctx.currentPage();
   if (!page || !Array.isArray(page.sections) || page.sections.length === 0) return null;
   if (ctx.selectedSectionId) {
@@ -221,7 +323,7 @@ export function targetSectionForSidebarImpl(ctx: EditorContext): CanvasSection |
 
 // Centre the camera on an element's world position. No-op if anything in
 // the lookup chain is missing (page/section/element/viewport).
-export function panToElementImpl(ctx: EditorContext, elementId: string): void {
+export function panToElementImpl(ctx: PanToElementContext, elementId: string): void {
   if (!ctx.viewport) return;
   const found = ctx.findElement(elementId);
   if (!found) return;
@@ -246,7 +348,7 @@ export function panToElementImpl(ctx: EditorContext, elementId: string): void {
   applyCameraTransform(ctx);
 }
 
-export function addBlankSectionFromSidebarImpl(ctx: EditorContext): void {
+export function addBlankSectionFromSidebarImpl(ctx: AddBlankSectionFromSidebarContext): void {
   const page = ctx.currentPage();
   if (!page) return;
   const section: CanvasSection = {
@@ -273,14 +375,17 @@ export function addBlankSectionFromSidebarImpl(ctx: EditorContext): void {
 // canonical section-action string (matches buildSectionToolbar's data
 // attribute + handleSectionAction's branch lookup).
 export function componentActionForSidebar(
-  ctx: EditorContext,
+  ctx: ComponentActionForSidebarContext,
   component: string,
 ): string | null {
   if (!ctx.SIDEBAR_COMMANDS[component]) return null;
   return 'add-' + component;
 }
 
-export function addComponentFromSidebarImpl(ctx: EditorContext, component: string): void {
+export function addComponentFromSidebarImpl(
+  ctx: AddComponentFromSidebarContext,
+  component: string,
+): void {
   const section = ctx.targetSectionForSidebar();
   if (!section) {
     ctx.setStatus('Add a section first', 'error');
@@ -295,7 +400,7 @@ export function addComponentFromSidebarImpl(ctx: EditorContext, component: strin
 }
 
 export function handleSectionActionImpl(
-  ctx: EditorContext,
+  ctx: HandleSectionActionContext,
   action: string,
   sectionId: string,
 ): void {
@@ -398,7 +503,7 @@ export function handleSectionActionImpl(
 // -- Save section to library ---------------------------------------------
 
 export async function saveToLibraryImpl(
-  ctx: EditorContext,
+  ctx: SaveToLibraryContext,
   section: CanvasSection,
 ): Promise<void> {
   let name = await ctx.openTextModal({
@@ -459,7 +564,7 @@ export async function saveToLibraryImpl(
 
 // -- Save site as template -----------------------------------------------
 
-export async function saveSiteAsTemplateImpl(ctx: EditorContext): Promise<void> {
+export async function saveSiteAsTemplateImpl(ctx: SaveSiteAsTemplateContext): Promise<void> {
   const firstPageTitle =
     ctx.state && ctx.state.pages && ctx.state.pages[0] ? ctx.state.pages[0].title : '';
   const name = await ctx.openTextModal({
