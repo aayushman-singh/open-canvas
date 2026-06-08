@@ -47,9 +47,36 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the Phase
 // 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  SelectionContext,
+  StateContext,
+} from './editor-context.js';
 import { cssEscape } from './css-escape.js';
 import { buildSectionThumbnail, moveSectionToIndex } from './reel.js';
+
+// ADR 0064 — canvas-side section drag. StateContext supplies `currentPage`
+// for the source-index lookup; DomContext supplies `root` for the section
+// query. The reel callees (`buildSectionThumbnail`, `moveSectionToIndex`)
+// still demand the full `EditorContext`, so this module forward-casts at
+// those four call sites until reel.ts carves under ADR 0064.
+export type BeginSectionDragContext = StateContext & DomContext;
+
+// ADR 0064 — reel-tile drag. StateContext for `currentPage`; the inline
+// `Pick` adds `reelViewMode` (no canonical alias owns the reel display
+// mode yet). Same reel.ts forward-cast applies on the ghost build and
+// the drop commit.
+export type BeginReelDragContext = StateContext & Pick<EditorContext, 'reelViewMode'>;
+
+// ADR 0064 — grip mousedown delegate. Composes the canvas-side drag
+// surface (so the `beginSectionDragImpl(ctx, …)` forward call typechecks
+// without a cast) with SelectionContext for the click-to-select branch
+// and an inline `Pick` for the reel toggle + interaction-mode short-
+// circuit verbs that no canonical alias owns yet.
+export type AttachGripHandlersContext = BeginSectionDragContext &
+  SelectionContext &
+  Pick<EditorContext, 'interactionMode' | 'openReel' | 'closeReel' | 'isReelOpen'>;
 
 // ADR 0059 — film-reel drag state machine. The `.reel-insert-btn` plus
 // affordances fight the drop zones during a drag, so we mark the reel
@@ -83,7 +110,7 @@ interface ReelDropTarget {
 type DropTarget = CanvasDropTarget | ReelDropTarget;
 
 export function beginSectionDragImpl(
-  ctx: EditorContext,
+  ctx: BeginSectionDragContext,
   sectionId: string,
   startEv: MouseEvent,
 ): void {
@@ -102,7 +129,10 @@ export function beginSectionDragImpl(
     sectionElCandidate instanceof HTMLElement ? sectionElCandidate : null;
   if (sectionEl) sectionEl.style.opacity = '0.5';
 
-  const ghost = buildSectionThumbnail(ctx, section, page.width, 200);
+  // ADR 0064 forward-cast — reel.ts has not carved yet, so its helpers
+  // still demand the full `EditorContext`. The cast retires when reel.ts
+  // adopts a narrow context.
+  const ghost = buildSectionThumbnail(ctx as EditorContext, section, page.width, 200);
   ghost.style.position = 'fixed';
   ghost.style.pointerEvents = 'none';
   ghost.style.opacity = '0.7';
@@ -219,7 +249,8 @@ export function beginSectionDragImpl(
     setReelDragging(false);
     if (sectionEl) sectionEl.style.opacity = '';
     if (dropTarget) {
-      moveSectionToIndex(ctx, fromIdx, dropTarget.insertAt);
+      // ADR 0064 forward-cast — see buildSectionThumbnail above.
+      moveSectionToIndex(ctx as EditorContext, fromIdx, dropTarget.insertAt);
     }
   }
 
@@ -228,7 +259,7 @@ export function beginSectionDragImpl(
 }
 
 export function beginReelDragImpl(
-  ctx: EditorContext,
+  ctx: BeginReelDragContext,
   sectionId: string,
   fromIdx: number,
   startEv: MouseEvent,
@@ -254,7 +285,8 @@ export function beginReelDragImpl(
     if (!hasMoved) {
       hasMoved = true;
       const isTile = ctx.reelViewMode === 'tile';
-      ghost = buildSectionThumbnail(ctx, sectionForGhost, pageWidth, isTile ? 200 : 64);
+      // ADR 0064 forward-cast — see beginSectionDragImpl.
+      ghost = buildSectionThumbnail(ctx as EditorContext, sectionForGhost, pageWidth, isTile ? 200 : 64);
       ghost.style.position = 'fixed';
       ghost.style.pointerEvents = 'none';
       ghost.style.opacity = '0.7';
@@ -329,7 +361,8 @@ export function beginReelDragImpl(
     if (dropLine) dropLine.remove();
     if (hasMoved) setReelDragging(false);
     if (hasMoved && dropTarget) {
-      moveSectionToIndex(ctx, fromIdx, dropTarget.insertAt);
+      // ADR 0064 forward-cast — see beginSectionDragImpl.
+      moveSectionToIndex(ctx as EditorContext, fromIdx, dropTarget.insertAt);
     }
   }
 
@@ -337,7 +370,7 @@ export function beginReelDragImpl(
   window.addEventListener('mouseup', onUp);
 }
 
-export function attachGripHandlersImpl(ctx: EditorContext): void {
+export function attachGripHandlersImpl(ctx: AttachGripHandlersContext): void {
   if (!ctx.root) return;
   const root = ctx.root;
   root.addEventListener('mousedown', (ev) => {
