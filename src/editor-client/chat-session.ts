@@ -53,7 +53,55 @@
 // Phase 3 cutover destination, not a live call site yet.
 
 import type { CanvasSection } from '../canvas/schema.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  AiContext,
+  ChatContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
+
+// ADR 0064 — chat-session.ts carve. The four exports share a chat-shaped
+// surface (ChatContext + AiContext lazy clusters) that's amplified by the
+// SSE branch's reach into canvas state/render/persist. Each function takes
+// the smallest type it needs; setup composes from the submit-handler
+// surface so callers can pass a single context object through.
+
+// ADR 0064 — `appendChatMessageImpl` only writes to the chat-messages DOM
+// container. A single-field `Pick` keeps the surface honest — pulling in
+// the full `ChatContext` would imply the helper reads every chat verb.
+export type AppendChatMessageContext = Pick<EditorContext, 'chatMessages'>;
+
+// ADR 0064 — `hideChatWelcomeImpl` only flips the welcome blurb's hidden
+// flag. Same rationale as `AppendChatMessageContext` — one DOM ref, one
+// `Pick`, no implicit reach into other chat verbs.
+export type HideChatWelcomeContext = Pick<EditorContext, 'chatWelcome'>;
+
+// ADR 0064 — chat-form submit listener surface. The SSE branch composes
+// the ChatContext lazy cluster (chat verbs + non-DOM state), the AiContext
+// lazy cluster (sidecar verbs the op-preview branch dispatches into), the
+// canonical Persist/State/Selection/Render/StatusEmitter aliases, plus
+// `siteBase` for the replaceMedia ghost URL and `root` + `viewport` for
+// the focus-fallback diagnostic log. No inline EditorContext casts —
+// every member access lives on a named cluster or this `Pick`.
+export type AttachChatSubmitContext = ChatContext &
+  AiContext &
+  PersistContext &
+  SelectionContext &
+  StateContext &
+  RenderContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'siteBase' | 'root' | 'viewport'>;
+
+// ADR 0064 — boot-time init for the chat panel. Caches the chat DOM refs
+// onto ctx, resets the per-session state, wires suggestion chips, then
+// delegates to `attachChatSubmitImpl`. Adopts the submit-handler surface
+// so the delegation is type-clean; no extra members beyond the assignment
+// targets the function captures.
+export type SetupChatSessionContext = AttachChatSubmitContext;
 
 /**
  * Loose shape of the SSE events the chat endpoint streams back. All fields
@@ -182,7 +230,11 @@ function errorToString(err: unknown): string {
   return 'unknown';
 }
 
-export function appendChatMessageImpl(ctx: EditorContext, role: string, text: string): void {
+export function appendChatMessageImpl(
+  ctx: AppendChatMessageContext,
+  role: string,
+  text: string,
+): void {
   if (!ctx.chatMessages) return;
   const div = document.createElement('div');
   div.className = 'opencanvas-chat-msg ' + role;
@@ -191,11 +243,11 @@ export function appendChatMessageImpl(ctx: EditorContext, role: string, text: st
   ctx.chatMessages.scrollTop = ctx.chatMessages.scrollHeight;
 }
 
-export function hideChatWelcomeImpl(ctx: EditorContext): void {
+export function hideChatWelcomeImpl(ctx: HideChatWelcomeContext): void {
   if (ctx.chatWelcome && !ctx.chatWelcome.hidden) ctx.chatWelcome.hidden = true;
 }
 
-export function setupChatSession(ctx: EditorContext): void {
+export function setupChatSession(ctx: SetupChatSessionContext): void {
   // -- Chat panel form submission -----------------------------------------
   ctx.chatForm = document.getElementById('canvas-chat-form') as HTMLFormElement | null;
   ctx.chatInput = document.getElementById('canvas-chat-input') as HTMLInputElement | null;
@@ -241,7 +293,7 @@ export function setupChatSession(ctx: EditorContext): void {
   attachChatSubmitImpl(ctx);
 }
 
-export function attachChatSubmitImpl(ctx: EditorContext): void {
+export function attachChatSubmitImpl(ctx: AttachChatSubmitContext): void {
   if (!ctx.chatForm) return;
   ctx.chatForm.addEventListener('submit', function (ev) {
     ev.preventDefault();
