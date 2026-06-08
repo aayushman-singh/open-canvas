@@ -963,18 +963,35 @@ interface SiteCard {
 // This is an explicit alternative behaviour (loudly logged below) so one
 // broken site does not 500 the whole dashboard — the owner can still see
 // every other card, click Edit on the broken card, and fix the data.
-const THUMB_FAILED_HTML =
-  '<!DOCTYPE html><html><head><style>' +
-  'body{margin:0;display:flex;align-items:center;justify-content:center;' +
-  'height:100vh;background:#1a1116;color:#ffb5b5;' +
-  'font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;' +
-  'text-align:center;padding:16px;box-sizing:border-box}' +
-  'strong{display:block;font-size:15px;margin-bottom:6px}' +
-  'span{opacity:.7;font-size:12px}' +
-  '</style></head><body><div>' +
-  '<strong>Preview failed</strong>' +
-  '<span>Open editor to inspect.</span>' +
-  '</div></body></html>';
+//
+// The error message is embedded verbatim so the owner can see WHY their
+// preview failed from the dashboard alone, without digging through worker
+// logs. Element id + expected shape are the load-bearing fragments.
+function buildThumbFailedHtml(reason: string): string {
+  const safe = reason
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  return (
+    '<!DOCTYPE html><html><head><style>' +
+    'body{margin:0;display:flex;flex-direction:column;align-items:center;' +
+    'justify-content:center;height:100vh;background:#1a1116;color:#ffb5b5;' +
+    'font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;' +
+    'text-align:center;padding:16px;box-sizing:border-box}' +
+    'strong{display:block;font-size:15px;margin-bottom:6px}' +
+    'span{opacity:.7;font-size:12px;margin-bottom:10px}' +
+    'pre{opacity:.65;font-size:11px;max-width:92%;white-space:pre-wrap;' +
+    'word-break:break-word;text-align:left;margin:0;line-height:1.5}' +
+    '</style></head><body>' +
+    '<strong>Preview failed</strong>' +
+    '<span>Open editor to inspect.</span>' +
+    '<pre>' +
+    safe +
+    '</pre>' +
+    '</body></html>'
+  );
+}
 
 function buildCards(
   rows: Array<{
@@ -1547,7 +1564,8 @@ dashboard.get('/thumbs/:siteId', async (c) => {
         `dashboard/thumbs: buildThumbHtml failed for siteId=${siteId} name=${JSON.stringify(fullRow.name)} subdomain=${JSON.stringify(fullRow.subdomain)}`,
         error,
       );
-      html = THUMB_FAILED_HTML;
+      const reason = error instanceof Error ? error.message : String(error);
+      html = buildThumbFailedHtml(reason);
     } finally {
       stopRender();
     }
