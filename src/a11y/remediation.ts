@@ -93,8 +93,13 @@ export interface RemediationPlan {
 }
 
 /** Stable identity of an issue across two audit runs (message is excluded — it
- * carries volatile ratios/levels). */
-function issueKey(issue: Pick<AuditIssue, 'kind' | 'pageSlug' | 'elementId'>): string {
+ * carries volatile ratios/levels). Accepts anything carrying the three keys —
+ * an `AuditIssue` or a `Remediation` (which targets one issue). */
+function issueKey(issue: {
+  kind: IssueKind;
+  pageSlug?: string | undefined;
+  elementId?: string | undefined;
+}): string {
   return `${issue.kind}|${issue.pageSlug ?? ''}|${issue.elementId ?? ''}`;
 }
 
@@ -151,7 +156,6 @@ interface Candidate {
  */
 function buildCandidate(
   state: EditableSite,
-  styleKit: StyleKitPreset,
   issue: AuditIssue,
 ): Candidate | { manual: string } | null {
   switch (issue.kind) {
@@ -162,6 +166,17 @@ function buildCandidate(
       }
       const el = findTextElementById(page, issue.elementId);
       if (!el) return { manual: 'Heading element not found.' };
+      // Resolve the kit here, lazily — never as a global step. A `heading-skip`
+      // issue can only exist if `runAudit` already resolved the kit to derive
+      // levels, so this won't throw in practice; if it somehow does, THIS issue
+      // becomes manual with the reason — no global swallow, no fallback.
+      let styleKit: StyleKitPreset;
+      try {
+        styleKit = resolveStyleKitWithCustom(state);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        return { manual: `Style Kit failed to resolve: ${detail}` };
+      }
       const predecessor = headingPredecessorLevel(page, styleKit, issue.elementId);
       const targetLevel = (predecessor + 1) as 1 | 2 | 3 | 4 | 5;
       if (targetLevel < 1 || targetLevel > 5) {
@@ -236,31 +251,8 @@ export function computeRemediations(
   const remediations: Remediation[] = [];
   const manual: ManualIssue[] = [];
 
-  let styleKit: StyleKitPreset;
-  try {
-    styleKit = resolveStyleKitWithCustom(state);
-  } catch (err) {
-    // Loud, not silent: a kit that won't resolve is a real failure. We can't
-    // compute heading levels without it, so every issue becomes manual — but we
-    // log the cause first (the audit itself separately surfaces an
-    // `audit-crash` for the same root cause).
-    console.error('[a11y/remediation] style kit resolution failed — all issues classified manual', err);
-    for (const issue of audit.issues) {
-      manual.push({
-        kind: issue.kind,
-        severity: issue.severity,
-        elementId: issue.elementId,
-        pageSlug: issue.pageSlug,
-        message: issue.message,
-        reason: 'Style Kit could not be resolved; fix the theme first.',
-        fixHint: issue.fixHint,
-      });
-    }
-    return { remediations, manual };
-  }
-
   for (const issue of audit.issues) {
-    const candidate = buildCandidate(state, styleKit, issue);
+    const candidate = buildCandidate(state, issue);
 
     if (candidate === null || 'manual' in (candidate as { manual?: string })) {
       const reason =
@@ -357,17 +349,19 @@ function verifyCandidate(
 }
 
 /**
- * Fold a list of remediation ops onto a site in order, then VERIFY the whole
- * batch by re-auditing: individual ops were each verified against the original
- * state, but applying several can interact (two heading fixes on one page), so
- * the batch is only sound if the final state introduces no new issue key. Pure
- * — returns the folded state (not validator-mutated), the validation verdict,
- * and `verified` (true iff the batch added no new a11y issues). The caller
- * persists only when `validation.valid` (and should refuse on `!verified`).
+ * Apply a batch of remediations and VERIFY the whole batch by re-auditing.
+ * Individual ops were each verified against the *original* state, but applying
+ * several can interact (two heading fixes on one page), so the batch is only
+ * sound when the final audit (a) introduces no new issue key AND (b) clears
+ * every issue the batch claimed to fix. Checking only (a) is unsafe: a batch
+ * could leave one of its own target issues unresolved while adding nothing new.
+ * Pure — returns the folded state (not validator-mutated), the validation
+ * verdict, and `verified`. The caller persists only when `validation.valid`
+ * and `verified`.
  */
 export function applyRemediationOps(
   state: EditableSite,
-  ops: ReadonlyArray<CanvasAgentOp>,
+  remediations: ReadonlyArray<Remediation>,
 ): {
   state: EditableSite;
   validation: ReturnType<typeof validateEditableSite>;
@@ -375,10 +369,13 @@ export function applyRemediationOps(
 } {
   const before = runAudit(state);
   let working = state;
-  for (const op of ops) {
-    working = applyCanvasAgentOp(working, op);
+  for (const remediation of remediations) {
+    working = applyCanvasAgentOp(working, remediation.op);
   }
   const validation = validateEditableSite(structuredClone(working));
-  const verified = newlyIntroduced(before, runAudit(working)).length === 0;
+  const after = runAudit(working);
+  const afterKeys = new Set(after.issues.map((i) => issueKey(i)));
+  const allTargetsCleared = remediations.every((r) => !afterKeys.has(issueKey(r)));
+  const verified = allTargetsCleared && newlyIntroduced(before, after).length === 0;
   return { state: working, validation, verified };
 }

@@ -160,7 +160,7 @@ function test1HeadingSkipComputed(): void {
   assert(fix.elementId === 'h-2', '1.4 fix targets the offending heading', fix.elementId);
   assert(fix.op.kind === 'updateElement', '1.5 fix is an updateElement op', fix.op.kind);
 
-  const { state: fixed, validation } = applyRemediationOps(site, [fix.op]);
+  const { state: fixed, validation } = applyRemediationOps(site, [fix]);
   assert(validation.valid, '1.6 fixed site validates', validation.valid ? '' : validation.errors.join('; '));
   const after = runAudit(fixed);
   assert(
@@ -252,8 +252,7 @@ function test3BatchApply(): void {
     JSON.stringify(plan.remediations.map((r) => r.kind)),
   );
 
-  const ops = plan.remediations.map((r) => r.op);
-  const { state: fixed, validation, verified } = applyRemediationOps(site, ops);
+  const { state: fixed, validation, verified } = applyRemediationOps(site, plan.remediations);
   assert(validation.valid, '3.2 batched apply validates', validation.valid ? '' : validation.errors.join('; '));
   assert(verified, '3.3 batch self-verifies (no new issue introduced)');
 
@@ -330,7 +329,7 @@ function test7FractionalScale(): void {
   const plan = computeRemediations(site, baseline);
   const fix = plan.remediations.find((r) => r.kind === 'heading-skip');
   assert(fix !== undefined, '7.2 a verified fix is offered despite the fractional scale', JSON.stringify(plan.manual));
-  const { validation } = applyRemediationOps(site, [fix.op]);
+  const { validation } = applyRemediationOps(site, [fix]);
   assert(validation.valid, '7.3 fractional-scale fix validates', validation.valid ? '' : validation.errors.join('; '));
 }
 
