@@ -53,6 +53,7 @@ import type {
   ContainerElement,
   EditableSite,
   ImageMediaElement,
+  TabsElement,
   TextElement,
 } from '../schema.js';
 import type { CollectionElement, CollectionSort } from './collection.js';
@@ -217,49 +218,178 @@ function sortEntriesManual(
   return ordered;
 }
 
-/** ADR 0063 dec 4 + dec 6 — assemble one entry's worth of canvas elements.
- *  Outer Container links the whole surface; siblings carry the visible chrome.
- *  Ids are suffixed with the entry slug so replay produces byte-equal output. */
-function buildCardEntryInstance(
+/** ADR 0065 D8 — shared per-entry clone-and-substitute helper used by both the
+ *  `'card'` arm (template = `[DEFAULT_CARD_TEMPLATE, ...DEFAULT_CARD_SIBLINGS]`)
+ *  and the `'custom'` arm (template = `el.customTemplate`).
+ *
+ *  For each element in `template` (and recursively for every nested child
+ *  inside a Tabs panel — codex review pass 3 finding 3):
+ *    1. Deep-clone the element so the source constants / Owner-authored
+ *       customTemplate are never mutated.
+ *    2. Walk every string field substituting the nine placeholders against the
+ *       entry (`substituteInValue`).
+ *    3. Suffix the element's `id` with `--<entry.slug>` so replay produces
+ *       byte-equal output AND nested ids do not collide across N materialized
+ *       cards (the validator's anchor-uniqueness rule was previously tripped
+ *       by un-suffixed Action ids inside a Tabs panel).
+ *    4. Force the per-entry link target: the OUTER element, when it's a
+ *       Container, has its `linkHref` overwritten to the canonical detail URL
+ *       (`/<collectionSlug>/<entry.slug>`). Any ActionElement anywhere in the
+ *       template — including ones nested inside a Tabs panel — has its `href`
+ *       overwritten to the same URL. This matches the ADR 0063 dec 6 "card
+ *       surface links to detail page" rule and is the one behaviour the
+ *       materializer asserts on top of whatever the template author wrote.
+ *
+ *  Codex review pass 3 finding 3 — the recursion was previously top-level
+ *  only. A custom template with a Tabs element wrapping Actions therefore:
+ *    (a) emitted nested Actions whose `href` kept the template's placeholder
+ *        URL (e.g. `/template-default`) instead of resolving per entry, and
+ *    (b) emitted nested Actions whose `id` was identical across every
+ *        materialized card, tripping the validator's anchor-uniqueness check.
+ *  Tabs is the only canvas element type with nested `CanvasElement[]`
+ *  children (container/accordion children are DOM siblings at section level,
+ *  not nested in the element tree — see ContainerElement + AccordionElement
+ *  schemas), so the recursion only needs to dive through `tabs[].elements`.
+ *  When the schema gains a new nested-children type, extend `substituteOne`'s
+ *  Tabs branch with the analogous walk.
+ *
+ *  Behavioural identity between `'card'` and `'custom'`: passing
+ *  `[DEFAULT_CARD_TEMPLATE, ...DEFAULT_CARD_SIBLINGS]` as `template` produces
+ *  output byte-equal to the `'custom'` arm with the same array on
+ *  `el.customTemplate` (asserted by smoke). */
+function cloneAndSubstituteTemplate(
+  template: readonly CanvasElement[],
   entry: MaterializerEntry,
   collectionSlug: string,
 ): CanvasElement[] {
   const detailUrl = `/${collectionSlug}/${entry.slug}`;
-  const containerSeed = deepClone(DEFAULT_CARD_TEMPLATE as ContainerElement);
-  const substitutedContainer = substituteInValue(containerSeed, entry);
-  const container: ContainerElement = {
-    ...substitutedContainer,
-    id: `${DEFAULT_CARD_TEMPLATE.id}--${entry.slug}`,
-    linkHref: { type: 'external', url: detailUrl },
-  };
-  const siblings: CanvasElement[] = DEFAULT_CARD_SIBLINGS.map((sib): CanvasElement => {
-    const seed = deepClone(sib);
+  /** Per-element transform with no awareness of position in the top-level
+   *  array. Recurses through Tabs panels so a nested Action gets the same
+   *  per-entry id suffix + detail-page href overwrite as a top-level one.
+   *  The outer-Container link-target overwrite is owned by the caller (it
+   *  applies ONLY to the index-0 element of the template), so this helper
+   *  treats every Container uniformly — the caller layers the outer rule
+   *  on top. */
+  function substituteOne(source: CanvasElement): CanvasElement {
+    const seed = deepClone(source);
     const substituted = substituteInValue(seed, entry);
+    const suffixedId = `${source.id}--${entry.slug}`;
+    // Codex review pass 4 finding 4 — per-entry suffix anchorId with the
+    // same `<original>--<entry.slug>` scheme used on `id`. The renderer
+    // emits `<anchorId>` as the DOM `id` attribute for in-page anchor
+    // navigation (schema.ts BaseElement.anchorId, ADR 0050 dec 2 — must
+    // be unique within a page). Without the suffix, an Owner-authored
+    // anchorId on a template child publishes N times verbatim across N
+    // materialized cards, producing duplicate DOM ids — invalid HTML +
+    // ambiguous fragment navigation + a11y failures. Suffix mirrors the
+    // id scheme exactly so the relationship between storage-key id and
+    // anchor-target id stays predictable; suffix happens AFTER
+    // substituteInValue so an Owner who wrote `{{slug}}` inside the
+    // anchorId still gets the surface-level token expansion first, then
+    // the uniqueness suffix on top.
+    if (
+      typeof (substituted as { anchorId?: unknown }).anchorId === 'string' &&
+      typeof (source as { anchorId?: unknown }).anchorId === 'string'
+    ) {
+      (substituted as { anchorId?: string }).anchorId =
+        `${(source as { anchorId?: string }).anchorId}--${entry.slug}`;
+    }
     if (substituted.type === 'action') {
+      // Codex review pass 1 — spread-and-override preserves Owner-authored
+      // fields (`iconKind`, `motion`, `elementStyle`, `responsive`,
+      // `anchorId`, pinned styles, etc.); the materializer only asserts the
+      // per-entry id suffix + canonical detail-page href. ActionElement is a
+      // discriminated union over `href` vs `behavior` (exactly one present);
+      // strip a possibly-present `behavior` so the result lands cleanly on
+      // the `href` arm.
+      const { behavior: _behavior, ...rest } = substituted;
+      void _behavior;
       const action: ActionElement = {
-        id: `${sib.id}--${entry.slug}`,
+        ...rest,
         type: 'action',
-        box: substituted.box,
-        label: substituted.label,
-        variant: substituted.variant,
+        id: suffixedId,
         href: { type: 'external', url: detailUrl },
       };
       return action;
     }
+    if (substituted.type === 'tabs') {
+      // Codex review pass 3 finding 3 — recurse through every panel's
+      // children so a nested Action inside a Tab gets the per-entry id
+      // suffix + detail-page href overwrite. The Tabs element itself is
+      // id-suffixed too; its `tabs[].elements[]` children pass through the
+      // same `substituteOne` transform so every level lands consistent.
+      const tabs: TabsElement = {
+        ...substituted,
+        id: suffixedId,
+        tabs: substituted.tabs.map((tab) => ({
+          ...tab,
+          elements: tab.elements.map(substituteOne),
+        })),
+      };
+      return tabs;
+    }
     if (substituted.type === 'media' && substituted.mediaKind === 'image') {
       const image: ImageMediaElement = {
         ...substituted,
-        id: `${sib.id}--${entry.slug}`,
+        id: suffixedId,
       };
       return image;
     }
-    const text: TextElement = {
-      ...(substituted as TextElement),
-      id: `${sib.id}--${entry.slug}`,
-    };
-    return text;
+    if (substituted.type === 'text') {
+      const text: TextElement = {
+        ...substituted,
+        id: suffixedId,
+      };
+      return text;
+    }
+    return { ...substituted, id: suffixedId };
+  }
+
+  return template.map((source, idx): CanvasElement => {
+    const out = substituteOne(source);
+    if (idx === 0 && out.type === 'container') {
+      // The outer Container (when present at index 0) carries the per-entry
+      // link surface. ContainerElement is the only top-level type that
+      // earns the linkHref overwrite; nested Containers (none in today's
+      // schema, but defensive against future surfaces) keep whatever the
+      // template author wrote.
+      const container: ContainerElement = {
+        ...out,
+        linkHref: { type: 'external', url: detailUrl },
+      };
+      return container;
+    }
+    return out;
   });
-  return [container, ...siblings];
+}
+
+/** Flat template array consumed by the `'card'` arm — the outer Container plus
+ *  its sibling chrome assembled in one shape so the shared helper can iterate
+ *  them uniformly. The order matters: the Container sits at index 0 so the
+ *  helper's "first element gets the outer linkHref" rule applies. */
+const DEFAULT_CARD_TEMPLATE_ARRAY: readonly CanvasElement[] = [
+  DEFAULT_CARD_TEMPLATE,
+  ...DEFAULT_CARD_SIBLINGS,
+];
+
+/** ADR 0063 dec 4 + dec 6 — assemble one entry's worth of canvas elements for
+ *  the `'card'` display arm. Delegates to `cloneAndSubstituteTemplate` so the
+ *  `'card'` and `'custom'` arms (ADR 0065 D8) share one code path. */
+function buildCardEntryInstance(
+  entry: MaterializerEntry,
+  collectionSlug: string,
+): CanvasElement[] {
+  return cloneAndSubstituteTemplate(DEFAULT_CARD_TEMPLATE_ARRAY, entry, collectionSlug);
+}
+
+/** ADR 0065 D8 — `'custom'` display arm. Reads the per-Collection
+ *  `customTemplate` and delegates to `cloneAndSubstituteTemplate`. */
+function buildCustomEntryInstance(
+  template: readonly CanvasElement[],
+  entry: MaterializerEntry,
+  collectionSlug: string,
+): CanvasElement[] {
+  return cloneAndSubstituteTemplate(template, entry, collectionSlug);
 }
 
 /** ADR 0063 dec 4 — image-only mode. Per-entry instance is a single Container
@@ -368,22 +498,54 @@ function resolveEntriesForCollection(
  *  `el.entries` (the matrix shape downstream consumers already iterate); on
  *  zero matches `el.entries` is set to `[]` (no placeholder content per
  *  ADR 0063 dec 5 — publish renderer emits empty, editor preview owns the
- *  placeholder UI separately). */
+ *  placeholder UI separately).
+ *
+ *  ADR 0065 D8 — `'custom'` arm failure paths (loud, no fallback to
+ *  `DEFAULT_CARD_TEMPLATE`):
+ *    - `display === 'custom'` AND `customTemplate === undefined` → zero cards
+ *      + warning: `"Collection element <id> display='custom' but customTemplate
+ *      is not set."`.
+ *    - `display === 'custom'` AND `customTemplate.length === 0` → zero cards
+ *      + warning: `"Collection element <id> display='custom' but customTemplate
+ *      has zero elements."`.
+ *  The Owner's intent (an empty customTemplate is preserved across mode
+ *  switches per ADR 0065 D4) is honoured exactly — a visually broken Collection
+ *  + a loud signal explaining why. */
 function hydrateCollectionElement(
   el: CollectionElement,
   entries: readonly MaterializerEntry[],
   pageSlug: string,
   warnings: string[],
 ): void {
+  const display = el.display ?? 'card';
+  let customTemplate: readonly CanvasElement[] | undefined;
+  if (display === 'custom') {
+    if (el.customTemplate === undefined) {
+      warnings.push(
+        `Collection element ${el.id} display='custom' but customTemplate is not set.`,
+      );
+      el.entries = [];
+      return;
+    }
+    if (el.customTemplate.length === 0) {
+      warnings.push(
+        `Collection element ${el.id} display='custom' but customTemplate has zero elements.`,
+      );
+      el.entries = [];
+      return;
+    }
+    customTemplate = el.customTemplate;
+  }
   const { ordered, warning } = resolveEntriesForCollection(el, entries, pageSlug);
   if (warning !== null) warnings.push(warning);
   const collectionSlug = el.collectionSlug ?? '';
-  const display = el.display ?? 'card';
-  const built: CanvasElement[][] = ordered.map((entry) =>
-    display === 'image-only'
-      ? buildImageOnlyEntryInstance(entry, collectionSlug)
-      : buildCardEntryInstance(entry, collectionSlug),
-  );
+  const built: CanvasElement[][] = ordered.map((entry) => {
+    if (display === 'image-only') return buildImageOnlyEntryInstance(entry, collectionSlug);
+    if (display === 'custom' && customTemplate !== undefined) {
+      return buildCustomEntryInstance(customTemplate, entry, collectionSlug);
+    }
+    return buildCardEntryInstance(entry, collectionSlug);
+  });
   el.entries = built;
 }
 

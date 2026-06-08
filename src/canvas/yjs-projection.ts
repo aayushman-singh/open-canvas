@@ -719,6 +719,14 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
     }
     out.set('entries', entries);
   }
+  // ADR 0065 D2 — `customTemplate` is a flat element subtree (not a
+  // matrix), so the encoding is one Y.Array of Y.Map<unknown> entries.
+  // Symmetric with the decode walker below.
+  if (el.customTemplate !== undefined) {
+    const tmpl = new Y.Array<Y.Map<unknown>>();
+    for (const child of el.customTemplate) tmpl.push([encodeElement(child)]);
+    out.set('customTemplate', tmpl);
+  }
   return out;
 }
 
@@ -1323,6 +1331,11 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
   if (map.has('entries')) {
     const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;
     el.entries = rawEntries.map((row) => row.map(decodeElement));
+  }
+  // ADR 0065 D2 — `customTemplate` decodes as a flat element array.
+  if (map.has('customTemplate')) {
+    const tmpl = map.get('customTemplate') as Y.Array<Y.Map<unknown>>;
+    el.customTemplate = tmpl.map(decodeElement);
   }
   return el;
 }

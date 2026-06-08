@@ -1,0 +1,922 @@
+// src/editor-client/collection-template-edit.smoke.ts
+//
+// ADR 0065 Phase 2C — parity smoke for the enter/exit verbs that drive
+// Collection custom-template edit mode. Asserts:
+//
+//  * first enter (customTemplate absent) seeds via seedCustomTemplate()
+//    AND pins ctx.editingCollectionTemplate atomically;
+//  * second enter (customTemplate present) flips the pin only — no
+//    re-seed (D4 silent keep);
+//  * enter on a non-existent element id surfaces a loud error status,
+//    no state change;
+//  * enter on a non-collection element surfaces a loud error status,
+//    no state change;
+//  * enter on a collection with display !== 'custom' surfaces a loud
+//    error status, no state change (precondition rule);
+//  * exit clears the pin and re-renders.
+//
+// Bare Bun — no `document`. The verbs do not touch DOM directly; they
+// mutate ctx and call ctx.renderAll(). renderAll is a counter here.
+//
+// Run with `bun run src/editor-client/collection-template-edit.smoke.ts`.
+
+import type {
+  CanvasElement,
+  CanvasSection,
+} from '../canvas/schema.js';
+import type { CollectionDisplay, CollectionElement } from '../canvas/elements/collection.js';
+import type { EditorContext } from './editor-context.js';
+import type { FindElementResult } from './editor-context-types.js';
+import {
+  enterCollectionTemplateEditImpl,
+  exitCollectionTemplateEditImpl,
+} from './collection-template-edit.js';
+import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
+
+declare const Bun: {
+  file(input: URL): { text(): Promise<string> };
+};
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(`[collection-template-edit:smoke] ${message}`);
+}
+
+interface StatusCall {
+  text: string;
+  tone: 'ok' | 'error' | 'info' | undefined;
+}
+
+interface CtxLog {
+  renderAll: number;
+  scheduleSave: number;
+  captureForUndo: number;
+  statuses: StatusCall[];
+}
+
+function makeCollection(id: string, display: CollectionDisplay): CollectionElement {
+  return {
+    id,
+    type: 'collection',
+    box: { x: 0, y: 0, w: 640, h: 480, z: 1 },
+    sort: 'date-desc',
+    display,
+  };
+}
+
+function makeSection(elements: CanvasElement[]): CanvasSection {
+  return {
+    id: 'section-tpl-smoke',
+    recipeId: 'feature-grid',
+    name: 'Smoke',
+    height: 800,
+    elements,
+  };
+}
+
+function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
+  const log: CtxLog = {
+    renderAll: 0,
+    scheduleSave: 0,
+    captureForUndo: 0,
+    statuses: [],
+  };
+  // Only the surface the verbs read/write is implemented; everything else
+  // is a throwing stub so accidental reads of unrelated ctx fields fail
+  // loudly. Cast through unknown because the smoke only exercises the
+  // verb's narrow read/write surface, not the full EditorContext.
+  //
+  // The walker also recurses one level into Collection.customTemplate so
+  // findElement resolves a template-child id with parentKind set to
+  // 'collection-custom-template' and parentMeta carrying the host
+  // Collection. This mirrors runtime-helpers.ts's findElementIn shape so
+  // the exit-verb's re-target-on-stale-selection branch (codex review
+  // pass 2 finding 2) has something realistic to walk in this smoke.
+  const partial = {
+    state: null,
+    selectedElementId: null as string | null,
+    editingCollectionTemplate: null as EditorContext['editingCollectionTemplate'],
+    findElement(elementId: string): FindElementResult | null {
+      for (const el of section.elements) {
+        if (el.id === elementId) {
+          return {
+            section,
+            element: el,
+            parentArray: section.elements,
+            parentKind: 'section',
+            parentMeta: null,
+          };
+        }
+        if (el.type === 'collection') {
+          const customTemplate = el.customTemplate;
+          if (Array.isArray(customTemplate)) {
+            for (const child of customTemplate) {
+              if (child.id === elementId) {
+                return {
+                  section,
+                  element: child,
+                  parentArray: customTemplate,
+                  parentKind: 'collection-custom-template',
+                  parentMeta: { collectionElement: el },
+                };
+              }
+            }
+          }
+        }
+      }
+      return null;
+    },
+    selectElement(elementId: string | null): void {
+      this.selectedElementId = elementId;
+    },
+    renderAll: () => {
+      log.renderAll += 1;
+    },
+    captureForUndo: () => {
+      log.captureForUndo += 1;
+    },
+    scheduleSave: () => {
+      log.scheduleSave += 1;
+    },
+    setStatus: (text: string, tone?: 'ok' | 'error' | 'info') => {
+      log.statuses.push({ text, tone });
+    },
+  };
+  const ctx = partial as unknown as EditorContext;
+  return { ctx, log };
+}
+
+// ----- enter: first switch seeds + pins atomically ----------------------
+
+(function enterFirstTimeSeedsSpec() {
+  const el = makeCollection('coll-a', 'custom');
+  const section = makeSection([el]);
+  const { ctx, log } = makeCtx(section);
+
+  enterCollectionTemplateEditImpl(ctx, 'coll-a');
+
+  assert(
+    el.customTemplate !== undefined,
+    'first enter must seed customTemplate',
+  );
+  assert(
+    Array.isArray(el.customTemplate),
+    'seeded customTemplate must be an array',
+  );
+  assert(
+    el.customTemplate !== undefined && el.customTemplate.length > 0,
+    'seeded customTemplate must contain at least the outer container',
+  );
+  assert(
+    ctx.editingCollectionTemplate !== null &&
+      ctx.editingCollectionTemplate.collectionId === 'coll-a',
+    'first enter must pin editingCollectionTemplate to the Collection',
+  );
+  assert(
+    log.captureForUndo === 1,
+    'first enter must captureForUndo exactly once',
+  );
+  assert(log.renderAll === 1, 'first enter must renderAll exactly once');
+  assert(log.scheduleSave === 1, 'first enter must scheduleSave exactly once');
+  assert(log.statuses.length === 0, 'first enter must not emit status');
+})();
+
+// ----- enter: second switch keeps existing customTemplate ---------------
+
+(function enterSecondTimePreservesTemplateSpec() {
+  const el = makeCollection('coll-b', 'custom');
+  el.customTemplate = [
+    {
+      id: 'preset-root',
+      type: 'container',
+      box: { x: 0, y: 0, w: 320, h: 360, z: 1 },
+      variant: 'raised',
+    },
+  ];
+  const before = el.customTemplate[0];
+  const section = makeSection([el]);
+  const { ctx, log } = makeCtx(section);
+
+  enterCollectionTemplateEditImpl(ctx, 'coll-b');
+
+  assert(
+    el.customTemplate !== undefined && el.customTemplate[0] === before,
+    'second enter must not re-seed (D4 silent keep)',
+  );
+  assert(
+    ctx.editingCollectionTemplate !== null &&
+      ctx.editingCollectionTemplate.collectionId === 'coll-b',
+    'second enter must pin editingCollectionTemplate',
+  );
+  assert(log.captureForUndo === 1, 'enter must captureForUndo once');
+  assert(log.renderAll === 1, 'enter must renderAll once');
+})();
+
+// ----- enter: missing element fails loudly ------------------------------
+
+(function enterMissingElementSpec() {
+  const section = makeSection([]);
+  const { ctx, log } = makeCtx(section);
+
+  enterCollectionTemplateEditImpl(ctx, 'ghost-id');
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'missing element must not mutate editingCollectionTemplate',
+  );
+  assert(
+    log.statuses.length === 1 && log.statuses[0]?.tone === 'error',
+    'missing element must emit error status',
+  );
+  assert(
+    log.captureForUndo === 0,
+    'missing element must not captureForUndo',
+  );
+  assert(log.renderAll === 0, 'missing element must not renderAll');
+})();
+
+// ----- enter: non-collection fails loudly ------------------------------
+
+(function enterNonCollectionSpec() {
+  const text: CanvasElement = {
+    id: 'text-a',
+    type: 'text',
+    box: { x: 0, y: 0, w: 100, h: 30, z: 1 },
+    content: [{ text: 'hi' }],
+    role: 'body',
+    fontSize: 14,
+    fontWeight: 400,
+    align: 'left',
+  };
+  const section = makeSection([text]);
+  const { ctx, log } = makeCtx(section);
+
+  enterCollectionTemplateEditImpl(ctx, 'text-a');
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'non-collection must not mutate editingCollectionTemplate',
+  );
+  assert(
+    log.statuses.length === 1 && log.statuses[0]?.tone === 'error',
+    'non-collection must emit error status',
+  );
+})();
+
+// ----- enter: display !== 'custom' fails loudly -------------------------
+
+(function enterWrongDisplaySpec() {
+  const el = makeCollection('coll-c', 'card');
+  const section = makeSection([el]);
+  const { ctx, log } = makeCtx(section);
+
+  enterCollectionTemplateEditImpl(ctx, 'coll-c');
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'wrong-display must not mutate editingCollectionTemplate',
+  );
+  assert(
+    el.customTemplate === undefined,
+    'wrong-display must not seed customTemplate',
+  );
+  assert(
+    log.statuses.length === 1 && log.statuses[0]?.tone === 'error',
+    'wrong-display must emit error status',
+  );
+  assert(log.captureForUndo === 0, 'wrong-display must not captureForUndo');
+})();
+
+// ----- exit: clears pin + renders --------------------------------------
+
+(function exitClearsPinSpec() {
+  const section = makeSection([]);
+  const { ctx, log } = makeCtx(section);
+  ctx.editingCollectionTemplate = { collectionId: 'coll-d' };
+
+  exitCollectionTemplateEditImpl(ctx);
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'exit must clear editingCollectionTemplate',
+  );
+  assert(log.renderAll === 1, 'exit must renderAll exactly once');
+})();
+
+// ----- codex review pass 2 finding 2 — exit re-targets stale child --------
+// selection on the host Collection so the inspector stops rendering a
+// phantom child whose canvas wrapper no longer exists after the grid re-
+// materializes.
+
+(function exitRetargetsTemplateChildSelectionSpec() {
+  const child: CanvasElement = {
+    id: 'tpl-child-title',
+    type: 'text',
+    box: { x: 0, y: 0, w: 200, h: 32, z: 1 },
+    content: [{ text: 'Title' }],
+    role: 'heading',
+    fontSize: 20,
+    fontWeight: 600,
+    align: 'left',
+  };
+  const el = makeCollection('coll-retarget', 'custom');
+  el.customTemplate = [child];
+  const section = makeSection([el]);
+  const { ctx } = makeCtx(section);
+
+  // Owner is editing the template AND clicked the title child.
+  ctx.editingCollectionTemplate = { collectionId: 'coll-retarget' };
+  ctx.selectedElementId = 'tpl-child-title';
+
+  exitCollectionTemplateEditImpl(ctx);
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'exit must clear editingCollectionTemplate',
+  );
+  // Decision: re-select the parent Collection (NOT clear) so the Owner
+  // stays in the "I just exited this Collection's edit mode" mental
+  // model — the Collection's inspector reopens immediately for re-enter
+  // / display change.
+  assert(
+    ctx.selectedElementId === 'coll-retarget',
+    'exit must re-target stale template-child selection to the host Collection, got ' +
+      String(ctx.selectedElementId),
+  );
+})();
+
+// Exit when the selection is NOT a template child must leave the
+// selection alone — the re-target is narrow to the stale-child case.
+(function exitLeavesUnrelatedSelectionAloneSpec() {
+  const el = makeCollection('coll-leave-alone', 'custom');
+  el.customTemplate = [
+    {
+      id: 'tpl-child-other',
+      type: 'text',
+      box: { x: 0, y: 0, w: 200, h: 32, z: 1 },
+      content: [{ text: 'other' }],
+      role: 'heading',
+      fontSize: 20,
+      fontWeight: 600,
+      align: 'left',
+    },
+  ];
+  const section = makeSection([el]);
+  const { ctx } = makeCtx(section);
+
+  // Owner is editing the template but the active selection is the
+  // Collection itself (or some unrelated section-level element). Exit
+  // must NOT re-target — there is nothing stale to fix.
+  ctx.editingCollectionTemplate = { collectionId: 'coll-leave-alone' };
+  ctx.selectedElementId = 'coll-leave-alone';
+
+  exitCollectionTemplateEditImpl(ctx);
+
+  assert(
+    ctx.selectedElementId === 'coll-leave-alone',
+    'exit must leave a non-template-child selection untouched, got ' +
+      String(ctx.selectedElementId),
+  );
+})();
+
+(function exitWhenAlreadyClearedSpec() {
+  const section = makeSection([]);
+  const { ctx, log } = makeCtx(section);
+
+  exitCollectionTemplateEditImpl(ctx);
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'exit on already-null must remain null (idempotent)',
+  );
+  assert(log.renderAll === 1, 'exit on null must still renderAll (idempotent re-render is fine)');
+})();
+
+// ----- ADR 0065 D1 + D3 — display-dropdown semantics ---------------------
+// The display dropdown change handler in element-inspector.ts is bare-DOM
+// and cannot be unit-smoke-tested under Bun (no `document`). But the
+// composite semantics it must enforce — first-switch auto-enter,
+// second-switch silent keep, away-from-custom auto-exit — are routed
+// through the verbs this smoke owns. The next four cases mirror the
+// dropdown handler's branches so the verb sequences are pinned even
+// without DOM coverage.
+
+// switch to 'custom' from 'card' with NO customTemplate → auto-enter
+// (handler flips display, then calls enterCollectionTemplateEdit; the verb
+// seeds + pins atomically).
+(function dropdownFirstSwitchToCustomSpec() {
+  const el = makeCollection('coll-e', 'card');
+  const section = makeSection([el]);
+  const { ctx } = makeCtx(section);
+  // Dropdown handler flips display first:
+  el.display = 'custom';
+  // Then calls the verb:
+  enterCollectionTemplateEditImpl(ctx, 'coll-e');
+
+  assert(
+    el.customTemplate !== undefined && el.customTemplate.length > 0,
+    'first switch to custom must auto-seed customTemplate',
+  );
+  assert(
+    ctx.editingCollectionTemplate !== null &&
+      ctx.editingCollectionTemplate.collectionId === 'coll-e',
+    'first switch to custom must auto-enter edit mode',
+  );
+})();
+
+// switch to 'custom' from 'card' WITH existing customTemplate → just flip
+// display; editingCollectionTemplate stays null (Owner clicks Edit
+// explicitly per D3 second-or-later case).
+(function dropdownSecondSwitchToCustomSpec() {
+  const el = makeCollection('coll-f', 'card');
+  el.customTemplate = [
+    {
+      id: 'preset-root',
+      type: 'container',
+      box: { x: 0, y: 0, w: 320, h: 360, z: 1 },
+      variant: 'raised',
+    },
+  ];
+  const beforeRoot = el.customTemplate[0];
+  const section = makeSection([el]);
+  const { ctx } = makeCtx(section);
+
+  // Dropdown handler in this branch does NOT call enterCollectionTemplateEdit:
+  el.display = 'custom';
+  // (verb is intentionally NOT called)
+
+  assert(
+    el.customTemplate[0] === beforeRoot,
+    'second switch to custom must NOT re-seed (silent keep)',
+  );
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'second switch to custom must NOT auto-enter (Owner clicks Edit explicitly)',
+  );
+})();
+
+// switch AWAY from 'custom' while editing → exit FIRST, then flip display
+// (handler calls exitCollectionTemplateEdit before mutating display).
+(function dropdownAwayFromCustomWhileEditingSpec() {
+  const el = makeCollection('coll-g', 'custom');
+  el.customTemplate = [
+    {
+      id: 'preset-root',
+      type: 'container',
+      box: { x: 0, y: 0, w: 320, h: 360, z: 1 },
+      variant: 'raised',
+    },
+  ];
+  const beforeRoot = el.customTemplate[0];
+  const section = makeSection([el]);
+  const { ctx } = makeCtx(section);
+  ctx.editingCollectionTemplate = { collectionId: 'coll-g' };
+
+  // Dropdown handler exits first:
+  exitCollectionTemplateEditImpl(ctx);
+  // Then flips display:
+  el.display = 'card';
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'away-from-custom while editing must auto-exit (D10)',
+  );
+  assert(
+    el.customTemplate !== undefined && el.customTemplate[0] === beforeRoot,
+    'away-from-custom must preserve customTemplate (D4 silent keep)',
+  );
+})();
+
+// switch AWAY from 'custom' while NOT editing → just flip display;
+// customTemplate preserved (D4).
+(function dropdownAwayFromCustomNotEditingSpec() {
+  const el = makeCollection('coll-h', 'custom');
+  el.customTemplate = [
+    {
+      id: 'preset-root',
+      type: 'container',
+      box: { x: 0, y: 0, w: 320, h: 360, z: 1 },
+      variant: 'raised',
+    },
+  ];
+  const beforeRoot = el.customTemplate[0];
+  const section = makeSection([el]);
+  const { ctx } = makeCtx(section);
+
+  // No editingCollectionTemplate pin to begin with.
+  el.display = 'image-only';
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'away-from-custom not editing must leave editingCollectionTemplate null',
+  );
+  assert(
+    el.customTemplate !== undefined && el.customTemplate[0] === beforeRoot,
+    'away-from-custom not editing must preserve customTemplate (D4 silent keep)',
+  );
+})();
+
+// ----- ADR 0065 D9 — Reset template behaviour ----------------------------
+// The reset button's confirm path lives in the inspector DOM handler and
+// can't be DOM-smoke-tested under Bun. The substantive behaviour — that
+// seedCustomTemplate() returns a fresh deep clone of the default — is the
+// canonical chokepoint; we pin it here so a future refactor of the seed
+// path doesn't quietly break the reset button.
+(function resetSeedReplaceSpec() {
+  const first = seedCustomTemplate('coll-x', 640, 480);
+  const second = seedCustomTemplate('coll-x', 640, 480);
+  assert(Array.isArray(first) && first.length > 0, 'seedCustomTemplate must return a non-empty array');
+  assert(first !== second, 'seedCustomTemplate must return a fresh array per call (deep clone)');
+  assert(
+    first[0] !== second[0],
+    'seedCustomTemplate must deep-clone the outer container per call so reset never reuses prior nodes',
+  );
+})();
+
+// ----- Codex review pass 1 — seed ids carry --<collectionId> suffix so two
+// Collections on the same page never collide on `card-default-root` -------
+(function seedIdsScopedToHostCollectionSpec() {
+  const a = seedCustomTemplate('coll-alpha', 640, 480);
+  const b = seedCustomTemplate('coll-beta', 640, 480);
+  const aIds = a.map((el) => el.id);
+  const bIds = b.map((el) => el.id);
+  for (const id of aIds) {
+    assert(
+      id.endsWith('--coll-alpha'),
+      `seed id ${id} from collection coll-alpha must carry --<collectionId> suffix`,
+    );
+  }
+  for (const id of bIds) {
+    assert(
+      id.endsWith('--coll-beta'),
+      `seed id ${id} from collection coll-beta must carry --<collectionId> suffix`,
+    );
+  }
+  // Pairwise — no id from collection A appears in collection B's seed.
+  for (const id of aIds) {
+    assert(
+      !bIds.includes(id),
+      `seed ids from different host Collections must not overlap (clash: ${id})`,
+    );
+  }
+})();
+
+// ----- Codex review pass 1 — findElement walker must recurse into ---------
+// customTemplate so selection of a template child resolves and the inspector
+// can render it. Source-grep the runtime helper since the real function
+// pulls in the full editor module graph (DOM helpers, render.ts, co-edit).
+{
+  const runtimeSrc = await Bun.file(
+    new URL('./runtime-helpers.ts', import.meta.url),
+  ).text();
+  // Find the findElementIn closure that drives findElementImpl.
+  const findElementInAnchor = runtimeSrc.indexOf('function findElementIn(');
+  assert(
+    findElementInAnchor > 0,
+    'runtime-helpers.ts must own findElementIn (re-locate if renamed)',
+  );
+  // Bound the walker body up to the function's end (a single export follows
+  // immediately after; finding the next top-level function boundary is good
+  // enough).
+  const walkerTail = runtimeSrc.slice(findElementInAnchor);
+  const walkerEnd = walkerTail.indexOf('\nexport function findElementImpl');
+  assert(
+    walkerEnd > 0,
+    'findElementIn must precede findElementImpl as the helper export pair',
+  );
+  const walkerBody = walkerTail.slice(0, walkerEnd);
+  assert(
+    walkerBody.includes("'collection-custom-template'"),
+    'findElement walker must recurse into customTemplate with parentKind="collection-custom-template" ' +
+      '(ADR 0065 D6 — selection of any element inside an active template must resolve)',
+  );
+  assert(
+    walkerBody.includes('customTemplate'),
+    'findElement walker must reference the customTemplate field name',
+  );
+}
+
+// ----- Codex review pass 1 — first-switch path must NOT call rebuildElement
+// after enterCollectionTemplateEdit -----------------------------------------
+// The enter verb already invokes ctx.renderAll() which rebuilds every wrapper
+// AND re-runs mountTemplateEditChromeImpl. A trailing ctx.rebuildElement on
+// the same Collection replaces the just-mounted wrapper, dropping the
+// `data-template-edit-active` attribute and the Done button (the chrome
+// mount runs in renderAll, not rebuildElement). Source-grep the inspector
+// handler so a future re-introduction of the rebuild call fails loudly.
+{
+  const inspectorSrc = await Bun.file(
+    new URL('./element-inspector.ts', import.meta.url),
+  ).text();
+  // Find the canonical call to enterCollectionTemplateEdit inside the
+  // display-dropdown change handler. The line immediately AFTER it must
+  // be `return;` (no trailing rebuildElement). Strip line-comments first
+  // so a comment that mentions ctx.rebuildElement (e.g. the explanatory
+  // block above the call) doesn't trip the grep.
+  const stripped = inspectorSrc
+    .split('\n')
+    .map((line) => {
+      const idx = line.indexOf('//');
+      return idx >= 0 ? line.slice(0, idx) : line;
+    })
+    .join('\n');
+  const enterCallIdx = stripped.indexOf('ctx.enterCollectionTemplateEdit(collection.id)');
+  assert(
+    enterCallIdx > 0,
+    'inspector display-dropdown handler must call ctx.enterCollectionTemplateEdit(collection.id)',
+  );
+  // Slice from the enter call to the next `return;` — that's the bounded
+  // window where a trailing rebuild would live. Strip line-comments above
+  // already removed any explanatory references to ctx.rebuildElement.
+  const afterEnter = stripped.slice(enterCallIdx);
+  const returnIdx = afterEnter.indexOf('return;');
+  assert(
+    returnIdx > 0,
+    'first-switch branch must terminate in a return after enterCollectionTemplateEdit',
+  );
+  const window = afterEnter.slice(0, returnIdx);
+  assert(
+    !window.includes('ctx.rebuildElement'),
+    'first-switch path must NOT call ctx.rebuildElement after enterCollectionTemplateEdit ' +
+      '(renderAll inside the verb already remounts and re-runs the chrome mount; ' +
+      'a trailing rebuild strips data-template-edit-active and the Done button)',
+  );
+}
+
+// ----- Codex review pass 3 finding 2 — Reset path must NOT use rebuildElement
+// either. The Reset button (inside the inspector's confirm handler) lands a
+// fresh seedCustomTemplate() into `customTemplate`; if Owner is currently in
+// edit mode for THIS Collection, the chrome (banner, Done, dim marker) lives
+// on the wrapper that ctx.rebuildElement replaces. The rebuild swaps the
+// wrapper, stripping the chrome — edit mode appears active but visually
+// unmoored. ctx.renderAll() rebuilds the entire canvas AND re-runs
+// mountTemplateEditChromeImpl (render.ts:381), so the chrome re-mounts on the
+// fresh wrapper. Mirrors the first-switch fix above.
+{
+  const inspectorSrc = await Bun.file(
+    new URL('./element-inspector.ts', import.meta.url),
+  ).text();
+  const stripped = inspectorSrc
+    .split('\n')
+    .map((line) => {
+      const idx = line.indexOf('//');
+      return idx >= 0 ? line.slice(0, idx) : line;
+    })
+    .join('\n');
+  // The Reset path is the only place where `seedCustomTemplate(refound.element.id, ...)`
+  // assigns into `refound.element.customTemplate`. Bound the search window
+  // from that assignment up to the next `scheduleSave()` call (the next
+  // synchronous statement after the rebuild in the historical code).
+  //
+  // Codex review pass 5 finding 1 — the call now takes host box dimensions
+  // (`refound.element.id, refound.element.box.w, refound.element.box.h`) so
+  // the substring spans multiple lines after Prettier formats it. Search
+  // for the assignment prefix and the wrapping function name to stay
+  // robust against formatting changes; assert the box.w/box.h args appear
+  // shortly after so the scaling wiring stays pinned.
+  const resetAssignIdx = stripped.indexOf(
+    'refound.element.customTemplate = seedCustomTemplate(',
+  );
+  assert(
+    resetAssignIdx > 0,
+    'inspector Reset path must assign seedCustomTemplate(...) into refound.element.customTemplate',
+  );
+  const callWindow = stripped.slice(resetAssignIdx, resetAssignIdx + 400);
+  assert(
+    callWindow.includes('refound.element.id'),
+    'Reset seed call must pass refound.element.id so the seed ids carry --<collectionId> suffix',
+  );
+  assert(
+    callWindow.includes('refound.element.box.w'),
+    'Reset seed call must pass refound.element.box.w so the seed scales to fit the host (pass 5 F1)',
+  );
+  assert(
+    callWindow.includes('refound.element.box.h'),
+    'Reset seed call must pass refound.element.box.h so the seed scales to fit the host (pass 5 F1)',
+  );
+  const afterReset = stripped.slice(resetAssignIdx);
+  const scheduleIdx = afterReset.indexOf('ctx.scheduleSave()');
+  assert(
+    scheduleIdx > 0,
+    'Reset path must end with ctx.scheduleSave() shortly after the seed assignment',
+  );
+  const resetWindow = afterReset.slice(0, scheduleIdx);
+  assert(
+    !resetWindow.includes('ctx.rebuildElement'),
+    'Reset path must NOT call ctx.rebuildElement after seedCustomTemplate assignment ' +
+      '(in-edit-mode Reset would replace the wrapper carrying the Phase 3 chrome — banner, ' +
+      'Done button, data-template-edit-active marker — leaving edit mode visually unmoored). ' +
+      'Use ctx.renderAll() instead so mountTemplateEditChromeImpl re-runs.',
+  );
+  assert(
+    resetWindow.includes('ctx.renderAll()'),
+    'Reset path must call ctx.renderAll() so mountTemplateEditChromeImpl re-mounts the chrome ' +
+      'after the customTemplate replacement',
+  );
+}
+
+// ----- Codex review pass 4 finding 3 — exit re-targets a DEEPLY NESTED
+// template-child selection (Tabs panel inside customTemplate). Pass 2
+// only handled direct children of customTemplate (parentKind ===
+// 'collection-custom-template'); a selection inside a nested Tabs panel
+// returns parentKind === 'tab-panel' and the parent-meta points at the
+// Tabs element, not the host Collection. The fix walks the active
+// Collection's customTemplate subtree and re-targets if the selected id
+// lives anywhere in it.
+(function exitRetargetsDeeplyNestedTemplateSelectionSpec() {
+  const nestedText: CanvasElement = {
+    id: 'tab-nested-text',
+    type: 'text',
+    box: { x: 0, y: 0, w: 200, h: 32, z: 1 },
+    content: [{ text: 'Inside tab' }],
+    role: 'body',
+    fontSize: 14,
+    fontWeight: 400,
+    align: 'left',
+  };
+  const tabs: CanvasElement = {
+    id: 'tpl-tabs',
+    type: 'tabs',
+    box: { x: 0, y: 0, w: 320, h: 360, z: 2 },
+    activeTabId: 'overview',
+    tabs: [
+      {
+        id: 'overview',
+        label: [{ text: 'Overview' }],
+        elements: [nestedText],
+      },
+    ],
+  };
+  const el = makeCollection('coll-nested', 'custom');
+  el.customTemplate = [tabs];
+  const section = makeSection([el]);
+  const { ctx } = makeCtx(section);
+
+  ctx.editingCollectionTemplate = { collectionId: 'coll-nested' };
+  // Owner clicked the deeply-nested Text inside the Tab panel.
+  ctx.selectedElementId = 'tab-nested-text';
+
+  exitCollectionTemplateEditImpl(ctx);
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'deeply-nested exit must clear editingCollectionTemplate',
+  );
+  assert(
+    ctx.selectedElementId === 'coll-nested',
+    'exit must re-target a deeply-nested template-subtree selection to the host Collection, got ' +
+      String(ctx.selectedElementId),
+  );
+})();
+
+// Exit with selection on a sibling element OUTSIDE the active Collection's
+// template subtree must leave the selection alone — the subtree predicate
+// must not over-match.
+(function exitLeavesSiblingSelectionAloneSpec() {
+  const otherText: CanvasElement = {
+    id: 'section-sibling-text',
+    type: 'text',
+    box: { x: 0, y: 0, w: 200, h: 32, z: 1 },
+    content: [{ text: 'sibling' }],
+    role: 'body',
+    fontSize: 14,
+    fontWeight: 400,
+    align: 'left',
+  };
+  const el = makeCollection('coll-with-sibling', 'custom');
+  el.customTemplate = [
+    {
+      id: 'tpl-child',
+      type: 'text',
+      box: { x: 0, y: 0, w: 200, h: 32, z: 1 },
+      content: [{ text: 'in template' }],
+      role: 'body',
+      fontSize: 14,
+      fontWeight: 400,
+      align: 'left',
+    },
+  ];
+  const section = makeSection([el, otherText]);
+  const { ctx } = makeCtx(section);
+
+  ctx.editingCollectionTemplate = { collectionId: 'coll-with-sibling' };
+  ctx.selectedElementId = 'section-sibling-text';
+
+  exitCollectionTemplateEditImpl(ctx);
+
+  assert(
+    ctx.selectedElementId === 'section-sibling-text',
+    'exit must leave a section-sibling selection untouched (not inside template subtree), got ' +
+      String(ctx.selectedElementId),
+  );
+})();
+
+// ----- Codex review pass 4 finding 1 + pass 7 finding 1 — body-builders-data
+// edit-mode precondition must fuse pin + display === 'custom' + an
+// `Array.isArray(customTemplate)` check (any length, including empty).
+// Pass 4 fused the three signals so a stale pin post-undo falls through
+// to the grid renderer. Pass 7 loosened the array check from `.length > 0`
+// to plain `Array.isArray()` so an Owner who deliberately empties the
+// template (deletes every child to start fresh) keeps the editable
+// frame instead of being kicked back to the entries grid. Source-grep
+// the body-builders module because the helper depends on real DOM
+// (document.createElement) that bare Bun doesn't provide.
+{
+  const bodyBuildersSrc = await Bun.file(
+    new URL('./body-builders-data.ts', import.meta.url),
+  ).text();
+  // Locate the buildCollectionBodyImpl function header.
+  const buildIdx = bodyBuildersSrc.indexOf(
+    'export function buildCollectionBodyImpl(',
+  );
+  assert(
+    buildIdx > 0,
+    'body-builders-data.ts must own buildCollectionBodyImpl (re-locate if renamed)',
+  );
+  // Bound the search window from the function header to the next
+  // top-level `export function` declaration (or end of file).
+  const tail = bodyBuildersSrc.slice(buildIdx);
+  const nextExport = tail.indexOf('\nexport function ', 1);
+  const fnWindow = nextExport > 0 ? tail.slice(0, nextExport) : tail;
+  // The fused precondition checks the three signals — pin, display,
+  // array-shaped customTemplate — before the edit-mode wrapper is mounted.
+  assert(
+    fnWindow.includes("element.display === 'custom'"),
+    "buildCollectionBodyImpl edit-mode precondition must check element.display === 'custom' " +
+      '(F1 fall-through guard against stale pin after undo)',
+  );
+  assert(
+    fnWindow.includes('Array.isArray(element.customTemplate)'),
+    'buildCollectionBodyImpl edit-mode precondition must check Array.isArray(element.customTemplate) ' +
+      '(pass 7 F1 — empty array is a valid edit-mode state, defend only against pre-seed undefined)',
+  );
+  // Codex review pass 7 finding 1 — assert the precondition does NOT
+  // require non-empty length anymore. We bound the assertion to the
+  // `isEditingThis` precondition slice (the one that drives the early
+  // return into the edit-mode branch); a `.length > 0` check anywhere
+  // inside this guard fails the contract.
+  const isEditingIdx = fnWindow.indexOf('isEditingThis');
+  assert(
+    isEditingIdx > 0,
+    'buildCollectionBodyImpl must declare an isEditingThis precondition (anchor for pass 7 check)',
+  );
+  // Walk forward to the `if (isEditingThis)` opening brace — that bounds
+  // the precondition's right-hand side.
+  const ifIdx = fnWindow.indexOf('if (isEditingThis)', isEditingIdx);
+  assert(
+    ifIdx > isEditingIdx,
+    'isEditingThis must gate an `if` branch (anchor for pass 7 check)',
+  );
+  const preconditionSlice = fnWindow.slice(isEditingIdx, ifIdx);
+  assert(
+    !preconditionSlice.includes('customTemplate.length > 0'),
+    'buildCollectionBodyImpl isEditingThis precondition must NOT require customTemplate.length > 0 ' +
+      '(pass 7 F1 — empty template is a valid authored state the Owner must be able to edit)',
+  );
+}
+
+// ----- Codex review pass 4 finding 2 — display-dropdown change handler
+// must call ctx.renderInspector() in ALL THREE branches (first-switch,
+// second-switch with existing template, switch-away) so the Edit /
+// Done / Reset row tracks display === 'custom' in lock-step.
+{
+  const inspectorSrc = await Bun.file(
+    new URL('./element-inspector.ts', import.meta.url),
+  ).text();
+  // Find the displaySelect change handler.
+  const handlerIdx = inspectorSrc.indexOf(
+    "displaySelect.addEventListener('change'",
+  );
+  assert(
+    handlerIdx > 0,
+    'element-inspector.ts must own the displaySelect change handler',
+  );
+  // Bound from the handler start to its closing `});` — the handler ends
+  // immediately before `inspector.appendChild(field('Display',`.
+  const handlerTail = inspectorSrc.slice(handlerIdx);
+  const handlerEndIdx = handlerTail.indexOf(
+    "inspector.appendChild(field('Display'",
+  );
+  assert(
+    handlerEndIdx > 0,
+    'displaySelect handler must be followed by inspector.appendChild(field(\'Display\', ...))',
+  );
+  const handlerWindow = handlerTail.slice(0, handlerEndIdx);
+  // Strip line-comments so explanatory text doesn't trigger false positives.
+  const handlerStripped = handlerWindow
+    .split('\n')
+    .map((line) => {
+      const idx = line.indexOf('//');
+      return idx >= 0 ? line.slice(0, idx) : line;
+    })
+    .join('\n');
+  // The handler has exactly three terminal branches; each must call
+  // renderInspector once before its return / end.
+  const renderInspectorCount = (handlerStripped.match(/ctx\.renderInspector\(\)/g) || []).length;
+  assert(
+    renderInspectorCount >= 3,
+    'displaySelect change handler must call ctx.renderInspector() in all three branches ' +
+      `(first-switch / second-switch / switch-away) — found ${renderInspectorCount} call(s)`,
+  );
+}
+
+console.log('[collection-template-edit:smoke] all assertions passed');

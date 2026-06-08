@@ -138,10 +138,17 @@ export function beginDragImpl(
   if (!found) return;
   // The element's box is in its IMMEDIATE container's coord space. For a
   // section child that's the section. For a tab-panel or collection-entry
-  // child it's the panel/card. Resolve the nearest positioned ancestor that
-  // matches one of those wrappers, falling back to section.
+  // child it's the panel/card. For an element inside an active
+  // collection-template-edit frame (ADR 0065 D5, codex review pass 3
+  // finding 5) the box is panel-local to the `.opencanvas-collection-
+  // template-edit` wrapper, NOT the surrounding section — without that
+  // selector the frame resolver falls back to the parent section's
+  // bounds and the dragged element can land outside the template card,
+  // tripping the validator's box-bounds rule and corrupting layout.
   const frame = wrapper.parentElement
-    ? wrapper.parentElement.closest('.opencanvas-tab-panel, .opencanvas-section')
+    ? wrapper.parentElement.closest(
+        '.opencanvas-tab-panel, .opencanvas-collection-template-edit, .opencanvas-section',
+      )
     : null;
   const frameEl = (frame || wrapper.closest('.opencanvas-section')) as HTMLElement | null;
   if (!frameEl) return;
@@ -214,8 +221,15 @@ export function beginResizeImpl(
   if (!found) return;
   // Match beginDrag's frame resolution so resizing a tab-panel/collection
   // child respects panel-local coords rather than section coords.
+  // Codex review pass 3 finding 5 — `.opencanvas-collection-template-edit`
+  // is the editor-only frame mounted around an active custom-template
+  // wrapper (body-builders-data.ts:596); without it the resize falls back
+  // to the parent section's bounds, letting handles drag past the template
+  // card's edge.
   const frame = wrapper.parentElement
-    ? wrapper.parentElement.closest('.opencanvas-tab-panel, .opencanvas-section')
+    ? wrapper.parentElement.closest(
+        '.opencanvas-tab-panel, .opencanvas-collection-template-edit, .opencanvas-section',
+      )
     : null;
   const frameEl = (frame || wrapper.closest('.opencanvas-section')) as HTMLElement | null;
   if (!frameEl) return;

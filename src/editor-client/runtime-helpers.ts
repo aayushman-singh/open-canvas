@@ -193,15 +193,36 @@ function findElementIn(section: CanvasSection, elementId: string): FindElementRe
           const hit = searchArray(tab.elements, 'tab-panel', { tabsElement: el, tab });
           if (hit) return hit;
         }
-      } else if (el.type === 'collection' && Array.isArray((el as { entries?: unknown }).entries)) {
-        const entries = (el as { entries: unknown[] }).entries;
-        for (let ei = 0; ei < entries.length; ei++) {
-          const entry = entries[ei];
-          if (!Array.isArray(entry)) continue;
-          const entryElements = entry as CanvasElement[];
-          const hit = searchArray(entryElements, 'collection-entry', {
+      } else if (el.type === 'collection') {
+        // ADR 0063 D6 — `entries` is the materializer's per-entry output;
+        // walked so the inspector can resolve a selection on a card child.
+        const collectionRecord = el as {
+          entries?: unknown;
+          customTemplate?: unknown;
+        };
+        const entries = collectionRecord.entries;
+        if (Array.isArray(entries)) {
+          const entriesArr = entries as unknown[];
+          for (let ei = 0; ei < entriesArr.length; ei++) {
+            const entry = entriesArr[ei];
+            if (!Array.isArray(entry)) continue;
+            const entryElements = entry as CanvasElement[];
+            const hit = searchArray(entryElements, 'collection-entry', {
+              collectionElement: el,
+              entryIndex: ei,
+            });
+            if (hit) return hit;
+          }
+        }
+        // ADR 0065 D6 — `customTemplate` is the in-place edit surface for
+        // `display === 'custom'`. Recurse so selection of any template
+        // child resolves (otherwise the inspector hides because it can't
+        // find the selected id). Walked unconditionally — the field is
+        // optional but its presence is what we care about, not display.
+        const customTemplate = collectionRecord.customTemplate;
+        if (Array.isArray(customTemplate)) {
+          const hit = searchArray(customTemplate as CanvasElement[], 'collection-custom-template', {
             collectionElement: el,
-            entryIndex: ei,
           });
           if (hit) return hit;
         }
@@ -1664,6 +1685,12 @@ function resolveNestedInsertionTarget(ctx: EditorContext): { elements: CanvasEle
   }
   if (found.parentKind === 'tab-panel' && found.parentArray) return { elements: found.parentArray };
   if (found.parentKind === 'collection-entry' && found.parentArray) {
+    return { elements: found.parentArray };
+  }
+  // ADR 0065 D6 — template-edit mode: the active customTemplate array IS the
+  // immediate parent of the selected child; sibling insertions land in the
+  // same array (mirrors the collection-entry handling above).
+  if (found.parentKind === 'collection-custom-template' && found.parentArray) {
     return { elements: found.parentArray };
   }
   return null;

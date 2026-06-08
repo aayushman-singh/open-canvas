@@ -580,6 +580,83 @@ export function buildNavBodyImpl(ctx: EditorContext, element: NavElement): HTMLE
 }
 
 export function buildCollectionBodyImpl(ctx: EditorContext, element: CollectionElement): HTMLElement {
+  // ADR 0065 D5 — when this Collection's custom template is in edit mode,
+  // render ONE editable instance of `element.customTemplate` instead of the
+  // N-clone entries grid. The template elements carry their own absolute
+  // boxes (per-card-frame coordinates), so the editor-only template-instance
+  // wrapper anchors them with relative positioning, mirroring the per-entry
+  // card cell shape buildCollectionBodyImpl already uses below. The wrapper
+  // gets `data-collection-template-instance` so the chrome augmenter
+  // (collection-template-edit-view.ts) can target it for the scrim cutout
+  // and pan helper.
+  //
+  // Codex review pass 4 finding 1 — the edit-mode precondition fuses THREE
+  // signals: the pin targets this Collection, AND the Collection is still
+  // a Custom display, AND `customTemplate` is a present array (any length).
+  // editingCollectionTemplate is UI-only (D6) so it is not in the undo stack;
+  // a Ctrl+Z that reverts the atomic first-switch (display + customTemplate)
+  // leaves the pin stale — `display` reverts to 'card' so the predicate
+  // falls through to the normal grid renderer below.
+  //
+  // Codex review pass 7 finding 1 — empty array is a VALID authored state.
+  // When the Owner deliberately deletes every template child to start
+  // fresh, `display` stays 'custom' and `customTemplate` becomes `[]`.
+  // The Owner must still be able to author into the empty surface; the
+  // earlier `length > 0` guard over-corrected by falling through to the
+  // entries grid in this state, locking the Owner out of edit mode with
+  // no way back. `Array.isArray()` alone separates "valid edit-mode
+  // state" (present array — empty or not) from "pre-seed" (undefined).
+  // Undefined cannot happen at this point because the enter verb seeds
+  // atomically before pinning, but defend anyway: undefined falls through
+  // to the grid renderer so a half-applied state never mounts an
+  // unanchored edit frame.
+  const isEditingThis =
+    ctx.editingCollectionTemplate !== null &&
+    ctx.editingCollectionTemplate.collectionId === element.id &&
+    element.display === 'custom' &&
+    Array.isArray(element.customTemplate);
+  if (isEditingThis) {
+    const node = document.createElement('div');
+    node.className = 'opencanvas-collection-template-edit';
+    node.setAttribute('data-collection-template-instance', element.id);
+    node.setAttribute('data-editor-only', 'true');
+    node.style.position = 'relative';
+    node.style.width = '100%';
+    node.style.height = '100%';
+    node.style.boxSizing = 'border-box';
+    const tpl = Array.isArray(element.customTemplate) ? element.customTemplate : [];
+    for (let i = 0; i < tpl.length; i++) {
+      const child = tpl[i];
+      if (child !== undefined) node.appendChild(ctx.buildElementNode(child));
+    }
+    // Codex review pass 7 finding 1 — empty template hint. When the
+    // authored array is `[]`, the frame above renders zero children and
+    // would otherwise look like a blank rectangle. An editor-only hint
+    // surfaces the affordance ("drop elements here") so the Owner has a
+    // visible target to author into. `data-editor-only="true"` keeps it
+    // out of any publish-path source-guard sweep.
+    if (tpl.length === 0) {
+      const hint = document.createElement('div');
+      hint.className = 'opencanvas-collection-template-empty-hint';
+      hint.setAttribute('data-editor-only', 'true');
+      hint.style.position = 'absolute';
+      hint.style.left = '0';
+      hint.style.right = '0';
+      hint.style.top = '0';
+      hint.style.bottom = '0';
+      hint.style.display = 'flex';
+      hint.style.alignItems = 'center';
+      hint.style.justifyContent = 'center';
+      hint.style.padding = '16px';
+      hint.style.textAlign = 'center';
+      hint.style.color = 'var(--ink-3, #888)';
+      hint.style.fontSize = '13px';
+      hint.style.pointerEvents = 'none';
+      hint.textContent = 'Drop elements here to build your card.';
+      node.appendChild(hint);
+    }
+    return node;
+  }
   const entries = Array.isArray(element.entries) ? element.entries : [];
   if (entries.length === 0) {
     const placeholder = document.createElement('div');

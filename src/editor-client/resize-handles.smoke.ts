@@ -342,4 +342,62 @@ assert(
   'Container handle count must stay under 16 — got ' + String(countResizeHandles(container)),
 );
 
+// ---- Codex review pass 3 finding 5 — drag-resize frame resolver must -----
+// recognise `.opencanvas-collection-template-edit` as a nested-frame ancestor.
+//
+// ADR 0065 D5 mounts an active custom-template inside an
+// `.opencanvas-collection-template-edit` wrapper (body-builders-data.ts:596).
+// Children inside that wrapper carry boxes in PANEL-LOCAL coords — not
+// section coords. drag-resize.ts's `beginDragImpl` and `beginResizeImpl`
+// resolve the nearest positioned ancestor via `.closest(...)`. Before this
+// fix the selector list was `'.opencanvas-tab-panel, .opencanvas-section'`,
+// so the resolver fell back to the parent section and clamped against
+// section bounds — letting the dragged element land outside the template
+// card frame and corrupt the published layout.
+//
+// Source-grep covers both call sites (beginDrag + beginResize). The smoke
+// can't simulate a mouse-down/-move/-up sequence under Bun (no JSDOM-level
+// event simulation in this project), so the source pin is the contract.
+{
+  const dragResizeSrc = await Bun.file(new URL('./drag-resize.ts', import.meta.url)).text();
+  const occurrences = dragResizeSrc.split('.opencanvas-collection-template-edit,').length - 1;
+  assert(
+    occurrences >= 2,
+    `drag-resize.ts must list '.opencanvas-collection-template-edit' in BOTH frame ` +
+      'selectors (beginDragImpl + beginResizeImpl) so the resolver clamps a dragged ' +
+      'template child to the template-edit frame instead of the parent section. ' +
+      'Got ' + String(occurrences) + ' occurrence(s).',
+  );
+  // Both `beginDragImpl` and `beginResizeImpl` must contain the selector
+  // INSIDE their bodies (not in a stray comment). Bound each function and
+  // re-check.
+  function bodyOf(name: string): string {
+    const sigIdx = dragResizeSrc.indexOf('export function ' + name);
+    assert(sigIdx >= 0, name + ' signature must exist in drag-resize.ts');
+    const tailIdx = dragResizeSrc.indexOf('\nexport function ', sigIdx + 1);
+    return dragResizeSrc.slice(sigIdx, tailIdx > 0 ? tailIdx : dragResizeSrc.length);
+  }
+  const dragBody = bodyOf('beginDragImpl');
+  const resizeBody = bodyOf('beginResizeImpl');
+  assert(
+    dragBody.includes('.opencanvas-collection-template-edit'),
+    "beginDragImpl must include '.opencanvas-collection-template-edit' in its frame resolver",
+  );
+  assert(
+    resizeBody.includes('.opencanvas-collection-template-edit'),
+    "beginResizeImpl must include '.opencanvas-collection-template-edit' in its frame resolver",
+  );
+  // The body-builders-data.ts wrapper class must match — verify the producer
+  // ships the exact selector the resolver looks for, so a future rename of
+  // the wrapper class fails loudly in BOTH files at once.
+  const bodyBuildersSrc = await Bun.file(
+    new URL('./body-builders-data.ts', import.meta.url),
+  ).text();
+  assert(
+    bodyBuildersSrc.includes("'opencanvas-collection-template-edit'"),
+    'body-builders-data.ts must mount the active template wrapper with class ' +
+      "'opencanvas-collection-template-edit' (the selector drag-resize.ts looks for)",
+  );
+}
+
 console.log('[resize-handles:smoke] OK');

@@ -29,6 +29,7 @@
 
 import type { EditorContext } from './editor-context.js';
 import { resolveCollectionAncestorForClick } from './selection.js';
+import { cssEscape } from './css-escape.js';
 
 export function attachRootEventsImpl(ctx: EditorContext): void {
   const root = ctx.root;
@@ -38,6 +39,27 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
     if (ctx.interactionMode === 'pan') return;
     const target = ev.target instanceof Element ? ev.target : null;
     if (!target) return;
+    // -- ADR 0065 D5 — click-outside template exits edit mode -----------
+    // When `editingCollectionTemplate` pins a Collection, clicks on the
+    // canvas region OUTSIDE the active template wrapper (the dimmed
+    // surround) exit edit mode. Clicks INSIDE the template are handled
+    // by the normal selection cascade below — Phase 2D's inverted
+    // resolveCollectionAncestorForClick routes them to the clicked
+    // child element. Done button stops propagation itself so the click
+    // never reaches this handler. We check this BEFORE the artboard /
+    // element / section cascade so that mid-edit clicks on the
+    // surround don't first toggle a section or page activation as a
+    // side-effect of the exit.
+    if (ctx.editingCollectionTemplate !== null) {
+      const activeId = ctx.editingCollectionTemplate.collectionId;
+      const activeWrapper = root.querySelector(
+        '[data-opencanvas-element="' + cssEscape(activeId) + '"][data-element-type="collection"]',
+      );
+      if (activeWrapper === null || !activeWrapper.contains(target)) {
+        ctx.exitCollectionTemplateEdit();
+        return;
+      }
+    }
     // -- Artboard label click: switch active page and pan to it ---------
     // setActivePage handles the camera pan now (preserves zoom). The
     // earlier behaviour also re-zoomed via fitToPage; the user-visible
@@ -112,7 +134,11 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
       // result and select the enclosing Collection instead, mirroring
       // Carousel slide behaviour — the inner nodes are materializer
       // output, not authorable elements.
-      const collectionAncestorId = resolveCollectionAncestorForClick(target);
+      //
+      // ADR 0065 D7 — INVERTED when editingCollectionTemplate pins this
+      // Collection. The helper short-circuits to null inside the active
+      // template so the clicked template child element selects directly.
+      const collectionAncestorId = resolveCollectionAncestorForClick(target, ctx.editingCollectionTemplate);
       if (collectionAncestorId !== null) {
         if (collectionAncestorId !== ctx.selectedElementId) {
           ctx.selectElement(collectionAncestorId);
@@ -196,11 +222,74 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
       if (!target) return;
       if (root && root.contains(target) && target !== root) return;
       if (target.closest('[data-zoom-action], [data-mode-action]')) return;
+      // -- ADR 0065 D5 — viewport-gutter click exits template edit mode ----
+      //
+      // Codex review pass 7 finding 2 — the click-outside-exit branch in
+      // the root-click handler above only fires for clicks that bubble
+      // through `ctx.root` (artboard / element / section / dimmed
+      // page-element). Clicks on the VIEWPORT GUTTER — the dark editor
+      // background between artboards — never reach root because the
+      // gutter is a viewport sibling of canvas-root, not a descendant.
+      // This handler is the gutter's only listener; without the early
+      // exit here, an Owner mid-edit who clicks on the gutter sees
+      // nothing happen (the existing deselect logic below would also
+      // pointlessly clear a selection that isn't there).
+      //
+      // No double-fire with the root-click handler: that handler's
+      // exit branch gates on `root.contains(target)`, which is the
+      // exact NEGATION of this handler's early-return at line 223.
+      // The two handlers split the canvas region; only one fires per
+      // click.
+      //
+      // Done button's `stopPropagation` keeps it out of both handlers.
+      // The active wrapper's inside-template clicks bubble through root
+      // (handled by Phase 2D's selection branch). Only the gutter
+      // reaches THIS line, which is exactly the case ADR D5 covers.
+      if (ctx.editingCollectionTemplate !== null) {
+        ctx.exitCollectionTemplateEdit();
+        return;
+      }
       if (ctx.selectedSectionId) ctx.selectSection(null);
       if (ctx.selectedElementId) ctx.selectElement(null);
       root.classList.add('canvas-pages-deselected');
     });
   }
+
+  // ADR 0065 D5 — Esc exits template-edit mode.
+  //
+  // Document-level keydown so the binding survives focus changes (e.g.
+  // the Owner clicked a sidebar input mid-edit then pressed Esc). Modal
+  // precedence: modals.ts owns its own Esc handler that closes the
+  // active modal first; we skip when ctx.modalOpen is true so a stacked
+  // confirm/select modal absorbs the Esc before this handler sees it.
+  // We also skip during text editing (editingElementId set) — Esc
+  // inside a contenteditable cancels the edit per text-edit.ts; the
+  // template-edit-exit fires on the next Esc instead.
+  //
+  // Codex review pass 6 finding 1 — `defaultPrevented` short-circuits
+  // the handler BEFORE any state checks. Text-edit's onKey is bound to
+  // the contenteditable `inner` element (text-edit.ts:299), runs in the
+  // bubbling path BEFORE this document-level handler, and calls
+  // `preventDefault()` + `finish(false)` which clears `editingElementId`
+  // synchronously. Without this guard the document handler runs next,
+  // sees `editingElementId === null` (text-edit already cleared it),
+  // proceeds past the editingElementId gate, and silently exits the
+  // template-edit mode too — one Esc keypress eats BOTH the text-edit
+  // AND the template-edit. The defaultPrevented check is the loud
+  // contract: any earlier handler that consumed Esc with
+  // preventDefault() owns the keystroke; the template-edit handler
+  // must NOT compete. Position matters — this is the first check in
+  // the handler, before editingCollectionTemplate / modalOpen /
+  // editingElementId, so a consumed Esc never reaches any state read.
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape') return;
+    if (ev.defaultPrevented) return;
+    if (ctx.editingCollectionTemplate === null) return;
+    if (ctx.modalOpen) return;
+    if (ctx.editingElementId) return;
+    ev.preventDefault();
+    ctx.exitCollectionTemplateEdit();
+  });
 
   // Click-outside deselect. The exclusion list defines every surface that
   // counts as "still inside the editing flow" — modal/ai-panel/reel because

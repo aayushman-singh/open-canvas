@@ -32,6 +32,7 @@ import type { CanvasElement } from '../canvas/schema.js';
 import { MOTION_PRESETS, type MotionPreset } from '../canvas/schema.js';
 import type { CollectionElement, CollectionSort } from '../canvas/elements/collection.js';
 import { COLLECTION_DISPLAYS, COLLECTION_SORTS } from '../canvas/elements/collection.js';
+import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
 import { renderSectionInspector } from './section-inspector.js';
 import { renderPageInspector, replayAnimations } from './page-inspector.js';
 import { field, selectInput } from './dom-builders.js';
@@ -1245,12 +1246,24 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
   }
 
   // -- 5. Display mode -----------------------------------------------------
-  // 'custom' is deferred to F1 — deliberately not in the dropdown. The
-  // ADR's COLLECTION_DISPLAYS const reflects this (the union excludes
-  // 'custom' until F1), so iterating it is the single source of truth.
+  // ADR 0065 D1 — 'custom' joins 'card' / 'image-only'. COLLECTION_DISPLAYS
+  // is the single source of truth (the union widened in collection.ts).
+  // Switch semantics per ADR 0065:
+  //   * to 'custom' from non-custom AND customTemplate absent → enter
+  //     edit mode immediately (first-time auto-enter per D3); the verb
+  //     atomically seeds customTemplate.
+  //   * to 'custom' from non-custom AND customTemplate already present →
+  //     just flip display (D4 silent keep — Owner clicks "Edit template"
+  //     explicitly per D3 second-or-later case).
+  //   * away from 'custom' WHILE editing → call exit FIRST (D10 auto-exit),
+  //     then flip display, so the editing state never references a
+  //     Collection whose display is no longer 'custom'.
+  //   * away from 'custom' while NOT editing → just flip display
+  //     (D4 silent keep — customTemplate persists for the next switch back).
   const DISPLAY_LABELS: Record<string, string> = {
     card: 'Card grid',
     'image-only': 'Image only',
+    custom: 'Custom',
   };
   const displaySelect = document.createElement('select');
   for (const d of COLLECTION_DISPLAYS) {
@@ -1261,12 +1274,191 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
   }
   displaySelect.value = collection.display ?? 'card';
   displaySelect.addEventListener('change', function () {
+    const next = displaySelect.value as typeof COLLECTION_DISPLAYS[number];
+    const prev = collection.display ?? 'card';
+    if (next === prev) return;
+    if (next === 'custom') {
+      // Switching TO custom. The first-time path needs an atomic seed
+      // + flip; the second-or-later path just flips display and waits
+      // for an explicit "Edit template" click.
+      if (collection.customTemplate === undefined) {
+        ctx.captureForUndo();
+        collection.display = 'custom';
+        // Hand off to the canonical enter verb — it owns the atomic
+        // seed + editingCollectionTemplate write per D3. The verb will
+        // capture undo + scheduleSave itself; we already captured above
+        // for the display flip, so the verb's second capture coalesces
+        // into the same undo entry via the persist module's debounce.
+        //
+        // ADR 0065 D5 + codex review pass 1 — do NOT call
+        // ctx.rebuildElement(collection.id) here. enterCollectionTemplateEdit
+        // already invokes ctx.renderAll() which re-mounts every wrapper AND
+        // re-runs mountTemplateEditChromeImpl (see render.ts). A trailing
+        // rebuildElement replaces the just-mounted wrapper, stripping the
+        // `data-template-edit-active` attribute and the Done button (the
+        // chrome mount is keyed off renderAll, not rebuildElement) and
+        // leaving only the scrim (which lives on ctx.viewport). The
+        // renderAll-only path is sufficient because nothing else needs the
+        // wrapper to be torn down: the display flip is already reflected by
+        // renderAll, the seed lives inside customTemplate which the
+        // wrapper's body builder reads, and the chrome mount runs after the
+        // wrapper mounts.
+        ctx.enterCollectionTemplateEdit(collection.id);
+        // Codex review pass 4 finding 2 — re-render the inspector so the
+        // "Edit template" / "Done editing template" / "Reset template"
+        // controls (gated on display === 'custom' + the edit pin) appear
+        // immediately. Without this, the dropdown shows Custom but the
+        // Edit/Done/Reset row is missing until the Owner reselects the
+        // element. renderInspector is idempotent.
+        ctx.renderInspector();
+        return;
+      }
+      ctx.captureForUndo();
+      collection.display = 'custom';
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+      // Codex review pass 4 finding 2 — same re-render rationale as the
+      // first-switch branch. Without it, switching to Custom (when a
+      // saved customTemplate already exists) leaves the inspector showing
+      // the pre-change state — display dropdown reads Custom but the
+      // Edit/Reset controls are absent.
+      ctx.renderInspector();
+      return;
+    }
+    // Switching AWAY from custom. D10 auto-exit: if we're editing THIS
+    // Collection's template, exit BEFORE applying the display change so
+    // the editing pin never references a non-custom Collection.
+    if (
+      prev === 'custom' &&
+      ctx.editingCollectionTemplate !== null &&
+      ctx.editingCollectionTemplate.collectionId === collection.id
+    ) {
+      ctx.exitCollectionTemplateEdit();
+    }
     ctx.captureForUndo();
-    collection.display = displaySelect.value as typeof COLLECTION_DISPLAYS[number];
+    collection.display = next;
     ctx.rebuildElement(collection.id);
     ctx.scheduleSave();
+    // Codex review pass 4 finding 2 — switching away from Custom must
+    // also re-render the inspector so the Edit/Done/Reset row (only
+    // shown when display === 'custom') disappears in lock-step with the
+    // dropdown change.
+    ctx.renderInspector();
   });
   inspector.appendChild(field('Display', displaySelect));
+
+  // -- 5b. Custom-template controls (ADR 0065 D9) -------------------------
+  // Three buttons mapped to three intents: enter, exit, reset.
+  //
+  // Visibility precedent: "Edit template" and "Done editing template" are
+  // mutually exclusive states of the same affordance, driven by whether
+  // ctx.editingCollectionTemplate pins THIS Collection. "Reset template"
+  // is always visible when display === 'custom' so the Owner can blow
+  // away accumulated experiments without leaving the inspector.
+  //
+  // Design choice — "Edit template" is HIDDEN (not disabled-with-tooltip)
+  // when display !== 'custom'. Two reasons:
+  //   (a) the ADR's D9 wording is "Inspector controls WHEN display ===
+  //       'custom'" — the buttons aren't part of the inspector contract
+  //       outside that mode at all;
+  //   (b) the precondition is one dropdown click away, and the dropdown
+  //       lives directly above the button row, so a disabled-with-tooltip
+  //       would just clutter the inspector for an Owner who hasn't
+  //       chosen 'custom' yet.
+  if (collection.display === 'custom') {
+    const tplControls = document.createElement('div');
+    tplControls.className = 'opencanvas-zorder-buttons';
+
+    const isEditingThis =
+      ctx.editingCollectionTemplate !== null &&
+      ctx.editingCollectionTemplate.collectionId === collection.id;
+
+    if (!isEditingThis) {
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.textContent = 'Edit template';
+      editBtn.addEventListener('click', function () {
+        ctx.enterCollectionTemplateEdit(collection.id);
+        ctx.renderInspector();
+      });
+      tplControls.appendChild(editBtn);
+    } else {
+      const doneBtn = document.createElement('button');
+      doneBtn.type = 'button';
+      doneBtn.textContent = 'Done editing template';
+      doneBtn.addEventListener('click', function () {
+        ctx.exitCollectionTemplateEdit();
+        ctx.renderInspector();
+      });
+      tplControls.appendChild(doneBtn);
+    }
+
+    // "Reset template" is destructive — gate behind a confirm dialog
+    // matching the asset-delete pattern (runtime-helpers.ts:902). Cancel
+    // path leaves customTemplate untouched (D4 silent keep applies — only
+    // explicit Reset discards). Confirm path seeds afresh via the same
+    // seedCustomTemplate() entry point the verb uses on first-enter.
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.textContent = 'Reset template';
+    resetBtn.addEventListener('click', function () {
+      void (async function runReset(): Promise<void> {
+        const confirmed = await ctx.openConfirmModal({
+          title: 'Reset template',
+          message:
+            'Replace your custom template with the default card?',
+          confirmLabel: 'Reset',
+          danger: true,
+        });
+        if (!confirmed) return;
+        // Re-resolve in case the element was removed by a concurrent
+        // collaborator while the modal was open. Loud failure on miss —
+        // no silent skip.
+        const refound = ctx.findElement(collection.id);
+        if (!refound || refound.element.type !== 'collection') {
+          ctx.setStatus(
+            'Reset template failed: Collection ' +
+              collection.id +
+              ' is no longer present.',
+            'error',
+          );
+          return;
+        }
+        ctx.captureForUndo();
+        // Codex review pass 1 — pass refound.element.id so the reset seed
+        // carries `--<collectionId>` suffixes on its element ids, matching
+        // the first-switch seed path. Two Collections on the same page can
+        // both reset without colliding on `card-default-root`.
+        //
+        // Codex review pass 5 finding 1 — pass refound.element.box.w/h so
+        // the reset seed scales to fit the (possibly resized) Collection.
+        // If the Owner shrank the host below the seed's native 320x360
+        // before clicking Reset, an unscaled seed would overflow and the
+        // save would block on box-bound validation errors.
+        refound.element.customTemplate = seedCustomTemplate(
+          refound.element.id,
+          refound.element.box.w,
+          refound.element.box.h,
+        );
+        // Codex review pass 3 finding 2 — reset must NOT use
+        // ctx.rebuildElement here. When the Owner is currently editing THIS
+        // Collection's template, the Phase 3 chrome (banner, Done button,
+        // `data-template-edit-active` marker, surround dimming) lives on
+        // the wrapper that rebuildElement replaces; the replacement strips
+        // that chrome and leaves edit mode appearing active but visually
+        // unmoored. ctx.renderAll() rebuilds the entire canvas AND re-runs
+        // mountTemplateEditChromeImpl (render.ts:381), so the chrome
+        // re-mounts on the fresh wrapper. The first-switch path uses the
+        // same renderAll-only discipline (pass 1 F2); this path now matches.
+        ctx.renderAll();
+        ctx.scheduleSave();
+        ctx.setStatus('Custom template reset to default.', 'ok');
+      })();
+    });
+    tplControls.appendChild(resetBtn);
+
+    inspector.appendChild(field('Custom template', tplControls));
+  }
 
   // -- 6. Manage entries link (ADR 0063 dec 10) ----------------------------
   // Only rendered when the slug is set — there's no entries view for an

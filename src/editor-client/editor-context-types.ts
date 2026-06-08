@@ -13,15 +13,23 @@ import type { Tab } from '../canvas/elements/tabs.js';
  * `findElementIn` return — the section that contains the element, the
  * element itself, the immediate parent array it lives in, plus parent-
  * kind/meta so callers can distinguish section-level vs nested (tab
- * panel / collection entry) parents.
+ * panel / collection entry / collection custom-template) parents.
+ *
+ * ADR 0065 D6 — `'collection-custom-template'` covers elements that live
+ * inside a Collection's `customTemplate` array, edited in-place when
+ * `EditorContext.editingCollectionTemplate` pins the Collection. The
+ * walker recurses into `customTemplate` for the same reason it recurses
+ * into `entries`: selection of any template child must resolve so the
+ * inspector can render it.
  */
 export interface FindElementResult {
   section: CanvasSection;
   element: CanvasElement;
   parentArray: CanvasElement[];
-  parentKind: 'section' | 'tab-panel' | 'collection-entry';
+  parentKind: 'section' | 'tab-panel' | 'collection-entry' | 'collection-custom-template';
   parentMeta:
     | null
     | { tabsElement: CanvasElement; tab: Tab }
-    | { collectionElement: CanvasElement; entryIndex: number };
+    | { collectionElement: CanvasElement; entryIndex: number }
+    | { collectionElement: CanvasElement };
 }

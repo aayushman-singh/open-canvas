@@ -32,9 +32,12 @@ import {
   collectReferencedAssets,
   collectReferencedAssetIds,
   collectUnfilledAssetReferences,
+  isAssetSubstitutionToken,
   type AssetReferenceRoot,
 } from './site-assets.js';
-import type { CanvasPage } from '../canvas/schema.js';
+import type { CanvasElement, CanvasPage, EditableSite } from '../canvas/schema.js';
+import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
+import { prepareSeedAssetsForCustomer } from '../routes/api/sites.js';
 import type { Db } from '../db/client.js';
 import { ownerAsset, site, slotHistory } from '../db/schema.js';
 
@@ -357,6 +360,309 @@ function runReferenceWalkTests(): void {
     ),
     'expected collection entry unfilled media asset to be reported with nested path',
   );
+
+  // -------------------------------------------------------------------------
+  // ADR 0065 D2 + codex review pass 1 — asset walkers must recurse into
+  // `customTemplate` so fixed asset references inside an Owner-authored
+  // custom card template participate in the publish guard's reference set
+  // AND the unfilled-asset hint set.
+  // -------------------------------------------------------------------------
+  const templateAssetPages: CanvasPage[] = [
+    {
+      id: 'page-custom-template-assets',
+      slug: 'custom-template-assets',
+      title: 'Custom template assets',
+      width: 1200,
+      sections: [
+        {
+          id: 'section-custom-template',
+          recipeId: 'custom',
+          name: 'Custom template',
+          height: 600,
+          elements: [
+            {
+              id: 'collection-with-custom-template',
+              type: 'collection',
+              box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
+              collectionSlug: 'blog',
+              display: 'custom',
+              sort: 'date-desc',
+              customTemplate: [
+                {
+                  id: 'custom-tpl-root',
+                  type: 'container',
+                  box: { x: 0, y: 0, w: 320, h: 360, z: 1 },
+                  variant: 'raised',
+                  preset: 'card',
+                },
+                {
+                  id: 'custom-tpl-brand-overlay',
+                  type: 'media',
+                  mediaKind: 'image',
+                  // FIXED assetId — Owner pinned a brand logo to ALL cards.
+                  // The publish-time materializer will clone this verbatim
+                  // into entries[][], but in editor state the canonical
+                  // location is here in customTemplate.
+                  assetId: 'custom-tpl-brand-logo-asset-id',
+                  alt: 'Brand',
+                  fit: 'cover',
+                  box: { x: 0, y: 0, w: 80, h: 32, z: 2 },
+                },
+                {
+                  id: 'custom-tpl-unfilled-media',
+                  type: 'media',
+                  mediaKind: 'image',
+                  // Unfilled slot — Owner dropped an Image but hasn't picked
+                  // bytes yet. Should surface in collectUnfilledAssetReferences.
+                  assetId: '',
+                  alt: '',
+                  fit: 'cover',
+                  box: { x: 0, y: 40, w: 320, h: 180, z: 3 },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  const templateRefIds = collectReferencedAssetIds(templateAssetPages);
+  assert(
+    templateRefIds.has('custom-tpl-brand-logo-asset-id'),
+    'expected fixed assetId inside customTemplate to be reachable from collectReferencedAssetIds',
+  );
+  const templateRefs = collectReferencedAssets(templateAssetPages);
+  assert(
+    templateRefs.some(
+      (ref) =>
+        ref.assetId === 'custom-tpl-brand-logo-asset-id' &&
+        ref.path.includes('.customTemplate[1].assetId') &&
+        ref.mediaElementId === 'custom-tpl-brand-overlay',
+    ),
+    'expected customTemplate asset reference path to carry .customTemplate[idx].assetId',
+  );
+  const templateUnfilled = collectUnfilledAssetReferences(templateAssetPages);
+  assert(
+    templateUnfilled.some(
+      (ref) =>
+        ref.mediaElementId === 'custom-tpl-unfilled-media' &&
+        ref.path.includes('.customTemplate[2].assetId'),
+    ),
+    'expected unfilled Image inside customTemplate to surface via collectUnfilledAssetReferences',
+  );
+
+  // -------------------------------------------------------------------------
+  // ADR 0065 D3 + codex review pass 2 finding 1 — a Collection whose
+  // `customTemplate` is the literal `seedCustomTemplate()` payload carries
+  // substitution tokens (e.g. `{{ogImageAssetId}}`) in its Image elements'
+  // `assetId` slots. Those are pre-substitution placeholders the publish
+  // materializer resolves per entry — NOT real asset references. The
+  // walker must skip them or the publish guard rejects the state with
+  // `missing asset {{ogImageAssetId}}`.
+  // -------------------------------------------------------------------------
+  const seededTemplate = seedCustomTemplate('test-coll-seed', 1200, 600);
+  const seededTemplatePages: CanvasPage[] = [
+    {
+      id: 'page-seeded-template',
+      slug: 'seeded-template',
+      title: 'Seeded template',
+      width: 1200,
+      sections: [
+        {
+          id: 'section-seeded-template',
+          recipeId: 'custom',
+          name: 'Seeded template',
+          height: 600,
+          elements: [
+            {
+              id: 'test-coll-seed',
+              type: 'collection',
+              box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
+              collectionSlug: 'blog',
+              display: 'custom',
+              sort: 'date-desc',
+              customTemplate: seededTemplate,
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  const seededIds = collectReferencedAssetIds(seededTemplatePages);
+  for (const id of seededIds) {
+    assert(
+      !/^\{\{[a-z0-9_]+\}\}$/i.test(id),
+      `expected zero substitution-token entries in collectReferencedAssetIds, found ${id}`,
+    );
+  }
+  const seededRefs = collectReferencedAssets(seededTemplatePages);
+  for (const ref of seededRefs) {
+    assert(
+      !/^\{\{[a-z0-9_]+\}\}$/i.test(ref.assetId),
+      `expected zero substitution-token entries in collectReferencedAssets, found ${ref.assetId}`,
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Codex review pass 3 finding 4 — isAssetSubstitutionToken predicate is
+  // case-SENSITIVE and limited to the materializer's asset-resolving
+  // placeholder set (today: `{{ogImageAssetId}}` only).
+  //
+  // The previous pass 2 implementation used a loose case-insensitive regex
+  // `/^\{\{[a-z0-9_]+\}\}$/i`. That regex matched typo'd tokens like
+  // `{{ogImageAssetID}}` (uppercase ID) AND text placeholders like
+  // `{{title}}` — both wrong. The typo'd case is the worst: the
+  // materializer does NOT substitute `{{ogImageAssetID}}` (the substitution
+  // pass uses an exact-case PLACEHOLDER_FIELDS lookup), so a permissive
+  // suppression silently shipped a broken asset id into publish output.
+  //
+  // The tight predicate now FAILS LOUDLY on typos:
+  //   * `{{ogImageAssetId}}` — true placeholder, skipped at the boundary.
+  //   * `{{ogImageAssetID}}` — typo, NOT skipped, reaches the asset rows
+  //     check as a fake id, publish guard rejects with a clear missing-
+  //     asset error pinpointing the typo.
+  //   * `{{title}}` — text placeholder, NOT skipped (it's never an asset
+  //     id slot; the materializer substitutes it into TextElement.content).
+  // -------------------------------------------------------------------------
+  assert(
+    isAssetSubstitutionToken('{{ogImageAssetId}}'),
+    'isAssetSubstitutionToken must accept the exact asset placeholder {{ogImageAssetId}}',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{ogImageAssetID}}'),
+    'isAssetSubstitutionToken must REJECT case-typo {{ogImageAssetID}} so a malformed id surfaces loudly',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{OGIMAGEASSETID}}'),
+    'isAssetSubstitutionToken must REJECT uppercase {{OGIMAGEASSETID}}',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{title}}'),
+    'isAssetSubstitutionToken must REJECT text placeholder {{title}} — never an asset id slot',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{slug}}'),
+    'isAssetSubstitutionToken must REJECT text placeholder {{slug}}',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{author}}'),
+    'isAssetSubstitutionToken must REJECT text placeholder {{author}}',
+  );
+  assert(
+    !isAssetSubstitutionToken('seed-customer-x-blog-hero'),
+    'isAssetSubstitutionToken must REJECT a real asset id',
+  );
+  assert(
+    !isAssetSubstitutionToken(''),
+    'isAssetSubstitutionToken must REJECT the empty string',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{ogImageAssetId'),
+    'isAssetSubstitutionToken must REJECT truncated placeholder (open brace, no close)',
+  );
+  assert(
+    !isAssetSubstitutionToken('prefix-{{ogImageAssetId}}-suffix'),
+    'isAssetSubstitutionToken must REJECT a placeholder embedded in a larger string',
+  );
+
+  // -------------------------------------------------------------------------
+  // Codex review pass 3 finding 1 — `prepareSeedAssetsForCustomer`'s rewrite
+  // walk must preserve substitution tokens verbatim inside customTemplate.
+  //
+  // Pass 1 F4 added customTemplate recursion to the rewrite walk; pass 2 F1
+  // filtered tokens out of `collectReferencedAssets` so `mappedIds` doesn't
+  // contain `{{ogImageAssetId}}`. Without pass 3 F1's matching skip, the
+  // rewrite walk reaches `materializeAssetId({{ogImageAssetId}})`, finds no
+  // mapping, returns `{ missing: '{{ogImageAssetId}}' }`, and site creation
+  // breaks with "template seed references invalid asset ids".
+  //
+  // Fixture: a single-page EditableSite with a Collection whose
+  // customTemplate carries one media child with `assetId: '{{ogImageAssetId}}'`
+  // (placeholder) and one media child with `assetId: 'seed-hero-poster-1'`
+  // (a real registered seed). The placeholder must pass through unchanged;
+  // the real seed id must be rewritten to the materialized customer-rooted id.
+  // -------------------------------------------------------------------------
+  {
+    const placeholderMedia: CanvasElement = {
+      id: 'tpl-media-placeholder',
+      type: 'media',
+      mediaKind: 'image',
+      box: { x: 0, y: 0, w: 320, h: 200, z: 1 },
+      assetId: '{{ogImageAssetId}}',
+      alt: '{{title}}',
+      fit: 'cover',
+    };
+    const fixedMedia: CanvasElement = {
+      id: 'tpl-media-fixed',
+      type: 'media',
+      mediaKind: 'image',
+      box: { x: 0, y: 200, w: 320, h: 60, z: 2 },
+      assetId: 'seed-hero-poster-1',
+      alt: 'Fixed brand mark',
+      fit: 'cover',
+    };
+    const collection: CanvasElement = {
+      id: 'tpl-collection',
+      type: 'collection',
+      box: { x: 0, y: 0, w: 1200, h: 300, z: 1 },
+      collectionSlug: 'blog',
+      display: 'custom',
+      sort: 'date-desc',
+      customTemplate: [placeholderMedia, fixedMedia],
+    };
+    const editableState: EditableSite = {
+      styleKit: 'charcoal',
+      pages: [
+        {
+          id: 'page-tpl-rewrite',
+          slug: 'tpl-rewrite',
+          title: 'Template rewrite',
+          width: 1200,
+          sections: [
+            {
+              id: 'section-tpl-rewrite',
+              recipeId: 'custom',
+              name: 'Template rewrite',
+              height: 600,
+              elements: [collection],
+            },
+          ],
+        },
+      ],
+    };
+    const prepared = prepareSeedAssetsForCustomer('cust-tpl-rewrite', editableState, new Map());
+    assert(
+      prepared.ok,
+      `(pass3 F1) prepareSeedAssetsForCustomer must succeed when customTemplate carries ` +
+        `{{ogImageAssetId}}; got ${prepared.ok ? 'ok' : JSON.stringify(prepared)}`,
+    );
+    if (prepared.ok) {
+      const rewrittenCollection = prepared.editableState.pages[0]!.sections[0]!.elements[0];
+      assert(
+        rewrittenCollection !== undefined && rewrittenCollection.type === 'collection',
+        '(pass3 F1) collection element must survive the rewrite walk',
+      );
+      if (rewrittenCollection?.type === 'collection') {
+        const tpl = rewrittenCollection.customTemplate ?? [];
+        const rewrittenPlaceholder = tpl[0];
+        const rewrittenFixed = tpl[1];
+        assert(
+          rewrittenPlaceholder !== undefined &&
+            rewrittenPlaceholder.type === 'media' &&
+            rewrittenPlaceholder.assetId === '{{ogImageAssetId}}',
+          `(pass3 F1) customTemplate[0].assetId must remain {{ogImageAssetId}} verbatim, got ` +
+            `${rewrittenPlaceholder?.type === 'media' ? rewrittenPlaceholder.assetId : 'non-media'}`,
+        );
+        assert(
+          rewrittenFixed !== undefined &&
+            rewrittenFixed.type === 'media' &&
+            rewrittenFixed.assetId === 'seed-cust-tpl-rewrite-seed-hero-poster-1',
+          `(pass3 F1) customTemplate[1].assetId must be rewritten to the customer-rooted id, got ` +
+            `${rewrittenFixed?.type === 'media' ? rewrittenFixed.assetId : 'non-media'}`,
+        );
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -925,6 +1231,388 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
       'expected R2 object to be preserved when a sibling row still references it',
     );
   }
+
+  // -------------------------------------------------------------------------
+  // 7c — Codex review pass 5 finding 2 — delete cascade walks
+  // `customTemplate`. The publish-guard walks in site-assets.ts recurse
+  // customTemplate; the delete-endpoint walks here previously stopped at
+  // the top level, so a customTemplate-only assetId reported 0 references
+  // and survived the cascade as a stale id (next publish failed the
+  // publish guard).
+  //
+  // Fixture: a Collection whose customTemplate carries a media child
+  // bound to the asset under deletion. Confirm-required must list this
+  // site as a reference; the cascade must rewrite the customTemplate
+  // child's assetId to '' so the next publish succeeds.
+  // -------------------------------------------------------------------------
+  const templateSiteRow = {
+    id: 'site-tpl',
+    name: 'Custom Template Site',
+    subdomain: 'tpl-site',
+    publishedVersion: 0,
+    editableState: {
+      pages: [
+        {
+          slug: 'home',
+          sections: [
+            {
+              elements: [
+                {
+                  id: 'coll-tpl',
+                  type: 'collection',
+                  customTemplate: [
+                    { id: 'tpl-cover', type: 'media', mediaKind: 'image', assetId: 'asset-uuid-2' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    publishedSnapshot: null,
+  };
+  function makeTemplateShim(
+    returnSibling: boolean,
+    updateLog: Array<Record<string, unknown>> = [],
+  ): Db {
+    let selectCount = 0;
+    return {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCount += 1;
+            if (selectCount === 1) {
+              const result = Promise.resolve([
+                { id: 'asset-uuid-2', contentHash: expectedHash, r2Key: 'assets/test.png' },
+              ]);
+              return Object.assign(result, { limit: () => result });
+            }
+            if (selectCount === 2) {
+              const result = Promise.resolve([templateSiteRow]);
+              return Object.assign(result, { limit: () => result });
+            }
+            const result = Promise.resolve(returnSibling ? [{ id: 'asset-uuid-sibling' }] : []);
+            return Object.assign(result, { limit: () => result });
+          },
+        }),
+      }),
+      update: () => ({
+        set: (values: Record<string, unknown>) => ({
+          where: () => {
+            updateLog.push(values);
+            return Promise.resolve();
+          },
+        }),
+      }),
+      delete: () => ({ where: () => Promise.resolve() }),
+    } as unknown as Db;
+  }
+
+  const templateReportR2 = new MockR2();
+  await templateReportR2.put('assets/test.png', png32, {
+    httpMetadata: { contentType: 'image/png' },
+  });
+  const templateReportClient = createR2Client(templateReportR2);
+  const templateReportResult = await deleteOwnerAsset(
+    { db: makeTemplateShim(false), r2: templateReportClient },
+    { assetId: 'asset-uuid-2', customerId: 'cust-1', confirm: false },
+  );
+  assert(
+    templateReportResult.status === 'confirm_required',
+    `(7c) expected confirm_required for customTemplate-only reference, got ${templateReportResult.status}`,
+  );
+  if (templateReportResult.status === 'confirm_required') {
+    const tplRef = templateReportResult.references.find(
+      (ref) => ref.siteId === 'site-tpl' && ref.elementId === 'tpl-cover' && ref.role === 'asset',
+    );
+    assert(
+      tplRef !== undefined,
+      `(7c) delete-cascade collectFromPages must surface customTemplate assetId as a reference; ` +
+        `got ${JSON.stringify(templateReportResult.references)}`,
+    );
+  }
+
+  const templateUpdateLog: Array<Record<string, unknown>> = [];
+  const templateConfirmResult = await deleteOwnerAsset(
+    { db: makeTemplateShim(false, templateUpdateLog), r2: templateReportClient },
+    { assetId: 'asset-uuid-2', customerId: 'cust-1', confirm: true },
+  );
+  assert(
+    templateConfirmResult.status === 'deleted',
+    `(7c) expected deleted for customTemplate-only reference, got ${templateConfirmResult.status}`,
+  );
+  assert(
+    templateUpdateLog.length === 1,
+    `(7c) expected one editable-state cleanup write for customTemplate cascade, got ${String(templateUpdateLog.length)}`,
+  );
+  const tplCleared = templateUpdateLog[0]?.editableState as
+    | { pages: Array<{ sections: Array<{ elements: unknown[] }> }> }
+    | undefined;
+  const tplCollection = tplCleared?.pages[0]?.sections[0]?.elements[0] as
+    | { customTemplate?: Array<{ assetId?: string }> }
+    | undefined;
+  const tplChild = tplCollection?.customTemplate?.[0];
+  assert(
+    tplChild?.assetId === '',
+    `(7c) clearAssetReferences must clear customTemplate child assetId to ''; ` +
+      `got ${String(tplChild?.assetId)}`,
+  );
+
+  // -------------------------------------------------------------------------
+  // 7d — Codex review pass 6 finding 3 — delete walker parity with
+  // site-assets.ts. The reference + clear walks must handle EVERY asset-
+  // bearing element type / field the publish-guard walker reports, or
+  // the cascade goes half-blind:
+  //
+  //   * `elementStyle.backgroundImageAssetId` on a Container (any element)
+  //   * `nav.logoAssetId` on a Header Nav
+  //   * `carousel.slides[].assetId` (incl. inside a Collection's
+  //     customTemplate, the worst-case nesting)
+  //
+  // Each must surface as a reference at confirm time AND be cleared by
+  // the cascade. Without these the next publish trips the guard on a
+  // field the cascade failed to drain.
+  // -------------------------------------------------------------------------
+  const parityAssetId = 'asset-parity-1';
+  const paritySiteRow = {
+    id: 'site-parity',
+    name: 'Parity Site',
+    subdomain: 'parity-site',
+    publishedVersion: 0,
+    editableState: {
+      pages: [
+        {
+          slug: 'parity',
+          sections: [
+            {
+              elements: [
+                // Container with elementStyle.backgroundImageAssetId — any
+                // element type carries this field per BaseElement.
+                {
+                  id: 'container-with-bg',
+                  type: 'container',
+                  elementStyle: {
+                    backgroundImageAssetId: parityAssetId,
+                    backgroundColor: '#fff',
+                  },
+                },
+                // Nav with logoAssetId — header surface in real fixtures
+                // mounts this as a section element.
+                {
+                  id: 'nav-with-logo',
+                  type: 'nav',
+                  logoAssetId: parityAssetId,
+                  links: [],
+                },
+                // Carousel with slide assetId — slides[] is the asset-
+                // bearing field site-assets.ts walks.
+                {
+                  id: 'carousel-with-slide',
+                  type: 'carousel',
+                  slides: [
+                    { id: 'slide-1', assetId: parityAssetId },
+                    { id: 'slide-2', assetId: 'asset-other' },
+                  ],
+                },
+                // Worst-case nesting: Carousel INSIDE a Collection's
+                // customTemplate. Both recursion + slide walking must
+                // fire to surface the reference.
+                {
+                  id: 'collection-with-nested-carousel',
+                  type: 'collection',
+                  customTemplate: [
+                    {
+                      id: 'tpl-carousel',
+                      type: 'carousel',
+                      slides: [{ id: 'tpl-slide-1', assetId: parityAssetId }],
+                    },
+                    // Container with elementStyle.backgroundImageAssetId
+                    // INSIDE the customTemplate — exercises both the
+                    // recursion AND the elementStyle clear.
+                    {
+                      id: 'tpl-bg-container',
+                      type: 'container',
+                      elementStyle: { backgroundImageAssetId: parityAssetId },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    publishedSnapshot: null,
+  };
+
+  function makeParityShim(
+    returnSibling: boolean,
+    updateLog: Array<Record<string, unknown>> = [],
+  ): Db {
+    let selectCount = 0;
+    return {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCount += 1;
+            if (selectCount === 1) {
+              const result = Promise.resolve([
+                { id: parityAssetId, contentHash: expectedHash, r2Key: 'assets/parity.png' },
+              ]);
+              return Object.assign(result, { limit: () => result });
+            }
+            if (selectCount === 2) {
+              const result = Promise.resolve([paritySiteRow]);
+              return Object.assign(result, { limit: () => result });
+            }
+            const result = Promise.resolve(returnSibling ? [{ id: 'asset-uuid-sibling' }] : []);
+            return Object.assign(result, { limit: () => result });
+          },
+        }),
+      }),
+      update: () => ({
+        set: (values: Record<string, unknown>) => ({
+          where: () => {
+            updateLog.push(values);
+            return Promise.resolve();
+          },
+        }),
+      }),
+      delete: () => ({ where: () => Promise.resolve() }),
+    } as unknown as Db;
+  }
+
+  const parityReportResult = await deleteOwnerAsset(
+    { db: makeParityShim(false), r2: reportClient },
+    { assetId: parityAssetId, customerId: 'cust-1', confirm: false },
+  );
+  assert(
+    parityReportResult.status === 'confirm_required',
+    `(7d) expected confirm_required for parity asset, got ${parityReportResult.status}`,
+  );
+  if (parityReportResult.status === 'confirm_required') {
+    const containerBgRef = parityReportResult.references.find(
+      (ref) => ref.elementId === 'container-with-bg',
+    );
+    assert(
+      containerBgRef !== undefined,
+      `(7d) delete walker must surface elementStyle.backgroundImageAssetId on a Container; ` +
+        `got ${JSON.stringify(parityReportResult.references)}`,
+    );
+    const navLogoRef = parityReportResult.references.find(
+      (ref) => ref.elementId === 'nav-with-logo',
+    );
+    assert(
+      navLogoRef !== undefined,
+      `(7d) delete walker must surface nav.logoAssetId; ` +
+        `got ${JSON.stringify(parityReportResult.references)}`,
+    );
+    const carouselSlideRef = parityReportResult.references.find(
+      (ref) => ref.elementId === 'carousel-with-slide',
+    );
+    assert(
+      carouselSlideRef !== undefined,
+      `(7d) delete walker must surface carousel.slides[].assetId; ` +
+        `got ${JSON.stringify(parityReportResult.references)}`,
+    );
+    const nestedCarouselRef = parityReportResult.references.find(
+      (ref) => ref.elementId === 'tpl-carousel',
+    );
+    assert(
+      nestedCarouselRef !== undefined,
+      `(7d) delete walker must recurse into customTemplate then surface ` +
+        `carousel.slides[].assetId nested inside; ` +
+        `got ${JSON.stringify(parityReportResult.references)}`,
+    );
+    const nestedBgRef = parityReportResult.references.find(
+      (ref) => ref.elementId === 'tpl-bg-container',
+    );
+    assert(
+      nestedBgRef !== undefined,
+      `(7d) delete walker must recurse into customTemplate then surface ` +
+        `elementStyle.backgroundImageAssetId nested inside; ` +
+        `got ${JSON.stringify(parityReportResult.references)}`,
+    );
+  }
+
+  const parityUpdateLog: Array<Record<string, unknown>> = [];
+  const parityConfirmResult = await deleteOwnerAsset(
+    { db: makeParityShim(false, parityUpdateLog), r2: reportClient },
+    { assetId: parityAssetId, customerId: 'cust-1', confirm: true },
+  );
+  assert(
+    parityConfirmResult.status === 'deleted',
+    `(7d) expected deleted for parity asset, got ${parityConfirmResult.status}`,
+  );
+  assert(
+    parityUpdateLog.length === 1,
+    `(7d) expected one editable-state cleanup write, got ${String(parityUpdateLog.length)}`,
+  );
+  const parityCleared = parityUpdateLog[0]?.editableState as
+    | { pages: Array<{ sections: Array<{ elements: unknown[] }> }> }
+    | undefined;
+  const parityElements = parityCleared?.pages[0]?.sections[0]?.elements ?? [];
+
+  const containerCleared = parityElements[0] as
+    | { elementStyle?: { backgroundImageAssetId?: string; backgroundColor?: string } }
+    | undefined;
+  assert(
+    containerCleared?.elementStyle?.backgroundImageAssetId === undefined,
+    `(7d) clearAssetReferences must DELETE elementStyle.backgroundImageAssetId; ` +
+      `got ${String(containerCleared?.elementStyle?.backgroundImageAssetId)}`,
+  );
+  assert(
+    containerCleared?.elementStyle?.backgroundColor === '#fff',
+    `(7d) clearAssetReferences must preserve other elementStyle fields; ` +
+      `got ${String(containerCleared?.elementStyle?.backgroundColor)}`,
+  );
+
+  const navCleared = parityElements[1] as { logoAssetId?: string } | undefined;
+  assert(
+    navCleared?.logoAssetId === '',
+    `(7d) clearAssetReferences must clear nav.logoAssetId to ''; ` +
+      `got ${String(navCleared?.logoAssetId)}`,
+  );
+
+  const carouselCleared = parityElements[2] as
+    | { slides?: Array<{ id?: string; assetId?: string }> }
+    | undefined;
+  assert(
+    carouselCleared?.slides?.[0]?.assetId === '',
+    `(7d) clearAssetReferences must clear carousel.slides[0].assetId to ''; ` +
+      `got ${String(carouselCleared?.slides?.[0]?.assetId)}`,
+  );
+  assert(
+    carouselCleared?.slides?.[1]?.assetId === 'asset-other',
+    `(7d) clearAssetReferences must leave UNREFERENCED carousel slides untouched; ` +
+      `got ${String(carouselCleared?.slides?.[1]?.assetId)}`,
+  );
+
+  const nestedCollection = parityElements[3] as
+    | {
+        customTemplate?: Array<
+          | { type?: string; slides?: Array<{ assetId?: string }> }
+          | { type?: string; elementStyle?: { backgroundImageAssetId?: string } }
+        >;
+      }
+    | undefined;
+  const nestedCarousel = nestedCollection?.customTemplate?.[0] as
+    | { slides?: Array<{ assetId?: string }> }
+    | undefined;
+  assert(
+    nestedCarousel?.slides?.[0]?.assetId === '',
+    `(7d) clearAssetReferences must clear carousel slide assetId nested inside ` +
+      `customTemplate; got ${String(nestedCarousel?.slides?.[0]?.assetId)}`,
+  );
+  const nestedBg = nestedCollection?.customTemplate?.[1] as
+    | { elementStyle?: { backgroundImageAssetId?: string } }
+    | undefined;
+  assert(
+    nestedBg?.elementStyle?.backgroundImageAssetId === undefined,
+    `(7d) clearAssetReferences must DELETE elementStyle.backgroundImageAssetId ` +
+      `nested inside customTemplate; got ${String(nestedBg?.elementStyle?.backgroundImageAssetId)}`,
+  );
 }
 
 // ---------------------------------------------------------------------------

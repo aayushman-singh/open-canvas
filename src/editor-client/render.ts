@@ -79,6 +79,7 @@ import {
 } from './editor-constants.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
 import { augmentCollectionPreviewsImpl } from './collection-preview.js';
+import { mountTemplateEditChromeImpl } from './collection-template-edit-view.js';
 
 export function clampZoom(value: number, max?: number): number {
   if (!Number.isFinite(value)) return 1;
@@ -371,6 +372,13 @@ export function renderAllImpl(ctx: EditorContext): void {
   // dimensions are settled; the augmenter is idempotent so a redundant
   // call on a no-Collection page is a cheap zero-iteration loop.
   augmentCollectionPreviewsImpl(ctx);
+  // ADR 0065 D5 — mount the in-place template-edit chrome (banner, Done
+  // button, scrim, viewport pan) when ctx.editingCollectionTemplate pins
+  // a Collection. Idempotent — runs after augmentCollectionPreviewsImpl
+  // so the placeholder-card branch settles first, then this layer
+  // overlays the active template's chrome. When the field is null the
+  // mount no-ops after stripping any stale chrome.
+  mountTemplateEditChromeImpl(ctx);
 
   if (ctx.pendingImport) {
     ctx.renderPlacementSlots();

@@ -1,7 +1,7 @@
 import { count, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { contentHashToR2Key, extFromMediaType } from '../../assets/hash';
-import { collectReferencedAssets } from '../../assets/site-assets';
+import { collectReferencedAssets, isAssetSubstitutionToken } from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
@@ -170,18 +170,39 @@ function rewriteElementAssetIds(
   elementPath: string,
   resolveAssetId: AssetIdResolver,
 ): string | null {
+  // Codex review pass 3 finding 1 — every leaf that calls `resolveAssetId`
+  // must first skip pre-substitution placeholder tokens (e.g.
+  // `{{ogImageAssetId}}`). Pass 1 F4 added customTemplate recursion to
+  // this walk; pass 2 F1 filtered tokens out of `collectReferencedAssets`
+  // so `mappedIds` never contains them. Without the matching skip here,
+  // the rewrite walk reaches `materializeAssetId({{ogImageAssetId}})`,
+  // finds no mapping (correctly), and reports `missing` — breaking site
+  // creation from any Template Seed whose Collection's customTemplate
+  // carries the seeded default card. The check runs at each leaf so the
+  // walk preserves the literal token verbatim — substitution happens at
+  // publish time inside the materializer, not at site-creation rewrite.
   const esBgImage = element.elementStyle?.backgroundImageAssetId;
-  if (typeof esBgImage === 'string' && esBgImage.length > 0) {
+  if (
+    typeof esBgImage === 'string' &&
+    esBgImage.length > 0 &&
+    !isAssetSubstitutionToken(esBgImage)
+  ) {
     const mapped = resolveAssetId(esBgImage, `${elementPath}.elementStyle.backgroundImageAssetId`);
     if (typeof mapped !== 'string') return mapped.missing;
     element.elementStyle = { ...element.elementStyle, backgroundImageAssetId: mapped };
   }
 
   if (element.type === 'media') {
-    const mapped = resolveAssetId(element.assetId, `${elementPath}.assetId`);
-    if (typeof mapped !== 'string') return mapped.missing;
-    element.assetId = mapped;
-    if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
+    if (!isAssetSubstitutionToken(element.assetId)) {
+      const mapped = resolveAssetId(element.assetId, `${elementPath}.assetId`);
+      if (typeof mapped !== 'string') return mapped.missing;
+      element.assetId = mapped;
+    }
+    if (
+      element.mediaKind === 'video' &&
+      element.posterAssetId !== undefined &&
+      !isAssetSubstitutionToken(element.posterAssetId)
+    ) {
       const posterMapped = resolveAssetId(element.posterAssetId, `${elementPath}.posterAssetId`);
       if (typeof posterMapped !== 'string') return posterMapped.missing;
       element.posterAssetId = posterMapped;
@@ -192,7 +213,8 @@ function rewriteElementAssetIds(
   if (
     element.type === 'nav' &&
     typeof element.logoAssetId === 'string' &&
-    element.logoAssetId.length > 0
+    element.logoAssetId.length > 0 &&
+    !isAssetSubstitutionToken(element.logoAssetId)
   ) {
     const mapped = resolveAssetId(element.logoAssetId, `${elementPath}.logoAssetId`);
     if (typeof mapped !== 'string') return mapped.missing;
@@ -204,6 +226,7 @@ function rewriteElementAssetIds(
     for (let slideIdx = 0; slideIdx < element.slides.length; slideIdx++) {
       const slide = element.slides[slideIdx];
       if (!slide) continue;
+      if (isAssetSubstitutionToken(slide.assetId)) continue;
       const mapped = resolveAssetId(
         slide.assetId,
         `${elementPath}.slides[${String(slideIdx)}].assetId`,
@@ -250,6 +273,22 @@ function rewriteElementAssetIds(
         );
         if (missing !== null) return missing;
       }
+    }
+    // ADR 0065 D2 + codex review pass 1 — `customTemplate` carries author-
+    // authored template children that may bind to fixed assetIds. Asset-id
+    // rewrite on import / clone must touch them too, mirroring the
+    // `entries` walk above; otherwise a cloned site arrives with stale
+    // upstream asset ids inside its custom card template.
+    const customTemplate = element.customTemplate ?? [];
+    for (let childIdx = 0; childIdx < customTemplate.length; childIdx++) {
+      const child = customTemplate[childIdx];
+      if (!child) continue;
+      const missing = rewriteElementAssetIds(
+        child,
+        `${elementPath}.customTemplate[${String(childIdx)}]`,
+        resolveAssetId,
+      );
+      if (missing !== null) return missing;
     }
   }
 

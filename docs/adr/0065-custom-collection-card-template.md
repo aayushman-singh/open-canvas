@@ -1,6 +1,6 @@
 # ADR 0065: Custom Collection card template lives on the element, edited in-place via global editor state
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-05
 **Decision driver:** Aayushman Singh (Owner)
 **Implements:** [ADR 0063](0063-collection-element-binds-at-element-level-and-ships-defaults.md) follow-up F1

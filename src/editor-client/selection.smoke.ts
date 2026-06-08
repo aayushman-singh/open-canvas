@@ -4,6 +4,11 @@
 // inside a Collection's rendered DOM to the Collection element instead
 // of the inner clicked node.
 //
+// ADR 0065 dec 7 — pins the inversion of that rule when the editor is
+// actively editing a specific Collection's custom template. Inside that
+// Collection's template the clicked child element is selected directly;
+// clicks inside any OTHER Collection still bubble to that Collection.
+//
 // Coverage:
 //   (1) A click on an inner card element (data-element-type="container")
 //       nested under data-element-type="collection" resolves to the
@@ -20,6 +25,20 @@
 //   (6) Source guard — canvas-root-events.ts imports the helper and
 //       calls it before falling through to the default selectElement
 //       branch.
+//   (7) ADR 0065 D7 — null edit-state preserves D6 behaviour
+//       (regression coverage when callers pass an explicit null).
+//   (8) ADR 0065 D7 — editing THIS Collection's template short-circuits
+//       the bubble, returning null so the default selection picks the
+//       clicked child element directly.
+//   (9) ADR 0065 D7 — editing a DIFFERENT Collection's template still
+//       bubbles for an unrelated Collection (per-Collection scoping).
+//  (10) ADR 0065 D7 — click outside any Collection while edit mode is
+//       active behaves like edit mode were off (D7 only affects clicks
+//       under the actively-edited Collection).
+//  (11) ADR 0065 D7 failure path — editingCollectionTemplate.collectionId
+//       references a missing Collection: helper degrades to plain D6
+//       behaviour, no crash. The next render-pass clears the field per
+//       the ADR; selection in the meantime acts as if the field were null.
 
 declare const Bun: {
   file(input: URL): { text(): Promise<string> };
@@ -174,12 +193,14 @@ assert(
   '(6) canvas-root-events.ts must import resolveCollectionAncestorForClick',
 );
 assert(
-  canvasRootSrc.includes('resolveCollectionAncestorForClick(target)'),
-  '(6) canvas-root-events.ts must call resolveCollectionAncestorForClick(target) in click handler',
+  canvasRootSrc.includes('resolveCollectionAncestorForClick(target, ctx.editingCollectionTemplate)'),
+  '(6) canvas-root-events.ts must call resolveCollectionAncestorForClick(target, ctx.editingCollectionTemplate) in click handler',
 );
 // The Collection-ancestor branch must run BEFORE the normal selectElement
 // fallback — otherwise inner-card clicks select the inner element first.
-const callIdx = canvasRootSrc.indexOf('resolveCollectionAncestorForClick(target)');
+const callIdx = canvasRootSrc.indexOf(
+  'resolveCollectionAncestorForClick(target, ctx.editingCollectionTemplate)',
+);
 const fallbackIdx = canvasRootSrc.indexOf(
   'if (id !== ctx.selectedElementId) ctx.selectElement(id);',
 );
@@ -188,5 +209,104 @@ assert(
   callIdx < fallbackIdx,
   '(6) Collection-ancestor selection must run BEFORE the default selectElement(id) fallback',
 );
+
+// (7) ADR 0065 D7 — explicit null edit-state matches default D6 behaviour.
+{
+  const collectionWrapper = makeEl('div');
+  collectionWrapper.setAttribute('data-element-type', 'collection');
+  collectionWrapper.setAttribute('data-opencanvas-element', 'coll-A');
+  const innerFrame = makeEl('div');
+  collectionWrapper.appendChild(innerFrame);
+  const cardChild = makeEl('div');
+  cardChild.setAttribute('class', 'opencanvas-collection-preview-card-image');
+  innerFrame.appendChild(cardChild);
+
+  const result = resolveCollectionAncestorForClick(cardChild as never, null);
+  assert(
+    result === 'coll-A',
+    '(7) editingCollectionTemplate === null must preserve D6 bubble; got: ' + result,
+  );
+}
+
+// (8) ADR 0065 D7 — editing THIS Collection's template: click on its
+// template child falls through (helper returns null) so the default
+// selectElement path picks the clicked child.
+{
+  const collectionWrapper = makeEl('div');
+  collectionWrapper.setAttribute('data-element-type', 'collection');
+  collectionWrapper.setAttribute('data-opencanvas-element', 'coll-A');
+  const innerFrame = makeEl('div');
+  collectionWrapper.appendChild(innerFrame);
+  const templateChild = makeEl('div');
+  templateChild.setAttribute('class', 'opencanvas-text');
+  innerFrame.appendChild(templateChild);
+
+  const result = resolveCollectionAncestorForClick(templateChild as never, {
+    collectionId: 'coll-A',
+  });
+  assert(
+    result === null,
+    '(8) editing template of clicked Collection must invert bubble to null; got: ' + result,
+  );
+}
+
+// (9) ADR 0065 D7 — per-Collection scoping: editing Collection A's
+// template does NOT affect clicks landing inside Collection B.
+{
+  const otherCollectionWrapper = makeEl('div');
+  otherCollectionWrapper.setAttribute('data-element-type', 'collection');
+  otherCollectionWrapper.setAttribute('data-opencanvas-element', 'coll-B');
+  const innerFrame = makeEl('div');
+  otherCollectionWrapper.appendChild(innerFrame);
+  const cardChild = makeEl('div');
+  cardChild.setAttribute('class', 'opencanvas-collection-preview-card-image');
+  innerFrame.appendChild(cardChild);
+
+  const result = resolveCollectionAncestorForClick(cardChild as never, {
+    collectionId: 'coll-A',
+  });
+  assert(
+    result === 'coll-B',
+    '(9) editing coll-A must NOT affect bubble inside coll-B; got: ' + result,
+  );
+}
+
+// (10) ADR 0065 D7 — click outside any Collection while edit mode is
+// active behaves identically to edit mode being off.
+{
+  const textWrapper = makeEl('div');
+  textWrapper.setAttribute('data-element-type', 'text');
+  textWrapper.setAttribute('data-opencanvas-element', 'text-1');
+  const span = makeEl('span');
+  textWrapper.appendChild(span);
+
+  const result = resolveCollectionAncestorForClick(span as never, { collectionId: 'coll-A' });
+  assert(
+    result === null,
+    '(10) edit mode active but click outside any Collection must return null; got: ' + result,
+  );
+}
+
+// (11) ADR 0065 D7 failure path — editingCollectionTemplate references a
+// Collection that no longer exists in the DOM (e.g. concurrent
+// deletion). The walk never matches, so the helper degrades to plain D6
+// bubble — no crash, no zombie selection of nothing.
+{
+  const collectionWrapper = makeEl('div');
+  collectionWrapper.setAttribute('data-element-type', 'collection');
+  collectionWrapper.setAttribute('data-opencanvas-element', 'coll-A');
+  const innerFrame = makeEl('div');
+  collectionWrapper.appendChild(innerFrame);
+  const cardChild = makeEl('div');
+  innerFrame.appendChild(cardChild);
+
+  const result = resolveCollectionAncestorForClick(cardChild as never, {
+    collectionId: 'deleted-id',
+  });
+  assert(
+    result === 'coll-A',
+    '(11) deleted-id edit-state must fall through to D6 bubble; got: ' + result,
+  );
+}
 
 console.log('[selection:smoke] OK');

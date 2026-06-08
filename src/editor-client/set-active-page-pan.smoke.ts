@@ -178,6 +178,12 @@ try {
       return found ?? null;
     },
     zoomReadout: null,
+    // ADR 0065 D6 — setActivePageImpl exits any active template-edit on
+    // page switch. Stub the field + verb so the call is a no-op here.
+    editingCollectionTemplate: null as { collectionId: string } | null,
+    exitCollectionTemplateEdit(): void {
+      ctxConcrete.editingCollectionTemplate = null;
+    },
   };
   const ctx = ctxConcrete as unknown as EditorContext;
 
