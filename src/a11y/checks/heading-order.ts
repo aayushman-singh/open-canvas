@@ -70,6 +70,26 @@ export function deriveHeadingLevel(
   return 6;
 }
 
+/**
+ * Inverse of {@link deriveHeadingLevel} for levels 1..5: the smallest `fontSize`
+ * that derives to exactly `level` under `headingScale`. Used by a11y
+ * remediation to compute the font size that demotes/promotes a heading to a
+ * specific level so a `heading-skip` is removed. The rungs are strictly
+ * decreasing in `minPx`, so `rung[level].minPx * scale` lands inside level
+ * `level`'s band (≥ its own threshold, < the next-higher rung's). Level 6 has
+ * no lower bound, so it is not a valid target.
+ */
+export function targetFontSizeForLevel(
+  level: 1 | 2 | 3 | 4 | 5,
+  headingScale: number,
+): number {
+  const rung = BASE_HEADING_RUNGS_PX.find((r) => r.level === level);
+  if (!rung) {
+    throw new Error(`targetFontSizeForLevel: no rung for level ${String(level)}`);
+  }
+  return rung.minPx * headingScale;
+}
+
 interface HeadingHit {
   element: TextElement;
   level: 1 | 2 | 3 | 4 | 5 | 6;
