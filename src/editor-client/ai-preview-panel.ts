@@ -70,7 +70,16 @@
 // Phase 3 cutover destination, not a live call site yet.
 
 import type { CanvasAgentOp } from '../agent/canvas-ops.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  AiContext,
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
 
@@ -85,7 +94,63 @@ function errorToString(err: unknown): string {
   return 'unknown';
 }
 
-export function closeAiPanelImpl(ctx: EditorContext): void {
+// ADR 0064 — closeAiPanelImpl detaches the live <aside> and releases the
+// AI UI lock. The `aiPanel` ref is panel-local DOM state (not in DomContext
+// because DomContext names boot-cached refs, not AI lifecycle slots); the
+// AiContext lazy-cluster alias supplies `setAiBusy`.
+export type CloseAiPanelContext = AiContext & Pick<EditorContext, 'aiPanel'>;
+
+// ADR 0064 — applyPreview owns the POST-then-replace flow: flush pending
+// save, hit /apply, swap ctx.state, re-render. Pulls in PersistContext for
+// the network call + identity fields, StateContext + SelectionContext +
+// DomContext + RenderContext for the post-apply reseat, AiContext for the
+// access-revoked / session-expired guards, plus an inline Pick for the
+// panel-lifecycle + migration verbs that don't yet have named contexts.
+type ApplyPreviewContext = AiContext &
+  PersistContext &
+  StatusEmitterContext &
+  StateContext &
+  SelectionContext &
+  DomContext &
+  RenderContext &
+  Pick<EditorContext, 'closeAiPanel' | 'flushPendingSave' | 'migrateState'>;
+
+// ADR 0064 — buildAiPanel mounts the preview <aside> and forwards ctx to
+// applyPreview on Accept, so it must be a superset of ApplyPreviewContext.
+// Adds `aiPanel` for the panel-slot write at the end of the build.
+type BuildAiPanelContext = ApplyPreviewContext & Pick<EditorContext, 'aiPanel'>;
+
+// ADR 0064 — runAiPreviewImpl posts the Owner prompt, forwards ctx into
+// buildAiPanel, and surfaces server errors through openAlertModal. Pulls in
+// the build surface verbatim plus the modal verb.
+export type RunAiPreviewContext = BuildAiPanelContext & Pick<EditorContext, 'openAlertModal'>;
+
+// ADR 0064 — aiRewriteTextImpl + aiCreateSectionImpl share a tiny surface:
+// gate on aiBusy, prompt via openTextModal, hand off to runAiPreview. They
+// reach for an inline Pick rather than the wider AiContext because only
+// aiBusy is needed from the AI cluster.
+export type AiRewriteTextContext = Pick<
+  EditorContext,
+  'aiBusy' | 'openTextModal' | 'runAiPreview'
+>;
+export type AiCreateSectionContext = AiRewriteTextContext;
+
+// ADR 0064 — aiReplaceMediaImpl bypasses the preview panel: picks a tile
+// from the 4-up modal and uploads it directly. Touches the AI busy gate,
+// the element lookup, the asset-generate endpoint (siteBase + authFetch),
+// the modal verb, the upload verb, and the status line.
+export type AiReplaceMediaContext = Pick<
+  EditorContext,
+  | 'aiBusy'
+  | 'findElement'
+  | 'authFetch'
+  | 'siteBase'
+  | 'openAiMediaModal'
+  | 'uploadGeneratedBlobToElement'
+  | 'setStatus'
+>;
+
+export function closeAiPanelImpl(ctx: CloseAiPanelContext): void {
   if (ctx.aiPanel && ctx.aiPanel.parentNode) {
     ctx.aiPanel.parentNode.removeChild(ctx.aiPanel);
   }
@@ -96,7 +161,7 @@ export function closeAiPanelImpl(ctx: EditorContext): void {
 // Every exit path must release the AI UI lock. If we leave aiBusy=true or
 // the preview <aside> mounted, every [data-ai-button] stays disabled and
 // the Owner sees a frozen editor after the first failed apply.
-async function applyPreview(ctx: EditorContext, ops: CanvasAgentOp[]): Promise<void> {
+async function applyPreview(ctx: ApplyPreviewContext, ops: CanvasAgentOp[]): Promise<void> {
   try {
     const saved = await ctx.flushPendingSave();
     if (!saved) {
@@ -157,7 +222,7 @@ async function applyPreview(ctx: EditorContext, ops: CanvasAgentOp[]): Promise<v
   }
 }
 
-function buildAiPanel(ctx: EditorContext, payload: PreviewPayload): void {
+function buildAiPanel(ctx: BuildAiPanelContext, payload: PreviewPayload): void {
   ctx.closeAiPanel();
   const panel = document.createElement('aside');
   panel.className = 'opencanvas-ai-panel';
@@ -213,7 +278,7 @@ function buildAiPanel(ctx: EditorContext, payload: PreviewPayload): void {
   ctx.aiPanel = panel;
 }
 
-export async function runAiPreviewImpl(ctx: EditorContext, prompt: string): Promise<void> {
+export async function runAiPreviewImpl(ctx: RunAiPreviewContext, prompt: string): Promise<void> {
   ctx.setAiBusy(true);
   const saved = await ctx.flushPendingSave();
   if (!saved) {
@@ -263,7 +328,10 @@ export async function runAiPreviewImpl(ctx: EditorContext, prompt: string): Prom
   }
 }
 
-export async function aiRewriteTextImpl(ctx: EditorContext, elementId: string): Promise<void> {
+export async function aiRewriteTextImpl(
+  ctx: AiRewriteTextContext,
+  elementId: string,
+): Promise<void> {
   if (ctx.aiBusy) return;
   const brief = await ctx.openTextModal({
     title: 'AI rewrite',
@@ -294,7 +362,10 @@ export function aspectRatioToBox(aspect: string): { w: number; h: number } {
   return { w: 1024, h: 1024 };
 }
 
-export async function aiReplaceMediaImpl(ctx: EditorContext, elementId: string): Promise<void> {
+export async function aiReplaceMediaImpl(
+  ctx: AiReplaceMediaContext,
+  elementId: string,
+): Promise<void> {
   if (ctx.aiBusy) return;
   const found = ctx.findElement(elementId);
   if (!found || found.element.type !== 'media' || found.element.mediaKind !== 'image') {
@@ -369,7 +440,7 @@ export async function aiReplaceMediaImpl(ctx: EditorContext, elementId: string):
 }
 
 export async function aiCreateSectionImpl(
-  ctx: EditorContext,
+  ctx: AiCreateSectionContext,
   afterSectionId: string,
 ): Promise<void> {
   if (ctx.aiBusy) return;
