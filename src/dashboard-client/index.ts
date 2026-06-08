@@ -22,15 +22,16 @@ import { mountProfile } from './profile.js';
 import { mountAddonShop } from './addon-shop.js';
 import { mountDomains } from './domains.js';
 import { mountVersionTimeline } from './version-timeline.js';
+import { mountSiteAddons } from './site-addons.js';
 
 interface DashboardBoot {
-  route: 'profile' | 'addon-shop' | 'domains' | 'version-timeline';
+  route: 'profile' | 'addon-shop' | 'domains' | 'version-timeline' | 'site-addons';
   // Per-request keys — present only for routes that need them. The
-  // `domains` and `version-timeline` routes ship the site id whose
-  // resources they are editing so the mount module can address
-  // `/api/sites/:siteId/...` without a closure capture. Other routes
-  // (profile, addon-shop) leave this unset; addon-shop instead seeds
-  // `#addon-state` JSON on the page.
+  // `domains`, `version-timeline`, and `site-addons` routes ship the
+  // site id whose resources they are editing so the mount module can
+  // address `/api/sites/:siteId/...` (or `/api/addons/sites/:siteId/...`)
+  // without a closure capture. Other routes (profile, addon-shop) leave
+  // this unset; addon-shop instead seeds `#addon-state` JSON on the page.
   siteId?: string;
 }
 
@@ -45,6 +46,7 @@ const DISPATCH: { [K in DashboardBoot['route']]: () => void } = {
   'addon-shop': mountAddonShop,
   domains: mountDomains,
   'version-timeline': mountVersionTimeline,
+  'site-addons': mountSiteAddons,
 };
 
 function run(): void {
