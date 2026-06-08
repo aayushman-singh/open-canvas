@@ -35,7 +35,11 @@
 // Phase 3 cutover destination, not a live call site yet.
 
 import type { CanvasPage } from '../canvas/schema.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  EditorContext,
+  SelectionContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import { isAllowedHref } from './href-utils.js';
 
 type LinkPopoverKind = 'inline' | 'nav' | 'action';
@@ -46,7 +50,83 @@ type LinkPopoverKind = 'inline' | 'nav' | 'action';
 const SHOW_DELAY_MS = 150;
 const HIDE_GRACE_MS = 200;
 
-export function removeLinkPopoverImpl(ctx: EditorContext): void {
+// ADR 0064 — popover-state grab bag. The five `linkPopover*` fields live
+// in this module's surface; no canonical alias owns them yet. Almost
+// every function below touches at least one, so they share one named
+// view rather than re-listing the bag at each call site.
+export type LinkPopoverStateContext = Pick<
+  EditorContext,
+  | 'linkPopover'
+  | 'linkPopoverAnchor'
+  | 'linkPopoverPinned'
+  | 'linkPopoverShowTimer'
+  | 'linkPopoverHideTimer'
+>;
+
+// ADR 0064 — `removeLinkPopoverImpl` is the popover teardown verb. It
+// clears both timers and detaches the floating bar; touches the full
+// popover-state surface, nothing else.
+export type RemoveLinkPopoverContext = LinkPopoverStateContext;
+
+// ADR 0064 — `positionLinkPopover` only reads `linkPopover` to measure /
+// place the floating bar. The narrowest signature in the module.
+export type PositionLinkPopoverContext = Pick<EditorContext, 'linkPopover'>;
+
+// ADR 0064 — `showLinkPopoverImpl` builds the popover DOM and wires the
+// per-kind buttons. It extends the popover-state surface with the page-
+// navigation verbs the "Go" button drives (findPageByHref / setActivePage /
+// panToPage), the link-modal verb the Edit button drives (openLinkModal),
+// the selection verbs the nav / action Inspector buttons drive
+// (SelectionContext for selectElement + forceOpenInspector), and the
+// status emitter for the rejected-href toast.
+export type ShowLinkPopoverContext = RemoveLinkPopoverContext &
+  SelectionContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    'findPageByHref' | 'setActivePage' | 'panToPage' | 'openLinkModal' | 'forceOpenInspector'
+  >;
+
+// ADR 0064 — `onLinkMouseEnter` debounces a show on hover over an inline
+// link inside a contenteditable. Folds in `ShowLinkPopoverContext` for
+// the deferred `showLinkPopoverImpl(ctx, ...)` call; `editingElementId`
+// rides in via the `SelectionContext` already inside that intersection.
+export type OnLinkMouseEnterContext = ShowLinkPopoverContext;
+
+// ADR 0064 — `onLinkMouseLeave` debounces a hide. It folds in
+// `RemoveLinkPopoverContext` so the deferred `removeLinkPopoverImpl(ctx)`
+// call typechecks without a cast. No selection / editing state read.
+export type OnLinkMouseLeaveContext = RemoveLinkPopoverContext;
+
+// ADR 0064 — `closestInlineLinkInEditMode` is a DOM-walk helper gated on
+// `editingElementId`. Pure `SelectionContext` — no popover state touched.
+export type ClosestInlineLinkInEditModeContext = SelectionContext;
+
+// ADR 0064 — `canHoverPopover` decides whether a hover may trigger the
+// popover for a given anchor. The decision flips on `editingElementId`
+// only, so `SelectionContext` is the entire surface.
+export type CanHoverPopoverContext = SelectionContext;
+
+// ADR 0064 — `onCanvasLinkHover` is the canvas-wide hover entry. It
+// forwards to both `canHoverPopover` (gated on editingElementId) and
+// `showLinkPopoverImpl` after the debounce, plus reads popover state to
+// short-circuit the already-pinned case.
+export type OnCanvasLinkHoverContext = ShowLinkPopoverContext & CanHoverPopoverContext;
+
+// ADR 0064 — `onCanvasLinkHoverLeave` debounces a hide off the canvas
+// root. Same surface as `onLinkMouseLeave`.
+export type OnCanvasLinkHoverLeaveContext = RemoveLinkPopoverContext;
+
+// ADR 0064 — `onSelectionChangeForLinkPopover` pins the popover to the
+// link containing the caret during text edit. Folds in
+// `ShowLinkPopoverContext` for the pin-show call,
+// `ClosestInlineLinkInEditModeContext` for the DOM-walk helper, plus the
+// mark-toolbar font-size resync verb (no canonical alias yet).
+export type OnSelectionChangeForLinkPopoverContext = ShowLinkPopoverContext &
+  ClosestInlineLinkInEditModeContext &
+  Pick<EditorContext, 'refreshMarkToolbarFontSizeState'>;
+
+export function removeLinkPopoverImpl(ctx: RemoveLinkPopoverContext): void {
   if (ctx.linkPopoverShowTimer) {
     clearTimeout(ctx.linkPopoverShowTimer);
     ctx.linkPopoverShowTimer = null;
@@ -63,7 +143,10 @@ export function removeLinkPopoverImpl(ctx: EditorContext): void {
   ctx.linkPopoverPinned = false;
 }
 
-export function positionLinkPopover(ctx: EditorContext, anchorEl: HTMLElement | null): void {
+export function positionLinkPopover(
+  ctx: PositionLinkPopoverContext,
+  anchorEl: HTMLElement | null,
+): void {
   if (!ctx.linkPopover || !anchorEl) return;
   const rect = anchorEl.getBoundingClientRect();
   const popoverHeight = ctx.linkPopover.offsetHeight || 32;
@@ -111,7 +194,7 @@ export function parentElementIdOf(node: Node | null): string | null {
 }
 
 export function showLinkPopoverImpl(
-  ctx: EditorContext,
+  ctx: ShowLinkPopoverContext,
   anchorEl: HTMLElement,
   opts?: { pinned: boolean },
 ): void {
@@ -343,7 +426,10 @@ export function showLinkPopoverImpl(
   positionLinkPopover(ctx, anchorEl);
 }
 
-export function onLinkMouseEnter(ctx: EditorContext, ev: { target: EventTarget | null }): void {
+export function onLinkMouseEnter(
+  ctx: OnLinkMouseEnterContext,
+  ev: { target: EventTarget | null },
+): void {
   if (!ctx.editingElementId) return;
   const target = ev.target as HTMLElement | null;
   if (!target || target.tagName !== 'A') return;
@@ -363,7 +449,10 @@ export function onLinkMouseEnter(ctx: EditorContext, ev: { target: EventTarget |
   }, SHOW_DELAY_MS);
 }
 
-export function onLinkMouseLeave(ctx: EditorContext, ev: { target: EventTarget | null }): void {
+export function onLinkMouseLeave(
+  ctx: OnLinkMouseLeaveContext,
+  ev: { target: EventTarget | null },
+): void {
   const target = ev.target as HTMLElement | null;
   if (!target || target.tagName !== 'A') return;
   if (ctx.linkPopoverShowTimer) {
@@ -381,7 +470,7 @@ export function onLinkMouseLeave(ctx: EditorContext, ev: { target: EventTarget |
 // text element currently in edit mode. Returns null when the node is not
 // inside a link or not inside an edited text element.
 export function closestInlineLinkInEditMode(
-  ctx: EditorContext,
+  ctx: ClosestInlineLinkInEditModeContext,
   node: Node | null,
 ): HTMLAnchorElement | null {
   if (!ctx.editingElementId || !node) return null;
@@ -405,7 +494,10 @@ export function closestInlineLinkInEditMode(
 // state. Inline marks fire only inside a text element being edited; nav
 // links and action elements fire only when no text edit is in progress
 // (otherwise they'd race the mark toolbar for the same screen real estate).
-export function canHoverPopover(ctx: EditorContext, anchorEl: Element | null): boolean {
+export function canHoverPopover(
+  ctx: CanHoverPopoverContext,
+  anchorEl: Element | null,
+): boolean {
   if (!anchorEl || anchorEl.tagName !== 'A') return false;
   const kind = linkPopoverKindOf(anchorEl as HTMLElement);
   if (kind === 'inline') return !!ctx.editingElementId;
@@ -415,7 +507,7 @@ export function canHoverPopover(ctx: EditorContext, anchorEl: Element | null): b
 // Canvas-wide link hover handlers. Attached on root in attachPointerHandlers
 // so nav links and action elements get the same popover treatment as inline
 // marks, without each renderer wiring its own listeners.
-export function onCanvasLinkHover(ctx: EditorContext, ev: Event): void {
+export function onCanvasLinkHover(ctx: OnCanvasLinkHoverContext, ev: Event): void {
   let target = ev.target;
   if (!(target instanceof Element)) return;
   if (target.tagName !== 'A') {
@@ -440,7 +532,7 @@ export function onCanvasLinkHover(ctx: EditorContext, ev: Event): void {
   }, SHOW_DELAY_MS);
 }
 
-export function onCanvasLinkHoverLeave(ctx: EditorContext, ev: Event): void {
+export function onCanvasLinkHoverLeave(ctx: OnCanvasLinkHoverLeaveContext, ev: Event): void {
   let target = ev.target;
   if (!(target instanceof Element)) return;
   if (target.tagName !== 'A') {
@@ -462,7 +554,9 @@ export function onCanvasLinkHoverLeave(ctx: EditorContext, ev: Event): void {
 // selectionchange driver — pin the popover to whichever link contains the
 // caret while text is in edit mode. When the caret leaves the link, the
 // pinned popover dismisses (hover may re-show it without pinning).
-export function onSelectionChangeForLinkPopover(ctx: EditorContext): void {
+export function onSelectionChangeForLinkPopover(
+  ctx: OnSelectionChangeForLinkPopoverContext,
+): void {
   if (!ctx.editingElementId) return;
   ctx.refreshMarkToolbarFontSizeState();
   const sel = document.getSelection();
