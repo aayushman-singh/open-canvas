@@ -47,9 +47,47 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the Phase
 // 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  SelectionContext,
+  StateContext,
+} from './editor-context.js';
 import { cssEscape } from './css-escape.js';
+import type {
+  BuildSectionThumbnailContext,
+  MoveSectionToIndexContext,
+} from './reel.js';
 import { buildSectionThumbnail, moveSectionToIndex } from './reel.js';
+
+// ADR 0064 — canvas-side section drag. Composes the local source-lookup
+// surface (StateContext + DomContext) with the narrow contexts the
+// reel.ts callees demand (`buildSectionThumbnail` for the ghost,
+// `moveSectionToIndex` for the drop commit). Folding both in lets the
+// four forwarded call sites typecheck without `ctx as EditorContext`
+// scaffolding now that reel.ts has carved.
+export type BeginSectionDragContext = StateContext &
+  DomContext &
+  BuildSectionThumbnailContext &
+  MoveSectionToIndexContext;
+
+// ADR 0064 — reel-tile drag. Same composition as the canvas-side drag
+// (so the two ghost/drop call sites are honest about the same callees)
+// plus the inline `Pick` for `reelViewMode` (no canonical alias owns
+// the reel display mode yet).
+export type BeginReelDragContext = StateContext &
+  BuildSectionThumbnailContext &
+  MoveSectionToIndexContext &
+  Pick<EditorContext, 'reelViewMode'>;
+
+// ADR 0064 — grip mousedown delegate. Composes the canvas-side drag
+// surface (so the `beginSectionDragImpl(ctx, …)` forward call typechecks
+// without a cast) with SelectionContext for the click-to-select branch
+// and an inline `Pick` for the reel toggle + interaction-mode short-
+// circuit verbs that no canonical alias owns yet.
+export type AttachGripHandlersContext = BeginSectionDragContext &
+  SelectionContext &
+  Pick<EditorContext, 'interactionMode' | 'openReel' | 'closeReel' | 'isReelOpen'>;
 
 // ADR 0059 — film-reel drag state machine. The `.reel-insert-btn` plus
 // affordances fight the drop zones during a drag, so we mark the reel
@@ -83,7 +121,7 @@ interface ReelDropTarget {
 type DropTarget = CanvasDropTarget | ReelDropTarget;
 
 export function beginSectionDragImpl(
-  ctx: EditorContext,
+  ctx: BeginSectionDragContext,
   sectionId: string,
   startEv: MouseEvent,
 ): void {
@@ -228,7 +266,7 @@ export function beginSectionDragImpl(
 }
 
 export function beginReelDragImpl(
-  ctx: EditorContext,
+  ctx: BeginReelDragContext,
   sectionId: string,
   fromIdx: number,
   startEv: MouseEvent,
@@ -337,7 +375,7 @@ export function beginReelDragImpl(
   window.addEventListener('mouseup', onUp);
 }
 
-export function attachGripHandlersImpl(ctx: EditorContext): void {
+export function attachGripHandlersImpl(ctx: AttachGripHandlersContext): void {
   if (!ctx.root) return;
   const root = ctx.root;
   root.addEventListener('mousedown', (ev) => {

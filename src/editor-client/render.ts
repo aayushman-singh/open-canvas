@@ -69,7 +69,7 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type { EditorContext, StateContext } from './editor-context.js';
 import {
   ARTBOARD_LABEL_HEIGHT,
   PAGE_GAP,
@@ -81,6 +81,37 @@ import { applyCustomKitCss } from './custom-kit-css.js';
 import { augmentCollectionPreviewsImpl } from './collection-preview.js';
 import { mountTemplateEditChromeImpl } from './collection-template-edit-view.js';
 
+// ADR 0064 — narrow Pick-based contexts for render.ts. The camera +
+// pagePositions cluster has no canonical alias yet; per-function shapes
+// share `CameraTransformContext` (the write-the-camera-into-the-DOM
+// surface), `CameraProjectionContext` (the screen↔world projection),
+// and `PagePositionsReaderContext` (the page-bounds lookup) so the
+// projection helpers and the fit/pan/renderAll verbs don't redeclare
+// their overlap. `StateContext` from editor-context.ts is folded in
+// where the page list is read. Two forward-casts remain inside
+// renderAllImpl — `augmentCollectionPreviewsImpl(ctx as EditorContext)`
+// and `mountTemplateEditChromeImpl(ctx as EditorContext)` — until those
+// modules land their own ADR 0064 carves.
+
+// ADR 0064 — write the camera state into the canvas root + zoom readout.
+// Optional remote-cursor + mark-toolbar reflow hooks are kept optional
+// at the type level so the boot-time `typeof === 'function'` gates stay
+// honest (they fire only after the co-edit / mark clusters wire in).
+export type CameraTransformContext = Pick<
+  EditorContext,
+  'root' | 'camera' | 'zoomReadout' | 'repaintRemoteCursors' | 'onMarkToolbarReflow'
+>;
+
+// ADR 0064 — viewport + camera together drive every screen↔world
+// projection. screenToWorld / worldToScreen ride this exact pair; the
+// fit / pan verbs extend it with the CameraTransform surface.
+export type CameraProjectionContext = Pick<EditorContext, 'viewport' | 'camera'>;
+
+// ADR 0064 — page-positions cache reader. getPagePosition is internal
+// but its surface flows into fitToPage / panToPage / fitAllPages, so it
+// earns its own narrow type instead of inline Picks at three call sites.
+export type PagePositionsReaderContext = Pick<EditorContext, 'pagePositions'>;
+
 export function clampZoom(value: number, max?: number): number {
   if (!Number.isFinite(value)) return 1;
   const upper = typeof max === 'number' ? max : ZOOM_MAX_MANUAL;
@@ -90,8 +121,11 @@ export function clampZoom(value: number, max?: number): number {
   return Math.round(value * 10) / 10;
 }
 
+// ADR 0064 — screen → world pointer projection. Rides the bare
+// viewport + camera pair; co-edit.ts and runtime-helpers.ts already
+// pass `ctx: EditorContext`, which is structurally a CameraProjectionContext.
 export function screenToWorld(
-  ctx: EditorContext,
+  ctx: CameraProjectionContext,
   screenX: number,
   screenY: number,
 ): { x: number; y: number } {
@@ -103,8 +137,11 @@ export function screenToWorld(
   };
 }
 
+// ADR 0064 — inverse of screenToWorld. Same CameraProjectionContext
+// surface; co-edit.ts is the sole external caller and passes the wide
+// EditorContext, which satisfies the narrower view structurally.
 export function worldToScreen(
-  ctx: EditorContext,
+  ctx: CameraProjectionContext,
   worldX: number,
   worldY: number,
 ): { x: number; y: number } {
@@ -116,7 +153,11 @@ export function worldToScreen(
   };
 }
 
-export function applyCameraTransform(ctx: EditorContext): void {
+// ADR 0064 — write camera.x/y/zoom into the canvas-root CSS transform
+// + zoom-readout text, then fan out to the optional remote-cursor and
+// mark-toolbar reflow hooks. ai-integration / collection-template-edit-
+// view / section-toolbar / runtime-helpers all pass `ctx: EditorContext`.
+export function applyCameraTransform(ctx: CameraTransformContext): void {
   if (!ctx.root) return;
   ctx.root.style.transform =
     'translate(' + ctx.camera.x + 'px, ' + ctx.camera.y + 'px) scale(' + ctx.camera.zoom + ')';
@@ -139,13 +180,24 @@ export function applyCameraTransform(ctx: EditorContext): void {
   }
 }
 
-export function setZoom(ctx: EditorContext, newZoom: number, maxClamp?: number): void {
+// ADR 0064 — clampZoom + applyCameraTransform. Needs the
+// CameraTransform surface plus a writable camera; the latter rides
+// inside CameraTransformContext (camera is a non-readonly field on
+// EditorContext, so the Pick stays mutable).
+export function setZoom(
+  ctx: CameraTransformContext,
+  newZoom: number,
+  maxClamp?: number,
+): void {
   ctx.camera.zoom = clampZoom(newZoom, maxClamp);
   applyCameraTransform(ctx);
 }
 
+// ADR 0064 — pinned-point zoom (wheel + pinch). Needs the viewport's
+// bounding rect on top of the CameraTransform surface, so the param
+// type is the intersection of both narrow views.
 export function zoomAtPoint(
-  ctx: EditorContext,
+  ctx: CameraTransformContext & Pick<EditorContext, 'viewport'>,
   newZoom: number,
   screenX: number,
   screenY: number,
@@ -160,7 +212,17 @@ export function zoomAtPoint(
   applyCameraTransform(ctx);
 }
 
-export function fitToPage(ctx: EditorContext, pageId: string | null): void {
+// ADR 0064 — center the named page in the viewport and auto-zoom up to
+// ZOOM_MAX_FIT (100%). Exported narrow type so save-wiring.ts can drop
+// its `ctx as EditorContext` forward-cast on the `1` shortcut. Surface =
+// CameraTransform (write camera + DOM) + viewport (bounding rect) +
+// pagePositions (page bounds) + StateContext (currentPage default).
+export type FitToPageContext = CameraTransformContext &
+  Pick<EditorContext, 'viewport'> &
+  PagePositionsReaderContext &
+  Pick<StateContext, 'currentPage'>;
+
+export function fitToPage(ctx: FitToPageContext, pageId: string | null): void {
   if (!ctx.viewport) return;
   const page = ctx.currentPage();
   const pos = getPagePosition(ctx, pageId || (page && page.id));
@@ -179,7 +241,10 @@ export function fitToPage(ctx: EditorContext, pageId: string | null): void {
   applyCameraTransform(ctx);
 }
 
-export function fitZoom(ctx: EditorContext): void {
+// ADR 0064 — toolbar "Fit" button — straight delegate to fitToPage with
+// a null page id (which then resolves the active page through
+// ctx.currentPage). Rides the same FitToPageContext surface.
+export function fitZoom(ctx: FitToPageContext): void {
   fitToPage(ctx, null);
 }
 
@@ -200,7 +265,15 @@ export function fitZoom(ctx: EditorContext): void {
 //   rect.left. The page's center sits at world.x = pos.x + pos.width/2.
 //   Setting its screen.x to rect.left + rect.width/2 and solving for
 //   camera.x gives the formula above.
-export function panToPage(ctx: EditorContext, pageId: string | null): void {
+// ADR 0064 — pan-only camera move; centers the named page at the
+// current zoom without ever touching camera.zoom. Same surface as
+// FitToPage minus the currentPage default (callers always pass a
+// concrete pageId — set-active-page-pan smoke pins that contract).
+export type PanToPageContext = CameraTransformContext &
+  Pick<EditorContext, 'viewport'> &
+  PagePositionsReaderContext;
+
+export function panToPage(ctx: PanToPageContext, pageId: string | null): void {
   if (!ctx.viewport) return;
   const pos = getPagePosition(ctx, pageId);
   if (!pos) return;
@@ -211,7 +284,14 @@ export function panToPage(ctx: EditorContext, pageId: string | null): void {
   applyCameraTransform(ctx);
 }
 
-export function computePagePositions(ctx: EditorContext): void {
+// ADR 0064 — rebuild pagePositions[] from state.pages (sums per-section
+// height + header/footer). Writes the result back onto ctx.pagePositions
+// in place, so the param surface needs both the state reader and the
+// pagePositions slot.
+export type ComputePagePositionsContext = Pick<EditorContext, 'state'> &
+  PagePositionsReaderContext;
+
+export function computePagePositions(ctx: ComputePagePositionsContext): void {
   if (!ctx.state || !ctx.state.pages) {
     ctx.pagePositions = [];
     return;
@@ -238,8 +318,10 @@ export function computePagePositions(ctx: EditorContext): void {
   ctx.pagePositions = positions;
 }
 
+// ADR 0064 — pagePositions lookup by id. Internal helper for the
+// fit/pan verbs; PagePositionsReaderContext is sufficient surface.
 export function getPagePosition(
-  ctx: EditorContext,
+  ctx: PagePositionsReaderContext,
   pageId: string | null | undefined,
 ): EditorContext['pagePositions'][number] | null {
   for (let i = 0; i < ctx.pagePositions.length; i++) {
@@ -248,7 +330,17 @@ export function getPagePosition(
   return null;
 }
 
-export function fitAllPages(ctx: EditorContext): void {
+// ADR 0064 — center the bounding box of every artboard in the viewport
+// and auto-zoom up to ZOOM_MAX_FIT (100%). Exported narrow type so
+// save-wiring.ts can drop its `ctx as EditorContext` forward-cast on
+// the `0` shortcut. Surface = CameraTransform (write camera + DOM) +
+// viewport (bounding rect) + pagePositions (all-page bounds). No state
+// reader needed — the bounds come straight off pagePositions.
+export type FitAllPagesContext = CameraTransformContext &
+  Pick<EditorContext, 'viewport'> &
+  PagePositionsReaderContext;
+
+export function fitAllPages(ctx: FitAllPagesContext): void {
   if (!ctx.viewport || ctx.pagePositions.length === 0) return;
   const rect = ctx.viewport.getBoundingClientRect();
   const pad = 64;
@@ -279,7 +371,37 @@ export function fitAllPages(ctx: EditorContext): void {
 
 // -- renderAll orchestrator ---------------------------------------------
 
-export function renderAllImpl(ctx: EditorContext): void {
+// ADR 0064 — top-level render. Touches the widest surface in this
+// module: ComputePagePositions (state → pagePositions rebuild), every
+// page-build verb (applyPageMotionAttributes, applyPageStyleProperties,
+// pageRenderWidth, buildSectionNode), ghostSections + activePageId for
+// the artboard chrome, mainEl + syncSidebarStyleKitButtons for the
+// style-kit chip sync, CameraTransform for the final paint, then
+// renderInspector / renderReel / autoGrowTextElements / placement
+// slots. No canonical alias covers the page-build verbs yet, so they
+// live as an inline Pick. The two augment* / mount* helpers still take
+// the wide EditorContext (their own ADR 0064 carves are pending), so
+// those two forward sites cast through EditorContext below.
+export type RenderAllContext = ComputePagePositionsContext &
+  CameraTransformContext &
+  AutoGrowTextElementsContext &
+  BuildGhostSectionNodeContext &
+  Pick<
+    EditorContext,
+    | 'activePageId'
+    | 'ghostSections'
+    | 'mainEl'
+    | 'applyPageMotionAttributes'
+    | 'applyPageStyleProperties'
+    | 'pageRenderWidth'
+    | 'syncSidebarStyleKitButtons'
+    | 'renderInspector'
+    | 'renderReel'
+    | 'pendingImport'
+    | 'renderPlacementSlots'
+  >;
+
+export function renderAllImpl(ctx: RenderAllContext): void {
   if (!ctx.state) return;
   computePagePositions(ctx);
 
@@ -371,14 +493,19 @@ export function renderAllImpl(ctx: EditorContext): void {
   // strictly after autoGrowTextElements so the inner frame's final box
   // dimensions are settled; the augmenter is idempotent so a redundant
   // call on a no-Collection page is a cheap zero-iteration loop.
-  augmentCollectionPreviewsImpl(ctx);
+  // ADR 0064 — augmentCollectionPreviewsImpl still takes the wide
+  // EditorContext; cast until collection-preview.ts narrows under its
+  // own carve.
+  augmentCollectionPreviewsImpl(ctx as EditorContext);
   // ADR 0065 D5 — mount the in-place template-edit chrome (banner, Done
   // button, scrim, viewport pan) when ctx.editingCollectionTemplate pins
   // a Collection. Idempotent — runs after augmentCollectionPreviewsImpl
   // so the placeholder-card branch settles first, then this layer
   // overlays the active template's chrome. When the field is null the
   // mount no-ops after stripping any stale chrome.
-  mountTemplateEditChromeImpl(ctx);
+  // ADR 0064 — mountTemplateEditChromeImpl still takes the wide
+  // EditorContext; cast until collection-template-edit-view.ts narrows.
+  mountTemplateEditChromeImpl(ctx as EditorContext);
 
   if (ctx.pendingImport) {
     ctx.renderPlacementSlots();
@@ -389,7 +516,15 @@ export function renderAllImpl(ctx: EditorContext): void {
   }
 }
 
-export function autoGrowTextElements(ctx: EditorContext): void {
+// ADR 0064 — walk the live DOM to grow text wrappers to their content
+// height. Needs root for the scoped query, findElement for the box
+// lookup, and setBoxStyle to push the new height back onto the wrapper.
+export type AutoGrowTextElementsContext = Pick<
+  EditorContext,
+  'root' | 'findElement' | 'setBoxStyle'
+>;
+
+export function autoGrowTextElements(ctx: AutoGrowTextElementsContext): void {
   const wrappers = ctx.root!.querySelectorAll('[data-element-type="text"]');
   for (let i = 0; i < wrappers.length; i++) {
     const w = wrappers[i] as HTMLElement;
@@ -417,8 +552,13 @@ export function autoGrowTextElements(ctx: EditorContext): void {
 // authoritative Accept/Reject live on the chat suggestion card.
 // ---------------------------------------------------------------------------
 
+// ADR 0064 — private helper. Only reaches ctx.buildSectionNode for
+// the inner section node; the wrapper chrome is built directly with
+// document.createElement.
+export type BuildGhostSectionNodeContext = Pick<EditorContext, 'buildSectionNode'>;
+
 function buildGhostSectionNode(
-  ctx: EditorContext,
+  ctx: BuildGhostSectionNodeContext,
   ghost: EditorContext['ghostSections'][number],
   renderWidth: number,
 ): HTMLElement {

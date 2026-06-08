@@ -37,34 +37,35 @@
 //          src/editor-client/index.ts alongside the existing
 //          canvas-add-page wiring.
 
-import type { EditorContext } from './editor-context.js';
+import type { EditorContext, StatusEmitterContext } from './editor-context.js';
 import type { CanvasPage, EditableSite } from '../canvas/schema.js';
 import { WIZARD_DEFAULT_SLUG } from '../canvas/collections-scaffold.js';
 
-/** Subset of EditorContext the wizard actually depends on. Carrying the
- *  narrow shape — instead of leaning on the full EditorContext — keeps
- *  the smoke's mock ctx small (otherwise the smoke has to populate ~150
- *  unrelated ctx fields, see inspector-actions.smoke.ts for the cost). */
-export interface CollectionScaffoldCtx {
-  apiBase: string;
-  siteId: string;
-  siteBase: string;
-  state: EditableSite | null;
-  authFetch(input: RequestInfo, init?: RequestInit): Promise<Response>;
-  openTextModal(opts: {
-    title?: string | undefined;
-    label?: string | undefined;
-    defaultValue?: string | undefined;
-    placeholder?: string | undefined;
-  }): Promise<string | null>;
-  setStatus(text: string, tone?: 'ok' | 'error' | 'info'): void;
-  flushPendingSave(): Promise<boolean>;
-  migrateState(state: EditableSite): EditableSite;
-  setActivePage(pageId: string | null): void;
-  panToPage(pageId: string | null): void;
-  renderAll(): void;
-  updatePageSidebar(): void;
-}
+// ADR 0064 — collection-scaffold's wizard touches one canonical cluster
+// (StatusEmitterContext for the toast surface) plus a grab bag of
+// persist/state/render/page-navigation/modal verbs. The canonical
+// StateContext / RenderContext / PersistContext aliases would each pull
+// in members the wizard never reads (findElement, renderInspector,
+// captureForUndo, etc.); declaring the surface as a single inline `Pick`
+// keeps the smoke's mock ctx (collection-scaffold.smoke.ts) at exactly
+// the 13 fields the wizard actually exercises. Exported because the
+// smoke imports it as the mock ctx's structural shape.
+export type CollectionScaffoldCtx = StatusEmitterContext &
+  Pick<
+    EditorContext,
+    | 'apiBase'
+    | 'siteId'
+    | 'siteBase'
+    | 'state'
+    | 'authFetch'
+    | 'openTextModal'
+    | 'flushPendingSave'
+    | 'migrateState'
+    | 'setActivePage'
+    | 'panToPage'
+    | 'renderAll'
+    | 'updatePageSidebar'
+  >;
 
 /** Slug rule mirrors `SLUG_RE` in src/canvas/collections-scaffold.ts so the
  *  client surfaces the same rejection the server would emit, without a round
@@ -288,7 +289,7 @@ export async function runCollectionScaffoldFlowImpl(
  *  multiple entry points (Pages tab, Add tab, future surfaces) share one
  *  handler without duplicating the flow. No-op when no buttons are
  *  present (smokes, edit-token surfaces without the sidebar, etc.). */
-export function attachCollectionScaffoldButtonImpl(ctx: EditorContext): void {
+export function attachCollectionScaffoldButtonImpl(ctx: CollectionScaffoldCtx): void {
   const buttons = document.querySelectorAll('[data-canvas-add-collection]');
   buttons.forEach((btn) => {
     btn.addEventListener('click', () => {

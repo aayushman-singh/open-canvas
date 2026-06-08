@@ -25,7 +25,12 @@
 //     row when a column is deleted. Cell ids use ctx.newElementId (sub-
 //     items get fresh ids) so the IIFE twin's id contract is preserved.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type { AccordionElement } from '../canvas/elements/accordion.js';
 import type { CarouselElement } from '../canvas/elements/carousel.js';
 import type { TableElement } from '../canvas/elements/table.js';
@@ -33,8 +38,32 @@ import type { InlineRun } from '../canvas/schema.js';
 import { field } from './dom-builders.js';
 import { newElementId } from './ids.js';
 
+// ADR 0064 — accordion-items mount carve. Render (rebuildElement after each
+// title/body/add/remove) + persist (scheduleSave on the same writes) +
+// serializeContentToRuns to round-trip the contentEditable body back to
+// InlineRun[] on blur. No status surface; the accordion editor has no
+// error-toast paths beyond the inline tag-stripping in runsToHtml.
+export type MountAccordionItemsContext = RenderContext &
+  PersistContext &
+  Pick<EditorContext, 'serializeContentToRuns'>;
+
+// ADR 0064 — carousel-slides mount carve. Render + persist + status (upload
+// in-flight / failure toasts) plus the two upload primitives the carousel
+// shares with the media picker: buildPickerThumb for the slide thumbnail and
+// postAssetUpload for the upload-image button's POST.
+export type MountCarouselSlidesContext = RenderContext &
+  PersistContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'buildPickerThumb' | 'postAssetUpload'>;
+
+// ADR 0064 — table-grid mount carve. Pure render + persist surface — every
+// cell/column/row mutation goes rebuildElement → scheduleSave, with no
+// status emission and no module-specific verbs. The two canonical clusters
+// say everything this mount touches.
+export type MountTableGridContext = RenderContext & PersistContext;
+
 export function mountAccordionItems(
-  ctx: EditorContext,
+  ctx: MountAccordionItemsContext,
   element: AccordionElement,
   host: HTMLElement,
 ): void {
@@ -164,7 +193,7 @@ export function mountAccordionItems(
 }
 
 export function mountCarouselSlides(
-  ctx: EditorContext,
+  ctx: MountCarouselSlidesContext,
   element: CarouselElement,
   host: HTMLElement,
 ): void {
@@ -271,7 +300,7 @@ export function mountCarouselSlides(
 }
 
 export function mountTableGrid(
-  ctx: EditorContext,
+  ctx: MountTableGridContext,
   element: TableElement,
   host: HTMLElement,
 ): void {

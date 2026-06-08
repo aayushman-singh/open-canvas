@@ -25,14 +25,19 @@
 //   - assertFormOptionShape throws on malformed option entries (no
 //     silent skip — see CLAUDE.md "no fallbacks" stance).
 
-import type { EditorContext } from './editor-context.js';
+import type { PersistContext, RenderContext } from './editor-context.js';
 import type { FormElement, FormFieldDef, FormStyle } from '../canvas/elements/form.js';
 import { field, selectInput } from './dom-builders.js';
 import { newElementId } from './ids.js';
 import { buildColorRow } from './inspector-leaf-builders.js';
 
+// ADR 0064 — form inspector mounts share one tiny surface: rebuildElement
+// after each field/style mutation (RenderContext) and scheduleSave to
+// debounce the server save (PersistContext). No module-specific verbs.
+export type InspectorFormMountContext = RenderContext & PersistContext;
+
 export function mountFormFields(
-  ctx: EditorContext,
+  ctx: InspectorFormMountContext,
   element: FormElement,
   host: HTMLElement,
 ): void {
@@ -217,7 +222,7 @@ export function mountFormFields(
 }
 
 export function mountFormStyle(
-  ctx: EditorContext,
+  ctx: InspectorFormMountContext,
   element: FormElement,
   host: HTMLElement,
 ): void {

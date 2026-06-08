@@ -48,14 +48,60 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type { StyleKit } from '../canvas/schema.js';
 import { STYLE_KITS } from './shared-constants.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
 
 const STYLE_KITS_LIST = STYLE_KITS as readonly string[];
 
-export function buildKitSummary(ctx: EditorContext): HTMLElement {
+// ADR 0064 — kit summary reads ctx.mainEl off DomContext and ctx.state
+// off StateContext. No verbs, no status, no persist — the summary is
+// pure read-side, so two canonical aliases cover it without an inline Pick.
+export type BuildKitSummaryContext = DomContext & StateContext;
+
+// ADR 0064 — chip-row sync only reads ctx.state to compare each chip's
+// data-sidebar-style-kit against the active kit. StateContext alone is
+// the honest minimal surface.
+export type SyncSidebarStyleKitButtonsContext = StateContext;
+
+// ADR 0064 — apply-kit touches four canonical clusters (StateContext for
+// state mutation, DomContext for the mainEl mirror, RenderContext for
+// the inspector re-render, PersistContext for captureForUndo + authFetch,
+// StatusEmitterContext for the toast) plus three verbs / one identity
+// field that no canonical alias owns yet — the chip-row sync verb, the
+// debounced-save flusher, and the per-site URL base.
+export type ApplySidebarStyleKitContext = StateContext &
+  DomContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'syncSidebarStyleKitButtons' | 'flushPendingSave' | 'siteBase'>;
+
+// ADR 0064 — tab wiring only forwards every click into the single
+// activateSidebarTab verb. No canonical cluster fits, so the surface is
+// an inline one-field Pick.
+export type AttachSidebarTabsContext = Pick<EditorContext, 'activateSidebarTab'>;
+
+// ADR 0064 — sidebar-actions wiring reads two DomContext refs (sidebar +
+// inspector) and forwards into applySidebarStyleKit (so it must satisfy
+// that alias too) plus three sidebar / section verbs that no canonical
+// alias owns yet.
+export type AttachSidebarActionsContext = DomContext &
+  ApplySidebarStyleKitContext &
+  Pick<
+    EditorContext,
+    'addBlankSectionFromSidebar' | 'addComponentFromSidebar' | 'handleSectionAction'
+  >;
+
+export function buildKitSummary(ctx: BuildKitSummaryContext): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'opencanvas-kit-summary';
   if (!ctx.mainEl || !ctx.state || !ctx.state.styleKit) {
@@ -95,7 +141,7 @@ export function buildKitSummary(ctx: EditorContext): HTMLElement {
 }
 
 export function syncSidebarStyleKitButtonsImpl(
-  ctx: EditorContext,
+  ctx: SyncSidebarStyleKitButtonsContext,
   buttons: NodeListOf<Element>,
 ): void {
   buttons.forEach((b) => {
@@ -115,7 +161,7 @@ export function syncSidebarStyleKitButtonsImpl(
 // on, and on POST failure we roll the local state back to prevKit so the
 // UI stops lying about what's saved.
 export async function applySidebarStyleKit(
-  ctx: EditorContext,
+  ctx: ApplySidebarStyleKitContext,
   kit: string | null,
   buttons: NodeListOf<Element>,
 ): Promise<void> {
@@ -171,7 +217,7 @@ export async function applySidebarStyleKit(
   }
 }
 
-export function attachSidebarTabs(ctx: EditorContext): void {
+export function attachSidebarTabs(ctx: AttachSidebarTabsContext): void {
   // Listeners attach to the 3 static tabs rendered in route.tsx (Add /
   // Sections / Pages). The Versions tab is mounted dynamically later by
   // ensureVersionsTabMounted and brings its own click handler. All four
@@ -191,7 +237,7 @@ export function attachSidebarTabs(ctx: EditorContext): void {
   });
 }
 
-export function attachSidebarActions(ctx: EditorContext): void {
+export function attachSidebarActions(ctx: AttachSidebarActionsContext): void {
   if (!ctx.sidebar) return;
   const sectionButtons = ctx.sidebar.querySelectorAll('[data-sidebar-add-section]');
   sectionButtons.forEach((button) => {

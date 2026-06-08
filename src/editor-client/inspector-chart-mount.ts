@@ -26,11 +26,17 @@
 //   - Empty-state hint appears only when both series.length === 0 and
 //     cats.length === 0.
 
-import type { EditorContext } from './editor-context.js';
+import type { PersistContext, RenderContext } from './editor-context.js';
 import type { ChartElement } from '../canvas/elements/chart.js';
 
+// ADR 0064 — chart-mount carve. Two canonical clusters cover the entire
+// surface: RenderContext for rebuildElement (repaint the canvas after every
+// grid mutation) and PersistContext for scheduleSave (debounced save on
+// commit). No module-specific verbs, so no inline Pick.
+export type InspectorChartMountContext = RenderContext & PersistContext;
+
 export function mountChartData(
-  ctx: EditorContext,
+  ctx: InspectorChartMountContext,
   element: ChartElement,
   host: HTMLElement,
 ): void {

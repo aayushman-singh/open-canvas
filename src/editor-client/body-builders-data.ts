@@ -32,7 +32,12 @@ import type { FormElement } from '../canvas/elements/form.js';
 import type { NavElement } from '../canvas/elements/nav.js';
 import type { TableElement } from '../canvas/elements/table.js';
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+} from './editor-context.js';
 import { isAllowedHref } from './href-utils.js';
 import { previewPaletteFromAccent } from './palette.js';
 import {
@@ -41,7 +46,96 @@ import {
   buildMediaBodyImpl,
   buildShapeBodyImpl,
   buildTextBodyImpl,
+  type BuildActionBodyContext,
+  type BuildContainerBodyContext,
+  type BuildMediaBodyContext,
+  type BuildShapeBodyContext,
+  type BuildTextBodyContext,
 } from './body-builders-basic.js';
+
+// ADR 0064 — chart preview reads the kit accent off `ctx.mainEl`'s
+// computed style; the helper + the public builder share this single-DOM
+// read surface so they ride DomContext alone.
+export type BuildChartBodyContext = DomContext;
+
+// ADR 0064 — form preview is pure DOM scaffolding from the FormElement.
+// Empty Pick honestly states "this builder touches no editor surface."
+export type BuildFormBodyContext = Pick<EditorContext, never>;
+
+// ADR 0064 — embed preview ignores ctx; only the element shape drives
+// the DOM. Empty Pick keeps the dispatcher signature uniform.
+export type BuildEmbedBodyContext = Pick<EditorContext, never>;
+
+// ADR 0064 — code preview ignores ctx; the <pre> body comes purely from
+// `element.source`. Empty Pick keeps the dispatcher signature uniform.
+export type BuildCodeBodyContext = Pick<EditorContext, never>;
+
+// ADR 0064 — accordion preview ignores ctx; <details>/<summary> markup
+// is driven entirely off `element.items`. Empty Pick keeps the
+// dispatcher signature uniform.
+export type BuildAccordionBodyContext = Pick<EditorContext, never>;
+
+// ADR 0064 — carousel preview composes per-slide image URLs from
+// `ctx.siteBase`; the local hydrate-preview helper only mutates the
+// wrapper DOM, not ctx. Single-field surface, no canonical alias yet.
+export type BuildCarouselBodyContext = Pick<EditorContext, 'siteBase'>;
+
+// ADR 0064 — table preview ignores ctx; the <table> body is built from
+// `element.columns` + `element.rows`. Empty Pick keeps the dispatcher
+// signature uniform.
+export type BuildTableBodyContext = Pick<EditorContext, never>;
+
+// ADR 0064 — private nav-link anchor helper routes internal clicks
+// through `ctx.goToHrefOnCanvas`. Single-verb surface; no canonical
+// alias owns it, so an inline `Pick` declares the contract honestly.
+export type BuildNavLinkAnchorContext = Pick<EditorContext, 'goToHrefOnCanvas'>;
+
+// ADR 0064 — nav preview composes the logo URL from `ctx.siteBase` and
+// reuses the link helper's `goToHrefOnCanvas` verb for every nav-link +
+// the primary action. Intersection of the two narrow shapes.
+export type BuildNavBodyContext = BuildNavLinkAnchorContext &
+  Pick<EditorContext, 'siteBase'>;
+
+// ADR 0064 — collection preview reads the template-edit pin
+// (`editingCollectionTemplate`) and recurses into `buildElementNode` for
+// both the per-entry card cells and the in-place custom-template edit
+// surface. Both fields sit outside the canonical aliases.
+export type BuildCollectionBodyContext = Pick<
+  EditorContext,
+  'editingCollectionTemplate' | 'buildElementNode'
+>;
+
+// ADR 0064 — tabs preview recurses into `ctx.buildElementNode` for the
+// active tab's children, mutates `element.activeTabId` on click and then
+// calls `ctx.rebuildElement` + `ctx.scheduleSave` to re-render and
+// persist. Picks up RenderContext for the rebuild, PersistContext for
+// the save, plus the local `buildElementNode` verb.
+export type BuildTabsBodyContext = RenderContext &
+  PersistContext &
+  Pick<EditorContext, 'buildElementNode'>;
+
+// ADR 0064 — buildElementBody is the per-type dispatcher; its parameter
+// surface is the union of every per-builder narrow context plus the five
+// primitive contexts re-exported from body-builders-basic.ts. The wiring
+// in index.ts hands the wide `EditorContext` here, which satisfies the
+// union; downstream code that calls `ctx.buildElementBody(...)` does so
+// through the wide EditorContext field, so this alias narrows the
+// declared surface without forcing any forward-cast.
+export type BuildElementBodyContext = BuildTextBodyContext &
+  BuildMediaBodyContext &
+  BuildActionBodyContext &
+  BuildShapeBodyContext &
+  BuildContainerBodyContext &
+  BuildChartBodyContext &
+  BuildFormBodyContext &
+  BuildEmbedBodyContext &
+  BuildCodeBodyContext &
+  BuildAccordionBodyContext &
+  BuildCarouselBodyContext &
+  BuildTableBodyContext &
+  BuildNavBodyContext &
+  BuildCollectionBodyContext &
+  BuildTabsBodyContext;
 
 // -- Chart editor preview ----------------------------------------------
 //
@@ -54,14 +148,14 @@ import {
 // matches what the server emits. No client-side chart library: ~80 lines
 // of plain DOM + a fixed-format colour-rotation.
 
-function currentChartPalette(ctx: EditorContext): string[] {
+function currentChartPalette(ctx: BuildChartBodyContext): string[] {
   if (!ctx.mainEl) return ['#888', '#888', '#888', '#888', '#888'];
   const cs = window.getComputedStyle(ctx.mainEl);
   const accent = (cs.getPropertyValue('--opencanvas-kit-accent') || '').trim();
   return previewPaletteFromAccent(accent || '#888888');
 }
 
-export function buildChartBodyImpl(ctx: EditorContext, element: ChartElement): HTMLElement {
+export function buildChartBodyImpl(ctx: BuildChartBodyContext, element: ChartElement): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-chart-preview';
   node.style.width = '100%';
@@ -175,7 +269,7 @@ export function buildChartBodyImpl(ctx: EditorContext, element: ChartElement): H
   return node;
 }
 
-export function buildFormBodyImpl(_ctx: EditorContext, element: FormElement): HTMLElement {
+export function buildFormBodyImpl(_ctx: BuildFormBodyContext, element: FormElement): HTMLElement {
   const node = document.createElement('form');
   node.className = 'opencanvas-form-preview';
   node.style.display = 'flex';
@@ -218,7 +312,7 @@ export function buildFormBodyImpl(_ctx: EditorContext, element: FormElement): HT
   return node;
 }
 
-export function buildEmbedBodyImpl(_ctx: EditorContext, element: EmbedElement): HTMLElement {
+export function buildEmbedBodyImpl(_ctx: BuildEmbedBodyContext, element: EmbedElement): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-embed-preview';
   node.style.display = 'flex';
@@ -233,7 +327,7 @@ export function buildEmbedBodyImpl(_ctx: EditorContext, element: EmbedElement): 
   return node;
 }
 
-export function buildCodeBodyImpl(_ctx: EditorContext, element: CodeElement): HTMLElement {
+export function buildCodeBodyImpl(_ctx: BuildCodeBodyContext, element: CodeElement): HTMLElement {
   const pre = document.createElement('pre');
   pre.className = 'opencanvas-code-preview';
   pre.style.margin = '0';
@@ -246,7 +340,7 @@ export function buildCodeBodyImpl(_ctx: EditorContext, element: CodeElement): HT
   return pre;
 }
 
-export function buildAccordionBodyImpl(_ctx: EditorContext, element: AccordionElement): HTMLElement {
+export function buildAccordionBodyImpl(_ctx: BuildAccordionBodyContext, element: AccordionElement): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-accordion-preview';
   const items = Array.isArray(element.items) ? element.items : [];
@@ -277,7 +371,7 @@ export function buildAccordionBodyImpl(_ctx: EditorContext, element: AccordionEl
 // the Owner no sense of how the carousel would behave on the published
 // page; this gives a true preview that respects direction, arrow position,
 // and arrow style presets.
-export function buildCarouselBodyImpl(ctx: EditorContext, element: CarouselElement): HTMLElement {
+export function buildCarouselBodyImpl(ctx: BuildCarouselBodyContext, element: CarouselElement): HTMLElement {
   const slides = Array.isArray(element.slides) ? element.slides : [];
   const count = slides.length;
   const direction = element.direction === 'vertical' ? 'vertical' : 'horizontal';
@@ -435,7 +529,7 @@ function hydrateCarouselPreview(root: HTMLElement, count: number): void {
   }
 }
 
-export function buildTableBodyImpl(_ctx: EditorContext, element: TableElement): HTMLElement {
+export function buildTableBodyImpl(_ctx: BuildTableBodyContext, element: TableElement): HTMLElement {
   const table = document.createElement('table');
   table.className = 'opencanvas-table-preview';
   table.style.width = '100%';
@@ -481,7 +575,7 @@ export function buildTableBodyImpl(_ctx: EditorContext, element: TableElement): 
 // window.open for external, no-op for anchor). Used for both nav-bar links
 // and the primary-action CTA so the click semantics stay identical.
 function buildNavLinkAnchor(
-  ctx: EditorContext,
+  ctx: BuildNavLinkAnchorContext,
   link: { label: string; href: string; kind: string },
   className: string,
 ): HTMLAnchorElement {
@@ -518,7 +612,7 @@ function buildNavLinkAnchor(
   return a;
 }
 
-export function buildNavBodyImpl(ctx: EditorContext, element: NavElement): HTMLElement {
+export function buildNavBodyImpl(ctx: BuildNavBodyContext, element: NavElement): HTMLElement {
   // Mirrors src/canvas/elements/nav.ts renderNav exactly so kit CSS selectors
   // matching .opencanvas-nav[data-opencanvas-nav-layout] and the slot rules
   // in editor styles fire on the editor preview the same way they fire on the
@@ -579,7 +673,7 @@ export function buildNavBodyImpl(ctx: EditorContext, element: NavElement): HTMLE
   return nav;
 }
 
-export function buildCollectionBodyImpl(ctx: EditorContext, element: CollectionElement): HTMLElement {
+export function buildCollectionBodyImpl(ctx: BuildCollectionBodyContext, element: CollectionElement): HTMLElement {
   // ADR 0065 D5 — when this Collection's custom template is in edit mode,
   // render ONE editable instance of `element.customTemplate` instead of the
   // N-clone entries grid. The template elements carry their own absolute
@@ -705,7 +799,7 @@ export function buildCollectionBodyImpl(ctx: EditorContext, element: CollectionE
   return node;
 }
 
-export function buildTabsBodyImpl(ctx: EditorContext, element: TabsElement): HTMLElement {
+export function buildTabsBodyImpl(ctx: BuildTabsBodyContext, element: TabsElement): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-tabs';
   node.style.position = 'relative';
@@ -787,7 +881,7 @@ export function buildTabsBodyImpl(ctx: EditorContext, element: TabsElement): HTM
   return node;
 }
 
-export function buildElementBodyImpl(ctx: EditorContext, element: CanvasElement): HTMLElement {
+export function buildElementBodyImpl(ctx: BuildElementBodyContext, element: CanvasElement): HTMLElement {
   switch (element.type) {
     case 'text':
       return buildTextBodyImpl(ctx, element);

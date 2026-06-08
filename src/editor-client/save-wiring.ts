@@ -50,6 +50,8 @@ import type {
   EditorContext,
   SelectionContext,
 } from './editor-context.js';
+import type { FitAllPagesContext, FitToPageContext } from './render.js';
+import type { RedoContext, UndoContext } from './persist.js';
 import { fitToPage, fitAllPages } from './render.js';
 import { undo, redo } from './persist.js';
 import { handleDeleteShortcut } from './delete-shortcut.js';
@@ -58,16 +60,22 @@ import { handleDeleteShortcut } from './delete-shortcut.js';
 // canonical cluster (DomContext for the two button refs) plus the
 // editing latch from SelectionContext, then a grab bag of save /
 // placement / pan-mode / fit-shortcut verbs + state that no canonical
-// alias owns yet. The inline `Pick` enumerates the local grab bag, and
+// alias owns yet. The inline `Pick` enumerates the local grab bag,
 // `DeleteShortcutContext` is folded in so the forwarded
-// `handleDeleteShortcut(ctx, ev)` call typechecks without a cast.
-// `undo(ctx)` / `redo(ctx)` / `fitToPage(ctx, …)` / `fitAllPages(ctx)`
-// still take the wide `EditorContext` (their own ADR 0064 carves are
-// pending), so those four call sites cast through `EditorContext` until
-// the callees narrow.
+// `handleDeleteShortcut(ctx, ev)` call typechecks without a cast, and
+// `UndoContext` / `RedoContext` / `FitToPageContext` / `FitAllPagesContext`
+// fold in the narrow surfaces of the four forwarded callees in persist.ts
+// and render.ts so the four keyboard-shortcut call sites typecheck
+// without `ctx as EditorContext`. (Earlier carves of this file retained
+// those casts as ADR 0064 scaffolding until persist.ts and render.ts
+// carved; they have, so the scaffolding retires here.)
 export type AttachSaveButtonContext = DomContext &
   SelectionContext &
   DeleteShortcutContext &
+  UndoContext &
+  RedoContext &
+  FitToPageContext &
+  FitAllPagesContext &
   Pick<
     EditorContext,
     | 'saveTimer'
@@ -117,9 +125,7 @@ export function attachSaveButtonImpl(ctx: AttachSaveButtonContext): void {
       // handler drives undo(ctx) / redo(ctx) directly. No ctx-method
       // wrapper exists yet (and would just re-import from this side),
       // so the static imports above are the binding.
-      // ADR 0064 — undo/redo still take wide EditorContext; cast until
-      // persist.ts narrows under its own carve.
-      undo(ctx as EditorContext);
+      undo(ctx);
       return;
     }
     if (
@@ -128,7 +134,7 @@ export function attachSaveButtonImpl(ctx: AttachSaveButtonContext): void {
         ((ev.key === 'z' || ev.key === 'Z') && ev.shiftKey))
     ) {
       ev.preventDefault();
-      redo(ctx as EditorContext);
+      redo(ctx);
       return;
     }
     const isSave = mod && (ev.key === 's' || ev.key === 'S');
@@ -177,13 +183,11 @@ export function attachSaveButtonImpl(ctx: AttachSaveButtonContext): void {
     }
     if (ev.key === '1' && !ctx.isEditableShortcutTarget(ev.target)) {
       ev.preventDefault();
-      // ADR 0064 — fitToPage/fitAllPages still take wide EditorContext;
-      // cast until render.ts narrows under its own carve.
-      fitToPage(ctx as EditorContext, ctx.activePageId);
+      fitToPage(ctx, ctx.activePageId);
     }
     if (ev.key === '0' && !ctx.isEditableShortcutTarget(ev.target)) {
       ev.preventDefault();
-      fitAllPages(ctx as EditorContext);
+      fitAllPages(ctx);
     }
   });
   window.addEventListener('keyup', (ev) => {

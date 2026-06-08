@@ -28,13 +28,52 @@ import type { ActionHref } from '../canvas/elements/action.js';
 import { renderInlineRun } from '../canvas/elements/render-utils.js';
 import { renderIconSvg, isIconName } from '../canvas/icons.js';
 
-import type { EditorContext } from './editor-context.js';
+import type { EditorContext, StateContext } from './editor-context.js';
 import { isAllowedHref } from './href-utils.js';
+
+// ADR 0064 — resolveActionHrefLocal only reads `ctx.state` to walk the
+// pages array for `{ type: 'page' }` href shapes. StateContext is the
+// canonical alias that owns `state`; the broader findElement/currentPage
+// helpers ride along but are unused here.
+export type ResolveActionHrefContext = StateContext;
+
+// ADR 0064 — text body builder forwards each InlineRun through
+// `ctx.buildRunNode` to render marks (bold/italic/inline-link). No
+// canonical alias owns buildRunNode yet, so the inline `Pick` declares
+// the single-verb surface honestly.
+export type BuildTextBodyContext = Pick<EditorContext, 'buildRunNode'>;
+
+// ADR 0064 — media body builder composes the owner-gated preview URL
+// from `ctx.siteBase`. Single field, no canonical alias yet, so an inline
+// `Pick` keeps the surface honest at this call site.
+export type BuildMediaBodyContext = Pick<EditorContext, 'siteBase'>;
+
+// ADR 0064 — action body builder forwards to `resolveActionHrefLocal`
+// (which rides `StateContext`) and reacts to alt+click by swapping the
+// active artboard and panning the camera. The two verbs sit outside the
+// canonical aliases; the inline `Pick` intersects them with the alias the
+// href resolver needs.
+export type BuildActionBodyContext = ResolveActionHrefContext &
+  Pick<EditorContext, 'setActivePage' | 'panToPage'>;
+
+// ADR 0064 — shape body builder only reads `ctx.ICON_SVG_MAP` for the
+// 'icon' variant. Single-field surface, no canonical alias yet, so the
+// inline `Pick` declares it directly.
+export type BuildShapeBodyContext = Pick<EditorContext, 'ICON_SVG_MAP'>;
+
+// ADR 0064 — container body builder ignores ctx entirely; the parameter
+// only exists to keep the builder dispatcher's call signature uniform
+// across all primitive types. An empty `Pick` honestly says "this builder
+// touches no editor surface."
+export type BuildContainerBodyContext = Pick<EditorContext, never>;
 
 // Client-side mirror of resolveActionHref in src/canvas/action-href.ts.
 // String-typed hrefs are tolerated because migrateState may not have run yet
 // on a session whose first render fires before the migrate pass completes.
-function resolveActionHrefLocal(ctx: EditorContext, href: ActionHref | string | undefined): string {
+function resolveActionHrefLocal(
+  ctx: ResolveActionHrefContext,
+  href: ActionHref | string | undefined,
+): string {
   if (href && typeof href === 'object' && href.type === 'external') {
     if (typeof href.url !== 'string' || href.url.length === 0) {
       throw new Error('resolveActionHref: external href missing url');
@@ -57,7 +96,7 @@ function resolveActionHrefLocal(ctx: EditorContext, href: ActionHref | string | 
   throw new Error('resolveActionHref: unknown href shape');
 }
 
-export function buildTextBodyImpl(ctx: EditorContext, element: TextElement): HTMLElement {
+export function buildTextBodyImpl(ctx: BuildTextBodyContext, element: TextElement): HTMLElement {
   const tag = element.role === 'heading' ? 'h1' : element.role === 'body' ? 'p' : 'span';
   const node = document.createElement(tag);
   node.className = 'opencanvas-text';
@@ -95,7 +134,7 @@ export function buildTextBodyImpl(ctx: EditorContext, element: TextElement): HTM
 // new media element via the section toolbar) is rendered as a non-resolving
 // hint until the Owner uploads. We keep the box visible so the Owner can
 // drag/resize it before uploading.
-export function buildMediaBodyImpl(ctx: EditorContext, element: MediaElement): HTMLElement {
+export function buildMediaBodyImpl(ctx: BuildMediaBodyContext, element: MediaElement): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-media';
   node.setAttribute('data-opencanvas-media-kind', element.mediaKind);
@@ -146,7 +185,7 @@ export function buildMediaBodyImpl(ctx: EditorContext, element: MediaElement): H
   return node;
 }
 
-export function buildActionBodyImpl(ctx: EditorContext, element: ActionElement): HTMLElement {
+export function buildActionBodyImpl(ctx: BuildActionBodyContext, element: ActionElement): HTMLElement {
   // ADR 0051 dec 3 — ActionElement is a one-of: { href } OR { behavior }.
   // The behavior arm (currently copy-to-clipboard) has no href at all, so
   // calling resolveActionHref(element.href) on it throws "unknown href
@@ -212,7 +251,7 @@ export function buildActionBodyImpl(ctx: EditorContext, element: ActionElement):
   return node;
 }
 
-export function buildShapeBodyImpl(ctx: EditorContext, element: ShapeElement): HTMLElement {
+export function buildShapeBodyImpl(ctx: BuildShapeBodyContext, element: ShapeElement): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-shape';
   node.setAttribute('data-variant', element.variant);
@@ -235,7 +274,7 @@ export function buildShapeBodyImpl(ctx: EditorContext, element: ShapeElement): H
 }
 
 export function buildContainerBodyImpl(
-  _ctx: EditorContext,
+  _ctx: BuildContainerBodyContext,
   element: ContainerElement,
 ): HTMLElement {
   const node = document.createElement('div');

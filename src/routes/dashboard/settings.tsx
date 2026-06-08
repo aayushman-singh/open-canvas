@@ -10,6 +10,7 @@ import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, readThemeCookie } from '../../ui';
+import { EDITOR_CLIENT_MANIFEST } from '../../_assets/manifest.generated';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -42,8 +43,8 @@ function formatBytes(bytes: number): string {
 //
 // The Usage panel keeps its 'tab-billing' panel id for deep-link
 // continuity with prior smoke tests. The .settings-tab / .settings-panel
-// / data-tab / data-active hooks the inline tab-switch script reads are
-// unchanged.
+// / data-tab / data-active hooks the bundled tab-switch handler reads
+// (see `src/dashboard-client/settings.ts`) are unchanged.
 const settingsStyles = `
   .content { max-width: 820px; padding-bottom: 70px; }
   .content > h1 { font-size: 32px; letter-spacing: -.03em; margin-bottom: 4px; }
@@ -267,65 +268,25 @@ const settingsStyles = `
   }
 `;
 
-const tabScript = raw(`<script>
-(function() {
-  var tabs = document.querySelectorAll('.settings-tab');
-  var panels = document.querySelectorAll('.settings-panel');
-  tabs.forEach(function(tab) {
-    tab.addEventListener('click', function() {
-      tabs.forEach(function(t) { t.setAttribute('aria-selected', 'false'); });
-      panels.forEach(function(p) { p.setAttribute('data-active', 'false'); });
-      tab.setAttribute('aria-selected', 'true');
-      var target = document.getElementById(tab.getAttribute('data-tab'));
-      if (target) target.setAttribute('data-active', 'true');
-    });
-  });
-})();
-</script>`);
-
-// ADR 0042 (2026-06-04). The Plan tab's Switch buttons issue
-// PATCH /api/profile with the chosen plan and reload on success so the
-// tiles repaint with the new current-plan badge. Failures surface in
-// the shared modal alert (window.__opencanvasModal.alert) the dashboard
-// shell already mounts — keeps copy + styling consistent across the
-// dashboard.
-const planSwitchScript = raw(`<script>
-(function() {
-  var buttons = document.querySelectorAll('#tab-plan .plan-switch-btn[data-plan]');
-  function alertSwitchFailure(err) {
-    var message = err && err.message ? err.message : 'Could not switch plan.';
-    var modal = window.__opencanvasModal;
-    if (!modal || typeof modal.alert !== 'function') {
-      console.error('[plan-switch] modal helper unavailable', { message: message, error: err });
-      throw new Error('plan switch modal helper unavailable');
-    }
-    return modal.alert(message, 'Switch plan');
-  }
-  buttons.forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var plan = btn.getAttribute('data-plan');
-      if (!plan) return;
-      var label = btn.textContent;
-      buttons.forEach(function(b) { b.disabled = true; });
-      btn.textContent = 'Switching…';
-      fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: plan })
-      }).then(function(r) {
-        return r.json().then(function(d) { return { ok: r.ok, data: d }; });
-      }).then(function(result) {
-        if (!result.ok) throw new Error(result.data.error || 'Switch failed');
-        window.location.reload();
-      }).catch(function(err) {
-        buttons.forEach(function(b) { b.disabled = false; });
-        btn.textContent = label;
-        alertSwitchFailure(err);
-      });
-    });
-  });
-})();
-</script>`);
+// ADR 0021 — migrated to dashboard-client bundle. The tab-switcher and
+// the ADR 0042 plan-picker click handler now live in
+// `src/dashboard-client/settings.ts` and ship in the shared dashboard
+// bundle (`EDITOR_CLIENT_MANIFEST.dashboardClientUrl`). The route emits
+// a tiny boot blob with `route: 'settings'` (no per-request keys —
+// both handlers operate purely on DOM hooks); the bundle's dispatcher
+// reads it and calls `mountSettings()`. DOM contract unchanged —
+// `.settings-tab` / `.settings-panel` / `[data-tab]` / `[data-active]`
+// for tabs, `#tab-plan .plan-switch-btn[data-plan]` for the plan
+// picker. API contract unchanged — same PATCH `/api/profile` with
+// `{ plan }` from the plan switch.
+const clientBoot = raw(
+  '<script>window.__opencanvasDashboardBoot = ' +
+    JSON.stringify({ route: 'settings' }) +
+    ';</script>' +
+    '<script src="' +
+    EDITOR_CLIENT_MANIFEST.dashboardClientUrl +
+    '" defer></script>',
+);
 
 settingsRoute.get('/settings', async (c) => {
   const user = await getClerkUser(c);
@@ -416,7 +377,8 @@ settingsRoute.get('/settings', async (c) => {
             customer.plan via PATCH /api/profile. The cost is mocked
             (no payment is processed); the DB write and its consequence
             (per-plan site/storage caps re-enforced on the next request)
-            are real. See planSwitchScript below. */}
+            are real. The click handler lives in `src/dashboard-client/settings.ts`
+            (`wirePlanSwitch`); see `clientBoot` below. */}
         <PlanTiles currentPlan={customerPlan} />
         <p class="plan-mock-note">
           Switching plans is instant and free in this build — no card needed, no charges made. Your
@@ -588,8 +550,7 @@ settingsRoute.get('/settings', async (c) => {
         </div>
       </div>
 
-      {tabScript}
-      {planSwitchScript}
+      {clientBoot}
     </DashboardShell>,
   );
 });
