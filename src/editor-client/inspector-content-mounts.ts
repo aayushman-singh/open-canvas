@@ -132,7 +132,7 @@ export function mountAccordionItems(
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '\\u00d7';
+        removeBtn.textContent = '×';
         removeBtn.title = 'Remove item';
         removeBtn.setAttribute('aria-label', 'Remove item');
         removeBtn.addEventListener('click', function () {
@@ -239,7 +239,7 @@ export function mountCarouselSlides(
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '\\u00d7';
+        removeBtn.textContent = '×';
         removeBtn.title = 'Remove slide';
         removeBtn.setAttribute('aria-label', 'Remove slide');
         removeBtn.addEventListener('click', function () {
@@ -309,7 +309,7 @@ export function mountTableGrid(
 
         const rmColBtn = document.createElement('button');
         rmColBtn.type = 'button';
-        rmColBtn.textContent = '\\u00d7';
+        rmColBtn.textContent = '×';
         rmColBtn.title = 'Remove column';
         rmColBtn.setAttribute('aria-label', 'Remove column');
         rmColBtn.style.cssText = 'font-size:13px;line-height:1;padding:1px 5px;margin-left:2px;color:var(--ink-3);border:1px solid var(--line-2);border-radius:4px;background:transparent;cursor:pointer;';
@@ -388,7 +388,7 @@ export function mountTableGrid(
         rmCell.style.cssText = 'padding:2px;border:1px solid var(--opencanvas-hairline);';
         const rmRowBtn = document.createElement('button');
         rmRowBtn.type = 'button';
-        rmRowBtn.textContent = '\\u00d7';
+        rmRowBtn.textContent = '×';
         rmRowBtn.title = 'Remove row';
         rmRowBtn.setAttribute('aria-label', 'Remove row');
         rmRowBtn.style.cssText = 'font-size:13px;line-height:1;padding:1px 5px;color:var(--ink-3);border:1px solid var(--line-2);border-radius:4px;background:transparent;cursor:pointer;';
