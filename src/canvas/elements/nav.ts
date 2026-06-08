@@ -147,6 +147,14 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
     navStyleEntries.push(['z-index', '100']);
   }
   navStyleEntries.push(['width', '100%']);
+  // height: 100% fills the absolutely-positioned element wrapper (always has
+  // an explicit `height: <box.h>px` from buildElementWrapperStyle), so the
+  // flex parent has a real content box. Without this the in-flow slots
+  // (left, primary) collapse — empty left slot is 0px and primary's only
+  // sibling rules don't set a height either — and the absolutely-positioned
+  // center slot resolves `top: 50%` against a 0px parent → centered links
+  // render with their top half above the section.
+  navStyleEntries.push(['height', '100%']);
   navStyleEntries.push(['display', 'flex']);
   navStyleEntries.push(['align-items', 'center']);
   const navStyle = styleFromEntries(navStyleEntries);
