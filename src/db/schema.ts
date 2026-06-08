@@ -49,12 +49,29 @@ export function decodeByteaDriverValue(value: unknown): Uint8Array {
   throw new Error(`bytea fromDriver: unsupported driver type ${typeof value}`);
 }
 
+// Ambient declaration for node's Buffer — only used by the bytea customType
+// below. We can't pull in `@types/node` for one usage, and `BufferSource`
+// (workers-types) isn't enough because postgres.js detects binary writes via
+// the runtime `Buffer.isBuffer` check, which only returns true for the real
+// thing.
+declare const Buffer: {
+  from(buffer: ArrayBufferLike, byteOffset?: number, length?: number): Uint8Array;
+};
+
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | string }>({
   dataType() {
     return 'bytea';
   },
   fromDriver(value: unknown): Uint8Array {
     return decodeByteaDriverValue(value);
+  },
+  // postgres.js needs a Buffer (or any nodejs_compat Buffer-tagged value) to
+  // encode bytea as binary on the wire — we run with `fetch_types: false`
+  // (db/client.ts) so postgres.js never resolves the bytea OID and otherwise
+  // falls back to text-encoding the Uint8Array, which mangles the snapshot
+  // bytes. The Worker has `nodejs_compat` so Buffer is available.
+  toDriver(value: Uint8Array): Uint8Array {
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
   },
 });
 
