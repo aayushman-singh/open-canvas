@@ -137,6 +137,40 @@ export interface PendingImport {
   librarySectionId: string;
 }
 
+// ADR 0064 — the sections-picker functions form a tight cycle (loader
+// calls renderer, renderer calls enter/exit, enter/exit re-render and
+// queue placement slots, importPendingSectionAt re-renders) so they
+// share a single narrow surface. Canonical clusters touched:
+//   - StateContext: `state` mutation + `currentPage()` walk for slots.
+//   - DomContext: `mainEl` for the data-style-kit attribute swap.
+//   - SelectionContext: clearing `selectedSectionId` / `selectedElementId`
+//     after the editableState swap so stale ids don't survive the import.
+//   - RenderContext: `renderAll()` after the state swap.
+//   - PersistContext: `authFetch` + `apiBase` + `siteId` for the
+//     /library/sections GET and /sites/<id>/sections/import POST.
+//   - StatusEmitterContext: the status-line surface area for placement
+//     prompts and import success/failure toasts.
+// The inline `Pick` covers picker-local UI state + the import flush hook
+// + the pending-import latch, none of which fits a canonical alias.
+export type SectionsPickerContext = StateContext &
+  DomContext &
+  SelectionContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    | 'sectionsCatalog'
+    | 'activeCategoryFilter'
+    | 'activeSearchQuery'
+    | 'activeSortMode'
+    | 'pendingImport'
+    | 'flushPendingSave'
+  >;
+
+type SectionsCatalogCacheContext = Pick<EditorContext, 'sectionsCatalog'>;
+type SectionsCatalogFetchContext = Pick<EditorContext, 'apiBase' | 'authFetch' | 'sectionsCatalog'>;
+
 // Module-level singleton for the in-flight prefetch. Tracks two states:
 //   - `null` = no prefetch attempted (or last attempt failed/invalidated;
 //     the next caller will start a fresh request).
@@ -175,45 +209,10 @@ let prefetchPromise: Promise<PrefetchOutcome> | null = null;
  * path (`ensureSectionsPanelLoaded`) reading the outcome — NOT silently
  * here, NOT as a fallback to an empty catalog.
  */
-export function prefetchSectionsCatalog(ctx: EditorContext): void {
+export function prefetchSectionsCatalog(ctx: SectionsCatalogFetchContext): void {
   if (prefetchPromise !== null) return;
   if (ctx.sectionsCatalog !== null) return;
   prefetchPromise = (async (): Promise<PrefetchOutcome> => {
-// ADR 0064 — the sections-picker functions form a tight cycle (loader
-// calls renderer, renderer calls enter/exit, enter/exit re-render and
-// queue placement slots, importPendingSectionAt re-renders) so they
-// share a single narrow surface. Canonical clusters touched:
-//   - StateContext: `state` mutation + `currentPage()` walk for slots.
-//   - DomContext: `mainEl` for the data-style-kit attribute swap.
-//   - SelectionContext: clearing `selectedSectionId` / `selectedElementId`
-//     after the editableState swap so stale ids don't survive the import.
-//   - RenderContext: `renderAll()` after the state swap.
-//   - PersistContext: `authFetch` + `apiBase` + `siteId` for the
-//     /library/sections GET and /sites/<id>/sections/import POST.
-//   - StatusEmitterContext: the status-line surface area for placement
-//     prompts and import success/failure toasts.
-// The inline `Pick` covers picker-local UI state + the import flush hook
-// + the pending-import latch, none of which fits a canonical alias.
-export type SectionsPickerContext = StateContext &
-  DomContext &
-  SelectionContext &
-  RenderContext &
-  PersistContext &
-  StatusEmitterContext &
-  Pick<
-    EditorContext,
-    | 'sectionsCatalog'
-    | 'activeCategoryFilter'
-    | 'activeSearchQuery'
-    | 'activeSortMode'
-    | 'pendingImport'
-    | 'flushPendingSave'
-  >;
-
-export async function ensureSectionsPanelLoaded(ctx: SectionsPickerContext): Promise<void> {
-  const root = document.querySelector('[data-section-picker-root]');
-  if (!root) return;
-  if (ctx.sectionsCatalog === null) {
     try {
       const response = await ctx.authFetch(ctx.apiBase + '/library/sections');
       if (!response.ok) {
@@ -238,12 +237,12 @@ export async function ensureSectionsPanelLoaded(ctx: SectionsPickerContext): Pro
  * /library/sections so the picker reflects the new entry on the next
  * open.
  */
-export function invalidateSectionsCache(ctx: EditorContext): void {
+export function invalidateSectionsCache(ctx: SectionsCatalogCacheContext): void {
   ctx.sectionsCatalog = null;
   prefetchPromise = null;
 }
 
-export async function ensureSectionsPanelLoaded(ctx: EditorContext): Promise<void> {
+export async function ensureSectionsPanelLoaded(ctx: SectionsPickerContext): Promise<void> {
   const root = document.querySelector('[data-section-picker-root]');
   if (!root) return;
   if (ctx.sectionsCatalog === null) {
@@ -258,13 +257,11 @@ export async function ensureSectionsPanelLoaded(ctx: EditorContext): Promise<voi
     // picks up the cached array.
     const outcome = prefetchPromise !== null ? await prefetchPromise : null;
     if (outcome && outcome.kind === 'failure') {
-      root.innerHTML =
-        '<p class="opencanvas-section-picker-empty">Failed to load sections.</p>';
+      root.innerHTML = '<p class="opencanvas-section-picker-empty">Failed to load sections.</p>';
       return;
     }
     if (ctx.sectionsCatalog === null) {
-      root.innerHTML =
-        '<p class="opencanvas-section-picker-empty">Failed to load sections.</p>';
+      root.innerHTML = '<p class="opencanvas-section-picker-empty">Failed to load sections.</p>';
       return;
     }
   }
@@ -294,7 +291,9 @@ function renderSectionsPickerShell(ctx: SectionsPickerContext, root: Element): v
   // so reading order stays Header → Hero → Features → … → Footer → Other.
   const filterOptions = [
     `<option value="all">${CATEGORY_LABEL.all}</option>`,
-    ...SECTION_CATEGORIES.map((category) => `<option value="${category}">${CATEGORY_LABEL[category]}</option>`),
+    ...SECTION_CATEGORIES.map(
+      (category) => `<option value="${category}">${CATEGORY_LABEL[category]}</option>`,
+    ),
   ].join('');
 
   // ADR 0061 Decision 11 — sort toggle: A-Z (default) vs Recently added.

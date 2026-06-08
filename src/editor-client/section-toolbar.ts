@@ -195,10 +195,7 @@ export type HandleSectionActionContext = StateContext &
   RenderContext &
   PersistContext &
   StatusEmitterContext &
-  Pick<
-    EditorContext,
-    'SIDEBAR_COMMANDS' | 'insertElementForSidebarCommand' | 'saveToLibrary'
-  >;
+  Pick<EditorContext, 'SIDEBAR_COMMANDS' | 'insertElementForSidebarCommand' | 'saveToLibrary'>;
 
 // ADR 0064 — saveToLibrary drives the three-modal flow then POSTs to
 // /library/sections. PersistContext supplies authFetch / apiBase /
@@ -206,7 +203,7 @@ export type HandleSectionActionContext = StateContext &
 // sectionsCatalog (cleared on success) live on EditorContext directly.
 export type SaveToLibraryContext = PersistContext &
   StatusEmitterContext &
-  Pick<EditorContext, 'openTextModal' | 'openSelectModal' | 'flushPendingSave' | 'sectionsCatalog'>;
+  Pick<EditorContext, 'openSaveFormModal' | 'flushPendingSave' | 'sectionsCatalog'>;
 
 // ADR 0064 — saveSiteAsTemplate mirrors saveToLibrary but reads the
 // first page title off state for the default name and POSTs to
@@ -215,7 +212,7 @@ export type SaveToLibraryContext = PersistContext &
 export type SaveSiteAsTemplateContext = StateContext &
   PersistContext &
   StatusEmitterContext &
-  Pick<EditorContext, 'openTextModal' | 'openSelectModal' | 'flushPendingSave'>;
+  Pick<EditorContext, 'openSaveFormModal' | 'flushPendingSave'>;
 
 /**
  * Inline IIFE twin reads `err.message || String(err)` — untyped JS. The

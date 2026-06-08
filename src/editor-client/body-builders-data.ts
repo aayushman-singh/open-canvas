@@ -32,12 +32,7 @@ import type { FormElement } from '../canvas/elements/form.js';
 import type { NavElement } from '../canvas/elements/nav.js';
 import type { TableElement } from '../canvas/elements/table.js';
 
-import type {
-  DomContext,
-  EditorContext,
-  PersistContext,
-  RenderContext,
-} from './editor-context.js';
+import type { DomContext, EditorContext, PersistContext, RenderContext } from './editor-context.js';
 import { isAllowedHref } from './href-utils.js';
 import { previewPaletteFromAccent } from './palette.js';
 import {
@@ -93,8 +88,7 @@ export type BuildNavLinkAnchorContext = Pick<EditorContext, 'goToHrefOnCanvas'>;
 // ADR 0064 — nav preview composes the logo URL from `ctx.siteBase` and
 // reuses the link helper's `goToHrefOnCanvas` verb for every nav-link +
 // the primary action. Intersection of the two narrow shapes.
-export type BuildNavBodyContext = BuildNavLinkAnchorContext &
-  Pick<EditorContext, 'siteBase'>;
+export type BuildNavBodyContext = BuildNavLinkAnchorContext & Pick<EditorContext, 'siteBase'>;
 
 // ADR 0064 — collection preview reads the template-edit pin
 // (`editingCollectionTemplate`) and recurses into `buildElementNode` for
@@ -291,7 +285,9 @@ export function buildFormBodyImpl(_ctx: BuildFormBodyContext, element: FormEleme
     label.style.fontSize = '12px';
     label.textContent = field.label || field.id || 'Field';
     const input: HTMLInputElement | HTMLTextAreaElement =
-      field.kind === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+      field.kind === 'textarea'
+        ? document.createElement('textarea')
+        : document.createElement('input');
     if (field.kind && field.kind !== 'textarea' && input instanceof HTMLInputElement) {
       input.setAttribute(
         'type',
@@ -312,7 +308,10 @@ export function buildFormBodyImpl(_ctx: BuildFormBodyContext, element: FormEleme
   return node;
 }
 
-export function buildEmbedBodyImpl(_ctx: BuildEmbedBodyContext, element: EmbedElement): HTMLElement {
+export function buildEmbedBodyImpl(
+  _ctx: BuildEmbedBodyContext,
+  element: EmbedElement,
+): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-embed-preview';
   node.style.display = 'flex';
@@ -340,7 +339,10 @@ export function buildCodeBodyImpl(_ctx: BuildCodeBodyContext, element: CodeEleme
   return pre;
 }
 
-export function buildAccordionBodyImpl(_ctx: BuildAccordionBodyContext, element: AccordionElement): HTMLElement {
+export function buildAccordionBodyImpl(
+  _ctx: BuildAccordionBodyContext,
+  element: AccordionElement,
+): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-accordion-preview';
   const items = Array.isArray(element.items) ? element.items : [];
@@ -382,7 +384,10 @@ export function buildAccordionBodyImpl(_ctx: BuildAccordionBodyContext, element:
 // on the body selects the element. Inline styles outrank the `*` selector,
 // so the arrows + dots stay clickable while the rest of the body still
 // routes to selection.
-export function buildCarouselBodyImpl(ctx: EditorContext, element: CarouselElement): HTMLElement {
+export function buildCarouselBodyImpl(
+  ctx: BuildCarouselBodyContext,
+  element: CarouselElement,
+): HTMLElement {
   const slides = Array.isArray(element.slides) ? element.slides : [];
   const count = slides.length;
   const direction = element.direction === 'vertical' ? 'vertical' : 'horizontal';
@@ -489,74 +494,10 @@ export function buildCarouselBodyImpl(ctx: EditorContext, element: CarouselEleme
   return wrap;
 }
 
-export function buildTableBodyImpl(_ctx: EditorContext, element: TableElement): HTMLElement {
-// Local copy of the visitor-side carousel hydration (src/interactive/
-// carousel.ts) — same index-clamp + dot aria-selected mirroring, but
-// attached at build time so Owners can click through their slides in
-// the editor without leaving edit mode. Stops mousedown propagating so
-// the canvas wrapper's drag handler doesn't snatch focus the moment
-// the Owner tries to click an arrow.
-function hydrateCarouselPreview(root: HTMLElement, count: number): void {
-  if (!(count > 0)) return;
-  function readIndex(): number {
-    const raw = root.getAttribute('data-opencanvas-slide-index');
-    let n = raw ? parseInt(raw, 10) : 0;
-    if (isNaN(n) || n < 0) n = 0;
-    if (n > count - 1) n = count - 1;
-    return n;
-  }
-  function setIndex(next: number): void {
-    let n = next;
-    if (n < 0) n = 0;
-    if (n > count - 1) n = count - 1;
-    root.setAttribute('data-opencanvas-slide-index', String(n));
-    const dots = root.querySelectorAll('[data-opencanvas-carousel-dot]');
-    for (let i = 0; i < dots.length; i++) {
-      const dot = dots[i];
-      if (!dot) continue;
-      const idx = parseInt(dot.getAttribute('data-opencanvas-carousel-dot') || '0', 10);
-      dot.setAttribute('aria-selected', idx === n ? 'true' : 'false');
-    }
-  }
-  function block(ev: Event): void {
-    ev.preventDefault();
-    ev.stopPropagation();
-  }
-  const prevBtn = root.querySelector('[data-opencanvas-carousel-prev]');
-  if (prevBtn) {
-    prevBtn.addEventListener('mousedown', block);
-    prevBtn.addEventListener('click', function (ev: Event) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      setIndex(readIndex() - 1);
-    });
-  }
-  const nextBtn = root.querySelector('[data-opencanvas-carousel-next]');
-  if (nextBtn) {
-    nextBtn.addEventListener('mousedown', block);
-    nextBtn.addEventListener('click', function (ev: Event) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      setIndex(readIndex() + 1);
-    });
-  }
-  const dotEls = root.querySelectorAll('[data-opencanvas-carousel-dot]');
-  for (let i = 0; i < dotEls.length; i++) {
-    const dot = dotEls[i];
-    if (!dot) continue;
-    (function (capturedDot: Element) {
-      capturedDot.addEventListener('mousedown', block);
-      capturedDot.addEventListener('click', function (ev: Event) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        const target = parseInt(capturedDot.getAttribute('data-opencanvas-carousel-dot') || '0', 10);
-        setIndex(target);
-      });
-    })(dot);
-  }
-}
-
-export function buildTableBodyImpl(_ctx: BuildTableBodyContext, element: TableElement): HTMLElement {
+export function buildTableBodyImpl(
+  _ctx: BuildTableBodyContext,
+  element: TableElement,
+): HTMLElement {
   const table = document.createElement('table');
   table.className = 'opencanvas-table-preview';
   table.style.width = '100%';
@@ -700,7 +641,10 @@ export function buildNavBodyImpl(ctx: BuildNavBodyContext, element: NavElement):
   return nav;
 }
 
-export function buildCollectionBodyImpl(ctx: BuildCollectionBodyContext, element: CollectionElement): HTMLElement {
+export function buildCollectionBodyImpl(
+  ctx: BuildCollectionBodyContext,
+  element: CollectionElement,
+): HTMLElement {
   // ADR 0065 D5 — when this Collection's custom template is in edit mode,
   // render ONE editable instance of `element.customTemplate` instead of the
   // N-clone entries grid. The template elements carry their own absolute
@@ -802,7 +746,8 @@ export function buildCollectionBodyImpl(ctx: BuildCollectionBodyContext, element
     headline.textContent = 'Collection grid — 0 entries';
     placeholder.appendChild(headline);
     const hint = document.createElement('div');
-    hint.textContent = 'Add entries in the Entries tab on the dashboard, then publish to populate this grid.';
+    hint.textContent =
+      'Add entries in the Entries tab on the dashboard, then publish to populate this grid.';
     placeholder.appendChild(hint);
     return placeholder;
   }
@@ -908,7 +853,10 @@ export function buildTabsBodyImpl(ctx: BuildTabsBodyContext, element: TabsElemen
   return node;
 }
 
-export function buildElementBodyImpl(ctx: BuildElementBodyContext, element: CanvasElement): HTMLElement {
+export function buildElementBodyImpl(
+  ctx: BuildElementBodyContext,
+  element: CanvasElement,
+): HTMLElement {
   switch (element.type) {
     case 'text':
       return buildTextBodyImpl(ctx, element);
@@ -945,5 +893,7 @@ export function buildElementBodyImpl(ctx: BuildElementBodyContext, element: Canv
   // Throw loudly anyway so a hand-rolled element type added without a
   // builder doesn't silently degrade to a blank wrapper.
   const exhaustive: never = element;
-  throw new Error('unsupported editor element type: ' + String((exhaustive as { type: string }).type));
+  throw new Error(
+    'unsupported editor element type: ' + String((exhaustive as { type: string }).type),
+  );
 }

@@ -48,14 +48,17 @@ import { cssEscape } from './css-escape.js';
 import type {
   DomContext,
   EditorContext,
-  PersistContext,
   RenderContext,
   SelectionContext,
   StateContext,
   StatusEmitterContext,
 } from './editor-context.js';
 import { newElementId } from './ids.js';
-import { applyZOrderAction, type InspectorActionContext, parentArrayFor } from './inspector-actions.js';
+import {
+  applyZOrderAction,
+  type InspectorActionContext,
+  parentArrayFor,
+} from './inspector-actions.js';
 import { nextZInArray } from './z-order.js';
 
 // ADR 0064 — `findMenuOwnerWrapper` + `closeElementMenuImpl` only walk the
@@ -84,7 +87,10 @@ export type ToggleElementMenuContext = StateContext &
 // appliers, body builder, plus a SelectionContext read so the wrapper can
 // stamp `data-selected` and mount resize handles on the active element.
 export type BuildElementNodeContext = SelectionContext &
-  Pick<EditorContext, 'setBoxStyle' | 'applyElementStyle' | 'applyPinnedStyle' | 'buildElementBody'>;
+  Pick<
+    EditorContext,
+    'setBoxStyle' | 'applyElementStyle' | 'applyPinnedStyle' | 'buildElementBody'
+  >;
 
 // ADR 0064 — `rebuildElementImpl` re-renders a single element in place. It
 // walks the section tree (StateContext), reads the live DOM (DomContext.root),
@@ -306,7 +312,10 @@ export function toggleElementMenuImpl(
   ctx.openMenuElementId = elementId;
 }
 
-export function buildElementNodeImpl(ctx: BuildElementNodeContext, element: CanvasElement): HTMLElement {
+export function buildElementNodeImpl(
+  ctx: BuildElementNodeContext,
+  element: CanvasElement,
+): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'opencanvas-element';
   wrapper.setAttribute('data-opencanvas-element', element.id);

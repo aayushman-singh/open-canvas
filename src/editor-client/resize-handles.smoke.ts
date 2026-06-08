@@ -56,14 +56,9 @@ assert(
 // function body and assert the only mountResizeHandles call inside it sits
 // behind the selection-id guard. We slice from the function signature to
 // the next `export function ` keyword (rebuildElementImpl).
-const buildStart = elementMenuSrc.indexOf(
-  'export function buildElementNodeImpl(ctx: BuildElementNodeContext, element: CanvasElement): HTMLElement {',
-);
+const buildStart = elementMenuSrc.indexOf('export function buildElementNodeImpl(');
 assert(buildStart >= 0, 'buildElementNodeImpl signature not found in element-menu.ts');
-const rebuildStart = elementMenuSrc.indexOf(
-  'export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string): void {',
-  buildStart,
-);
+const rebuildStart = elementMenuSrc.indexOf('export function rebuildElementImpl(', buildStart);
 assert(rebuildStart > buildStart, 'rebuildElementImpl signature must follow buildElementNodeImpl');
 const buildBody = elementMenuSrc.slice(buildStart, rebuildStart);
 
@@ -94,7 +89,9 @@ assert(
 const selectionSrc = await Bun.file(new URL('./selection.ts', import.meta.url)).text();
 
 assert(
-  selectionSrc.includes("import { mountResizeHandles, unmountResizeHandles } from './element-menu.js';"),
+  selectionSrc.includes(
+    "import { mountResizeHandles, unmountResizeHandles } from './element-menu.js';",
+  ),
   'selection.ts must import mountResizeHandles + unmountResizeHandles from element-menu.js',
 );
 assert(
@@ -167,7 +164,9 @@ function makeStubEl(tagName: string): StubEl {
       // Support only ':scope > [data-resize-handle]' — that's all
       // mountResizeHandles uses.
       if (selector !== ':scope > [data-resize-handle]') {
-        throw new Error('[resize-handles:smoke] stub querySelector got unsupported selector: ' + selector);
+        throw new Error(
+          '[resize-handles:smoke] stub querySelector got unsupported selector: ' + selector,
+        );
       }
       for (const c of this.children) {
         if (c.attrs.has('data-resize-handle')) return c;
@@ -229,14 +228,17 @@ wrapper.setAttribute('class', 'opencanvas-element');
 mountResizeHandles(wrapper as unknown as HTMLElement);
 assert(
   countResizeHandles(wrapper) === 8,
-  'mountResizeHandles must add exactly 8 handles to a wrapper — got ' + String(countResizeHandles(wrapper)),
+  'mountResizeHandles must add exactly 8 handles to a wrapper — got ' +
+    String(countResizeHandles(wrapper)),
 );
 
 // Idempotence: double-mount must not double the count.
 mountResizeHandles(wrapper as unknown as HTMLElement);
 assert(
   countResizeHandles(wrapper) === 8,
-  'mountResizeHandles must be idempotent — got ' + String(countResizeHandles(wrapper)) + ' after second call',
+  'mountResizeHandles must be idempotent — got ' +
+    String(countResizeHandles(wrapper)) +
+    ' after second call',
 );
 
 unmountResizeHandles(wrapper as unknown as HTMLElement);
@@ -249,7 +251,8 @@ assert(
 unmountResizeHandles(wrapper as unknown as HTMLElement);
 assert(
   countResizeHandles(wrapper) === 0,
-  'unmountResizeHandles on empty wrapper must stay at 0 — got ' + String(countResizeHandles(wrapper)),
+  'unmountResizeHandles on empty wrapper must stay at 0 — got ' +
+    String(countResizeHandles(wrapper)),
 );
 
 // ---- End-to-end count check --------------------------------------------
@@ -279,7 +282,8 @@ assert(
 mountResizeHandles(wrapA as unknown as HTMLElement);
 assert(
   countResizeHandles(rootStub) === 8,
-  'After selecting A, DOM must carry exactly 8 handles — got ' + String(countResizeHandles(rootStub)),
+  'After selecting A, DOM must carry exactly 8 handles — got ' +
+    String(countResizeHandles(rootStub)),
 );
 
 // Select B (selection.ts unmounts prior, mounts next).
@@ -287,12 +291,13 @@ unmountResizeHandles(wrapA as unknown as HTMLElement);
 mountResizeHandles(wrapB as unknown as HTMLElement);
 assert(
   countResizeHandles(rootStub) === 8,
-  'After switching from A to B, DOM must carry exactly 8 handles — got ' + String(countResizeHandles(rootStub)),
+  'After switching from A to B, DOM must carry exactly 8 handles — got ' +
+    String(countResizeHandles(rootStub)),
 );
 const aHandles = wrapA.children.filter((c) => c.attrs.has('data-resize-handle')).length;
 assert(
   aHandles === 0,
-  'Switching selection away from A must strip A\'s handles — got ' + String(aHandles) + ' on A',
+  "Switching selection away from A must strip A's handles — got " + String(aHandles) + ' on A',
 );
 
 // Select C.
@@ -300,7 +305,8 @@ unmountResizeHandles(wrapB as unknown as HTMLElement);
 mountResizeHandles(wrapC as unknown as HTMLElement);
 assert(
   countResizeHandles(rootStub) === 8,
-  'After switching to C, DOM must carry exactly 8 handles — got ' + String(countResizeHandles(rootStub)),
+  'After switching to C, DOM must carry exactly 8 handles — got ' +
+    String(countResizeHandles(rootStub)),
 );
 
 // Deselect (click empty canvas).
@@ -366,7 +372,9 @@ assert(
     `drag-resize.ts must list '.opencanvas-collection-template-edit' in BOTH frame ` +
       'selectors (beginDragImpl + beginResizeImpl) so the resolver clamps a dragged ' +
       'template child to the template-edit frame instead of the parent section. ' +
-      'Got ' + String(occurrences) + ' occurrence(s).',
+      'Got ' +
+      String(occurrences) +
+      ' occurrence(s).',
   );
   // Both `beginDragImpl` and `beginResizeImpl` must contain the selector
   // INSIDE their bodies (not in a stray comment). Bound each function and
