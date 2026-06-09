@@ -1131,6 +1131,11 @@ body.opencanvas-modal-open {
 
 .opencanvas-sidebar-panel {
   display: grid;
+  /* Cap the single column at the panel width (minmax(0,1fr) instead of the
+     implicit max-content track) so wide children — e.g. the sections picker's
+     control row — can't push the grid past the 360px sidebar and get clipped
+     by its overflow-x. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   padding: 14px 12px 20px;
 }
@@ -1281,6 +1286,7 @@ body.opencanvas-modal-open {
   flex-direction: column;
   gap: 10px;
   padding: 10px 8px;
+  min-width: 0;
 }
 
 .opencanvas-section-picker-empty {
@@ -1290,8 +1296,10 @@ body.opencanvas-modal-open {
 
 .opencanvas-section-picker-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 .opencanvas-section-picker-search {
   flex: 1;
@@ -1305,15 +1313,14 @@ body.opencanvas-modal-open {
 }
 .opencanvas-section-picker-filter,
 .opencanvas-section-picker-sort {
+  flex: 1 1 110px;
+  min-width: 0;
   padding: 6px 10px;
   border: 1px solid var(--opencanvas-hairline);
   border-radius: 6px;
   background: var(--opencanvas-bg);
   color: var(--opencanvas-fg);
   font: inherit;
-}
-.opencanvas-section-picker-sort {
-  min-width: 120px;
 }
 .opencanvas-section-picker-grid {
   list-style: none;
@@ -1322,6 +1329,7 @@ body.opencanvas-modal-open {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 .opencanvas-section-card {
   display: flex;
@@ -1331,6 +1339,8 @@ body.opencanvas-modal-open {
   border: 1px solid var(--opencanvas-hairline);
   border-radius: 6px;
   background: var(--opencanvas-bg-panel);
+  min-width: 0;
+  overflow-wrap: anywhere;
   cursor: grab;
 }
 .opencanvas-section-card-thumb {
