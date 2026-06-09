@@ -247,10 +247,20 @@ export function hideChatWelcomeImpl(ctx: HideChatWelcomeContext): void {
   if (ctx.chatWelcome && !ctx.chatWelcome.hidden) ctx.chatWelcome.hidden = true;
 }
 
+// Size the chat <textarea> to its content: collapse to the one-row base
+// (height:auto + the CSS min-height), then grow to fit. The extra
+// (offsetHeight - clientHeight) term restores the borders, which scrollHeight
+// excludes — without it the box loses a pixel each keystroke. The CSS
+// max-height caps growth and switches on the scrollbar past that point.
+export function autoGrowChatInput(el: HTMLTextAreaElement): void {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + (el.offsetHeight - el.clientHeight) + 'px';
+}
+
 export function setupChatSession(ctx: SetupChatSessionContext): void {
   // -- Chat panel form submission -----------------------------------------
   ctx.chatForm = document.getElementById('canvas-chat-form') as HTMLFormElement | null;
-  ctx.chatInput = document.getElementById('canvas-chat-input') as HTMLInputElement | null;
+  ctx.chatInput = document.getElementById('canvas-chat-input') as HTMLTextAreaElement | null;
   ctx.chatMessages = document.getElementById('canvas-chat-messages');
   ctx.chatWelcome = document.getElementById('canvas-chat-welcome');
   // Bind the Accept-all banner to the module-scope handle so the
@@ -269,6 +279,29 @@ export function setupChatSession(ctx: SetupChatSessionContext): void {
   ctx.chatSessionId = null;
   ctx.chatBusy = false;
 
+  // The chat box is a <textarea> so a multi-line prompt grows the field
+  // instead of scrolling off as one long line. Mirror the content height on
+  // every input, and submit on Enter (Shift+Enter inserts a newline) so the
+  // single-line ergonomics of the old <input> survive the upgrade.
+  const chatInput = ctx.chatInput;
+  if (chatInput) {
+    chatInput.addEventListener('input', function () {
+      autoGrowChatInput(chatInput);
+    });
+    chatInput.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        const form = ctx.chatForm;
+        if (!form) return;
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else {
+          form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      }
+    });
+  }
+
   // Suggestion chips: clicking pre-fills the input AND submits, so the
   // chat does the work without the Owner having to retype. We rely on
   // requestSubmit() so the existing submit listener fires its full flow
@@ -281,6 +314,7 @@ export function setupChatSession(ctx: SetupChatSessionContext): void {
         const prompt = chip.getAttribute('data-chip-prompt') || chip.textContent || '';
         if (!prompt) return;
         ctx.chatInput.value = prompt;
+        autoGrowChatInput(ctx.chatInput);
         if (typeof ctx.chatForm.requestSubmit === 'function') {
           ctx.chatForm.requestSubmit();
         } else {
@@ -301,6 +335,7 @@ export function attachChatSubmitImpl(ctx: AttachChatSubmitContext): void {
     const msg = ctx.chatInput.value.trim();
     if (msg.length === 0) return;
     ctx.chatInput.value = '';
+    autoGrowChatInput(ctx.chatInput);
     ctx.hideChatWelcome();
     ctx.appendChatMessage('user', msg);
     ctx.chatBusy = true;

@@ -1276,9 +1276,10 @@ body.opencanvas-modal-open {
   gap: 8px;
   padding: 14px;
   border-top: 1px solid var(--line);
-  align-items: center;
+  /* The textarea grows upward; keep the Send button pinned to its base. */
+  align-items: flex-end;
 }
-.opencanvas-chat-input input {
+.opencanvas-chat-input textarea {
   flex: 1;
   appearance: none;
   border: 1.5px solid var(--line-2);
@@ -1287,12 +1288,19 @@ body.opencanvas-modal-open {
   font: inherit;
   font-family: var(--sans);
   font-size: 13.5px;
+  line-height: 1.4;
   padding: 10px 14px;
-  border-radius: var(--r-pill);
+  border-radius: 18px;
+  box-sizing: border-box;
+  /* Height is driven by JS (autoGrowChatInput); the user can't drag-resize.
+     max-height caps the growth and hands off to an internal scrollbar. */
+  resize: none;
+  overflow-y: auto;
+  max-height: 160px;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.opencanvas-chat-input input::placeholder { color: var(--ink-3); }
-.opencanvas-chat-input input:focus {
+.opencanvas-chat-input textarea::placeholder { color: var(--ink-3); }
+.opencanvas-chat-input textarea:focus {
   outline: none;
   border-color: var(--red);
   box-shadow: var(--ring);
@@ -4125,12 +4133,17 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   flex-direction: row;
   gap: 6px;
   flex-wrap: nowrap;
+  align-items: center;
+  /* Reserve a row's worth of height so the slot never collapses to zero
+     while a refresh is in flight \u2014 keeps the labels below from jumping. */
+  min-height: 60px;
 }
 
 .media-picker .picker-gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
   gap: 6px;
+  min-height: 60px;
   max-height: 240px;
   overflow-y: auto;
 }

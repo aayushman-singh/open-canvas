@@ -719,10 +719,12 @@ export interface EditorContext {
    *  Suggestion-chip clicks call ctx.chatForm.requestSubmit() to reuse
    *  the same submit handler. */
   chatForm: HTMLFormElement | null;
-  /** The chat panel's <input> for the message. Submit handler reads
+  /** The chat panel's <textarea> for the message. Submit handler reads
    *  .value, clears it after capture, then re-arms for the next turn.
-   *  Suggestion-chip clicks write into this before triggering submit. */
-  chatInput: HTMLInputElement | null;
+   *  Suggestion-chip clicks write into this before triggering submit.
+   *  A <textarea> (not <input>) so it can auto-grow as the Owner types a
+   *  multi-line prompt; Enter submits, Shift+Enter inserts a newline. */
+  chatInput: HTMLTextAreaElement | null;
   /** The scrolling message list inside the chat panel. appendChatMessage
    *  appends + auto-scrolls; the SSE token branch streams text into a
    *  reusable assistant bubble appended here. Null short-circuits every

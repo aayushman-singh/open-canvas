@@ -237,6 +237,7 @@ export function mountNavLogo(
 
   const currentAssetId = typeof element.logoAssetId === 'string' ? element.logoAssetId : '';
   let currentThumb = ctx.buildPickerThumb(currentAssetId, currentAssetId, () => {});
+  let currentThumbAssetId = currentAssetId;
   currentRow.appendChild(currentThumb);
 
   const actionsCol = document.createElement('div');
@@ -283,9 +284,11 @@ export function mountNavLogo(
 
   function refreshCurrentThumb(): void {
     const id = typeof element.logoAssetId === 'string' ? element.logoAssetId : '';
+    if (id === currentThumbAssetId && currentThumb.isConnected) return;
     const nextThumb = ctx.buildPickerThumb(id, id, () => {});
     currentRow.replaceChild(nextThumb, currentThumb);
     currentThumb = nextThumb;
+    currentThumbAssetId = id;
   }
 
   function assignLogo(nextAssetId: string): void {
@@ -296,7 +299,6 @@ export function mountNavLogo(
   }
 
   async function refreshGalleryGrid(): Promise<void> {
-    galleryGrid.replaceChildren();
     let entries: Array<{ id?: string; assetId?: string; kind?: string }>;
     try {
       const resp = await ctx.authFetch(ctx.apiBase + '/owner/assets');
@@ -315,29 +317,41 @@ export function mountNavLogo(
       return;
     }
     const selected = typeof element.logoAssetId === 'string' ? element.logoAssetId : '';
+    const ids: string[] = [];
     for (const entry of entries) {
       const assetId = typeof entry.id === 'string' ? entry.id : entry.assetId;
-      if (typeof assetId !== 'string' || assetId.length === 0) continue;
-      const cell = document.createElement('div');
-      cell.className = 'picker-gallery-cell';
-
-      const thumb = ctx.buildPickerThumb(assetId, selected, (id: string) => assignLogo(id));
-      cell.appendChild(thumb);
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'picker-delete';
-      delBtn.type = 'button';
-      delBtn.textContent = 'x';
-      delBtn.title = 'Delete asset';
-      delBtn.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        void ctx.runDeleteAsset(assetId, refreshAll);
-      });
-      cell.appendChild(delBtn);
-
-      galleryGrid.appendChild(cell);
+      if (typeof assetId === 'string' && assetId.length > 0) ids.push(assetId);
     }
-    if (entries.length === 0) {
+    reconcilePickerChildren(
+      galleryGrid,
+      ids,
+      (id) => {
+        const cell = document.createElement('div');
+        cell.className = 'picker-gallery-cell';
+        cell.setAttribute('data-asset-id', id);
+
+        const thumb = ctx.buildPickerThumb(id, selected, (clicked: string) => assignLogo(clicked));
+        cell.appendChild(thumb);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'picker-delete';
+        delBtn.type = 'button';
+        delBtn.textContent = 'x';
+        delBtn.title = 'Delete asset';
+        delBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          void ctx.runDeleteAsset(id, refreshAll);
+        });
+        cell.appendChild(delBtn);
+
+        return cell;
+      },
+      (cell, id) => {
+        const thumb = cell.querySelector('.picker-thumb');
+        if (thumb) thumb.classList.toggle('selected', id === selected);
+      },
+    );
+    if (ids.length === 0) {
       const hint = document.createElement('span');
       hint.style.cssText =
         'font-size:11px;color:var(--opencanvas-fg-faint);font-family:var(--opencanvas-font-mono);grid-column:1/-1;';
@@ -468,6 +482,38 @@ export function mountNavPrimaryAction(
   host.appendChild(field('Primary action', wrap));
 }
 
+// Reconcile a picker row/grid against a desired ordered list of asset IDs
+// WITHOUT clearing first. Existing nodes (keyed by their data-asset-id) are
+// reused and only re-ordered into place, so their <img> never reloads and the
+// row never blanks out between the fetch and the repopulate — that blanking is
+// what made thumbnails vanish and the surrounding text jump. Nodes whose asset
+// is gone are removed, brand-new assets are built on demand, and the current
+// selection is re-marked in place on the reused nodes.
+function reconcilePickerChildren(
+  container: HTMLElement,
+  desiredIds: string[],
+  build: (assetId: string) => HTMLElement,
+  markSelected: (node: HTMLElement, assetId: string) => void,
+): void {
+  const desiredSet = new Set(desiredIds);
+  const existing = new Map<string, HTMLElement>();
+  for (const child of Array.from(container.children)) {
+    const node = child as HTMLElement;
+    const id = node.getAttribute('data-asset-id');
+    if (id !== null && desiredSet.has(id) && !existing.has(id)) {
+      existing.set(id, node);
+    } else {
+      container.removeChild(node);
+    }
+  }
+  for (const id of desiredIds) {
+    let node = existing.get(id);
+    if (node === undefined) node = build(id);
+    markSelected(node, id);
+    container.appendChild(node);
+  }
+}
+
 export function mountMediaPicker(
   ctx: MountMediaPickerContext,
   element: MediaElement,
@@ -486,6 +532,7 @@ export function mountMediaPicker(
   pickerWrap.appendChild(currentRow);
 
   let currentThumb = ctx.buildPickerThumb(element.assetId, element.assetId, () => {});
+  let currentThumbAssetId = element.assetId;
   currentRow.appendChild(currentThumb);
 
   const actionsCol = document.createElement('div');
@@ -539,9 +586,11 @@ export function mountMediaPicker(
   host.appendChild(pickerWrap);
 
   function refreshCurrentThumb(): void {
+    if (element.assetId === currentThumbAssetId && currentThumb.isConnected) return;
     const nextThumb = ctx.buildPickerThumb(element.assetId, element.assetId, () => {});
     currentRow.replaceChild(nextThumb, currentThumb);
     currentThumb = nextThumb;
+    currentThumbAssetId = element.assetId;
   }
 
   function refreshAll(): Promise<unknown> {
@@ -550,7 +599,6 @@ export function mountMediaPicker(
   }
 
   async function refreshHistoryRow(): Promise<void> {
-    historyRow.replaceChildren();
     let entries: Array<{ assetId: string }>;
     try {
       const resp = await ctx.authFetch(
@@ -567,14 +615,22 @@ export function mountMediaPicker(
       console.error('slot-history fetch failed', err);
       return;
     }
-    for (const entry of entries) {
-      const assetId = entry.assetId;
-      const thumb = ctx.buildPickerThumb(assetId, element.assetId, (id: string) => {
-        void ctx.applyAssetIdToElement(element, id, refreshAll);
-      });
-      historyRow.appendChild(thumb);
-    }
-    if (entries.length === 0) {
+    const ids = entries
+      .map((entry) => entry.assetId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    reconcilePickerChildren(
+      historyRow,
+      ids,
+      (id) => {
+        const thumb = ctx.buildPickerThumb(id, element.assetId, (clicked: string) => {
+          void ctx.applyAssetIdToElement(element, clicked, refreshAll);
+        });
+        thumb.setAttribute('data-asset-id', id);
+        return thumb;
+      },
+      (node, id) => node.classList.toggle('selected', id === element.assetId),
+    );
+    if (ids.length === 0) {
       const hint = document.createElement('span');
       hint.style.cssText = 'font-size:11px;color:var(--opencanvas-fg-faint);font-family:var(--opencanvas-font-mono);';
       hint.textContent = 'None yet';
@@ -583,7 +639,6 @@ export function mountMediaPicker(
   }
 
   async function refreshGalleryGrid(): Promise<void> {
-    galleryGrid.replaceChildren();
     let entries: Array<{ id?: string; assetId?: string; kind?: string }>;
     try {
       const resp = await ctx.authFetch(ctx.apiBase + '/owner/assets');
@@ -601,31 +656,43 @@ export function mountMediaPicker(
       console.error('gallery fetch failed', err);
       return;
     }
+    const ids: string[] = [];
     for (const entry of entries) {
       const assetId = typeof entry.id === 'string' ? entry.id : entry.assetId;
-      if (typeof assetId !== 'string' || assetId.length === 0) continue;
-      const cell = document.createElement('div');
-      cell.className = 'picker-gallery-cell';
-
-      const thumb = ctx.buildPickerThumb(assetId, element.assetId, (id: string) => {
-        void ctx.applyAssetIdToElement(element, id, refreshAll);
-      });
-      cell.appendChild(thumb);
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'picker-delete';
-      delBtn.type = 'button';
-      delBtn.textContent = 'x';
-      delBtn.title = 'Delete asset';
-      delBtn.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        void ctx.runDeleteAsset(assetId, refreshAll);
-      });
-      cell.appendChild(delBtn);
-
-      galleryGrid.appendChild(cell);
+      if (typeof assetId === 'string' && assetId.length > 0) ids.push(assetId);
     }
-    if (entries.length === 0) {
+    reconcilePickerChildren(
+      galleryGrid,
+      ids,
+      (id) => {
+        const cell = document.createElement('div');
+        cell.className = 'picker-gallery-cell';
+        cell.setAttribute('data-asset-id', id);
+
+        const thumb = ctx.buildPickerThumb(id, element.assetId, (clicked: string) => {
+          void ctx.applyAssetIdToElement(element, clicked, refreshAll);
+        });
+        cell.appendChild(thumb);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'picker-delete';
+        delBtn.type = 'button';
+        delBtn.textContent = 'x';
+        delBtn.title = 'Delete asset';
+        delBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          void ctx.runDeleteAsset(id, refreshAll);
+        });
+        cell.appendChild(delBtn);
+
+        return cell;
+      },
+      (cell, id) => {
+        const thumb = cell.querySelector('.picker-thumb');
+        if (thumb) thumb.classList.toggle('selected', id === element.assetId);
+      },
+    );
+    if (ids.length === 0) {
       const hint = document.createElement('span');
       hint.style.cssText = 'font-size:11px;color:var(--opencanvas-fg-faint);font-family:var(--opencanvas-font-mono);grid-column:1/-1;';
       hint.textContent = 'No assets yet';
