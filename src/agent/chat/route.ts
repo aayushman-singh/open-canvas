@@ -53,6 +53,8 @@ import {
   type ChatSessionState,
 } from './session.js';
 import { SseStreamWriter } from './stream.js';
+import { checkAiRateLimit, aiRateLimitRetryAfterSeconds } from '../../billing/ai-rate-limit.js';
+import type { FormRateLimiterDoNamespace } from '../../password/rate-limit.js';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -60,6 +62,9 @@ type Bindings = {
   DATABASE_URL: string;
   GEMINI_API_KEY: string;
   REPLICATE_API_TOKEN: string;
+  // Shared FormRateLimiter DO — enforces the per-account AI cap (ai-agent
+  // bucket) before each chat turn. Fails closed when missing.
+  FORM_RATE_LIMITER: FormRateLimiterDoNamespace;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -199,6 +204,23 @@ chatApi.post('/:siteId/chat', async (c) => {
   const apiKey = c.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.length === 0) {
     return c.json({ error: 'GEMINI_API_KEY not configured' }, 500);
+  }
+
+  const aiLimit = await checkAiRateLimit(
+    c.env.FORM_RATE_LIMITER,
+    row.callerCustomerId,
+    'ai-agent',
+  );
+  if (!aiLimit.allowed) {
+    const retryAfter = aiRateLimitRetryAfterSeconds(aiLimit);
+    return c.json(
+      {
+        error: 'AI usage limit reached for your account. Try again later.',
+        retryAfterSeconds: retryAfter,
+      },
+      429,
+      { 'Retry-After': String(retryAfter) },
+    );
   }
 
   // Load or create the session row up-front so we can emit the sessionId as

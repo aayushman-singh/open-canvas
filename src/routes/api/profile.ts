@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { customer, BILLING_PLANS, type BillingPlan } from '../../db/schema';
+import { customer } from '../../db/schema';
 import {
   clerkAuth,
   getClerkUser,
@@ -82,10 +82,11 @@ profileApi.patch('/', async (c) => {
   }
 
   if (body.plan !== undefined) {
-    if (!BILLING_PLANS.includes(body.plan as BillingPlan)) {
-      return c.json({ error: `plan must be one of: ${BILLING_PLANS.join(', ')}` }, 400);
-    }
-    updates.plan = body.plan;
+    // Plan changes are disabled on the public deployment. Every account stays
+    // on the default 'free' plan, which the 3-site cap and the AI rate limits
+    // are calibrated against. Reject loudly rather than silently ignore so
+    // neither the UI nor a direct API caller can believe an upgrade succeeded.
+    return c.json({ error: 'Plan changes are disabled.' }, 403);
   }
 
   const database = db(c.env);

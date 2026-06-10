@@ -22,6 +22,8 @@ import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { ownerAsset, site } from '../../db/schema';
 import { generateImageViaReplicate, snapToFluxAspectRatio } from '../../agent/replicate-image';
+import { checkAiRateLimit, aiRateLimitRetryAfterSeconds } from '../../billing/ai-rate-limit';
+import type { FormRateLimiterDoNamespace } from '../../password/rate-limit';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -30,6 +32,9 @@ type Bindings = {
   REPLICATE_API_TOKEN: string;
   ASSETS_BUCKET: R2Bucket;
   SITE_ROOM: DurableObjectNamespace;
+  // Shared FormRateLimiter DO — enforces the per-account AI cap (ai-image
+  // bucket) before each Replicate call. Fails closed when missing.
+  FORM_RATE_LIMITER: FormRateLimiterDoNamespace;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -718,6 +723,25 @@ canvasApi.post('/sites/:siteId/assets/generate', async (c) => {
   const token = c.env.REPLICATE_API_TOKEN;
   if (typeof token !== 'string' || token.length === 0) {
     throw new Error('REPLICATE_API_TOKEN binding is missing');
+  }
+
+  // Image generation is the costliest AI call — its own tighter per-account
+  // bucket. Keyed on the Owner, matching where the generated asset lands.
+  const aiLimit = await checkAiRateLimit(
+    c.env.FORM_RATE_LIMITER,
+    result.ownerCustomerId,
+    'ai-image',
+  );
+  if (!aiLimit.allowed) {
+    const retryAfter = aiRateLimitRetryAfterSeconds(aiLimit);
+    return c.json(
+      {
+        error: 'Image generation limit reached for your account. Try again later.',
+        retryAfterSeconds: retryAfter,
+      },
+      429,
+      { 'Retry-After': String(retryAfter) },
+    );
   }
 
   const aspectRatio = snapToFluxAspectRatio(parsed.boxW, parsed.boxH);
