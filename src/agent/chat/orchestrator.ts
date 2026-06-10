@@ -181,6 +181,16 @@ export interface OrchestratorContext {
     prompt: string,
     aspectRatio: string,
   ) => Promise<{ bytes: Uint8Array; mediaType: string }>;
+  /**
+   * Optional. Per-account image-generation cap hook. Called once before each
+   * `generateImage` Replicate dispatch; when it returns `allowed: false` the
+   * tool reports the cap to the model instead of generating. The chat route
+   * wires this to the tighter 'ai-image' bucket (src/billing/ai-rate-limit.ts)
+   * keyed by the site owner, so chat image generation can't bypass the cap the
+   * direct /assets/generate endpoint enforces. Omitted by canvas-agent (no
+   * `generateImage` tool) and by smokes.
+   */
+  imageRateLimit?: () => Promise<{ allowed: boolean; retryAfterMs: number | null }>;
 }
 
 export interface RunTurnInput {
@@ -962,6 +972,27 @@ async function dispatchGenerateImage(
     return {};
   }
   const { prompt, alt, target } = parsed.value;
+
+  // Enforce the per-account image cap before the (costly) Replicate call, so
+  // chat-triggered generation consumes the same 'ai-image' bucket the direct
+  // /assets/generate endpoint does. Mirrors the missing-token error branch:
+  // report to the model, don't generate.
+  if (ctx.imageRateLimit) {
+    const limit = await ctx.imageRateLimit();
+    if (!limit.allowed) {
+      const errMsg =
+        'generateImage: image generation limit reached for this account. Try again later.';
+      await writer.write({ kind: 'error', error: errMsg });
+      history.push({
+        role: 'tool',
+        toolCallId: call.id,
+        toolName: call.name,
+        content: JSON.stringify({ error: errMsg }),
+      });
+      return {};
+    }
+  }
+
   const aspectRatio =
     target.mode === 'replace'
       ? snapToFluxAspectRatio(target.boxW, target.boxH)

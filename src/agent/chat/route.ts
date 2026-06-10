@@ -255,6 +255,14 @@ chatApi.post('/:siteId/chat', async (c) => {
       ...(typeof replicateToken === 'string' && replicateToken.length > 0
         ? { replicateToken }
         : {}),
+      imageRateLimit: async () => {
+        const r = await checkAiRateLimit(
+          c.env.FORM_RATE_LIMITER,
+          row.siteOwnerCustomerId,
+          'ai-image',
+        );
+        return { allowed: r.allowed, retryAfterMs: r.retryAfterMs };
+      },
       systemInstruction: buildSystemPrompt(row.editableState, selectedElementId),
     };
 

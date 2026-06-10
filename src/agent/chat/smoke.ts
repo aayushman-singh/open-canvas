@@ -1018,7 +1018,7 @@ function makeReplicateStub(): {
     result.doneReason === 'stop',
     `expected doneReason=stop after REPLACE happy path, got ${result.doneReason}`,
   );
-  console.log('[chat:smoke] 11/14 generateImage REPLACE mode — OK');
+  console.log('[chat:smoke] 11/15 generateImage REPLACE mode — OK');
 }
 
 // ---- Test 12 — ADD mode with default box ---------------------------------
@@ -1095,7 +1095,7 @@ function makeReplicateStub(): {
       box.y >= 40,
     `op.target.box must default to {x:40, w:480, h:270, y >= 40}, got ${JSON.stringify(box)}`,
   );
-  console.log('[chat:smoke] 12/14 generateImage ADD mode default box — OK');
+  console.log('[chat:smoke] 12/15 generateImage ADD mode default box — OK');
 }
 
 // ---- Test 13 — Missing REPLICATE_API_TOKEN -------------------------------
@@ -1148,7 +1148,7 @@ function makeReplicateStub(): {
     !events.some((e) => e.kind === 'op-preview'),
     'missing token must not emit any op-preview',
   );
-  console.log('[chat:smoke] 13/14 generateImage missing-token — OK');
+  console.log('[chat:smoke] 13/15 generateImage missing-token — OK');
 }
 
 // ---- Test 14 — both elementId and sectionId ------------------------------
@@ -1205,7 +1205,60 @@ function makeReplicateStub(): {
     !events.some((e) => e.kind === 'op-preview'),
     'parser rejection must not emit any op-preview',
   );
-  console.log('[chat:smoke] 14/14 generateImage parser rejection — OK');
+  console.log('[chat:smoke] 14/15 generateImage parser rejection — OK');
+}
+
+// ---- Test 15 — per-account image cap blocks generation -------------------
+//
+// When ctx.imageRateLimit reports the account is over the 'ai-image' budget,
+// the generateImage tool must NOT call Replicate and must surface a loud
+// error to the model — mirroring the missing-token branch. Pins the fix for
+// the chat image-gen cap bypass (codex review).
+{
+  const fix = buildGenerateFixture();
+  const stub = makeReplicateStub();
+  const callId = 'gen-capped-1';
+  const adapter = new MockLlmAdapter([
+    () =>
+      yieldChunks(
+        { type: 'text', text: 'Generating…' },
+        {
+          type: 'tool_call',
+          id: callId,
+          name: 'generateImage',
+          arguments: { elementId: fix.heroMediaId, prompt: 'a foggy harbour at dawn' },
+        },
+        { type: 'done', reason: 'tool_use' },
+      ),
+    () => yieldChunks({ type: 'text', text: 'Acknowledged.' }, { type: 'done', reason: 'stop' }),
+  ]);
+  const writer = new BufferedStreamWriter();
+  const session = await new InMemorySessionStore().create('site-gen-capped', 'customer-smoke');
+  await runChatTurn({
+    session,
+    userMessage: 'Generate a hero image.',
+    writer,
+    ctx: {
+      adapter,
+      state: fix.state,
+      systemInstruction: '[smoke] sys',
+      replicateToken: 'test-token-XYZ',
+      replicateClient: stub.client,
+      imageRateLimit: () => Promise.resolve({ allowed: false, retryAfterMs: 9_999 }),
+    },
+  });
+
+  assert(stub.calls.length === 0, 'over-budget image cap must NOT call Replicate');
+  const events = writer.events();
+  assert(
+    events.some((e) => e.kind === 'error' && e.error.includes('image generation limit reached')),
+    'over-budget image cap must emit a loud error event',
+  );
+  assert(
+    !events.some((e) => e.kind === 'op-preview'),
+    'over-budget image cap must not emit an op-preview',
+  );
+  console.log('[chat:smoke] 15/15 generateImage rate-limit cap — OK');
 }
 
 // ---------------------------------------------------------------------------
