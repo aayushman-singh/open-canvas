@@ -1,9 +1,16 @@
 # ADR 0052 — Tabs as a `TabsElement` with embedded panels
 
-**Status:** Proposed
-**Date:** 2026-06-02
+**Status:** Accepted
+**Date:** 2026-06-02 (Accepted 2026-06-09)
 **Author:** Aayushman Singh
 **Drives:** gap #2 from [docs/portfolio-template-gaps.md](../portfolio-template-gaps.md). Bundle D in the gap-bundling plan agreed on 2026-06-01.
+
+**As-built (2026-06-09):** all five decisions live in the canvas.
+Decision 1 (`TabsElement` schema) at [`src/canvas/elements/tabs.ts`](../../src/canvas/elements/tabs.ts), wired into `ELEMENT_TYPES` and the element union in [`src/canvas/schema.ts`](../../src/canvas/schema.ts); smoke at [`src/canvas/tabs-element.smoke.ts`](../../src/canvas/tabs-element.smoke.ts).
+Decision 2 (`Tab.label: InlineRun[]`) on the same module.
+Decision 3 (panel-local coordinates) — `renderTabs` wraps each panel in `position: relative` ([`tabs.ts`](../../src/canvas/elements/tabs.ts)).
+Decision 4 (delegated visitor JS) — render emits the click handler against the `[data-opencanvas-tabs]` root.
+Decision 5 (graceful no-JS degradation) — corresponding rules in [`src/canvas/public-styles.ts`](../../src/canvas/public-styles.ts).
 
 ## Context
 

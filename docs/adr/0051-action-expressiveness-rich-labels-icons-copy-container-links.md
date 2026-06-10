@@ -1,9 +1,16 @@
 # ADR 0051 — Action expressiveness: rich labels, icon registry, copy behaviour, container links
 
-**Status:** Proposed
-**Date:** 2026-06-02
+**Status:** Accepted
+**Date:** 2026-06-02 (Accepted 2026-06-09)
 **Author:** Aayushman Singh
 **Drives:** gaps 7, 8, 9, and 10 from [docs/portfolio-template-gaps.md](../portfolio-template-gaps.md). Bundle C in the gap-bundling plan agreed on 2026-06-01.
+
+**As-built (2026-06-09):** all five decisions live in the canvas.
+Decision 1 (`label: InlineRun[]`) on [`src/canvas/elements/action.ts`](../../src/canvas/elements/action.ts) with the 2026-06-02 JSONB migration that swept legacy string labels.
+Decision 2 (icon registry) lives in [`src/canvas/icons.ts`](../../src/canvas/icons.ts) (`ICON_NAMES`, `IconName`, `renderIconSvg`), surfaced via the visual picker in [`src/editor-client/inspector-icon-picker.ts`](../../src/editor-client/inspector-icon-picker.ts).
+Decision 3 (`href` ⊕ `behavior` discriminated union) on [`src/canvas/elements/action.ts`](../../src/canvas/elements/action.ts).
+Decision 4 (delegated copy handler) emitted from [`src/canvas/render.ts`](../../src/canvas/render.ts) under `[data-opencanvas-copy]`; smoke at [`src/canvas/action-expressiveness.smoke.ts`](../../src/canvas/action-expressiveness.smoke.ts).
+Decision 5 (`ContainerElement.linkHref`) on [`src/canvas/elements/container.ts`](../../src/canvas/elements/container.ts).
 
 ## Context
 

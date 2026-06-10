@@ -1,9 +1,15 @@
 # ADR 0050 — Layout primitives: fluid type, anchor ids, site-level scroll behaviour
 
-**Status:** Proposed
-**Date:** 2026-06-01
+**Status:** Accepted
+**Date:** 2026-06-01 (Accepted 2026-06-09)
 **Author:** Aayushman Singh
 **Drives:** gaps 1, 11, and 12 from [docs/portfolio-template-gaps.md](../portfolio-template-gaps.md) — the punch list produced by porting `C:/Repo/portfolio` into the canvas as `portfolio-showcase`. Bundle B in the gap-bundling plan agreed before the port (see conversation log 2026-06-01).
+
+**As-built (2026-06-09):** all four decisions live in the canvas.
+Decision 1 (fluidSize) wired through [`src/canvas/elements/text.ts`](../../src/canvas/elements/text.ts) and validated in [`src/canvas/validate.ts`](../../src/canvas/validate.ts); smoke at [`src/canvas/layout-primitives.smoke.ts`](../../src/canvas/layout-primitives.smoke.ts).
+Decision 2 (anchorId) lives on `BaseElement` and `CanvasSection` in [`src/canvas/schema.ts`](../../src/canvas/schema.ts) and is rendered through [`src/canvas/render.ts`](../../src/canvas/render.ts).
+Decision 3 (scrollBehavior) lands as the optional `{ smooth?, paddingTop? }` slot on `EditableSiteBase` in [`src/canvas/schema.ts`](../../src/canvas/schema.ts).
+Decision 4 (validator gate) covers all three in [`src/canvas/validate.ts`](../../src/canvas/validate.ts).
 
 ## Context
 
