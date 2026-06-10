@@ -2,9 +2,20 @@
 
 > A desktop canvas site builder where an Owner starts from one Template Seed, edits positioned design primitives with AI help, switches deterministic Style Kits, and publishes to a real Published Address that updates open Visitor tabs immediately.
 
-[![Status](https://img.shields.io/badge/status-launching--soon-cyan)](https://github.com/aayushman-singh/open-canvas)
+[![CI](https://github.com/aayushman-singh/open-canvas/actions/workflows/deploy-worker.yml/badge.svg)](https://github.com/aayushman-singh/open-canvas/actions/workflows/deploy-worker.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Live](https://img.shields.io/badge/live-opencanvas.aayushman.dev-cyan)](https://opencanvas.aayushman.dev)
+
+## Demo
+
+▶️ **[Watch the full walkthrough →](https://youtu.be/VIDEO_ID)**  _(replace `VIDEO_ID` with your YouTube video id)_
+
+<!--
+  Hero clip: add a short (~10s) optimized GIF or a GitHub-hosted .mp4 under
+  docs/media/, then uncomment one of these for an inline preview:
+  ![Open Canvas in action](docs/media/demo.gif)
+  [![Watch the demo](docs/media/demo-thumbnail.png)](https://youtu.be/VIDEO_ID)
+-->
 
 ## What it is
 
@@ -66,7 +77,17 @@ bun.cmd run build           # wrangler deploy --dry-run
 
 ## Status
 
-Launching soon.
+Live at **[opencanvas.aayushman.dev](https://opencanvas.aayushman.dev)** and under active development. Issues and PRs welcome.
+
+## Documentation
+
+- [FEATURES.md](FEATURES.md) — exhaustive feature reference
+- [docs/adr/](docs/adr/) — 66 architecture decision records (the reasoning behind every major choice)
+- [CONTEXT.md](CONTEXT.md) — domain language and core concepts
+
+## Contributing
+
+Pull requests welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev loop and PR checklist, plus [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) and [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 
 ## License
 

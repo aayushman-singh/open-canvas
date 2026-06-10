@@ -309,7 +309,7 @@
         "variant": "ghost",
         "behavior": {
           "type": "copy",
-          "value": "aayushman2702@gmail.com"
+          "value": "hello@example.com"
         },
         "iconKind": "mail"
       },
@@ -325,7 +325,7 @@
         },
         "content": [
           {
-            "text": "aayushman2702@gmail.com"
+            "text": "hello@example.com"
           }
         ],
         "role": "label",

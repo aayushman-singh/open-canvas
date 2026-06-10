@@ -5,7 +5,7 @@
 // `DATABASE_URL`.
 //
 // Test plan:
-//   1. Pick a fixed test customer (kremzylo@gmail.com) + one of their sites.
+//   1. Pick a fixed test customer + one of their sites.
 //   2. Insert 3 notification rows: one customer-kind unread, one site-kind
 //      unread, one customer-kind already read.
 //   3. Call listInbox + unreadCount → verify counts + read flags.
@@ -29,8 +29,8 @@ function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(`[inbox-integration-smoke] ${message}`);
 }
 
-const CUSTOMER_ID = '90829df1-2f52-4f89-90a2-03d0739f6d75'; // kremzylo@gmail.com
-const SITE_ID = '74a8854d-6f2a-45f8-af18-19b0f74bf215'; // Briar
+const CUSTOMER_ID = '90829df1-2f52-4f89-90a2-03d0739f6d75'; // fixed test customer
+const SITE_ID = '74a8854d-6f2a-45f8-af18-19b0f74bf215'; // a site owned by the test customer
 // Picked deliberately: a customer who is not the owner of SITE_ID and not in
 // site_collaborator for it. Picking the wrong customer here (one who IS a
 // collaborator) silently passes the negative case for the wrong reason.
