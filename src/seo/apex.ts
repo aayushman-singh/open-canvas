@@ -25,6 +25,7 @@
 
 import { Hono } from 'hono';
 import { createR2Client, type R2Client } from '../assets/r2-client.js';
+import type { StyleKitPreset } from '../canvas/schema.js';
 import { STYLE_KIT_PRESETS } from '../canvas/style-kits.js';
 import { appDomain, appOrigin, type HostConfigEnv } from '../host-config.js';
 import { OG_CONTENT_TYPE } from '../og-image/cache.js';
@@ -53,8 +54,40 @@ export const APEX_OG_SITE_NAME = 'Open Canvas';
 export const APEX_OG_HEADLINE = 'Build your site, together';
 export const APEX_OG_DESCRIPTION =
   'Drag things where you want them. Ask the built-in assistant. Hit publish and it is live — no code, no plugins.';
-const APEX_OG_VERSION = 1;
+// v2: card gained the brand logo lockup and switched from the cool charcoal
+// Style Kit to the brand dark-mode palette below.
+const APEX_OG_VERSION = 2;
 const APEX_OG_R2_KEY = `og/apex/landing.v${String(APEX_OG_VERSION)}.png`;
+
+// Brand dark-mode palette for the marketing card. Mirrors the dark theme in
+// src/ui/theme.css (--paper / --ink / --ink-2 / --red) so the card matches the
+// dark landing page visitors actually see — warm near-black ground, off-white
+// ink, brand-red accent — rather than the cool charcoal Style Kit. The card
+// reads only bg / panel / text / muted / accent, so the rest is spread from
+// charcoal unchanged.
+const APEX_OG_PRESET: StyleKitPreset = {
+  ...STYLE_KIT_PRESETS.charcoal,
+  bg: '#16140F',
+  panel: '#201D17',
+  text: '#F6F2E9',
+  muted: '#B7AFA1',
+  accent: '#FF6257',
+};
+
+// Open Canvas brand mark as a standalone SVG `data:` URI for the satori <img>.
+// Geometry mirrors `OcLogo` in src/ui/brand.tsx (keep in sync); colours are
+// baked in because satori resolves neither `currentColor` nor CSS vars. The
+// frame + lens ring take the ink colour; the two bars take the brand red.
+function apexBrandLogoDataUri(ink: string, red: string): string {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 64 64" fill="none">` +
+    `<rect x="14" y="9" width="40" height="46" stroke="${ink}" stroke-width="2.4"/>` +
+    `<circle cx="34" cy="32" r="11" stroke="${ink}" stroke-width="7"/>` +
+    `<rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="${red}"/>` +
+    `<rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="${red}"/>` +
+    `</svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
 
 const CACHE_CONTROL_PUBLIC_1H = 'public, max-age=3600';
 const CACHE_CONTROL_PUBLIC_1D = 'public, max-age=86400';
@@ -157,7 +190,8 @@ export async function renderApexOgPng(env: Bindings & RasteriseEnv): Promise<Uin
     siteName: APEX_OG_SITE_NAME,
     pageTitle: APEX_OG_HEADLINE,
     pageDescription: APEX_OG_DESCRIPTION,
-    preset: STYLE_KIT_PRESETS.charcoal,
+    preset: APEX_OG_PRESET,
+    brandLogoDataUri: apexBrandLogoDataUri(APEX_OG_PRESET.text, APEX_OG_PRESET.accent),
   });
   const { bytes } = await rasteriseSvgToPng(svg, {
     wasmModule: resvgWasmModule as WebAssembly.Module,

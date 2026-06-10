@@ -40,6 +40,14 @@ export interface RenderOgCardInput {
   pageTitle: string;
   pageDescription?: string;
   preset: StyleKitPreset;
+  /**
+   * Optional brand mark rendered as a logo lockup to the left of the site
+   * name. A standalone SVG `data:` URI (satori resolves neither `currentColor`
+   * nor CSS vars, so colours must be baked in — see `apexBrandLogoDataUri` in
+   * src/seo/apex.ts). Per-site cards omit this; only the apex marketing card
+   * sets it, so a visitor's published-site OG never carries the OC logo.
+   */
+  brandLogoDataUri?: string;
 }
 
 interface SatoriNode {
@@ -62,7 +70,7 @@ function h(
  * Build the JSX tree for the OG card. Returns a Satori-compatible node.
  */
 function buildCardTree(input: RenderOgCardInput): SatoriNode {
-  const { siteName, pageTitle, pageDescription, preset } = input;
+  const { siteName, pageTitle, pageDescription, preset, brandLogoDataUri } = input;
 
   // The whole card.
   return h(
@@ -81,21 +89,39 @@ function buildCardTree(input: RenderOgCardInput): SatoriNode {
         fontFamily: 'Inter',
       },
     },
-    // Top row: site name as small caps.
+    // Top row: optional brand logo + site name as small caps (a lockup).
     h(
       'div',
       {
         style: {
           display: 'flex',
           alignItems: 'center',
-          fontSize: '22px',
-          fontWeight: 600,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: preset.muted,
+          gap: '18px',
         },
       },
-      siteName,
+      brandLogoDataUri !== undefined
+        ? h('img', {
+            src: brandLogoDataUri,
+            width: 52,
+            height: 52,
+            style: { display: 'flex' },
+          })
+        : null,
+      h(
+        'div',
+        {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            fontSize: '22px',
+            fontWeight: 600,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: preset.muted,
+          },
+        },
+        siteName,
+      ),
     ),
     // Middle block — title and optional description.
     h(
