@@ -207,6 +207,7 @@
     "@types/markdown-it": "^14.1.2",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
+    "aws4fetch": "^1.0.20",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",
