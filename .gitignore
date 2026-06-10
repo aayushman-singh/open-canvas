@@ -48,3 +48,6 @@ HANDOFF*.md
 SESSION_SUMMARY*.md
 STATE.md
 DECISIONS.md
+
+# Agent working directory — internal scratch output, not for the public repo.
+codex/
