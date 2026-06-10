@@ -4,7 +4,7 @@
 >
 > **Stack:** Cloudflare Workers + Hono + Drizzle ORM + Neon Postgres + Yjs + Gemini + Playwright
 >
-> **Live:** https://rev01.aayushman.dev
+> **Live:** https://opencanvas.aayushman.dev
 
 ---
 
@@ -819,7 +819,7 @@ Dark color scheme, Google Fonts integration, a JS-driven hero demo canvas, and f
 | Capability | Detail |
 |---|---|
 | Provider | Resend (direct HTTP API, no SDK) |
-| From address | Environment-driven `${EMAIL_FROM}` (per [ADR 0018](docs/adr/0018-email-sender-from-env.md)); defaults to `rev01 <noreply@rev01.aayushman.dev>` for the rev01 deployment |
+| From address | Environment-driven `${EMAIL_FROM}` (per [ADR 0018](docs/adr/0018-email-sender-from-env.md)); defaults to `Open Canvas <noreply@opencanvas.aayushman.dev>` for the canonical deployment |
 | Templates | Responsive HTML email (480px table-based) |
 | Hosted brand-mark | All transactional templates emit a hosted brand-mark PNG header (no inline SVG, no attachment) so every mail client renders the brand identically |
 | Copyright footer | Every template renders a copyright footer line beneath the body |
@@ -1001,8 +1001,8 @@ Proxy endpoints under `/__api/` using edit-token cookie instead of Clerk: canvas
 
 ### Routing
 
-- `rev01.aayushman.dev` — Custom domain (dashboard + API + landing)
-- `*.rev01.aayushman.dev` — Wildcard (published sites at `<subdomain>.rev01.aayushman.dev`)
+- `opencanvas.aayushman.dev` — Custom domain (dashboard + API + landing)
+- `*.opencanvas.aayushman.dev` — Wildcard (published sites at `<subdomain>.opencanvas.aayushman.dev`)
 
 ---
 

@@ -108,12 +108,12 @@ async function cmdConsole() {
 
 async function cmdCookieSet(name, value, domain) {
   const { ctx } = await connect();
-  const url = new URL(domain?.startsWith('http') ? domain : `https://${domain ?? 'rev01.aayushman.dev'}`);
+  const url = new URL(domain?.startsWith('http') ? domain : `https://${domain ?? 'opencanvas.aayushman.dev'}`);
   await ctx.addCookies([
     {
       name,
       value,
-      domain: domain ?? '.rev01.aayushman.dev',
+      domain: domain ?? '.opencanvas.aayushman.dev',
       path: '/',
       httpOnly: false,
       secure: true,
