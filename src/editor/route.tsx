@@ -632,12 +632,12 @@ export function editorPageJsx(opts: EditorPageOptions) {
               </span>
             </button>
             <form id="canvas-chat-form" class="opencanvas-chat-input">
-              <input
-                type="text"
+              <textarea
                 id="canvas-chat-input"
                 placeholder="Ask the agent to edit your site..."
+                rows={1}
                 autocomplete="off"
-              />
+              ></textarea>
               <button type="submit">Send</button>
             </form>
           </aside>

@@ -78,7 +78,9 @@ import {
   ZOOM_MIN,
 } from './editor-constants.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
+import type { AugmentCollectionPreviewsContext } from './collection-preview.js';
 import { augmentCollectionPreviewsImpl } from './collection-preview.js';
+import type { MountTemplateEditChromeContext } from './collection-template-edit-view.js';
 import { mountTemplateEditChromeImpl } from './collection-template-edit-view.js';
 import { hydrateInteractives } from './hydrate-interactives.js';
 
@@ -380,13 +382,16 @@ export function fitAllPages(ctx: FitAllPagesContext): void {
 // style-kit chip sync, CameraTransform for the final paint, then
 // renderInspector / renderReel / autoGrowTextElements / placement
 // slots. No canonical alias covers the page-build verbs yet, so they
-// live as an inline Pick. The two augment* / mount* helpers still take
-// the wide EditorContext (their own ADR 0064 carves are pending), so
-// those two forward sites cast through EditorContext below.
+// live as an inline Pick. Folds in AugmentCollectionPreviewsContext
+// and MountTemplateEditChromeContext so the two augment* / mount*
+// forward sites typecheck without `ctx as EditorContext` scaffolding
+// (their own ADR 0064 carves landed in dce94a7 and 300ad71).
 export type RenderAllContext = ComputePagePositionsContext &
   CameraTransformContext &
   AutoGrowTextElementsContext &
   BuildGhostSectionNodeContext &
+  AugmentCollectionPreviewsContext &
+  MountTemplateEditChromeContext &
   Pick<
     EditorContext,
     | 'activePageId'
@@ -494,19 +499,14 @@ export function renderAllImpl(ctx: RenderAllContext): void {
   // strictly after autoGrowTextElements so the inner frame's final box
   // dimensions are settled; the augmenter is idempotent so a redundant
   // call on a no-Collection page is a cheap zero-iteration loop.
-  // ADR 0064 — augmentCollectionPreviewsImpl still takes the wide
-  // EditorContext; cast until collection-preview.ts narrows under its
-  // own carve.
-  augmentCollectionPreviewsImpl(ctx as EditorContext);
+  augmentCollectionPreviewsImpl(ctx);
   // ADR 0065 D5 — mount the in-place template-edit chrome (banner, Done
   // button, scrim, viewport pan) when ctx.editingCollectionTemplate pins
   // a Collection. Idempotent — runs after augmentCollectionPreviewsImpl
   // so the placeholder-card branch settles first, then this layer
   // overlays the active template's chrome. When the field is null the
   // mount no-ops after stripping any stale chrome.
-  // ADR 0064 — mountTemplateEditChromeImpl still takes the wide
-  // EditorContext; cast until collection-template-edit-view.ts narrows.
-  mountTemplateEditChromeImpl(ctx as EditorContext);
+  mountTemplateEditChromeImpl(ctx);
 
   // Hydrate the visitor interactive runtime against every newly-rendered
   // carousel / accordion. The `data-opencanvas-hydrated="true"` idempotence

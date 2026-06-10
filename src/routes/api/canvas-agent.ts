@@ -45,6 +45,8 @@ import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
 import { broadcastEditableStateReplaced } from './canvas';
+import { checkAiRateLimit, aiRateLimitRetryAfterSeconds } from '../../billing/ai-rate-limit';
+import type { FormRateLimiterDoNamespace } from '../../password/rate-limit';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -56,6 +58,9 @@ type Bindings = {
   // stale Y.Doc back to Postgres and silently revert the agent's write.
   // Mirror of the binding canvas.ts uses for the same reason (canvas.ts:127).
   SITE_ROOM: DurableObjectNamespace;
+  // Shared FormRateLimiter DO — enforces the per-account AI cap (ai-agent
+  // bucket) before each Gemini turn. Fails closed when missing.
+  FORM_RATE_LIMITER: FormRateLimiterDoNamespace;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -303,6 +308,19 @@ canvasAgentApi.post('/sites/:siteId/preview', async (c) => {
   const apiKey = c.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.length === 0) {
     return c.json({ error: 'GEMINI_API_KEY not configured' }, 503);
+  }
+
+  const aiLimit = await checkAiRateLimit(c.env.FORM_RATE_LIMITER, row.customerId, 'ai-agent');
+  if (!aiLimit.allowed) {
+    const retryAfter = aiRateLimitRetryAfterSeconds(aiLimit);
+    return c.json(
+      {
+        error: 'AI usage limit reached for your account. Try again later.',
+        retryAfterSeconds: retryAfter,
+      },
+      429,
+      { 'Retry-After': String(retryAfter) },
+    );
   }
 
   // Per ADR 0055 decision 7 the preview endpoint runs the same multi-turn

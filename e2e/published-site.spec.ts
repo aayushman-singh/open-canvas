@@ -12,7 +12,7 @@ const subdomain = process.env.PUBLISHED_SUBDOMAIN;
 test.describe('Published site — error handling (no subdomain needed)', () => {
   test('non-existent subdomain gets a clear error — not a crash', async ({ request }) => {
     const resp = await request.get('/', {
-      headers: { host: 'nonexistent-xyz-999.rev01.aayushman.dev' },
+      headers: { host: 'nonexistent-xyz-999.opencanvas.aayushman.dev' },
     });
     // Should be 404 or a fallback, not 500
     expect(resp.status()).toBeLessThan(500);
@@ -33,7 +33,7 @@ test.describe('Published site — visitor experience', () => {
   test.skip(!subdomain, 'Set PUBLISHED_SUBDOMAIN env var to run these tests');
 
   const siteUrl = subdomain
-    ? `https://${subdomain}.rev01.aayushman.dev`
+    ? `https://${subdomain}.opencanvas.aayushman.dev`
     : '';
 
   test('published site loads and renders visible content', async ({ page }) => {

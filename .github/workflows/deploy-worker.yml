@@ -37,6 +37,7 @@ jobs:
       - run: bun run sidebar-dispatch:smoke
       - run: bun run yjs-projection:smoke
       - run: bun run canvas-agent:smoke
+      - run: bun run ai-rate-limit:smoke
       - run: bun run build
 
   deploy:

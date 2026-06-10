@@ -127,17 +127,23 @@ const pageStyles = `
   .chat-input {
     display: flex;
     gap: 8px;
+    align-items: flex-end;
   }
   .chat-input textarea {
     flex: 1;
     min-height: 64px;
-    resize: vertical;
+    max-height: 200px;
+    box-sizing: border-box;
+    /* Height tracks content via autoGrowInput; cap then scroll internally. */
+    resize: none;
+    overflow-y: auto;
     padding: 10px 12px;
     background: var(--bg);
     color: var(--text);
     border: 1px solid var(--line);
     border-radius: 8px;
     font: inherit;
+    line-height: 1.4;
   }
   .chat-status { color: var(--muted); font-size: 13px; min-height: 18px; }
 `;
@@ -161,6 +167,12 @@ const browserScript = `
     thread.scrollTop = thread.scrollHeight;
     return div;
   }
+
+  function autoGrowInput() {
+    input.style.height = 'auto';
+    input.style.height = (input.scrollHeight + input.offsetHeight - input.clientHeight) + 'px';
+  }
+  input.addEventListener('input', autoGrowInput);
 
   function appendToolMarker(name, args) {
     const div = document.createElement('div');
@@ -225,6 +237,7 @@ const browserScript = `
     if (text.length === 0) return;
     appendBubble('user', text);
     input.value = '';
+    autoGrowInput();
     sendBtn.disabled = true;
     statusEl.textContent = 'Agent thinking…';
     pendingAgentBubble = appendBubble('agent', '');

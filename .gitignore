@@ -36,10 +36,18 @@ e2e/live-driver/.profile/
 e2e/live-driver/screenshots/
 
 # Demo recording-loop artefacts — contain operator email, site IDs, infra fingerprints.
-# Script + feature-coverage + README + diagrams stay tracked.
 docs/demo/drive-*/
 docs/demo/handoff-*.md
 docs/demo/*-findings.md
 docs/demo/retest-*.md
 docs/demo/dryrun-report.md
 docs/demo/script-deltas-*.md
+
+# Internal session/handoff working notes — never meant for the public repo.
+HANDOFF*.md
+SESSION_SUMMARY*.md
+STATE.md
+DECISIONS.md
+
+# Agent working directory — internal scratch output, not for the public repo.
+codex/

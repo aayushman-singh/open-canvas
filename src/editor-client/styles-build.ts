@@ -947,9 +947,10 @@ body.opencanvas-modal-open {
   gap: 8px;
   padding: 14px;
   border-top: 1px solid var(--line);
-  align-items: center;
+  /* The textarea grows upward; keep the Send button pinned to its base. */
+  align-items: flex-end;
 }
-.opencanvas-chat-input input {
+.opencanvas-chat-input textarea {
   flex: 1;
   appearance: none;
   border: 1.5px solid var(--line-2);
@@ -958,12 +959,19 @@ body.opencanvas-modal-open {
   font: inherit;
   font-family: var(--sans);
   font-size: 13.5px;
+  line-height: 1.4;
   padding: 10px 14px;
-  border-radius: var(--r-pill);
+  border-radius: 18px;
+  box-sizing: border-box;
+  /* Height is driven by JS (autoGrowChatInput); the user can't drag-resize.
+     max-height caps the growth and hands off to an internal scrollbar. */
+  resize: none;
+  overflow-y: auto;
+  max-height: 160px;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.opencanvas-chat-input input::placeholder { color: var(--ink-3); }
-.opencanvas-chat-input input:focus {
+.opencanvas-chat-input textarea::placeholder { color: var(--ink-3); }
+.opencanvas-chat-input textarea:focus {
   outline: none;
   border-color: var(--red);
   box-shadow: var(--ring);
@@ -1123,6 +1131,11 @@ body.opencanvas-modal-open {
 
 .opencanvas-sidebar-panel {
   display: grid;
+  /* Cap the single column at the panel width (minmax(0,1fr) instead of the
+     implicit max-content track) so wide children — e.g. the sections picker's
+     control row — can't push the grid past the 360px sidebar and get clipped
+     by its overflow-x. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   padding: 14px 12px 20px;
 }
@@ -1273,6 +1286,7 @@ body.opencanvas-modal-open {
   flex-direction: column;
   gap: 10px;
   padding: 10px 8px;
+  min-width: 0;
 }
 
 .opencanvas-section-picker-empty {
@@ -1282,8 +1296,10 @@ body.opencanvas-modal-open {
 
 .opencanvas-section-picker-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 .opencanvas-section-picker-search {
   flex: 1;
@@ -1297,15 +1313,14 @@ body.opencanvas-modal-open {
 }
 .opencanvas-section-picker-filter,
 .opencanvas-section-picker-sort {
+  flex: 1 1 110px;
+  min-width: 0;
   padding: 6px 10px;
   border: 1px solid var(--opencanvas-hairline);
   border-radius: 6px;
   background: var(--opencanvas-bg);
   color: var(--opencanvas-fg);
   font: inherit;
-}
-.opencanvas-section-picker-sort {
-  min-width: 120px;
 }
 .opencanvas-section-picker-grid {
   list-style: none;
@@ -1314,6 +1329,7 @@ body.opencanvas-modal-open {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 .opencanvas-section-card {
   display: flex;
@@ -1323,6 +1339,8 @@ body.opencanvas-modal-open {
   border: 1px solid var(--opencanvas-hairline);
   border-radius: 6px;
   background: var(--opencanvas-bg-panel);
+  min-width: 0;
+  overflow-wrap: anywhere;
   cursor: grab;
 }
 .opencanvas-section-card-thumb {
@@ -3796,12 +3814,17 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   flex-direction: row;
   gap: 6px;
   flex-wrap: nowrap;
+  align-items: center;
+  /* Reserve a row's worth of height so the slot never collapses to zero
+     while a refresh is in flight — keeps the labels below from jumping. */
+  min-height: 60px;
 }
 
 .media-picker .picker-gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
   gap: 6px;
+  min-height: 60px;
   max-height: 240px;
   overflow-y: auto;
 }

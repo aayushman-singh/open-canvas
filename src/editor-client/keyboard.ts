@@ -24,10 +24,45 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
+import type { DeleteShortcutContext } from './delete-shortcut.js';
 import type { EditorContext } from './editor-context.js';
+import type { FitAllPagesContext, FitToPageContext } from './render.js';
+import type { UndoContext } from './persist.js';
 import { undo, redo } from './persist.js';
 import { fitToPage, fitAllPages } from './render.js';
 import { handleDeleteShortcut } from './delete-shortcut.js';
+
+// ADR 0064 — the Phase 2o.b window-keyboard handler shares its surface
+// almost wholesale with save-wiring.ts's AttachSaveButtonContext (the two
+// listeners are byte-identical twins until ADR 0015 Phase 3 cutover
+// retires the inline IIFE). The narrow type folds in the three forwarded
+// callees' own contexts — UndoContext (RedoContext = UndoContext in
+// persist.ts, so one alias covers both undo + redo forwards),
+// FitToPageContext / FitAllPagesContext for fitToPage/fitAllPages, and
+// DeleteShortcutContext for handleDeleteShortcut — so the forward calls
+// typecheck without `ctx as EditorContext` casts. The inline `Pick`
+// enumerates the local grab bag (save / placement / pan-mode verbs +
+// state) that no canonical alias owns yet. No DomContext: keyboard.ts is
+// pure window-scope listeners and never touches the cached button refs
+// (those live in save-wiring.ts).
+export type RegisterKeyboardHandlersContext = DeleteShortcutContext &
+  UndoContext &
+  FitToPageContext &
+  FitAllPagesContext &
+  Pick<
+    EditorContext,
+    | 'saveTimer'
+    | 'saveStateNow'
+    | 'pendingImport'
+    | 'exitPlacementMode'
+    | 'temporaryPanPreviousMode'
+    | 'spaceHeldForPan'
+    | 'interactionMode'
+    | 'setInteractionMode'
+    | 'clearTemporaryPanState'
+    | 'activePageId'
+    | 'endTemporaryPan'
+  >;
 
 /**
  * Private to this module — the canonical impl lives at
@@ -46,7 +81,7 @@ function isEditableShortcutTarget(target: EventTarget | null): boolean {
   return editable.getAttribute('contenteditable') !== 'false';
 }
 
-export function registerKeyboardHandlers(ctx: EditorContext): void {
+export function registerKeyboardHandlers(ctx: RegisterKeyboardHandlersContext): void {
   window.addEventListener('keydown', (ev) => {
     // Placement-mode Escape takes priority — it cancels the pending import
     // before any other Escape behaviour (e.g. inline-editing exits, which

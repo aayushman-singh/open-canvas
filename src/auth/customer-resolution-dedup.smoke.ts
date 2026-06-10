@@ -49,7 +49,7 @@ function assert(condition: unknown, message: string): asserts condition {
 const sampleRow = (overrides: Partial<Customer> = {}): Customer => ({
   id: 'cust_A',
   clerkUserId: 'user_old',
-  email: 'kremzylo@gmail.com',
+  email: 'owner@example.com',
   displayName: null,
   bio: null,
   timezone: 'UTC',
@@ -214,8 +214,8 @@ const mkUser = (id: string, email: string): User =>
   const existing = baseRow({
     id: 'cust_existing_A',
     clerkUserId: 'user_returning',
-    email: 'kremzylo@gmail.com',
-    displayName: 'Aayushman',
+    email: 'owner@example.com',
+    displayName: 'Test Owner',
     plan: 'pro',
   });
   const store: FakeStore = {
@@ -226,7 +226,7 @@ const mkUser = (id: string, email: string): User =>
     ops: [],
     selectCallNumber: 0,
   };
-  const row = await upsertCustomerFromClerk(makeDb(store), mkUser('user_returning', 'kremzylo@gmail.com'));
+  const row = await upsertCustomerFromClerk(makeDb(store), mkUser('user_returning', 'owner@example.com'));
   assert(row.id === existing.id, 'A: returns the existing row by id');
   assert(row.plan === 'pro', 'A: preserves paid plan');
   assert(
@@ -286,8 +286,8 @@ const mkUser = (id: string, email: string): User =>
   const existing = baseRow({
     id: 'cust_existing_B',
     clerkUserId: 'user_old_password',
-    email: 'kremzylo@gmail.com',
-    displayName: 'Aayushman',
+    email: 'owner@example.com',
+    displayName: 'Test Owner',
     plan: 'pro',
     createdAt: new Date('2026-05-22T11:19:51Z'),
   });
@@ -301,7 +301,7 @@ const mkUser = (id: string, email: string): User =>
   };
   const row = await upsertCustomerFromClerk(
     makeDb(store),
-    mkUser('user_new_google', 'kremzylo@gmail.com'),
+    mkUser('user_new_google', 'owner@example.com'),
   );
   assert(row.id === existing.id, 'B: returns the EXISTING customer row, not a forked one');
   assert(
@@ -364,8 +364,8 @@ const mkUser = (id: string, email: string): User =>
   const reboundRow = baseRow({
     id: 'cust_existing_B',
     clerkUserId: 'user_new_google',
-    email: 'kremzylo@gmail.com',
-    displayName: 'Aayushman',
+    email: 'owner@example.com',
+    displayName: 'Test Owner',
     plan: 'pro',
   });
   const store: FakeStore = {
@@ -378,7 +378,7 @@ const mkUser = (id: string, email: string): User =>
   };
   const row = await upsertCustomerFromClerk(
     makeDb(store),
-    mkUser('user_new_google', 'kremzylo@gmail.com'),
+    mkUser('user_new_google', 'owner@example.com'),
   );
   assert(row.id === reboundRow.id, 'D: re-visit returns the same row');
   assert(store.selectCallNumber === 1, 'D: single SELECT — hot path');

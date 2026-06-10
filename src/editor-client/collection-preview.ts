@@ -35,6 +35,16 @@
 import type { EditorContext } from './editor-context.js';
 import { cssEscape } from './css-escape.js';
 
+// ADR 0064 — both exported impls only read `ctx.root` (the editor mount
+// node) to walk the DOM. That field lives in [[DomContext]]; everything
+// else this module needs comes from the DOM itself (data-attrs the
+// canonical renderer + Phase 2B materializer stamp onto the Collection
+// frame). We export the narrow surfaces per-function so render.ts and
+// element-menu.ts can retire their `ctx as EditorContext` forward-casts
+// on the two call sites.
+export type AugmentCollectionPreviewsContext = Pick<EditorContext, 'root'>;
+export type AugmentCollectionPreviewForElementContext = Pick<EditorContext, 'root'>;
+
 /** Class on the editor-only chrome we mount. Used as the idempotency
  *  marker — re-running the augmenter strips any prior chrome first. */
 const PREVIEW_ROOT_CLASS = 'opencanvas-collection-preview';
@@ -304,7 +314,7 @@ function augmentOneCollection(wrapper: HTMLElement): void {
  *  buildElementNodeImpl) rather than scanning ctx.state — the DOM is the
  *  source of truth at this point and the attribute is stable across the
  *  IIFE / module-cutover boundary. */
-export function augmentCollectionPreviewsImpl(ctx: EditorContext): void {
+export function augmentCollectionPreviewsImpl(ctx: AugmentCollectionPreviewsContext): void {
   if (!ctx.root) return;
   const wrappers = ctx.root.querySelectorAll('[data-element-type="collection"]');
   for (let i = 0; i < wrappers.length; i++) {
@@ -320,7 +330,7 @@ export function augmentCollectionPreviewsImpl(ctx: EditorContext): void {
  *  replaced (inspector binding change, etc.) so the placeholder state
  *  catches up without waiting for a full renderAll. */
 export function augmentCollectionPreviewForElementImpl(
-  ctx: EditorContext,
+  ctx: AugmentCollectionPreviewForElementContext,
   elementId: string,
 ): void {
   if (!ctx.root) return;

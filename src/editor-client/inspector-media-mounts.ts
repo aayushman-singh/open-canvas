@@ -14,8 +14,22 @@
 //     with the autoplay-implies-muted enforcement intact and the lazy
 //     element.playback default-init on first inspector open.
 
-import type { EditorContext } from './editor-context.js';
+import type { EditorContext, PersistContext } from './editor-context.js';
 import type { MediaElement } from '../canvas/elements/media.js';
+
+// ADR 0064 — media inspector mounts split into two narrow surfaces.
+// `mountMediaAi` reaches into the AI sidecar's busy flag + the inspector
+// action-handler registry, both module-specific verbs that do NOT have
+// a named cluster (the AI context aliases own panel state, not the
+// action-handler dispatch table). Inline Pick declares the surface
+// honestly. `mountVideoPlayback` only schedules saves on checkbox change,
+// so it earns `PersistContext`.
+export type InspectorMediaAiContext = Pick<
+  EditorContext,
+  'aiBusy' | 'INSPECTOR_ACTION_HANDLERS'
+>;
+
+export type InspectorVideoPlaybackContext = PersistContext;
 
 // AI media generation is image-only. Skip rendering for video elements
 // entirely — the upstream model has no video synthesis endpoint, so the
@@ -23,7 +37,7 @@ import type { MediaElement } from '../canvas/elements/media.js';
 // tried it. The image branch matches the legacy button-action shape:
 // primary inspector button wired to the replaceMedia AI handler.
 export function mountMediaAi(
-  ctx: EditorContext,
+  ctx: InspectorMediaAiContext,
   element: MediaElement,
   host: HTMLElement,
 ): void {
@@ -49,7 +63,7 @@ export function mountMediaAi(
 // render so older sites that pre-date the playback field still pick up
 // the default shape on first inspector open.
 export function mountVideoPlayback(
-  ctx: EditorContext,
+  ctx: InspectorVideoPlaybackContext,
   element: MediaElement,
   host: HTMLElement,
 ): void {

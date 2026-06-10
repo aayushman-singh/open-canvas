@@ -53,7 +53,55 @@
 // Phase 3 cutover destination, not a live call site yet.
 
 import type { CanvasSection } from '../canvas/schema.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  AiContext,
+  ChatContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
+
+// ADR 0064 — chat-session.ts carve. The four exports share a chat-shaped
+// surface (ChatContext + AiContext lazy clusters) that's amplified by the
+// SSE branch's reach into canvas state/render/persist. Each function takes
+// the smallest type it needs; setup composes from the submit-handler
+// surface so callers can pass a single context object through.
+
+// ADR 0064 — `appendChatMessageImpl` only writes to the chat-messages DOM
+// container. A single-field `Pick` keeps the surface honest — pulling in
+// the full `ChatContext` would imply the helper reads every chat verb.
+export type AppendChatMessageContext = Pick<EditorContext, 'chatMessages'>;
+
+// ADR 0064 — `hideChatWelcomeImpl` only flips the welcome blurb's hidden
+// flag. Same rationale as `AppendChatMessageContext` — one DOM ref, one
+// `Pick`, no implicit reach into other chat verbs.
+export type HideChatWelcomeContext = Pick<EditorContext, 'chatWelcome'>;
+
+// ADR 0064 — chat-form submit listener surface. The SSE branch composes
+// the ChatContext lazy cluster (chat verbs + non-DOM state), the AiContext
+// lazy cluster (sidecar verbs the op-preview branch dispatches into), the
+// canonical Persist/State/Selection/Render/StatusEmitter aliases, plus
+// `siteBase` for the replaceMedia ghost URL and `root` + `viewport` for
+// the focus-fallback diagnostic log. No inline EditorContext casts —
+// every member access lives on a named cluster or this `Pick`.
+export type AttachChatSubmitContext = ChatContext &
+  AiContext &
+  PersistContext &
+  SelectionContext &
+  StateContext &
+  RenderContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'siteBase' | 'root' | 'viewport'>;
+
+// ADR 0064 — boot-time init for the chat panel. Caches the chat DOM refs
+// onto ctx, resets the per-session state, wires suggestion chips, then
+// delegates to `attachChatSubmitImpl`. Adopts the submit-handler surface
+// so the delegation is type-clean; no extra members beyond the assignment
+// targets the function captures.
+export type SetupChatSessionContext = AttachChatSubmitContext;
 
 /**
  * Loose shape of the SSE events the chat endpoint streams back. All fields
@@ -182,7 +230,11 @@ function errorToString(err: unknown): string {
   return 'unknown';
 }
 
-export function appendChatMessageImpl(ctx: EditorContext, role: string, text: string): void {
+export function appendChatMessageImpl(
+  ctx: AppendChatMessageContext,
+  role: string,
+  text: string,
+): void {
   if (!ctx.chatMessages) return;
   const div = document.createElement('div');
   div.className = 'opencanvas-chat-msg ' + role;
@@ -191,14 +243,24 @@ export function appendChatMessageImpl(ctx: EditorContext, role: string, text: st
   ctx.chatMessages.scrollTop = ctx.chatMessages.scrollHeight;
 }
 
-export function hideChatWelcomeImpl(ctx: EditorContext): void {
+export function hideChatWelcomeImpl(ctx: HideChatWelcomeContext): void {
   if (ctx.chatWelcome && !ctx.chatWelcome.hidden) ctx.chatWelcome.hidden = true;
 }
 
-export function setupChatSession(ctx: EditorContext): void {
+// Size the chat <textarea> to its content: collapse to the one-row base
+// (height:auto + the CSS min-height), then grow to fit. The extra
+// (offsetHeight - clientHeight) term restores the borders, which scrollHeight
+// excludes — without it the box loses a pixel each keystroke. The CSS
+// max-height caps growth and switches on the scrollbar past that point.
+export function autoGrowChatInput(el: HTMLTextAreaElement): void {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + (el.offsetHeight - el.clientHeight) + 'px';
+}
+
+export function setupChatSession(ctx: SetupChatSessionContext): void {
   // -- Chat panel form submission -----------------------------------------
   ctx.chatForm = document.getElementById('canvas-chat-form') as HTMLFormElement | null;
-  ctx.chatInput = document.getElementById('canvas-chat-input') as HTMLInputElement | null;
+  ctx.chatInput = document.getElementById('canvas-chat-input') as HTMLTextAreaElement | null;
   ctx.chatMessages = document.getElementById('canvas-chat-messages');
   ctx.chatWelcome = document.getElementById('canvas-chat-welcome');
   // Bind the Accept-all banner to the module-scope handle so the
@@ -217,6 +279,29 @@ export function setupChatSession(ctx: EditorContext): void {
   ctx.chatSessionId = null;
   ctx.chatBusy = false;
 
+  // The chat box is a <textarea> so a multi-line prompt grows the field
+  // instead of scrolling off as one long line. Mirror the content height on
+  // every input, and submit on Enter (Shift+Enter inserts a newline) so the
+  // single-line ergonomics of the old <input> survive the upgrade.
+  const chatInput = ctx.chatInput;
+  if (chatInput) {
+    chatInput.addEventListener('input', function () {
+      autoGrowChatInput(chatInput);
+    });
+    chatInput.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        const form = ctx.chatForm;
+        if (!form) return;
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else {
+          form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      }
+    });
+  }
+
   // Suggestion chips: clicking pre-fills the input AND submits, so the
   // chat does the work without the Owner having to retype. We rely on
   // requestSubmit() so the existing submit listener fires its full flow
@@ -229,6 +314,7 @@ export function setupChatSession(ctx: EditorContext): void {
         const prompt = chip.getAttribute('data-chip-prompt') || chip.textContent || '';
         if (!prompt) return;
         ctx.chatInput.value = prompt;
+        autoGrowChatInput(ctx.chatInput);
         if (typeof ctx.chatForm.requestSubmit === 'function') {
           ctx.chatForm.requestSubmit();
         } else {
@@ -241,7 +327,7 @@ export function setupChatSession(ctx: EditorContext): void {
   attachChatSubmitImpl(ctx);
 }
 
-export function attachChatSubmitImpl(ctx: EditorContext): void {
+export function attachChatSubmitImpl(ctx: AttachChatSubmitContext): void {
   if (!ctx.chatForm) return;
   ctx.chatForm.addEventListener('submit', function (ev) {
     ev.preventDefault();
@@ -249,6 +335,7 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
     const msg = ctx.chatInput.value.trim();
     if (msg.length === 0) return;
     ctx.chatInput.value = '';
+    autoGrowChatInput(ctx.chatInput);
     ctx.hideChatWelcome();
     ctx.appendChatMessage('user', msg);
     ctx.chatBusy = true;

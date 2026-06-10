@@ -62,8 +62,17 @@ export function PlanTiles({ currentPlan }: { currentPlan: BillingPlan }) {
                 Current plan
               </button>
             ) : (
-              <button type="button" class="btn btn-primary plan-switch-btn" data-plan={plan}>
-                Switch to {billingPlanLabel(plan)}
+              // Plan upgrades are disabled on the public deployment. No
+              // `data-plan` attribute, so the settings client never wires a
+              // switch handler; the server also rejects PATCH /api/profile
+              // plan changes with 403.
+              <button
+                type="button"
+                class="btn btn-outline plan-switch-btn"
+                disabled
+                aria-disabled="true"
+              >
+                Unavailable
               </button>
             )}
           </div>

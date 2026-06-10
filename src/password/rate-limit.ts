@@ -28,8 +28,12 @@
 export interface RateLimitCheckInput {
   /** Stable per-IP identifier; the unlock route passes the CF-Connecting-IP. */
   ipKey: string;
-  /** Logical per-feature namespace. The DO partitions storage by this. */
-  kind: 'password-unlock';
+  /**
+   * Logical per-feature namespace. The DO partitions storage by this, so the
+   * generic limiter is shared across surfaces: password unlock (per-IP) and
+   * the per-account AI caps (src/billing/ai-rate-limit.ts).
+   */
+  kind: 'password-unlock' | 'ai-agent' | 'ai-image';
   /** Maximum failed attempts allowed inside the window. Default 5. */
   limit?: number;
   /** Sliding-window width in seconds. Default 60. */

@@ -420,9 +420,7 @@ export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string
   // this call the editor-only placeholder cards would disappear until
   // the next full renderAll().
   if (found.element.type === 'collection') {
-    // ADR 0064 — collection-preview.ts has not carved yet; forward-cast
-    // until augmentCollectionPreviewForElementImpl narrows its parameter.
-    augmentCollectionPreviewForElementImpl(ctx as EditorContext, elementId);
+    augmentCollectionPreviewForElementImpl(ctx, elementId);
   }
   // Re-hydrate the visitor interactive runtime against the replaced
   // wrapper(s). A carousel rebuilt via the inspector (slide added /

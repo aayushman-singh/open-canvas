@@ -719,10 +719,12 @@ export interface EditorContext {
    *  Suggestion-chip clicks call ctx.chatForm.requestSubmit() to reuse
    *  the same submit handler. */
   chatForm: HTMLFormElement | null;
-  /** The chat panel's <input> for the message. Submit handler reads
+  /** The chat panel's <textarea> for the message. Submit handler reads
    *  .value, clears it after capture, then re-arms for the next turn.
-   *  Suggestion-chip clicks write into this before triggering submit. */
-  chatInput: HTMLInputElement | null;
+   *  Suggestion-chip clicks write into this before triggering submit.
+   *  A <textarea> (not <input>) so it can auto-grow as the Owner types a
+   *  multi-line prompt; Enter submits, Shift+Enter inserts a newline. */
+  chatInput: HTMLTextAreaElement | null;
   /** The scrolling message list inside the chat panel. appendChatMessage
    *  appends + auto-scrolls; the SSE token branch streams text into a
    *  reusable assistant bubble appended here. Null short-circuits every
@@ -1872,3 +1874,82 @@ export type PersistContext = Pick<
  *  cluster, so it earns its own one-field alias rather than living
  *  inline at every call site. */
 export type StatusEmitterContext = Pick<EditorContext, 'setStatus'>;
+
+// ---------------------------------------------------------------------------
+// ADR 0064 Decision 5 — lazy cluster contexts. Added when 3+ modules sign
+// against the same cluster of EditorContext fields, or when a single big
+// module's inline `Pick` would otherwise stretch beyond readability. Each
+// alias names a cohesive runtime surface that's specific to one feature
+// area (chat orchestration, co-edit presence, AI sidecar/panel) — they're
+// NOT general-purpose like the six canonical aliases above; downstream
+// modules outside the named cluster should reach for inline `Pick`s
+// instead of pulling these in.
+// ---------------------------------------------------------------------------
+
+/** Chat panel verbs + state — the editor-side chat session orchestrator
+ *  ([[chat-session.ts]]) reads/writes all of these. The DOM refs that
+ *  back the chat panel (`chatPanelEl`, `chatToggleBtn`, etc.) live in
+ *  [[DomContext]]; this alias names the verbs + non-DOM state. */
+export type ChatContext = Pick<
+  EditorContext,
+  | 'chatMessages'
+  | 'chatInput'
+  | 'chatForm'
+  | 'chatWelcome'
+  | 'chatBusy'
+  | 'chatSessionId'
+  | 'chatSelectionDropped'
+  | 'appendChatMessage'
+  | 'hideChatWelcome'
+  | 'updateChatSelectionChip'
+  | 'showAcceptAllSummary'
+  | 'applyAgentOps'
+  | 'revertAgentEntry'
+  | 'focusCanvasOnNode'
+>;
+
+/** Yjs co-edit connection, presence broadcast, and remote-cursor render
+ *  surface ([[co-edit.ts]]). Includes the WebSocket connection, the
+ *  presence-publish throttle state, and the per-peer cursor cache. */
+export type CoEditContext = Pick<
+  EditorContext,
+  | 'coEditConnection'
+  | 'coEditSocketOpen'
+  | 'coEditSync'
+  | 'collectionTemplateEditors'
+  | 'localPresence'
+  | 'presenceLayer'
+  | 'presenceDisplayName'
+  | 'presencePublishLastAtMs'
+  | 'presencePublishPending'
+  | 'presenceUserId'
+  | 'pointerPublishLastAtMs'
+  | 'pointerPublishPending'
+  | 'pointerPublishTimerId'
+  | 'remoteCursors'
+  | 'remotePeerCount'
+  | 'repaintRemoteCursors'
+  | 'wsToken'
+  | 'lastWorldPoint'
+>;
+
+/** AI sidecar + AI panel verbs/flags shared across the AI cluster
+ *  ([[ai-integration.ts]], [[ai-preview-panel.ts]], [[chat-session.ts]]'s
+ *  sidecar consumers). The flags (`aiBusy`, `accessRevoked`,
+ *  `sessionExpired`) gate UI affordances. The sidecar verbs
+ *  (`describeOp`, `findCanvasNodeForOp`, `ghostSections`,
+ *  `pendingAiSuggestions`, `refreshAcceptAllButton`, `chatAcceptAllBtn`)
+ *  describe and replay AI-proposed canvas operations. */
+export type AiContext = Pick<
+  EditorContext,
+  | 'aiBusy'
+  | 'setAiBusy'
+  | 'accessRevoked'
+  | 'sessionExpired'
+  | 'describeOp'
+  | 'findCanvasNodeForOp'
+  | 'ghostSections'
+  | 'pendingAiSuggestions'
+  | 'refreshAcceptAllButton'
+  | 'chatAcceptAllBtn'
+>;

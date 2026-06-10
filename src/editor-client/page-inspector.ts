@@ -31,7 +31,14 @@
 //     so individual edits update the live artboard without a full
 //     renderAll().
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type {
   CanvasPage,
   CollectionPageKind,
@@ -42,7 +49,87 @@ import { COLLECTION_PAGE_KINDS, MOTION_PRESETS, SCROLL_TRIGGER_MODES } from '../
 import { selectInput } from './dom-builders.js';
 import { buildColorRow } from './inspector-leaf-builders.js';
 import { cssEscape } from './css-escape.js';
-import { openPageSeoAfterSave } from './page-crud.js';
+import { openPageSeoAfterSave, type OpenPageSeoAfterSaveContext } from './page-crud.js';
+
+// ADR 0064 — narrow context carves for the page-inspector cluster. Each
+// alias names the runtime surface the function actually touches so the
+// signature reads as a contract instead of "give me the whole editor".
+// Shared across siblings where two functions stand on the same view —
+// e.g. `renderPageInspector` and `renderTemplateControls` recurse into
+// each other and ride one shared alias rather than splitting hairs.
+
+/** Replay the CSS keyframes on a single element or every motion-tagged
+ *  element under the active artboard. Walks the artboard via `root` and
+ *  reads `activePageId` / `currentPage()` to scope the query. */
+export type ReplayAnimationsContext = StateContext &
+  Pick<DomContext, 'root'> &
+  Pick<EditorContext, 'activePageId'>;
+
+/** True when the active page has page-level or per-element motion. Reads
+ *  only `currentPage()` off the loaded state. */
+export type PageHasMotionContext = StateContext;
+
+/** Tear down an in-place template preview overlay. Only needs the DOM
+ *  root for the per-page artboard query. */
+export type RevertActivePreviewContext = Pick<DomContext, 'root'>;
+
+/** Live-apply page-level visual properties (motion attrs, background,
+ *  section gap, max-width) on the artboard. Reads `root` for the query
+ *  and forwards into three pure `ctx`-bound helpers that own the actual
+ *  attribute writes. */
+export type ApplyPageStylesContext = Pick<DomContext, 'root'> &
+  Pick<
+    EditorContext,
+    'applyPageMotionAttributes' | 'applyPageStyleProperties' | 'pageRenderWidth'
+  >;
+
+/** Insert a `{{field}}` token into the focused contenteditable or fall
+ *  back to clipboard. Reads `root` to confirm focus is inside the editor
+ *  surface and emits status on success / failure. */
+export type InsertOrCopyPlaceholderContext = StatusEmitterContext & Pick<DomContext, 'root'>;
+
+/** Idempotently create / update / remove the canvas-top template banner.
+ *  Reads `currentPage()` + `siteId` to drive the label + manage-href, and
+ *  mounts the banner under `viewport` so renderAll's `root` wipe can't
+ *  vacate it. */
+export type SyncTemplateBannerContext = StateContext &
+  Pick<DomContext, 'viewport'> &
+  Pick<PersistContext, 'siteId'>;
+
+/** The page inspector right-pane renderer. Touches every canonical
+ *  cluster (selection-adjacent render orchestrators, DOM refs,
+ *  persistence, status), the page-SEO flush forwarder, the modal verbs,
+ *  plus a small grab bag of EditorContext fields no canonical alias owns
+ *  yet (`inspectorRenderSubject`, `revokePendingPreviews`,
+ *  `updatePageSidebar`, `openConfirmModal`, `activePageId`). Folds in the
+ *  sub-renderer surfaces it dispatches through: applyPageStyles,
+ *  replayAnimations, syncTemplateBanner, revertActivePreview, and
+ *  template-controls (which recurses back into the page inspector — they
+ *  ride one shared alias). */
+export type RenderPageInspectorContext = StateContext &
+  RenderContext &
+  StatusEmitterContext &
+  PersistContext &
+  Pick<DomContext, 'inspector' | 'root' | 'viewport'> &
+  ApplyPageStylesContext &
+  ReplayAnimationsContext &
+  SyncTemplateBannerContext &
+  RevertActivePreviewContext &
+  OpenPageSeoAfterSaveContext &
+  Pick<
+    EditorContext,
+    | 'inspectorRenderSubject'
+    | 'revokePendingPreviews'
+    | 'updatePageSidebar'
+    | 'openConfirmModal'
+    | 'activePageId'
+  >;
+
+/** Page-kind picker + template-context panel. Shares the page-inspector
+ *  surface because it both calls back into `renderPageInspector` on
+ *  kind/slug change and needs the placeholder-insert status path. */
+export type RenderTemplateControlsContext = RenderPageInspectorContext &
+  InsertOrCopyPlaceholderContext;
 
 // ADR 0060 Pass 2 — placeholder fields the entry-preview substitutor knows
 // about. Same set as the publish-time materializer (collection-materializer.ts)
@@ -242,7 +329,7 @@ let activePreviewPageId: string | null = null;
 // a template from one collection to another cannot reuse the old options.
 const entriesCache = new Map<string, TemplatePreviewEntry[]>();
 
-export function replayAnimations(ctx: EditorContext, scope: string): void {
+export function replayAnimations(ctx: ReplayAnimationsContext, scope: string): void {
   // scope: "page" replays all, or an element id replays just that one.
   // Two motion paths exist server-side (src/canvas/render.ts):
   //   1. on-load: the element gets data-motion-preset right away and the
@@ -289,7 +376,7 @@ export function replayAnimations(ctx: EditorContext, scope: string): void {
   }
 }
 
-export function pageHasMotion(ctx: EditorContext): boolean {
+export function pageHasMotion(ctx: PageHasMotionContext): boolean {
   const page = ctx.currentPage();
   if (!page) return false;
   if (page.entranceAnimation && page.entranceAnimation !== 'none') return true;
@@ -303,7 +390,7 @@ export function pageHasMotion(ctx: EditorContext): boolean {
 }
 
 // -- Page inspector (right panel when nothing selected) -----------------
-export function renderPageInspector(ctx: EditorContext): void {
+export function renderPageInspector(ctx: RenderPageInspectorContext): void {
   if (!ctx.inspector) return;
   const pageLookup = ctx.currentPage();
   if (!pageLookup) {
@@ -755,7 +842,7 @@ function templateBadgeText(page: CanvasPage): string {
 
 /** Revert any active artboard preview back to the placeholder text. Resets
  *  module state so the next preview cycle starts clean. */
-function revertActivePreview(ctx: EditorContext): void {
+function revertActivePreview(ctx: RevertActivePreviewContext): void {
   if (activePreviewPageId === null) return;
   if (ctx.root !== null) {
     const artboard = ctx.root.querySelector(
@@ -770,7 +857,7 @@ function revertActivePreview(ctx: EditorContext): void {
 
 /** Render the page-kind picker + (when a kind is set) the template-context
  *  panel: badge with entry counts, placeholder chips, preview-as-entry. */
-function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
+function renderTemplateControls(ctx: RenderTemplateControlsContext, page: CanvasPage): void {
   if (!ctx.inspector) return;
 
   // Divider above the section so the picker visually separates from SEO.
@@ -1033,7 +1120,7 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
  *  active artboard owns focus; otherwise copy to clipboard and surface a
  *  status line. Falls back to clipboard when execCommand isn't supported
  *  (older browsers don't all wire up `insertText`). */
-function insertOrCopyPlaceholder(ctx: EditorContext, token: string): void {
+function insertOrCopyPlaceholder(ctx: InsertOrCopyPlaceholderContext, token: string): void {
   const active = typeof document !== 'undefined' ? document.activeElement : null;
   if (
     active !== null &&
@@ -1159,7 +1246,7 @@ function removeTemplateBanner(host: HTMLElement): void {
  *  in place rather than stacked.
  *
  *  ADR 0060 Pass 3 follow-up #7. */
-export function syncTemplateBanner(ctx: EditorContext): void {
+export function syncTemplateBanner(ctx: SyncTemplateBannerContext): void {
   // Host is the viewport (parent of #canvas-root). renderAll wipes ctx.root's
   // children via replaceChildren, so a banner under ctx.root would vanish on
   // every full re-render. Living under ctx.viewport means the banner survives
@@ -1281,7 +1368,7 @@ export function syncTemplateBanner(ctx: EditorContext): void {
 }
 
 // Live-apply page-level visual properties on the artboard.
-export function applyPageStyles(ctx: EditorContext, page: CanvasPage): void {
+export function applyPageStyles(ctx: ApplyPageStylesContext, page: CanvasPage): void {
   if (!ctx.root) return;
   const artboard = ctx.root.querySelector('[data-page-id="' + cssEscape(page.id) + '"]');
   if (!artboard) return;
