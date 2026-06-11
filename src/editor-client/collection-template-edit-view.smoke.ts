@@ -31,8 +31,8 @@
 //       on page switch (ADR D6 — UI state does not survive page changes).
 //
 // Bare Bun — no real `document`. The view module touches createElement /
-// appendChild / querySelector / setAttribute / style.cssText only, so
-// the stub used by collection-preview.smoke.ts is reused here.
+// appendChild / querySelector / setAttribute / style.cssText only, so a
+// minimal DOM stub suffices.
 
 declare const Bun: {
   file(input: URL): { text(): Promise<string> };

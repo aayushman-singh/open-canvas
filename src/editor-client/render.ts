@@ -78,8 +78,6 @@ import {
   ZOOM_MIN,
 } from './editor-constants.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
-import type { AugmentCollectionPreviewsContext } from './collection-preview.js';
-import { augmentCollectionPreviewsImpl } from './collection-preview.js';
 import type { MountTemplateEditChromeContext } from './collection-template-edit-view.js';
 import { mountTemplateEditChromeImpl } from './collection-template-edit-view.js';
 import { hydrateInteractives } from './hydrate-interactives.js';
@@ -91,10 +89,7 @@ import { hydrateInteractives } from './hydrate-interactives.js';
 // and `PagePositionsReaderContext` (the page-bounds lookup) so the
 // projection helpers and the fit/pan/renderAll verbs don't redeclare
 // their overlap. `StateContext` from editor-context.ts is folded in
-// where the page list is read. Two forward-casts remain inside
-// renderAllImpl — `augmentCollectionPreviewsImpl(ctx as EditorContext)`
-// and `mountTemplateEditChromeImpl(ctx as EditorContext)` — until those
-// modules land their own ADR 0064 carves.
+// where the page list is read.
 
 // ADR 0064 — write the camera state into the canvas root + zoom readout.
 // Optional remote-cursor + mark-toolbar reflow hooks are kept optional
@@ -382,15 +377,13 @@ export function fitAllPages(ctx: FitAllPagesContext): void {
 // style-kit chip sync, CameraTransform for the final paint, then
 // renderInspector / renderReel / autoGrowTextElements / placement
 // slots. No canonical alias covers the page-build verbs yet, so they
-// live as an inline Pick. Folds in AugmentCollectionPreviewsContext
-// and MountTemplateEditChromeContext so the two augment* / mount*
-// forward sites typecheck without `ctx as EditorContext` scaffolding
-// (their own ADR 0064 carves landed in dce94a7 and 300ad71).
+// live as an inline Pick. Folds in MountTemplateEditChromeContext so the
+// mount* forward site typechecks without `ctx as EditorContext`
+// scaffolding (its ADR 0064 carve landed in 300ad71).
 export type RenderAllContext = ComputePagePositionsContext &
   CameraTransformContext &
   AutoGrowTextElementsContext &
   BuildGhostSectionNodeContext &
-  AugmentCollectionPreviewsContext &
   MountTemplateEditChromeContext &
   Pick<
     EditorContext,
@@ -493,19 +486,12 @@ export function renderAllImpl(ctx: RenderAllContext): void {
 
   ctx.renderReel();
   autoGrowTextElements(ctx);
-  // ADR 0063 dec 5 — augment Collection wrappers with editor-only
-  // placeholder card chrome (3 cards + a "Source: <slug or unset>"
-  // banner) when the binding is unset or matches zero entries. Runs
-  // strictly after autoGrowTextElements so the inner frame's final box
-  // dimensions are settled; the augmenter is idempotent so a redundant
-  // call on a no-Collection page is a cheap zero-iteration loop.
-  augmentCollectionPreviewsImpl(ctx);
   // ADR 0065 D5 — mount the in-place template-edit chrome (banner, Done
   // button, scrim, viewport pan) when ctx.editingCollectionTemplate pins
-  // a Collection. Idempotent — runs after augmentCollectionPreviewsImpl
-  // so the placeholder-card branch settles first, then this layer
-  // overlays the active template's chrome. When the field is null the
-  // mount no-ops after stripping any stale chrome.
+  // a Collection. The empty/grid Collection body is rendered by
+  // buildCollectionBodyImpl (body-builders-data.ts) at element-build time;
+  // this layer overlays the active template's chrome on top. When the
+  // field is null the mount no-ops after stripping any stale chrome.
   mountTemplateEditChromeImpl(ctx);
 
   // Hydrate the visitor interactive runtime against every newly-rendered
