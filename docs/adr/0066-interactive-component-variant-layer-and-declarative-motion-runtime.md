@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-06-10 (accepted 2026-06-11)
 **Author:** Aayushman Singh
-**Implementing commit:** `__IMPL_SHA__` (branch `feat/v4-variant-layer`)
+**Implementing commit:** `47eb4cb6` (branch `feat/v4-variant-layer`)
 
 ## Context
 

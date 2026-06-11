@@ -108,5 +108,5 @@ CSS arm preview (D11 / ADR follow-up) and live-broadcast re-hydration (pre-
 existing across all interactives; runtime-dedup follow-up).
 
 ## Implementing commit
-ADR header `**Implementing commit:**` and the PR body carry the SHA, stamped
-after the implementation commit lands.
+`47eb4cb6` — `feat(canvas): ADR 0066 variant-preset layer + pointer-fx runtime`
+(branch `feat/v4-variant-layer`). Also recorded in the ADR header and PR body.

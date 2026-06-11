@@ -28,19 +28,20 @@ merge).
   encode/decode per component. Editor mirror: pointer-fx + carousel offset in
   hydrate-interactives.ts. Smokes + parity, wired into ci:smoke.
 
-## Progress log
-- [x] Mapped codebase; read action.ts reference (variant template), accordion/
-      tabs/carousel/form render roots, public-styles structure, validate seam,
-      yjs seam, interactive runtime, editor inspector.
-- [x] Reverted invented-model edits; rewrote ADR-aligned DECISIONS_V4 + this file.
-- [ ] Element files: variant tuple+field+render+inspector+agent (4 files).
-- [ ] index.ts re-exports; validate.ts enum checks.
-- [ ] yjs encode/decode variant leaf.
-- [ ] public-styles.ts variant CSS blocks.
-- [ ] pointer-fx runtime + build/runtime/inject + carousel offset.
-- [ ] editor mirror.
-- [ ] smokes + ci:smoke wiring.
-- [ ] codex, ADR→Accepted+SHA, SESSION_SUMMARY_V4.md, green gate, PR.
+## Progress log — COMPLETE (impl commit 47eb4cb6)
+- [x] Mapped codebase; reverted early invented-model; rewrote ADR-aligned docs.
+- [x] Element files: variant tuple+field+render+inspector+agent (4 files).
+- [x] index.ts re-exports; validate.ts enum checks.
+- [x] yjs encode/decode variant leaf (+ smoke fixtures).
+- [x] public-styles.ts variant CSS (cascade vars on wrapper).
+- [x] pointer-fx runtime + build/runtime/inject + carousel offset.
+- [x] editor mirror (pointer-fx + slide-offset + data-variant on builders).
+- [x] smokes (variant-presets, pointer-fx, variant-parity) + ci:smoke wiring.
+- [x] codex review applied (cascade, form vars, coverflow clamp, vertical-rail
+      dropped, tabs relabel, loud pointer-fx); disposition in codex/.
+- [x] ADR 0066 → Accepted + SHA 47eb4cb6; SESSION_SUMMARY_V4.md written.
+- [x] Green gate: ci:smoke + typecheck + lint all green (enforced by pre-commit).
+- [ ] PR opened (no merge) — final step.
 
 ## Key seams (file:line, branch start)
 - Element render roots to add data-variant:
