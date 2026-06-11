@@ -10,10 +10,6 @@
 //     as the search target).
 //   - `src/canvas/fixtures/**` (seed JSON data; ADR 0013 out-of-scope #6).
 //   - `src/templates/seeds/**` (seed template content; ADR 0013 out-of-scope #6).
-//   - `src/assets/seed-script.ts` (TEMPORARY — holds the `rev01-assets` R2
-//     bucket binding name. Remove this exemption after the R2 bucket is
-//     renamed to `opencanvas-assets` out-of-band; see Tier D in the rebrand
-//     work for the wrangler command sheet).
 //
 // Files matching `*.smoke.ts` are NOT exempt — smokes must pin against an
 // injected test APP_DOMAIN / COOKIE_NAME_PREFIX per ADR 0013 decision 7
@@ -49,13 +45,10 @@ const EXEMPT_PREFIXES = [
   join('templates', 'seeds') + sep,
 ];
 
-const EXEMPT_FILES = [join('assets', 'seed-script.ts')];
-
 function isExempt(absPath: string): boolean {
   if (absPath === SELF_PATH) return true;
   const rel = relative(SRC_ROOT, absPath);
   if (EXEMPT_PREFIXES.some((prefix) => rel.startsWith(prefix))) return true;
-  if (EXEMPT_FILES.includes(rel)) return true;
   return false;
 }
 

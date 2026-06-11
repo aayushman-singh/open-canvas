@@ -72,7 +72,7 @@ async function main(): Promise<void> {
     console.log('[seed:assets] dry-run OK (pass --upload to write to R2 + DB)');
     return;
   }
-  const BUCKET = 'rev01-assets';
+  const BUCKET = 'opencanvas-assets';
   const uploaded = new Set<string>();
   for (const { seedId, bytes } of seeded) {
     const asset = SEED_ASSET_REGISTRY[seedId]!;
