@@ -79,6 +79,14 @@ export type CarouselArrowStyle = (typeof CAROUSEL_ARROW_STYLES)[number];
 export const CAROUSEL_MODES = ['paginate', 'scroll-snap'] as const;
 export type CarouselMode = (typeof CAROUSEL_MODES)[number];
 
+// ADR 0066 — variant-preset layer (orthogonal to `mode`, which is the
+// structural knob per ADR 0054; `variant` is purely stylistic). First arm
+// (`classic`) reproduces the current look and is the default. `coverflow` reads
+// a per-slide `--opencanvas-slide-offset` published by the carousel runtime
+// fragment (runtime publishes state, CSS paints — no DOM branch, ADR dec 3).
+export const CAROUSEL_VARIANTS = ['classic', 'coverflow', 'ken-burns', 'editorial'] as const;
+export type CarouselVariant = (typeof CAROUSEL_VARIANTS)[number];
+
 export interface CarouselElement extends BaseElement {
   type: 'carousel';
   slides: CarouselSlide[];
@@ -89,6 +97,8 @@ export interface CarouselElement extends BaseElement {
   arrowStyle?: CarouselArrowStyle;
   /** Presentation mode. Absent defaults to `'paginate'` for back-compat. */
   mode?: CarouselMode;
+  /** ADR 0066 — visual preset. Absent resolves to `classic` (current look). */
+  variant?: CarouselVariant;
 }
 
 export interface CarouselRenderCtx {
@@ -141,6 +151,7 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
   const arrowStyle: CarouselArrowStyle = el.arrowStyle ?? 'round';
   const mode: CarouselMode = el.mode ?? 'paginate';
   const isScrollSnap = mode === 'scroll-snap';
+  const variant: CarouselVariant = el.variant ?? 'classic';
 
   const total = el.slides.length;
   const slidesHtml = el.slides
@@ -202,6 +213,7 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
     `data-opencanvas-arrow-position="${escapeAttr(arrowPosition)}" `,
     `data-opencanvas-arrow-style="${escapeAttr(arrowStyle)}" `,
     `data-opencanvas-carousel-mode="${escapeAttr(mode)}" `,
+    `data-variant="${escapeAttr(variant)}" `,
     `role="region" aria-roledescription="carousel">`,
     `<div class="opencanvas-carousel-track">`,
     slidesHtml,
@@ -223,6 +235,13 @@ export const carouselInspectorSpec: InspectorSpec = {
     // third such mount lands the trigger to design a declarative
     // list-editor kind per ADR 0011 dec 3.
     { kind: 'custom-mount', name: 'carousel-slides' },
+    {
+      kind: 'select',
+      label: 'Style',
+      path: 'variant',
+      options: CAROUSEL_VARIANTS,
+      defaultValue: 'classic',
+    },
     {
       kind: 'select',
       label: 'Mode',
@@ -269,6 +288,11 @@ export const carouselSidebarSpec: SidebarSpec = {
 
 export const carouselAgentToolSpec: AgentToolSpec = {
   patchProperties: {
+    variant: {
+      type: 'string',
+      enum: [...CAROUSEL_VARIANTS],
+      description: `Carousel visual preset. One of [${CAROUSEL_VARIANTS.join(', ')}]. Carousel elements only.`,
+    },
     showArrows: {
       type: 'boolean',
       description: 'Show navigation arrows. Carousel elements only.',
@@ -318,6 +342,10 @@ export const carouselAgentToolSpec: AgentToolSpec = {
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
+    if (args.variant !== undefined) {
+      if (typeof args.variant !== 'string') throw new Error('variant must be a string');
+      patch.variant = args.variant;
+    }
     if (args.showArrows !== undefined) {
       if (typeof args.showArrows !== 'boolean') throw new Error('showArrows must be a boolean');
       patch.showArrows = args.showArrows;

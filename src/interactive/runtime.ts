@@ -28,6 +28,12 @@ function hydrateAll() {
       hydrateCarousel(root);
     }
   }
+  // ADR 0066 dec 4 — pointer-fx is a document-wide pass keyed on the
+  // [data-opencanvas-pointer-fx] attribute, NOT a per-interactive-root dispatch
+  // arm (a pointer-fx element need not be an interactive element type). It is
+  // idempotent, so running it every hydrateAll (incl. live-publish re-hydrate)
+  // is safe.
+  hydratePointerFx(document);
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', hydrateAll);

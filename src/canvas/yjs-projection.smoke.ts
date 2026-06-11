@@ -167,6 +167,7 @@ const syntheticElements: CanvasElement[] = [
     submitLabel: 'Send',
     successMessage: 'Thanks!',
     webhookUrl: 'https://example.com/hook',
+    variant: 'spotlight', // ADR 0066 — round-trip the variant leaf
   },
   {
     id: 'el-embed',
@@ -203,6 +204,7 @@ const syntheticElements: CanvasElement[] = [
       },
     ],
     allowMultipleOpen: true,
+    variant: 'cards', // ADR 0066
   },
   {
     id: 'el-carousel',
@@ -215,6 +217,7 @@ const syntheticElements: CanvasElement[] = [
     showArrows: true,
     showDots: false,
     mode: 'scroll-snap',
+    variant: 'coverflow', // ADR 0066
   },
   {
     id: 'el-table',
@@ -281,6 +284,7 @@ const syntheticElements: CanvasElement[] = [
     box: { x: 0, y: 2950, w: 800, h: 600, z: 1 },
     activeTabId: 'b',
     tabBarHeight: 64,
+    variant: 'segmented', // ADR 0066
     tabs: [
       {
         id: 'a',

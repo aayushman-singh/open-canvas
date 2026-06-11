@@ -6,6 +6,7 @@
 
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import { CUSTOM_404_PAGE_SLUG } from './page-routing.js';
+import { ACCORDION_VARIANTS } from './elements/accordion.js';
 import { COLLECTION_DISPLAYS, COLLECTION_SORTS } from './elements/collection.js';
 import type { CollectionDisplay, CollectionSort } from './elements/collection.js';
 import { escapeCssValue } from './elements/render-utils.js';
@@ -13,12 +14,13 @@ import { isAllowedHref } from './action-href.js';
 import {
   FORM_FONT_FAMILIES,
   FORM_FONT_WEIGHTS,
+  FORM_VARIANTS,
   type FormFontFamily,
   type FormFontWeight,
 } from './elements/form.js';
 import { ICON_NAMES, isIconName } from './icons.js';
-import { TABS_DEFAULT_BAR_HEIGHT } from './elements/tabs.js';
-import { CAROUSEL_MODES } from './elements/carousel.js';
+import { TABS_DEFAULT_BAR_HEIGHT, TABS_VARIANTS } from './elements/tabs.js';
+import { CAROUSEL_MODES, CAROUSEL_VARIANTS } from './elements/carousel.js';
 import { NAV_LAYOUTS, NAV_LINK_KINDS, type NavLayout, type NavLinkKind } from './elements/nav.js';
 
 // Re-export the canonical href allowlist so existing consumers (agent
@@ -1022,6 +1024,10 @@ function validateElement(
       if (element.mode !== undefined) {
         assertOneOf(element.mode, CAROUSEL_MODES, `${basePath}.mode`, errors);
       }
+      // ADR 0066 — optional variant-preset enum.
+      if (element.variant !== undefined) {
+        assertOneOf(element.variant, CAROUSEL_VARIANTS, `${basePath}.variant`, errors);
+      }
       break;
     }
     case 'action': {
@@ -1105,6 +1111,10 @@ function validateElement(
     }
     case 'form': {
       validateFormStyle(element.formStyle, basePath, errors);
+      // ADR 0066 — optional variant-preset enum.
+      if (element.variant !== undefined) {
+        assertOneOf(element.variant, FORM_VARIANTS, `${basePath}.variant`, errors);
+      }
       break;
     }
     case 'container': {
@@ -1260,6 +1270,10 @@ function validateElement(
       // and is unique within the TabsElement, `activeTabId` references one of
       // them, each tab.label is a non-empty InlineRun[], each tab.elements
       // recurses through validateElement with panel-local dimensions.
+      // ADR 0066 — optional variant-preset enum.
+      if (element.variant !== undefined) {
+        assertOneOf(element.variant, TABS_VARIANTS, `${basePath}.variant`, errors);
+      }
       if (!Array.isArray(element.tabs) || element.tabs.length < 2) {
         errors.push(`${basePath}.tabs must be an array with length >= 2`);
         break;
@@ -1325,6 +1339,14 @@ function validateElement(
         errors.push(
           `${basePath}.activeTabId "${element.activeTabId}" must reference one of tabs[].id (known: [${Array.from(tabIds).join(', ')}])`,
         );
+      }
+      break;
+    }
+    case 'accordion': {
+      // ADR 0066 — optional variant-preset enum. (Accordion items keep their
+      // existing pass-through; this case exists solely to gate the variant.)
+      if (element.variant !== undefined) {
+        assertOneOf(element.variant, ACCORDION_VARIANTS, `${basePath}.variant`, errors);
       }
       break;
     }

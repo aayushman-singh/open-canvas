@@ -1,8 +1,9 @@
 # ADR 0066 — Interactive components gain the variant-preset layer, and pointer-reactive variants are powered by one fragment in the existing interactive runtime
 
-**Status:** Proposed
-**Date:** 2026-06-10
+**Status:** Accepted
+**Date:** 2026-06-10 (accepted 2026-06-11)
 **Author:** Aayushman Singh
+**Implementing commit:** `47eb4cb6` (branch `feat/v4-variant-layer`)
 
 ## Context
 
@@ -120,8 +121,57 @@ Three shapes for the preset layer competed:
 - New parity smoke asserting the editor mirror (`hydrate-interactives.ts`) and the visitor fragment agree on the pointer-fx and carousel-offset contracts — extending the existing `carousel-hydration.smoke.ts` that already guards the mirror — so the two implementations cannot drift silently.
 - All wired into the `ci:smoke` chain.
 
+## Implementation notes (2026-06-11)
+
+Shipped on branch `feat/v4-variant-layer` (see `DECISIONS_V4.md`):
+
+- Variant tuples + optional `variant` field on `FormElement` / `CarouselElement`
+  / `AccordionElement` / `TabsElement`, re-exported via `elements/index.ts`.
+- Render emits `data-variant` on each component root (default = first arm);
+  Form `spotlight` also emits `data-opencanvas-pointer-fx="spotlight"`.
+- `public-styles.ts` variant CSS block (custom-property cascade, first arm =
+  current look); validator enum checks per component; Yjs `variant` leaf
+  round-trips; inspector `Style` select + agent-tool `enum` per component.
+- `src/interactive/pointer-fx.ts` fragment (`spotlight`, `tilt`) added to the
+  existing IIFE; `inject.ts` widened to trip on `data-opencanvas-pointer-fx`;
+  carousel runtime publishes `--opencanvas-slide-offset` for `coverflow`. Editor
+  mirror (`hydrate-interactives.ts`) mirrors the pointer-fx pass + slide-offset.
+- Smokes: `variant-presets`, `pointer-fx`, `variant-parity` (+ yjs/inspector
+  fixtures), all wired into `ci:smoke` (green), `typecheck` + `lint` green.
+
+**Catalogued arms** (dec 3, finalised): Form `classic`/`underline`/`card`/
+`brutalist`/`spotlight`; Carousel `classic`/`coverflow`/`ken-burns`/`editorial`;
+Accordion `list`/`bordered`/`cards`/`filled`; Tabs `classic`/`underline`/`pill`/
+`segmented`. (The draft catalog's `vertical-rail` tab arm was dropped during
+implementation — the tab panels carry an inline full-width box a CSS-only rail
+cannot reflow; see the codex follow-up below. The draft's Tabs first arm was
+`underline`, but the actual current look is a filled active-tab pill, so the
+first/default arm is `classic` and `underline` is a real alternate.) The `tilt`
+pointer-fx primitive is implemented + smoke-tested but not yet attached to a
+catalogued arm (available for a future arm; see DECISIONS_V4 D5).
+
+**Cascade (dec 2) note.** The variant VAR-SETTING arms are emitted on the OUTER
+`.opencanvas-element` wrapper (`render.ts variantAttr`), the same element
+`pinnedStyle` lands on, so an inline `pinnedStyle` override beats the stylesheet
+arm and `formStyle` (inline on the inner `<form>`) beats the variant — kit <
+variant < granular holds. (Setting the vars on the inner component root, as the
+first cut did, lost to `pinnedStyle` by proximity; fixed per codex review.)
+
 ## Follow-ups
 
+- **Editor static-variant CSS preview parity.** The editor preview maintains its
+  own hand-written stylesheet (`src/editor-client/styles-build.ts`, ~3k lines)
+  with preview-specific class names (`opencanvas-form-preview`,
+  `opencanvas-accordion-preview`) rather than loading `canvasPublishedStyles`.
+  This wave emits `data-variant` (+ pointer-fx) on the editor builder nodes and
+  mirrors the *runtime* (pointer-fx + slide-offset), so the Owner's choice
+  persists, hydrates, and publishes correctly — and a publish-preview shows each
+  arm. Mirroring every static arm's CSS into the editor stylesheet (re-
+  parameterising preview-class inner CSS with the same custom-property cascade)
+  is deferred to its own change to avoid a large, regression-prone edit to the
+  live editor's stylesheet. Tracked loudly here rather than left as a silent gap.
+- **`vertical-rail` tabs.** Dropped from the catalog this wave: the tab panels are sized with an inline full-width box (`renderTabs` writes `width: <box.w>px`), which a CSS-only leading-edge rail cannot reflow without making panel sizing CSS-owned. Re-introduce once tab layout exposes width as a variable both the visitor and editor honour.
+- **Live-broadcast re-hydration.** The `/__live` publish broadcast swaps HTML via `innerHTML`, whose inline scripts do not execute, so post-broadcast DOM is not hydrated. This is pre-existing (it already affects accordion/carousel/popup, which share the one-shot `hydrateAll` IIFE); ADR 0066's pointer-fx + slide-offset inherit it. The fix — expose an idempotent global re-hydrator the broadcast handler invokes — benefits every interactive and belongs with the runtime-dedup follow-up below.
 - **User-authored variants.** A "save current styling as a named, reusable variant" feature — the open-vocabulary counterpart to this ADR's closed enums. Needs its own ADR; touches storage (where do user variants live?) and the inspector.
 - **Additional pointer-fx primitives.** Magnetic-pull, pointer-trail, and similar cursor-reactive effects as further `data-opencanvas-pointer-fx` values, each additive.
 - **Kit-level variant defaults.** Letting a style kit set the default variant per component, so a kit ships a coherent interactive look out of the box.

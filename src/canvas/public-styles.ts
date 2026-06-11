@@ -720,4 +720,183 @@ const carouselActiveCss = (() => {
   return `${selectors.join(',\n')} {\n  opacity: 1;\n  visibility: visible;\n}\n`;
 })();
 
-export const canvasPublishedStyles = `${baseCss}\n${carouselActiveCss}\n${kitCss}`;
+// ADR 0066 — variant-preset layer. One selector block per interactive
+// component. The pattern (dec 2): inner-part properties are re-declared here
+// reading a component-scoped `--opencanvas-<comp>-*` custom property with the
+// CURRENT value as the `var()` fallback — so with no variant set (or the first
+// arm) the look is byte-for-byte the existing one. Each `[data-variant="x"]`
+// arm only *sets* those custom properties (plus a few arm-scoped structural
+// rules where a look needs more than a token swap — never a DOM branch). An
+// Owner override via `pinnedStyle` on the root sets the same property inline and
+// wins over the stylesheet arm: kit-token < variant < granular.
+const variantCss = String.raw`
+/* ===== ADR 0066 variant-preset layer ================================== */
+
+/* ---- Accordion: parameterise overridable inner-part values ----------- */
+.opencanvas-accordion { gap: var(--opencanvas-accordion-gap, 8px); }
+.opencanvas-accordion-item {
+  background: var(--opencanvas-accordion-item-bg, var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06)));
+  border: var(--opencanvas-accordion-item-border, 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18)));
+  border-radius: var(--opencanvas-accordion-item-radius, var(--opencanvas-kit-radius, 8px));
+  box-shadow: var(--opencanvas-accordion-item-shadow, none);
+}
+.opencanvas-accordion-header {
+  background: var(--opencanvas-accordion-header-bg, transparent);
+  color: var(--opencanvas-accordion-header-color, inherit);
+}
+/* list = current look (all fallbacks). VAR-SETTING arms live on the OUTER
+   .opencanvas-element wrapper — the same element pinnedStyle lands on — so an
+   inline pinnedStyle override of a --opencanvas-accordion-* property beats the
+   stylesheet arm (kit < variant < granular). Setting the vars on a child arm
+   would lose to pinnedStyle's wrapper value only by proximity, so the wrapper is
+   the correct host. Structural arm rules (no granular contract) stay on inner. */
+.opencanvas-element[data-element-type="accordion"][data-variant="bordered"] {
+  --opencanvas-accordion-gap: 0;
+  --opencanvas-accordion-item-bg: transparent;
+  --opencanvas-accordion-item-radius: 0;
+  --opencanvas-accordion-item-border: 0;
+}
+.opencanvas-accordion[data-variant="bordered"] .opencanvas-accordion-item {
+  border-bottom: 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
+}
+.opencanvas-element[data-element-type="accordion"][data-variant="cards"] {
+  --opencanvas-accordion-gap: 12px;
+  --opencanvas-accordion-item-radius: 12px;
+  --opencanvas-accordion-item-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.opencanvas-element[data-element-type="accordion"][data-variant="filled"] {
+  --opencanvas-accordion-header-bg: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.1));
+}
+.opencanvas-accordion[data-variant="filled"] .opencanvas-accordion-header[aria-expanded="true"] {
+  background: var(--opencanvas-kit-accent, #7dd3fc);
+  color: var(--opencanvas-kit-bg, #0c0c0d);
+}
+
+/* ---- Tabs: classic = current look (filled active-tab pill, untouched). The
+   alternates repaint the ACTIVE-tab treatment directly — these are structural
+   (they set CSS properties with no granular-override contract), so they stay on
+   the inner root rather than the wrapper. (vertical-rail was dropped: the tab
+   panels carry an inline full-width box that a CSS-only rail cannot reflow; it
+   is an ADR follow-up.) */
+.opencanvas-tabs[data-variant="underline"] .opencanvas-tab[data-tab-active] {
+  background: transparent;
+  color: var(--opencanvas-kit-accent, #7dd3fc);
+  border-radius: 0;
+  box-shadow: inset 0 -2px 0 0 var(--opencanvas-kit-accent, #7dd3fc);
+}
+.opencanvas-tabs[data-variant="pill"] .opencanvas-tab { border-radius: 9999px; }
+.opencanvas-tabs[data-variant="segmented"] .opencanvas-tab-bar {
+  gap: 0;
+  padding: 4px;
+  border: 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
+  border-bottom-width: 1px;
+  border-radius: 9999px;
+  background: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  width: max-content;
+}
+.opencanvas-tabs[data-variant="segmented"] .opencanvas-tab { border-radius: 9999px; }
+
+/* ---- Carousel: classic = current look. The other arms repaint slides. */
+.opencanvas-carousel[data-variant="ken-burns"] .opencanvas-carousel-image {
+  animation: opencanvas-ken-burns 14s ease-in-out infinite alternate;
+}
+.opencanvas-carousel[data-variant="editorial"] .opencanvas-carousel-caption {
+  padding: 28px 32px;
+  font-size: 18px;
+  font-weight: 600;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0));
+}
+/* coverflow: the carousel runtime publishes --opencanvas-slide-offset (signed
+   distance to the active slide) per slide; CSS positions/scales/dims from it.
+   PAGINATE MODE ONLY — scroll-snap already lays slides out as a relative flex
+   rail, and stacking coverflow on top of it is incompatible, so the arm is
+   scoped out of scroll-snap. --opencanvas-coverflow-depth is |offset| CLAMPED to
+   [0,3] so scale stays in [0.52,1] and opacity in [0.1,1] — never negative for
+   far slides. Runtime publishes state, CSS paints — no DOM branch (ADR dec 3). */
+.opencanvas-carousel[data-variant="coverflow"]:not([data-opencanvas-carousel-mode="scroll-snap"]) {
+  overflow: visible;
+}
+.opencanvas-carousel[data-variant="coverflow"]:not([data-opencanvas-carousel-mode="scroll-snap"]) .opencanvas-carousel-slide {
+  --opencanvas-coverflow-depth: min(3, max(var(--opencanvas-slide-offset, 0), var(--opencanvas-slide-offset, 0) * -1));
+  opacity: calc(1 - 0.3 * var(--opencanvas-coverflow-depth));
+  visibility: visible;
+  transform: translateX(calc(var(--opencanvas-slide-offset, 0) * 56%))
+    scale(calc(1 - 0.16 * var(--opencanvas-coverflow-depth)));
+  transition: transform 320ms ease, opacity 320ms ease;
+  z-index: calc(10 - var(--opencanvas-coverflow-depth));
+}
+@keyframes opencanvas-ken-burns {
+  from { transform: scale(1); }
+  to { transform: scale(1.12); }
+}
+
+/* ---- Form: classic = current. Each arm SETS the existing --opencanvas-form-*
+   custom properties on the OUTER wrapper, so it composes UNDER the granular
+   layer: formStyle is emitted inline on the inner <form> (closer → wins over
+   the variant) and pinnedStyle is inline on the wrapper (same element → beats
+   the stylesheet arm). Direct descendant declarations are used ONLY for the
+   handful of properties that have no --opencanvas-form-* contract (the
+   underline bottom-rule, the card field surface, the brutalist offset shadow). */
+.opencanvas-element[data-element-type="form"][data-variant="underline"] {
+  --opencanvas-form-input-border-width: 0;
+  --opencanvas-form-input-radius: 0;
+}
+.opencanvas-form[data-variant="underline"] .opencanvas-form-input,
+.opencanvas-form[data-variant="underline"] .opencanvas-form select {
+  border-bottom: 1px solid var(--opencanvas-form-input-border-color, var(--opencanvas-hairline));
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+.opencanvas-form[data-variant="card"] .opencanvas-form-field {
+  padding: 14px 16px;
+  border-radius: var(--opencanvas-kit-radius, 10px);
+  background: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+}
+.opencanvas-element[data-element-type="form"][data-variant="brutalist"] {
+  --opencanvas-form-input-border-width: 2px;
+  --opencanvas-form-input-border-color: currentColor;
+  --opencanvas-form-input-radius: 0;
+  --opencanvas-form-submit-radius: 0;
+}
+.opencanvas-form[data-variant="brutalist"] .opencanvas-form-input,
+.opencanvas-form[data-variant="brutalist"] .opencanvas-form select {
+  box-shadow: 4px 4px 0 0 currentColor;
+}
+.opencanvas-form[data-variant="brutalist"] .opencanvas-form-label {
+  font-family: var(--opencanvas-kit-font-mono, ui-monospace, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.opencanvas-form[data-variant="brutalist"] .opencanvas-form-submit { border-radius: 0; box-shadow: 4px 4px 0 0 currentColor; }
+/* spotlight: the card look + a pointer-follow radial glow. The glow centre is
+   --opencanvas-ptr-x/y (published by the pointer-fx runtime); when the runtime
+   has not run the 50%/50% fallbacks render a deliberate, authored centred glow
+   (ADR dec 6 — the static base is a shippable look, not a silent fallback). */
+.opencanvas-form[data-variant="spotlight"] {
+  padding: 20px;
+  border-radius: var(--opencanvas-kit-radius, 12px);
+  background:
+    radial-gradient(
+      240px circle at var(--opencanvas-ptr-x, 50%) var(--opencanvas-ptr-y, 50%),
+      color-mix(in oklab, var(--opencanvas-kit-accent, #7dd3fc) 22%, transparent),
+      transparent 70%
+    ),
+    var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+}
+
+/* ---- pointer-fx: generic CSS hooks any element with the attribute uses.
+   spotlight publishes --opencanvas-ptr-x/y (consumed per-variant above);
+   tilt publishes --opencanvas-tilt-x/y, applied generically here. */
+[data-opencanvas-pointer-fx="tilt"] {
+  transform: perspective(700px)
+    rotateX(var(--opencanvas-tilt-y, 0deg))
+    rotateY(var(--opencanvas-tilt-x, 0deg));
+  transition: transform 120ms ease;
+  transform-style: preserve-3d;
+}
+`;
+
+export const canvasPublishedStyles = `${baseCss}\n${carouselActiveCss}\n${variantCss}\n${kitCss}`;

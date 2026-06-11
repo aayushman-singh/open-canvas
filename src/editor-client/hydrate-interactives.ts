@@ -75,6 +75,59 @@ export function hydrateInteractives(
   if (!options.skipPopups) {
     hydratePopups(root);
   }
+  // ADR 0066 dec 4 — pointer-fx is a document-wide pass keyed on the
+  // [data-opencanvas-pointer-fx] attribute (not a data-opencanvas-interactive
+  // dispatch arm), mirroring hydratePointerFx in `./pointer-fx.ts` so the
+  // editor preview reacts to the cursor exactly as the published site does.
+  hydratePointerFx(root);
+}
+
+// ---------------------------------------------------------------------------
+// Pointer-fx — mirrors POINTER_FX_RUNTIME_SRC in `src/interactive/pointer-fx.ts`.
+// Publishes pointer state as CSS custom properties; never paints. Idempotent via
+// the data-opencanvas-pfx-hydrated marker. Recentres on pointerleave so the
+// authored static base (ADR dec 6) is restored.
+// ---------------------------------------------------------------------------
+
+function hydratePointerFx(scope: ParentNode): void {
+  const nodes = scope.querySelectorAll('[data-opencanvas-pointer-fx]');
+  for (let i = 0; i < nodes.length; i++) {
+    const el = nodes[i];
+    if (!(el instanceof HTMLElement)) continue;
+    if (el.getAttribute('data-opencanvas-pfx-hydrated') === 'true') continue;
+    el.setAttribute('data-opencanvas-pfx-hydrated', 'true');
+    const primitive = el.getAttribute('data-opencanvas-pointer-fx');
+    if (primitive === 'spotlight') {
+      el.addEventListener('pointermove', (ev: PointerEvent): void => {
+        const r = el.getBoundingClientRect();
+        if (!(r.width > 0) || !(r.height > 0)) return;
+        const px = ((ev.clientX - r.left) / r.width) * 100;
+        const py = ((ev.clientY - r.top) / r.height) * 100;
+        el.style.setProperty('--opencanvas-ptr-x', px.toFixed(2) + '%');
+        el.style.setProperty('--opencanvas-ptr-y', py.toFixed(2) + '%');
+      });
+      el.addEventListener('pointerleave', (): void => {
+        el.style.setProperty('--opencanvas-ptr-x', '50%');
+        el.style.setProperty('--opencanvas-ptr-y', '50%');
+      });
+    } else if (primitive === 'tilt') {
+      el.addEventListener('pointermove', (ev: PointerEvent): void => {
+        const r = el.getBoundingClientRect();
+        if (!(r.width > 0) || !(r.height > 0)) return;
+        const nx = (ev.clientX - r.left) / r.width - 0.5;
+        const ny = (ev.clientY - r.top) / r.height - 0.5;
+        el.style.setProperty('--opencanvas-tilt-x', (nx * 12).toFixed(2) + 'deg');
+        el.style.setProperty('--opencanvas-tilt-y', (-ny * 12).toFixed(2) + 'deg');
+      });
+      el.addEventListener('pointerleave', (): void => {
+        el.style.setProperty('--opencanvas-tilt-x', '0deg');
+        el.style.setProperty('--opencanvas-tilt-y', '0deg');
+      });
+    } else {
+      // Unknown primitive — fail loud (mirrors the visitor fragment).
+      console.error('[opencanvas pointer-fx] unknown primitive ' + JSON.stringify(primitive));
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +155,18 @@ function hydrateCarousel(root: HTMLElement): void {
     if (n > count - 1) n = count - 1;
     return n;
   }
+  // ADR 0066 — mirror CAROUSEL_RUNTIME_SRC's per-slide --opencanvas-slide-offset
+  // publishing so the editor preview's `coverflow` variant paints identically
+  // to the published site.
+  function publishOffsets(active: number): void {
+    const slides = root.querySelectorAll('[data-opencanvas-carousel-slide-index]');
+    for (let s = 0; s < slides.length; s++) {
+      const slide = slides[s];
+      if (!(slide instanceof HTMLElement)) continue;
+      const sIdx = parseInt(slide.getAttribute('data-opencanvas-carousel-slide-index') || '0', 10);
+      slide.style.setProperty('--opencanvas-slide-offset', String(sIdx - active));
+    }
+  }
   function setIndex(next: number): void {
     let n = next;
     if (n < 0) n = 0;
@@ -114,7 +179,9 @@ function hydrateCarousel(root: HTMLElement): void {
       const dotIdx = parseInt(dot.getAttribute('data-opencanvas-carousel-dot') || '0', 10);
       dot.setAttribute('aria-selected', dotIdx === n ? 'true' : 'false');
     }
+    publishOffsets(n);
   }
+  publishOffsets(readIndex());
   // Each event handler stops propagation so the editor's root mousedown +
   // click listeners don't ALSO process the same event (drag-start or
   // element-deselect). Mousedown blockers run before drag-resize's root

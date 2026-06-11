@@ -537,6 +537,7 @@ function encodeFormElement(el: FormElement): Y.Map<unknown> {
   out.set('submitLabel', el.submitLabel);
   out.set('successMessage', el.successMessage);
   setIfDefined(out, 'webhookUrl', el.webhookUrl);
+  setIfDefined(out, 'variant', el.variant); // ADR 0066
   if (el.formStyle !== undefined) out.set('formStyle', encodeFormStyle(el.formStyle));
   return out;
 }
@@ -590,6 +591,7 @@ function encodeAccordionElement(el: AccordionElement): Y.Map<unknown> {
   for (const item of el.items) items.push([encodeAccordionItem(item)]);
   out.set('items', items);
   out.set('allowMultipleOpen', el.allowMultipleOpen);
+  setIfDefined(out, 'variant', el.variant); // ADR 0066
   return out;
 }
 
@@ -611,6 +613,7 @@ function encodeCarouselElement(el: CarouselElement): Y.Map<unknown> {
   out.set('showArrows', el.showArrows);
   out.set('showDots', el.showDots);
   setIfDefined(out, 'mode', el.mode);
+  setIfDefined(out, 'variant', el.variant); // ADR 0066
   return out;
 }
 
@@ -681,6 +684,7 @@ function encodeTabsElement(el: TabsElement): Y.Map<unknown> {
   encodeBaseElementFields(out, el);
   out.set('activeTabId', el.activeTabId);
   setIfDefined(out, 'tabBarHeight', el.tabBarHeight);
+  setIfDefined(out, 'variant', el.variant); // ADR 0066
   const tabsArr = new Y.Array<Y.Map<unknown>>();
   for (const tab of el.tabs) {
     const tabMap = new Y.Map<unknown>();
@@ -1188,6 +1192,7 @@ function decodeFormElement(map: Y.Map<unknown>, base: BaseElement): FormElement 
     successMessage: map.get('successMessage') as string,
   };
   if (map.has('webhookUrl')) el.webhookUrl = map.get('webhookUrl') as string;
+  if (map.has('variant')) el.variant = map.get('variant') as NonNullable<FormElement['variant']>; // ADR 0066
   if (map.has('formStyle')) {
     el.formStyle = decodeFormStyle(map.get('formStyle') as Y.Map<unknown>);
   }
@@ -1228,6 +1233,9 @@ function decodeAccordionElement(map: Y.Map<unknown>, base: BaseElement): Accordi
     type: 'accordion',
     items,
     allowMultipleOpen: map.get('allowMultipleOpen') as boolean,
+    ...(map.has('variant')
+      ? { variant: map.get('variant') as NonNullable<AccordionElement['variant']> }
+      : {}), // ADR 0066
   };
 }
 
@@ -1241,6 +1249,7 @@ function decodeCarouselElement(map: Y.Map<unknown>, base: BaseElement): Carousel
     showDots: map.get('showDots') as boolean,
   };
   if (map.has('mode')) el.mode = map.get('mode') as NonNullable<CarouselElement['mode']>;
+  if (map.has('variant')) el.variant = map.get('variant') as NonNullable<CarouselElement['variant']>; // ADR 0066
   return el;
 }
 
@@ -1298,6 +1307,7 @@ function decodeTabsElement(map: Y.Map<unknown>, base: BaseElement): TabsElement 
     activeTabId: map.get('activeTabId') as string,
   };
   if (map.has('tabBarHeight')) out.tabBarHeight = map.get('tabBarHeight') as number;
+  if (map.has('variant')) out.variant = map.get('variant') as NonNullable<TabsElement['variant']>; // ADR 0066
   return out;
 }
 
