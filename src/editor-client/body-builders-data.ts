@@ -734,7 +734,9 @@ export function buildCollectionBodyImpl(
     }
     return node;
   }
-  const entries = Array.isArray(element.entries) ? element.entries : [];
+  const rawEntries = element.entries;
+  const entriesKnown = Array.isArray(rawEntries);
+  const entries = entriesKnown ? rawEntries : [];
   if (entries.length === 0) {
     const placeholder = document.createElement('div');
     placeholder.className = 'opencanvas-collection-preview opencanvas-collection-empty';
@@ -755,11 +757,28 @@ export function buildCollectionBodyImpl(
     const headline = document.createElement('div');
     headline.style.fontWeight = '600';
     headline.style.color = 'var(--ink-2, #555)';
-    headline.textContent = 'Collection grid — 0 entries';
+    const sourceSlug =
+      typeof element.collectionSlug === 'string' && element.collectionSlug.length > 0
+        ? element.collectionSlug
+        : null;
+    if (sourceSlug === null) {
+      headline.textContent = 'Collection preview';
+    } else if (!entriesKnown) {
+      headline.textContent = 'Collection preview - ' + sourceSlug;
+    } else {
+      headline.textContent = 'Collection grid - 0 entries';
+    }
     placeholder.appendChild(headline);
     const hint = document.createElement('div');
-    hint.textContent =
-      'Add entries in the Entries tab on the dashboard, then publish to populate this grid.';
+    if (sourceSlug === null) {
+      hint.textContent = 'Pick a source to bind this collection.';
+    } else if (!entriesKnown) {
+      hint.textContent =
+        'Use the inspector for the live entry count; publish to populate this preview.';
+    } else {
+      hint.textContent =
+        'No entries matched this source/folder. Add entries from the dashboard, then publish.';
+    }
     placeholder.appendChild(hint);
     return placeholder;
   }

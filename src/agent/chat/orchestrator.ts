@@ -975,22 +975,33 @@ async function dispatchGenerateImage(
 
   // Enforce the per-account image cap before the (costly) Replicate call, so
   // chat-triggered generation consumes the same 'ai-image' bucket the direct
-  // /assets/generate endpoint does. Mirrors the missing-token error branch:
-  // report to the model, don't generate.
-  if (ctx.imageRateLimit) {
-    const limit = await ctx.imageRateLimit();
-    if (!limit.allowed) {
-      const errMsg =
-        'generateImage: image generation limit reached for this account. Try again later.';
-      await writer.write({ kind: 'error', error: errMsg });
-      history.push({
-        role: 'tool',
-        toolCallId: call.id,
-        toolName: call.name,
-        content: JSON.stringify({ error: errMsg }),
-      });
-      return {};
-    }
+  // /assets/generate endpoint does. A valid generateImage dispatch without a
+  // limiter hook is a server wiring error; fail closed rather than letting a
+  // future CHAT_AGENT_TOOLS caller bypass the cap.
+  if (!ctx.imageRateLimit) {
+    const errMsg =
+      'generateImage: image rate limiter hook is missing on this deployment';
+    await writer.write({ kind: 'error', error: errMsg });
+    history.push({
+      role: 'tool',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: JSON.stringify({ error: errMsg }),
+    });
+    return {};
+  }
+  const limit = await ctx.imageRateLimit();
+  if (!limit.allowed) {
+    const errMsg =
+      'generateImage: image generation limit reached for this account. Try again later.';
+    await writer.write({ kind: 'error', error: errMsg });
+    history.push({
+      role: 'tool',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: JSON.stringify({ error: errMsg }),
+    });
+    return {};
   }
 
   const aspectRatio =
