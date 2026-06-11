@@ -43,10 +43,18 @@ export function importLibrarySectionIntoSite(input: LibraryImportInput): Library
   // reserved for the single site-wide header/footer pair and would mark the
   // imported clone as a second header/footer.
   delete cloned.role;
+  // anchorId is a page-scoped in-page-link target (ADR 0050 dec 2: unique
+  // within a rendered page) meaningful only in the SOURCE page's nav graph.
+  // A freshly imported body section has nothing pointing at it in the target,
+  // so carrying the source value only risks a duplicate-anchor collision that
+  // fails validateEditableSite ("imported section produced invalid state").
+  // Strip it like role; the Owner re-assigns an anchor via the inspector.
+  delete cloned.anchorId;
   const errors: string[] = [];
 
   for (const element of cloned.elements) {
     element.id = newId(rolePrefix(element.id));
+    delete element.anchorId;
   }
   cloned.id = newId(`sec-${cloned.recipeId}`);
 
