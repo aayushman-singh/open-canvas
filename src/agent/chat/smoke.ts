@@ -960,6 +960,7 @@ function makeReplicateStub(): {
       systemInstruction: '[smoke] sys',
       replicateToken: 'test-token-XYZ',
       replicateClient: stub.client,
+      imageRateLimit: () => Promise.resolve({ allowed: true, retryAfterMs: null }),
     },
   });
 
@@ -1018,7 +1019,7 @@ function makeReplicateStub(): {
     result.doneReason === 'stop',
     `expected doneReason=stop after REPLACE happy path, got ${result.doneReason}`,
   );
-  console.log('[chat:smoke] 11/15 generateImage REPLACE mode — OK');
+  console.log('[chat:smoke] 11/16 generateImage REPLACE mode — OK');
 }
 
 // ---- Test 12 — ADD mode with default box ---------------------------------
@@ -1056,6 +1057,7 @@ function makeReplicateStub(): {
       systemInstruction: '[smoke] sys',
       replicateToken: 'test-token-ABC',
       replicateClient: stub.client,
+      imageRateLimit: () => Promise.resolve({ allowed: true, retryAfterMs: null }),
     },
   });
 
@@ -1095,7 +1097,7 @@ function makeReplicateStub(): {
       box.y >= 40,
     `op.target.box must default to {x:40, w:480, h:270, y >= 40}, got ${JSON.stringify(box)}`,
   );
-  console.log('[chat:smoke] 12/15 generateImage ADD mode default box — OK');
+  console.log('[chat:smoke] 12/16 generateImage ADD mode default box — OK');
 }
 
 // ---- Test 13 — Missing REPLICATE_API_TOKEN -------------------------------
@@ -1148,7 +1150,7 @@ function makeReplicateStub(): {
     !events.some((e) => e.kind === 'op-preview'),
     'missing token must not emit any op-preview',
   );
-  console.log('[chat:smoke] 13/15 generateImage missing-token — OK');
+  console.log('[chat:smoke] 13/16 generateImage missing-token — OK');
 }
 
 // ---- Test 14 — both elementId and sectionId ------------------------------
@@ -1205,7 +1207,7 @@ function makeReplicateStub(): {
     !events.some((e) => e.kind === 'op-preview'),
     'parser rejection must not emit any op-preview',
   );
-  console.log('[chat:smoke] 14/15 generateImage parser rejection — OK');
+  console.log('[chat:smoke] 14/16 generateImage parser rejection — OK');
 }
 
 // ---- Test 15 — per-account image cap blocks generation -------------------
@@ -1258,7 +1260,61 @@ function makeReplicateStub(): {
     !events.some((e) => e.kind === 'op-preview'),
     'over-budget image cap must not emit an op-preview',
   );
-  console.log('[chat:smoke] 15/15 generateImage rate-limit cap — OK');
+  console.log('[chat:smoke] 15/16 generateImage rate-limit cap — OK');
+}
+
+// ---- Test 16 — image generation requires a cap hook ----------------------
+//
+// Valid generateImage dispatch with a Replicate token but no imageRateLimit
+// hook is a server wiring error. The orchestrator must fail closed before the
+// provider call; otherwise a future CHAT_AGENT_TOOLS caller can bypass the
+// per-account 'ai-image' cap by forgetting the route-level hook.
+{
+  const fix = buildGenerateFixture();
+  const stub = makeReplicateStub();
+  const callId = 'gen-no-limit-hook';
+  const adapter = new MockLlmAdapter([
+    () =>
+      yieldChunks(
+        {
+          type: 'tool_call',
+          id: callId,
+          name: 'generateImage',
+          arguments: { elementId: fix.heroMediaId, prompt: 'a foggy harbour at dawn' },
+        },
+        { type: 'done', reason: 'tool_use' },
+      ),
+    () => yieldChunks({ type: 'text', text: 'Acknowledged.' }, { type: 'done', reason: 'stop' }),
+  ]);
+  const writer = new BufferedStreamWriter();
+  const session = await new InMemorySessionStore().create(
+    'site-gen-no-limit-hook',
+    'customer-smoke',
+  );
+  await runChatTurn({
+    session,
+    userMessage: 'Generate a hero image.',
+    writer,
+    ctx: {
+      adapter,
+      state: fix.state,
+      systemInstruction: '[smoke] sys',
+      replicateToken: 'test-token-XYZ',
+      replicateClient: stub.client,
+    },
+  });
+
+  assert(stub.calls.length === 0, 'missing imageRateLimit hook must NOT call Replicate');
+  const events = writer.events();
+  assert(
+    events.some((e) => e.kind === 'error' && e.error.includes('image rate limiter')),
+    'missing imageRateLimit hook must emit a loud wiring error',
+  );
+  assert(
+    !events.some((e) => e.kind === 'op-preview'),
+    'missing imageRateLimit hook must not emit an op-preview',
+  );
+  console.log('[chat:smoke] 16/16 generateImage limiter wiring — OK');
 }
 
 // ---------------------------------------------------------------------------
