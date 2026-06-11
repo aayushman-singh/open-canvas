@@ -74,6 +74,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0063 | Collection element binds at element level, ships visible defaults, and groups entries by folder | Accepted | [`docs/adr/0063-collection-element-binds-at-element-level-and-ships-defaults.md`](0063-collection-element-binds-at-element-level-and-ships-defaults.md) |
 | 0064 | EditorContext decomposes into narrow named-Pick contexts per consumer | Accepted | [`docs/adr/0064-editor-context-decomposition.md`](0064-editor-context-decomposition.md) |
 | 0065 | Custom Collection card template lives on the element, edited in-place via global editor state | Accepted | [`docs/adr/0065-custom-collection-card-template.md`](0065-custom-collection-card-template.md) |
+| 0066 | Interactive components gain the variant-preset layer; pointer-reactive variants run on one fragment in the existing interactive runtime | Proposed | [`docs/adr/0066-interactive-component-variant-layer-and-declarative-motion-runtime.md`](0066-interactive-component-variant-layer-and-declarative-motion-runtime.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 
