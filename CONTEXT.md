@@ -45,8 +45,16 @@ A reusable visual primitive that can be positioned, styled, and combined to recr
 _Avoid_: Reference-site clone, component library, arbitrary CSS
 
 **Motion Preset**:
-A curated animation behaviour that can be applied to a section or positioned element.
-_Avoid_: Custom animation code, interaction script
+A curated animation behaviour that can be applied to a section or positioned element. Time- or scroll-triggered (entrance, drift, parallax) — never driven by the visitor's cursor position.
+_Avoid_: Custom animation code, interaction script, pointer-reactive effect
+
+**Pointer-Reactive Effect**:
+A curated visual behaviour on an element that responds continuously to the visitor's cursor position (e.g. a glow that follows the pointer, a tilt toward it). Distinct from a Motion Preset, which is time- or scroll-triggered and ignores the cursor.
+_Avoid_: Motion preset, animation, hover state, interaction script
+
+**Variant**:
+A named, designed look for a single element that the owner selects with one choice, applying a complete coherent presentation at once. Sits above the granular per-element style: a Variant sets the base, the owner's explicit style choices override it. Each element kind that offers Variants exposes a fixed, curated set.
+_Avoid_: Theme, skin, preset, template, style kit
 
 **Pinned Style**:
 An explicit element-level visual choice that is not changed by a theme choice.
