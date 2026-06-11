@@ -187,15 +187,27 @@ function variantAttr(element: CanvasElement): string {
       return ` data-variant="${escapeAttr(element.kind)}"`;
     case 'code':
       return ` data-variant="${escapeAttr(element.language)}"`;
-    case 'media':
+    // ADR 0066 — the interactive components also mirror their variant onto the
+    // OUTER wrapper (the same element `pinnedStyle` lands on). The variant CSS
+    // *sets* its `--opencanvas-<component>-*` custom properties here, so an
+    // inline `pinnedStyle` override on the wrapper beats the stylesheet arm on
+    // the same element — making the kit-token < variant < granular cascade
+    // actually hold (it would not if the vars were set on a child element,
+    // because proximity would let the child arm win over the wrapper's inline
+    // value). Default to the first arm so the attribute is always present.
     case 'form':
-    case 'embed':
+      return ` data-variant="${escapeAttr(element.variant ?? 'classic')}"`;
     case 'accordion':
+      return ` data-variant="${escapeAttr(element.variant ?? 'list')}"`;
     case 'carousel':
+      return ` data-variant="${escapeAttr(element.variant ?? 'classic')}"`;
+    case 'tabs':
+      return ` data-variant="${escapeAttr(element.variant ?? 'classic')}"`;
+    case 'media':
+    case 'embed':
     case 'table':
     case 'nav':
     case 'collection':
-    case 'tabs':
       return '';
   }
 }

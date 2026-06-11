@@ -44,6 +44,22 @@ export type FormFontFamily = (typeof FORM_FONT_FAMILIES)[number];
 export const FORM_FONT_WEIGHTS = ['normal', 'medium', 'bold'] as const;
 export type FormFontWeight = (typeof FORM_FONT_WEIGHTS)[number];
 
+// ADR 0066 — variant-preset layer. First arm (`classic`) reproduces the current
+// form look and is the default. Arms set `--opencanvas-form-*` custom props that
+// the inner-part CSS already reads, so they compose under any `FormStyle`
+// granular override (ADR dec 2). `spotlight` is a pointer-fx variant: its render
+// also emits `data-opencanvas-pointer-fx="spotlight"`; its static base (the
+// `card` look with a centred glow, from the `--opencanvas-ptr-*` 50% fallbacks)
+// is authored + smoke-tested, not a silent fallback (ADR dec 6).
+export const FORM_VARIANTS = ['classic', 'underline', 'card', 'brutalist', 'spotlight'] as const;
+export type FormVariant = (typeof FORM_VARIANTS)[number];
+
+// Map a variant to the pointer-fx primitive it opts into, or null. Keeps the
+// render fn's pointer-fx emission a pure lookup (and the editor mirror agrees).
+export function formPointerFx(variant: FormVariant): 'spotlight' | null {
+  return variant === 'spotlight' ? 'spotlight' : null;
+}
+
 /**
  * Per-form visual overrides. Every field optional. The renderer emits CSS
  * custom-property declarations on the form root and the public stylesheet
@@ -93,6 +109,8 @@ export interface FormElement extends BaseElement {
    * the visitor page.
    */
   title?: string;
+  /** ADR 0066 — visual preset. Absent resolves to `classic` (current look). */
+  variant?: FormVariant;
   /** Optional webhook to POST submission JSON to (signed via HMAC). */
   webhookUrl?: string;
   /**
@@ -264,6 +282,14 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
   const action = `/__opencanvas/forms/${encodeURIComponent(ctx.siteId)}/${encodeURIComponent(el.id)}`;
   const fieldsHtml = el.fields.map((field) => renderField(field, el.id)).join('');
   const { styleAttr, flagAttr } = formStyleAttrs(el.formStyle);
+  // ADR 0066 dec 1 + dec 4 — variant on the root (default first arm), plus the
+  // pointer-fx attribute when the chosen variant opts into a cursor-reactive
+  // primitive. The pointer-fx attr is what trips runtime injection (dec 5).
+  const variant: FormVariant = el.variant ?? 'classic';
+  const pointerFx = formPointerFx(variant);
+  const variantAttr = ` data-variant="${escapeAttr(variant)}"`;
+  const pointerFxAttr =
+    pointerFx !== null ? ` data-opencanvas-pointer-fx="${escapeAttr(pointerFx)}"` : '';
 
   // Turnstile widget. The Cloudflare-managed JS loader script is emitted next
   // to the widget; the Cloudflare CDN caches it so multiple forms on the same
@@ -328,7 +354,7 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
 </script>`;
 
   return [
-    `<form class="opencanvas-form" method="post" action="${escapeAttr(action)}" data-form-id="${escapeAttr(el.id)}"${flagAttr}${styleAttr}>`,
+    `<form class="opencanvas-form" method="post" action="${escapeAttr(action)}" data-form-id="${escapeAttr(el.id)}"${variantAttr}${pointerFxAttr}${flagAttr}${styleAttr}>`,
     `<input type="hidden" name="pageSlug" value="${escapeAttr(ctx.pageSlug)}" />`,
     fieldsHtml,
     turnstileBlock,
@@ -361,6 +387,7 @@ export const formInspectorSpec: InspectorSpec = {
     // way to swap the conditional sub-fields without a declarative
     // visible-when machinery (ADR 0011 dec 3 generalize on demand).
     { kind: 'custom-mount', name: 'form-fields' },
+    { kind: 'select', label: 'Style', path: 'variant', options: FORM_VARIANTS },
     { kind: 'text', label: 'Submit label', path: 'submitLabel' },
     { kind: 'text', label: 'Success message', path: 'successMessage' },
     {
@@ -391,6 +418,11 @@ export const formSidebarSpec: SidebarSpec = {
 
 export const formAgentToolSpec: AgentToolSpec = {
   patchProperties: {
+    variant: {
+      type: 'string',
+      enum: [...FORM_VARIANTS],
+      description: `Form visual preset. One of [${FORM_VARIANTS.join(', ')}]. Form elements only.`,
+    },
     title: {
       type: 'string',
       description:
@@ -426,6 +458,10 @@ export const formAgentToolSpec: AgentToolSpec = {
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
+    if (args.variant !== undefined) {
+      if (typeof args.variant !== 'string') throw new Error('variant must be a string');
+      patch.variant = args.variant;
+    }
     if (args.title !== undefined) {
       if (typeof args.title !== 'string') throw new Error('title must be a string');
       patch.title = args.title;

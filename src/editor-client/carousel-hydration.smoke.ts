@@ -58,6 +58,15 @@ class StubStyle {
   set pointerEvents(value: string) {
     this.values.set('pointer-events', value);
   }
+  // ADR 0066 — the carousel hydrator now publishes --opencanvas-slide-offset
+  // per slide for the coverflow variant. Stub the CSSOM setProperty so the
+  // call succeeds and the value is observable.
+  setProperty(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+  getPropertyValue(key: string): string {
+    return this.values.get(key) || '';
+  }
 }
 
 class StubElement {

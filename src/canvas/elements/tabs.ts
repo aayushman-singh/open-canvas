@@ -30,6 +30,16 @@ export interface Tab {
   elements: CanvasElement[];
 }
 
+// ADR 0066 — variant-preset layer. First arm (`classic`) reproduces the current
+// tab-bar look (a filled active-tab pill) verbatim and is the default when
+// `variant` is absent, so existing snapshots render unchanged. The alternates
+// repaint the active-tab treatment. (The ADR's draft catalog listed
+// `vertical-rail`; it is dropped here — the tab panels are sized with an inline
+// full-width box, which a CSS-only rail cannot reflow without a layout rework.
+// Tracked as an ADR follow-up; see codex review.)
+export const TABS_VARIANTS = ['classic', 'underline', 'pill', 'segmented'] as const;
+export type TabsVariant = (typeof TABS_VARIANTS)[number];
+
 export interface TabsElement extends BaseElement {
   type: 'tabs';
   /** Length ≥ 2 — single-tab `TabsElement` is structurally a Container with a label. */
@@ -38,6 +48,8 @@ export interface TabsElement extends BaseElement {
   activeTabId: string;
   /** Bar height in px; default 56. */
   tabBarHeight?: number;
+  /** ADR 0066 — visual preset. Absent resolves to `classic` (current look). */
+  variant?: TabsVariant;
 }
 
 /** Default bar height when `tabBarHeight` is unset. ADR 0052 dec 3 rationale. */
@@ -81,7 +93,9 @@ export function renderTabs(el: TabsElement, ctx: TabsRenderCtx): string {
     })
     .join('');
 
-  return `<div class="opencanvas-tabs" data-opencanvas-tabs="${escapeAttr(el.id)}">${barHtml}${panelsHtml}</div>`;
+  // ADR 0066 dec 1 — variant on the root (default first arm `classic`).
+  const variant = el.variant ?? 'classic';
+  return `<div class="opencanvas-tabs" data-opencanvas-tabs="${escapeAttr(el.id)}" data-variant="${escapeAttr(variant)}">${barHtml}${panelsHtml}</div>`;
 }
 
 // Tabs is the second element type to nest CanvasElement[] (after Collection).
@@ -91,6 +105,7 @@ export function renderTabs(el: TabsElement, ctx: TabsRenderCtx): string {
 
 export const tabsInspectorSpec: InspectorSpec = {
   fields: [
+    { kind: 'select', label: 'Style', path: 'variant', options: TABS_VARIANTS },
     {
       kind: 'text',
       label: 'Active tab id',
@@ -125,6 +140,11 @@ export const tabsSidebarSpec: SidebarSpec = {
 // agent swap `activeTabId` and `tabBarHeight` without rewiring panels.
 export const tabsAgentToolSpec: AgentToolSpec = {
   patchProperties: {
+    variant: {
+      type: 'string',
+      enum: [...TABS_VARIANTS],
+      description: `Tabs visual preset. One of [${TABS_VARIANTS.join(', ')}]. Tabs elements only.`,
+    },
     activeTabId: {
       type: 'string',
       description: 'Id of the tab to surface as active. Must reference one of tabs[].id.',
@@ -136,6 +156,10 @@ export const tabsAgentToolSpec: AgentToolSpec = {
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
+    if (args.variant !== undefined) {
+      if (typeof args.variant !== 'string') throw new Error('variant must be a string');
+      patch.variant = args.variant;
+    }
     if (args.activeTabId !== undefined) {
       if (typeof args.activeTabId !== 'string' || args.activeTabId.length === 0) {
         throw new Error('activeTabId must be a non-empty string');

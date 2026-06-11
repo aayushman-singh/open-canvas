@@ -29,6 +29,7 @@ import type { CodeElement } from '../canvas/elements/code.js';
 import type { CollectionElement } from '../canvas/elements/collection.js';
 import type { EmbedElement } from '../canvas/elements/embed.js';
 import type { FormElement } from '../canvas/elements/form.js';
+import { formPointerFx } from '../canvas/elements/form.js';
 import type { NavElement } from '../canvas/elements/nav.js';
 import type { TableElement } from '../canvas/elements/table.js';
 
@@ -266,6 +267,15 @@ export function buildChartBodyImpl(ctx: BuildChartBodyContext, element: ChartEle
 export function buildFormBodyImpl(_ctx: BuildFormBodyContext, element: FormElement): HTMLElement {
   const node = document.createElement('form');
   node.className = 'opencanvas-form-preview';
+  // ADR 0066 — reflect the chosen variant (+ pointer-fx primitive) on the
+  // editor preview node so it mirrors the published DOM contract; the runtime
+  // mirror (hydrate-interactives.ts) and any editor variant CSS key off it.
+  {
+    const variant = element.variant ?? 'classic';
+    node.setAttribute('data-variant', variant);
+    const pfx = formPointerFx(variant);
+    if (pfx !== null) node.setAttribute('data-opencanvas-pointer-fx', pfx);
+  }
   node.style.display = 'flex';
   node.style.flexDirection = 'column';
   node.style.gap = '8px';
@@ -345,6 +355,7 @@ export function buildAccordionBodyImpl(
 ): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-accordion-preview';
+  node.setAttribute('data-variant', element.variant ?? 'list'); // ADR 0066
   const items = Array.isArray(element.items) ? element.items : [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -412,6 +423,7 @@ export function buildCarouselBodyImpl(
   // without it the visitor CSS (which selects on the attribute) would
   // disagree with the editor preview for scroll-snap carousels.
   wrap.setAttribute('data-opencanvas-carousel-mode', mode);
+  wrap.setAttribute('data-variant', element.variant ?? 'classic'); // ADR 0066
   wrap.setAttribute('role', 'region');
   wrap.setAttribute('aria-roledescription', 'carousel');
 
@@ -774,6 +786,7 @@ export function buildCollectionBodyImpl(
 export function buildTabsBodyImpl(ctx: BuildTabsBodyContext, element: TabsElement): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-tabs';
+  node.setAttribute('data-variant', element.variant ?? 'classic'); // ADR 0066
   node.style.position = 'relative';
   node.style.width = '100%';
   node.style.height = '100%';

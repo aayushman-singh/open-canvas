@@ -99,6 +99,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     box: { x: 0, y: 0, w: 320, h: 240, z: 0 },
     items: [{ id: 'fx-item-1', title: 'Item 1', body: [{ text: 'Body', marks: [] }] }],
     allowMultipleOpen: false,
+    variant: 'list', // ADR 0066 — inspector exposes a Style select on this path
   },
   carousel: {
     id: 'fx-carousel',
@@ -111,6 +112,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     arrowPosition: 'split-vertical-center',
     arrowStyle: 'round',
     mode: 'paginate',
+    variant: 'classic', // ADR 0066
   },
   tabs: {
     id: 'fx-tabs',
@@ -118,6 +120,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     box: { x: 0, y: 0, w: 640, h: 360, z: 0 },
     activeTabId: 'overview',
     tabBarHeight: 56,
+    variant: 'underline', // ADR 0066
     tabs: [
       { id: 'overview', label: [{ text: 'Overview' }], elements: [] },
       { id: 'details', label: [{ text: 'Details' }], elements: [] },
@@ -162,6 +165,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     submitLabel: 'Submit',
     successMessage: 'Thanks!',
     webhookUrl: '',
+    variant: 'classic', // ADR 0066
   },
 };
 

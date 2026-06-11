@@ -24,6 +24,7 @@ import type {
   ElementType,
   PublishedSnapshot,
 } from '../canvas/schema.js';
+import { formPointerFx } from '../canvas/elements/form.js';
 import { INTERACTIVE_RUNTIME_SRC } from './build.js';
 
 /**
@@ -37,6 +38,18 @@ const INTERACTIVE_ELEMENT_TYPES: ReadonlySet<ElementType> = new Set<ElementType>
 ]);
 
 /**
+ * ADR 0066 dec 5 — does this element opt into a pointer-fx primitive? Pointer-fx
+ * is derived from the chosen variant by the renderer, so the injection scan must
+ * mirror that derivation: a pointer-fx element needs the runtime even when it is
+ * not an "interactive element type" (e.g. a Form with the `spotlight` variant).
+ * Centralised so adding a future pointer-fx-bearing variant is one edit.
+ */
+function elementHasPointerFx(element: CanvasElement): boolean {
+  if (element.type === 'form') return formPointerFx(element.variant ?? 'classic') !== null;
+  return false;
+}
+
+/**
  * Walk the snapshot's element tree until an interactive type is found.
  * O(elements) worst case, but most snapshots short-circuit on the first match
  * in their first interactive section.
@@ -48,6 +61,7 @@ export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): bo
   };
   const elementNeedsRuntime = (element: CanvasElement): boolean => {
     if (INTERACTIVE_ELEMENT_TYPES.has(element.type)) return true;
+    if (elementHasPointerFx(element)) return true; // ADR 0066 dec 5
     if (element.type === 'tabs') {
       return element.tabs.some((tab) => tab.elements.some(elementNeedsRuntime));
     }

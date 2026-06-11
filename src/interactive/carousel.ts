@@ -29,6 +29,17 @@ function hydrateCarousel(root) {
     if (n > count - 1) n = count - 1;
     return n;
   }
+  // ADR 0066 — publish each slide's signed distance to the active index as
+  // --opencanvas-slide-offset so the coverflow variant CSS can position/scale/
+  // dim neighbours (runtime publishes state, CSS paints — no DOM branch). Inert
+  // for every other variant, which simply never reads the property.
+  function publishOffsets(active) {
+    var slides = root.querySelectorAll('[data-opencanvas-carousel-slide-index]');
+    for (var s = 0; s < slides.length; s++) {
+      var sIdx = parseInt(slides[s].getAttribute('data-opencanvas-carousel-slide-index') || '0', 10);
+      slides[s].style.setProperty('--opencanvas-slide-offset', String(sIdx - active));
+    }
+  }
   function setIndex(next) {
     if (next < 0) next = 0;
     if (next > count - 1) next = count - 1;
@@ -38,7 +49,10 @@ function hydrateCarousel(root) {
       var dotIdx = parseInt(dots[i].getAttribute('data-opencanvas-carousel-dot') || '0', 10);
       dots[i].setAttribute('aria-selected', dotIdx === next ? 'true' : 'false');
     }
+    publishOffsets(next);
   }
+  // Seed offsets from the initial index so coverflow paints before interaction.
+  publishOffsets(readIndex());
   var prev = root.querySelector('[data-opencanvas-carousel-prev]');
   if (prev) {
     prev.addEventListener('click', function (event) {

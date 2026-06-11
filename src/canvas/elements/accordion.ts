@@ -32,10 +32,21 @@ export interface AccordionItem {
   body: InlineRun[];
 }
 
+// ADR 0066 — variant-preset layer. The first arm (`list`) reproduces the
+// component's current look verbatim and is the default when `variant` is
+// absent, so existing snapshots render unchanged. Each arm only *sets*
+// `--opencanvas-accordion-*` custom properties in public-styles.ts; inner-part
+// CSS reads `var(--prop, <kit fallback>)`, so a `pinnedStyle` override on the
+// root still wins (kit-token < variant < granular).
+export const ACCORDION_VARIANTS = ['list', 'bordered', 'cards', 'filled'] as const;
+export type AccordionVariant = (typeof ACCORDION_VARIANTS)[number];
+
 export interface AccordionElement extends BaseElement {
   type: 'accordion';
   items: AccordionItem[];
   allowMultipleOpen: boolean;
+  /** ADR 0066 — visual preset. Absent resolves to `list` (current look). */
+  variant?: AccordionVariant;
 }
 
 export interface AccordionRenderCtx {
@@ -86,9 +97,13 @@ export function renderAccordion(el: AccordionElement, ctx: AccordionRenderCtx): 
   // allow-multi-open` (string literal "true"/"false") tells the runtime whether
   // to close siblings on open. Group role so AT reads the items as a related
   // set.
+  // ADR 0066 dec 1 — emit the chosen variant on the root (default first arm).
+  // public-styles.ts paints `.opencanvas-accordion[data-variant="x"]`.
+  const variant = el.variant ?? 'list';
   return [
     `<div class="opencanvas-accordion" `,
     `data-opencanvas-interactive="accordion" `,
+    `data-variant="${escapeAttr(variant)}" `,
     `data-opencanvas-allow-multi-open="${el.allowMultipleOpen ? 'true' : 'false'}" `,
     `role="group">`,
     itemsHtml,
@@ -107,6 +122,7 @@ export const accordionInspectorSpec: InspectorSpec = {
     // for a declarative `list-editor` kind (ADR 0011 dec 3, generalize on
     // three data points).
     { kind: 'custom-mount', name: 'accordion-items' },
+    { kind: 'select', label: 'Style', path: 'variant', options: ACCORDION_VARIANTS },
     { kind: 'checkbox', label: 'Allow multiple open', path: 'allowMultipleOpen' },
   ],
 };
@@ -124,6 +140,11 @@ export const accordionSidebarSpec: SidebarSpec = {
 
 export const accordionAgentToolSpec: AgentToolSpec = {
   patchProperties: {
+    variant: {
+      type: 'string',
+      enum: [...ACCORDION_VARIANTS],
+      description: `Accordion visual preset. One of [${ACCORDION_VARIANTS.join(', ')}]. Accordion elements only.`,
+    },
     allowMultipleOpen: {
       type: 'boolean',
       description: 'Allow multiple accordion items open. Accordion elements only.',
@@ -145,6 +166,10 @@ export const accordionAgentToolSpec: AgentToolSpec = {
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
+    if (args.variant !== undefined) {
+      if (typeof args.variant !== 'string') throw new Error('variant must be a string');
+      patch.variant = args.variant;
+    }
     if (args.allowMultipleOpen !== undefined) {
       if (typeof args.allowMultipleOpen !== 'boolean') {
         throw new Error('allowMultipleOpen must be a boolean');

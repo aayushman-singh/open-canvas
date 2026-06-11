@@ -57,8 +57,10 @@ export type {
   ShapeElement,
   TextElement,
 } from '../schema.js';
-export type { AccordionElement, AccordionItem } from './accordion.js';
-export type { CarouselElement, CarouselSlide } from './carousel.js';
+export type { AccordionElement, AccordionItem, AccordionVariant } from './accordion.js';
+export { ACCORDION_VARIANTS } from './accordion.js';
+export type { CarouselElement, CarouselSlide, CarouselVariant } from './carousel.js';
+export { CAROUSEL_VARIANTS } from './carousel.js';
 export type { ChartElement, ChartKind, ChartSeries } from './chart.js';
 export type { CodeElement, CodeLanguage } from './code.js';
 export type { EmbedElement } from './embed.js';
@@ -69,8 +71,9 @@ export type {
   FormFontFamily,
   FormFontWeight,
   FormStyle,
+  FormVariant,
 } from './form.js';
-export { FORM_FONT_FAMILIES, FORM_FONT_WEIGHTS } from './form.js';
+export { FORM_FONT_FAMILIES, FORM_FONT_WEIGHTS, FORM_VARIANTS } from './form.js';
 export type { NavElement, NavLayout, NavLink, NavLinkKind } from './nav.js';
 export type { TableColumn, TableElement, TableRow } from './table.js';
 export type {
@@ -78,8 +81,8 @@ export type {
   CollectionElement,
   CollectionSort,
 } from './collection.js';
-export type { Tab, TabsElement } from './tabs.js';
-export { TABS_DEFAULT_BAR_HEIGHT } from './tabs.js';
+export type { Tab, TabsElement, TabsVariant } from './tabs.js';
+export { TABS_DEFAULT_BAR_HEIGHT, TABS_VARIANTS } from './tabs.js';
 
 // Re-export recipe id constants so the recipes module + smoke tests can
 // reference them without depending directly on individual element files.
