@@ -1,10 +1,10 @@
 # ADR 0049 — Rename R2 bucket `rev01-assets` to `opencanvas-assets`
 
-**Status:** Proposed
-**Date:** 2026-06-01 (proposed)
+**Status:** Accepted
+**Date:** 2026-06-01 (proposed) · 2026-06-11 (accepted)
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 rebrand sweep landed Tier B (CSS / window globals / data attrs), Tier C (visitor route paths `/__rev01/*` → `/__opencanvas/*`), and the docs rename (Tier A). Tier D — renaming the R2 bucket binding — was deferred because the rename requires out-of-band ops (bucket create + byte copy) that this code pass cannot execute. This ADR names the cutover so the binding flip is a one-line `wrangler.toml` edit on the day the bytes are in place.
-**Drove:** to-be-filled-on-acceptance
+**Drove:** the 2026-06-11 cutover — 212 objects / 41.63 MB cloned `rev01-assets` → `opencanvas-assets` server-side via [`scripts/r2-clone.ts`](../../scripts/r2-clone.ts) (count + byte parity verified), binding flipped in [`wrangler.toml`](../../wrangler.toml), shipped with `wrangler deploy`. Old bucket retained until 2026-07-11, then dropped.
 
 ## Context
 
@@ -34,9 +34,11 @@ The cost of renaming: one R2 bucket create + one byte copy + one `wrangler.toml`
 
    This would be wrong if the asset volume were large enough that 30 days of duplicate R2 storage cost was material. The current Owner Asset corpus is small (the product is launching). Re-evaluate at the first cost review after 1,000+ Owners.
 
-2. **The copy is performed with `rclone` against the R2 S3-compatible endpoint, not a Workers-side script.**
+2. **The copy is performed against the R2 S3-compatible endpoint from the operator's machine, not a Workers-side script.**
 
-   **Why:** A Worker-script copy runs on Cloudflare's compute and per-call subrequest limits would force pagination across many invocations. `rclone sync` from the operator's machine using R2 access keys is one command, has built-in resumability, and produces a verifiable byte-count diff. Workers-side scripts are appropriate when the copy must run inside the trust boundary; this copy can safely run wherever the operator has R2 keys.
+   **Why:** A Worker-script copy runs on Cloudflare's compute and per-call subrequest limits would force pagination across many invocations. An operator-side copy using R2 access keys runs once, is resumable, and produces a verifiable byte-count diff. Workers-side scripts are appropriate when the copy must run inside the trust boundary; this copy can safely run wherever the operator has R2 keys.
+
+   **Execution note (2026-06-11):** the plan named `rclone`, but `rclone` was not available in the cutover environment. It was replaced by [`scripts/r2-clone.ts`](../../scripts/r2-clone.ts) — a Bun script using R2's S3 `CopyObject` for server-side cloning (bytes never leave Cloudflare), with skip-if-exists idempotency and a `--count-only` parity check. Same external behaviour as the `rclone sync` it stands in for.
 
 3. **Owner uploads during the cutover window go to the OLD bucket. After the cutover, the operator runs the copy a second time to catch any new bytes written between first-copy and binding-flip, then verifies counts match.**
 
@@ -50,19 +52,19 @@ The cost of renaming: one R2 bucket create + one byte copy + one `wrangler.toml`
 
 ## Cutover commands (executable when Decision 1 is accepted)
 
-Prerequisites: R2 API token with read on `rev01-assets` and read/write on `opencanvas-assets`. Stored as the operator's `rclone` remote `r2` (S3-compatible profile pointing at `<account-id>.r2.cloudflarestorage.com`).
+Prerequisites: an R2 S3 API token (Access Key ID + Secret Access Key) with read on `rev01-assets` and read/write on `opencanvas-assets`. Exported as `R2_ACCOUNT_ID` (= the Cloudflare account id), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Note: a Cloudflare *API token* cannot sign S3 requests — the dedicated R2 access-key pair is required.
 
 ```sh
 # 1. Create the new bucket.
 wrangler r2 bucket create opencanvas-assets
 
-# 2. First copy. Run from the operator's machine.
-rclone sync r2:rev01-assets r2:opencanvas-assets --progress --transfers 8 --checksum
+# 2. First copy. Run from the operator's machine (server-side CopyObject; bytes
+#    stay inside Cloudflare). --dry-run first to preview.
+bun run scripts/r2-clone.ts rev01-assets opencanvas-assets
 
-# 3. Verify counts match.
-rclone size r2:rev01-assets
-rclone size r2:opencanvas-assets
-# Sizes should be identical. Any delta is uploads-since-step-2.
+# 3. Verify object + byte parity.
+bun run scripts/r2-clone.ts rev01-assets opencanvas-assets --count-only
+# Exits non-zero if the buckets diverge.
 
 # 4. Edit wrangler.toml: change bucket_name = "rev01-assets" → "opencanvas-assets".
 #    Edit src/assets/seed-script.ts:75: change BUCKET = 'rev01-assets' → 'opencanvas-assets'.
@@ -74,8 +76,9 @@ wrangler deploy
 # 6. Smoke from the worker URL — upload an asset, list, fetch. Confirms the
 #    binding points at the new bucket and reads/writes go through.
 
-# 7. Delta copy to catch any uploads written between step 2 and step 5.
-rclone sync r2:rev01-assets r2:opencanvas-assets --progress --transfers 8 --checksum
+# 7. Delta copy to catch any uploads written between step 2 and step 5
+#    (skip-if-exists makes this a cheap re-run).
+bun run scripts/r2-clone.ts rev01-assets opencanvas-assets
 
 # 8. Mark ADR 0049 Accepted. Add a "Drove:" line linking the deploy commit.
 

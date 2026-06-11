@@ -95,7 +95,7 @@ new_sqlite_classes = ["NotificationOwnerRoom"]
 # Phase 0 scaffold — Owner Asset originals (ADR 0006 + plan #2). The bucket
 # itself is created out-of-band (`wrangler r2 bucket create opencanvas-assets`);
 # this binding wires the Worker to it. Wave 1 / Phase 0 asset-pipeline owner
-# (Agent 3) populates the read/write paths. ADR 0049 (Accepted 2026-06-09)
+# (Agent 3) populates the read/write paths. ADR 0049 (Accepted 2026-06-11)
 # renamed from `rev01-assets` to `opencanvas-assets` via the copy-then-cutover
 # playbook; the old bucket stays 30 days as rollback safety.
 [[r2_buckets]]
