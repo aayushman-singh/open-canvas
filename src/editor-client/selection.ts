@@ -184,9 +184,8 @@ export function findElementWrapperInArtboardOf(
 }
 
 // ADR 0063 dec 6 — clicks inside a Collection's rendered DOM (per-entry
-// cards from the Phase 2B materializer, or editor-only placeholder cards
-// from collection-preview.ts) select the parent Collection, not the inner
-// node. Mirrors Carousel slide behaviour: per-entry instances are
+// cards from the Phase 2B materializer) select the parent Collection, not
+// the inner node. Mirrors Carousel slide behaviour: per-entry instances are
 // materializer output, not authorable elements, so every click bubbles
 // to the Collection element itself.
 //

@@ -43,7 +43,6 @@ import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
 
 import { hydrateInteractives } from './hydrate-interactives.js';
 
-import { augmentCollectionPreviewForElementImpl } from './collection-preview.js';
 import { cssEscape } from './css-escape.js';
 import type {
   DomContext,
@@ -97,9 +96,7 @@ export type BuildElementNodeContext = SelectionContext &
 // drives a fall-back full renderAll (RenderContext), reports the inline-text
 // commit toast (StatusEmitterContext), and checks the inline-edit latch
 // (SelectionContext.editingElementId). The build + measurement verbs live in
-// the local Pick; the Collection placeholder re-augment forwards to
-// collection-preview.ts which still takes wide EditorContext (forward-cast
-// retained below).
+// the local Pick.
 export type RebuildElementContext = StateContext &
   DomContext &
   RenderContext &
@@ -413,14 +410,6 @@ export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string
         }
       }
     }
-  }
-  // ADR 0063 dec 5 — re-augment placeholder chrome after a Collection
-  // wrapper is replaced (e.g. inspector binding change). The new wrapper
-  // contains only the canonical .opencanvas-collection frame; without
-  // this call the editor-only placeholder cards would disappear until
-  // the next full renderAll().
-  if (found.element.type === 'collection') {
-    augmentCollectionPreviewForElementImpl(ctx, elementId);
   }
   // Re-hydrate the visitor interactive runtime against the replaced
   // wrapper(s). A carousel rebuilt via the inspector (slide added /

@@ -36,10 +36,10 @@
 //     Phase 2C exit verb. We do NOT silently delete the field here — the
 //     ADR's D6 failure-path discipline owns the recovery.
 //
-// Boot-order contract: `mountTemplateEditChromeImpl(ctx)` runs after
-// `augmentCollectionPreviewsImpl` inside `renderAllImpl` so the wrapper's
-// own per-element body has already settled. Idempotent — re-running the
-// mount strips prior chrome before re-mounting.
+// Boot-order contract: `mountTemplateEditChromeImpl(ctx)` runs late in
+// `renderAllImpl` so the wrapper's own per-element body has already
+// settled. Idempotent — re-running the mount strips prior chrome before
+// re-mounting.
 
 import type { DomContext, EditorContext } from './editor-context.js';
 import { cssEscape } from './css-escape.js';

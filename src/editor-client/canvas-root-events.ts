@@ -157,8 +157,7 @@ export function attachRootEventsImpl(ctx: AttachRootEventsContext): void {
     const elementNode = ctx.resolveElementWrapperAtPoint(target, ev.clientX, ev.clientY);
     if (elementNode) {
       // ADR 0063 dec 6 — when the click landed inside a Collection's
-      // rendered DOM (per-entry materializer cards in Phase 2B, or
-      // editor-only placeholder cards from collection-preview.ts), the
+      // rendered DOM (per-entry materializer cards in Phase 2B), the
       // hit-test above picks the innermost wrapper. We override that
       // result and select the enclosing Collection instead, mirroring
       // Carousel slide behaviour — the inner nodes are materializer
