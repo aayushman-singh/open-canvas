@@ -27,6 +27,8 @@ import { db } from '../../db/client';
 import { site } from '../../db/schema';
 import { runAudit, type AuditIssue } from '../../a11y/audit';
 import type { Severity } from '../../a11y/severity';
+import { CHECK_CATEGORIES, summariseCategory } from '../../a11y/report-categories';
+import { computeRemediations, type Remediation } from '../../a11y/remediation';
 
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, readThemeCookie } from '../../ui';
@@ -246,58 +248,9 @@ function ArrowIcon() {
   );
 }
 
-// Six category cards mirroring a11y.html. Each one summarises issue
-// counts under a kind family — when the family has 0 issues we render
-// the .ok variant; otherwise .warn (and .red for blocking-only families).
-interface CheckCategory {
-  label: string;
-  kinds: ReadonlyArray<string>;
-  okCopy: string;
-}
-
-const CHECK_CATEGORIES: ReadonlyArray<CheckCategory> = [
-  { label: 'Image descriptions', kinds: ['img-alt-missing'], okCopy: 'All images labelled' },
-  { label: 'Button labels', kinds: ['button-label-missing'], okCopy: 'Every button is clear' },
-  {
-    label: 'Colour contrast',
-    kinds: ['contrast-low', 'contrast-failing'],
-    okCopy: 'All contrast checks pass',
-  },
-  {
-    label: 'Form labels',
-    kinds: ['form-label-missing', 'form-field-missing'],
-    okCopy: 'All fields labelled',
-  },
-  {
-    label: 'Heading order',
-    kinds: ['heading-skip', 'heading-order'],
-    okCopy: 'No skipped levels',
-  },
-  {
-    label: 'Page titles',
-    kinds: ['page-title-missing', 'page-meta-missing'],
-    okCopy: 'Set on all pages',
-  },
-];
-
-function summariseCategory(
-  category: CheckCategory,
-  issues: AuditIssue[],
-): { variant: 'ok' | 'warn' | 'red'; copy: string } {
-  const matches = issues.filter((issue) =>
-    category.kinds.some((kind) => issue.kind === kind || issue.kind.startsWith(`${kind}-`)),
-  );
-  if (matches.length === 0) {
-    return { variant: 'ok', copy: category.okCopy };
-  }
-  const blocking = matches.filter((issue) => issue.severity === 'blocking').length;
-  if (blocking > 0) {
-    const word = blocking === 1 ? 'block' : 'blocks';
-    return { variant: 'red', copy: `${blocking} ${word} publish` };
-  }
-  const word = matches.length === 1 ? 'area' : 'areas';
-  return { variant: 'warn', copy: `${matches.length} ${word} to review` };
-}
+// Category-tile summary logic lives in `src/a11y/report-categories.ts` (pure,
+// unit-tested) so the issue-kind strings can't drift back out of sync with the
+// real `IssueKind` union the way they once did.
 
 function severityChipClass(severity: Severity): string {
   if (severity === 'blocking') return 'chip chip-red';
@@ -334,6 +287,41 @@ function IssueCard({ issue, editorHref }: { issue: AuditIssue; editorHref: strin
         <span class="where">{where}</span>
         <a href={fixHref} class="fix">
           Fix in editor <ArrowIcon />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// Friendly name for the issue a remediation resolves. Only `heading-skip` is
+// auto-fixable today (everything else is validator-prevented or manual).
+const REMEDIATION_LABEL: Readonly<Record<string, string>> = {
+  'heading-skip': 'Heading hierarchy',
+};
+
+// A computed auto-fix surfaced from the remediation engine. Each was
+// self-verified server-side at audit time: applying its op alone and re-running
+// the audit cleared the finding with no new issue. This card is READ-ONLY — it
+// shows the exact change and the value to set; the Owner opens the element to
+// apply it (one-click apply is a follow-up; the engine's applyRemediationOps is
+// ready for it).
+function RemediationCard({ fix, editorHref }: { fix: Remediation; editorHref: string }) {
+  const label = REMEDIATION_LABEL[fix.kind] ?? fix.kind;
+  const params = new URLSearchParams();
+  if (fix.pageSlug !== undefined) params.set('focusPage', fix.pageSlug);
+  if (fix.elementId !== undefined) params.set('focusElement', fix.elementId);
+  const fixHref = params.toString().length > 0 ? `${editorHref}?${params.toString()}` : editorHref;
+  return (
+    <div class="issue">
+      <span class="sev chip chip-ok">Computed ✓</span>
+      <div class="it">
+        <b>{label}</b>
+        <p>
+          {fix.before} → <strong>{fix.after}</strong>
+        </p>
+        <span class="where">Verified against this audit run. Review layout after changing the size.</span>
+        <a href={fixHref} class="fix">
+          Open in editor <ArrowIcon />
         </a>
       </div>
     </div>
@@ -383,6 +371,9 @@ a11yReportRoute.get('/sites/:siteId/a11y', async (c) => {
 
   const report = runAudit(owned.editableState);
   const grouped = groupBySeverity(report.issues);
+  // Self-verified auto-fixes for the findings above. Read-only here — each card
+  // shows the exact computed change and deep-links the Owner into the editor.
+  const plan = computeRemediations(owned.editableState, report);
   const editorHref = `/dashboard/sites/${siteId}/edit`;
 
   // Score: 100 minus 20 per blocker, 5 per warning, capped at 0.
@@ -449,6 +440,21 @@ a11yReportRoute.get('/sites/:siteId/a11y', async (c) => {
           );
         })}
       </div>
+
+      {plan.remediations.length > 0 && (
+        <>
+          <h2 class="fixes-h">Computed fixes</h2>
+          <p class="sub">
+            Each fix below was verified against this audit — applying it alone clears its finding
+            with no new issue. Open the element to apply the change.
+          </p>
+          <div class="issues">
+            {plan.remediations.map((fix) => (
+              <RemediationCard fix={fix} editorHref={editorHref} />
+            ))}
+          </div>
+        </>
+      )}
 
       {report.issues.length === 0 ? (
         <div class="card">
