@@ -3,6 +3,9 @@
 **Status:** Investigation
 **Date:** 2026-06-16
 
+**Agent pickup:** future work now lives in
+[`docs/specs/designer-interactions-future-work.md`](designer-interactions-future-work.md).
+
 ## User-Visible Done State
 
 The target user is a template author trying to reproduce a high-end designer
@@ -477,4 +480,3 @@ Every existing feature should map into that model:
 
 That keeps behaviour explicit and prevents the next designer-template wave from
 adding disconnected one-off runtimes.
-

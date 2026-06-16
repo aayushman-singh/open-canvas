@@ -188,3 +188,5 @@ Route Transition.
 
 - Add schema and editor controls for View Transition same-document modes when a
   template needs native shared-target snapshots beyond Motion Sequences.
+- Keep future adapter work centralized in
+  [Designer Interactions Future Work](../specs/designer-interactions-future-work.md).

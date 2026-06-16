@@ -122,9 +122,11 @@ synchronisation:
 
 ## Follow-ups
 
-- Define the exact Motion Sequence TypeScript shape and validator.
-- Define the Motion property whitelist by target kind.
+- Motion Sequence shape, validator, property whitelist, editor controls, and
+  visitor runtime hydration shipped in the designer-interactions branch.
 - Add import animation inventory output and publish warnings for unsupported
   source choreography.
 - Add a focused ADR for Layout Transition once route transitions and overlays
   need shared-target movement.
+- Keep future adapter work centralized in
+  [Designer Interactions Future Work](../specs/designer-interactions-future-work.md).

@@ -2,6 +2,9 @@
 
 Open Canvas is a live site builder where an owner starts from a template seed, edits a site directly, and publishes it to a public address visitors can open.
 
+Agent pickup for the designer-template fidelity backlog lives at
+[`docs/specs/designer-interactions-future-work.md`](docs/specs/designer-interactions-future-work.md).
+
 ## Language
 
 **Owner**:

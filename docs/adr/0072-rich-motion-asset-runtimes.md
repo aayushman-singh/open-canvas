@@ -117,9 +117,10 @@ and Three.js is MIT licensed for WebGL/3D scenes
 
 ## Follow-ups
 
-- Define the Rich Motion Asset metadata union.
-- Define Lottie, Rive, image-sequence, and bounded-3D validation rules.
-- Decide whether Rich Motion Asset playback lives on Media Element or a new
-  element type.
+- Lottie metadata, validation, editor binding, upload/read/delete lifecycle, and
+  visitor runtime hydration shipped in the designer-interactions branch.
+- Add Rive, image-sequence, and bounded-3D runtime adapters and validation.
 - Add import inventory findings for detected rich-motion sources.
 - Add bundle-size and performance budgets for each runtime family.
+- Keep future adapter work centralized in
+  [Designer Interactions Future Work](../specs/designer-interactions-future-work.md).
