@@ -116,6 +116,18 @@ Route Transition.
 - Route Transition can share Motion Sequence, Overlay, and future Layout
   Transition concepts without each feature inventing a navigation lifecycle.
 
+## Implementation Status
+
+- **Load Experience runtime shipped in the designer-interactions branch.** The
+  visitor Runtime Hydrator consumes the saved `loadExperience`, runs bounded
+  readiness gates, plays configured Motion Sequences, and emits explicit ready
+  or failure events.
+- **Route Transition is schema-validated and rendered into the designer
+  interaction payload, but the same-site navigation runtime is not shipped in
+  this branch.** Do not present Route Transition as a usable template feature
+  until the fetch, parse, public-root swap, hydrate, history, scroll, focus, and
+  restore-on-failure lifecycle has focused smoke coverage.
+
 ## Follow-ups
 
 - Define the Load Experience schema and supported readiness gates.
