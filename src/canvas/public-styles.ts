@@ -264,6 +264,34 @@ html, body {
 .opencanvas-element[data-es-shadow] > .opencanvas-action,
 .opencanvas-element[data-es-shadow] > .opencanvas-shape { box-shadow: none; }
 
+/* ---- Collections ------------------------------------------------------
+   Materialized entries render as mini relative frames inside the Collection
+   host. Component Style writes host variables; CSS consumes them here so the
+   materializer's generated child element payload stays canonical. */
+.opencanvas-collection {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+.opencanvas-collection-entry {
+  position: relative;
+}
+.opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="container"]:first-child > .opencanvas-surface,
+.opencanvas-collection[data-collection-display="custom"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="container"]:first-child > .opencanvas-surface {
+  background: var(--opencanvas-collection-card-bg, inherit);
+  border: var(--opencanvas-collection-card-border-width, 0) solid var(--opencanvas-collection-card-border-color, transparent);
+  border-radius: var(--opencanvas-collection-card-radius, inherit);
+  box-shadow: var(--opencanvas-collection-card-shadow, inherit);
+  padding: var(--opencanvas-collection-card-padding, 0);
+}
+.opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="media"] .opencanvas-media,
+.opencanvas-collection[data-collection-display="custom"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="media"] .opencanvas-media {
+  border-radius: var(--opencanvas-collection-card-image-radius, 0);
+}
+.opencanvas-collection[data-collection-display="image-only"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="media"] .opencanvas-media {
+  border-radius: var(--opencanvas-collection-image-only-radius, 0);
+}
+
 /* ---- Forms ------------------------------------------------------------
    Visitor-facing form chrome. Browsers' default form widgets look broken
    next to a designed canvas, so we ship a small, opinionated reset:
@@ -283,6 +311,14 @@ html, body {
   gap: 6px;
   font-size: 13px;
   color: var(--opencanvas-fg);
+}
+.opencanvas-form[data-variant="card"] .opencanvas-form-field,
+.opencanvas-form[data-variant="spotlight"] .opencanvas-form-field {
+  padding: var(--opencanvas-form-field-surface-pad-y, 14px) var(--opencanvas-form-field-surface-pad-x, 16px);
+  border: var(--opencanvas-form-field-surface-border-width, 0) solid var(--opencanvas-form-field-surface-border-color, transparent);
+  border-radius: var(--opencanvas-form-field-surface-radius, var(--opencanvas-kit-radius, 10px));
+  background: var(--opencanvas-form-field-surface-bg, var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06)));
+  box-shadow: var(--opencanvas-form-field-surface-shadow, 0 4px 16px rgba(0, 0, 0, 0.14));
 }
 .opencanvas-form-field-checkbox {
   display: flex;
@@ -388,15 +424,16 @@ html, body {
 .opencanvas-accordion {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--opencanvas-accordion-gap, 8px);
   width: 100%;
   height: 100%;
   overflow: auto;
 }
 .opencanvas-accordion-item {
-  border: 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
-  border-radius: var(--opencanvas-kit-radius, 8px);
-  background: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  border: var(--opencanvas-accordion-item-border, var(--opencanvas-accordion-item-border-width, 1px) solid var(--opencanvas-accordion-item-border-color, var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18))));
+  border-radius: var(--opencanvas-accordion-item-radius, var(--opencanvas-kit-radius, 8px));
+  background: var(--opencanvas-accordion-item-bg, var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06)));
+  box-shadow: var(--opencanvas-accordion-item-shadow, none);
   overflow: hidden;
 }
 .opencanvas-accordion-header {
@@ -404,10 +441,10 @@ html, body {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 12px 16px;
-  background: transparent;
+  padding: var(--opencanvas-accordion-header-pad-y, 12px) var(--opencanvas-accordion-header-pad-x, 16px);
+  background: var(--opencanvas-accordion-header-bg, transparent);
   border: 0;
-  color: inherit;
+  color: var(--opencanvas-accordion-header-color, inherit);
   font: inherit;
   font-weight: 600;
   text-align: left;
@@ -423,9 +460,10 @@ html, body {
 .opencanvas-accordion-header[aria-expanded="true"]::after { content: "−"; }
 .opencanvas-accordion-header:hover { background: rgba(127, 127, 127, 0.08); }
 .opencanvas-accordion-body {
-  padding: 0 16px 14px;
-  font-size: 14px;
-  line-height: 1.55;
+  padding: var(--opencanvas-accordion-body-pad-y, 0) var(--opencanvas-accordion-body-pad-x, 16px) var(--opencanvas-accordion-body-pad-y, 14px);
+  color: var(--opencanvas-accordion-body-color, inherit);
+  font-size: var(--opencanvas-accordion-body-font-size, 14px);
+  line-height: var(--opencanvas-accordion-body-line-height, 1.55);
 }
 .opencanvas-accordion-body[hidden] { display: none; }
 
@@ -438,28 +476,38 @@ html, body {
 .opencanvas-tab-bar {
   display: flex;
   align-items: stretch;
-  gap: 8px;
+  gap: var(--opencanvas-tabs-bar-gap, 8px);
   padding: 0 0 10px;
-  border-bottom: 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
+  border: var(--opencanvas-tabs-bar-border-width, 0) solid var(--opencanvas-tabs-bar-border-color, transparent);
+  border-bottom-width: var(--opencanvas-tabs-bar-border-width, 1px);
+  border-bottom-color: var(--opencanvas-tabs-bar-border-color, var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18)));
+  border-radius: var(--opencanvas-tabs-bar-radius, 0);
+  background: var(--opencanvas-tabs-bar-bg, transparent);
   overflow-x: auto;
 }
 .opencanvas-tab {
   appearance: none;
   border: 0;
-  border-radius: var(--opencanvas-kit-radius, 8px);
+  border-radius: var(--opencanvas-tabs-tab-radius, var(--opencanvas-kit-radius, 8px));
   background: transparent;
-  color: var(--opencanvas-kit-muted, #9ca3af);
-  padding: 0 18px;
+  color: var(--opencanvas-tabs-tab-color, var(--opencanvas-kit-muted, #9ca3af));
+  padding: var(--opencanvas-tabs-tab-pad-y, 0) var(--opencanvas-tabs-tab-pad-x, 18px);
   font: inherit;
-  font-weight: 600;
+  font-weight: var(--opencanvas-tabs-tab-font-weight, 600);
   cursor: pointer;
   white-space: nowrap;
 }
 .opencanvas-tab[data-tab-active] {
-  background: var(--opencanvas-kit-accent, #7dd3fc);
-  color: var(--opencanvas-kit-bg, #0c0c0d);
+  background: var(--opencanvas-tabs-active-tab-bg, var(--opencanvas-kit-accent, #7dd3fc));
+  color: var(--opencanvas-tabs-active-tab-color, var(--opencanvas-kit-bg, #0c0c0d));
+  font-weight: var(--opencanvas-tabs-active-tab-font-weight, var(--opencanvas-tabs-tab-font-weight, 600));
+  box-shadow: inset 0 -2px 0 0 var(--opencanvas-tabs-active-indicator-color, transparent);
 }
 .opencanvas-tab-panel {
+  box-sizing: border-box;
+  background: var(--opencanvas-tabs-panel-bg, transparent);
+  border: var(--opencanvas-tabs-panel-border-width, 0) solid var(--opencanvas-tabs-panel-border-color, transparent);
+  border-radius: var(--opencanvas-tabs-panel-radius, 0);
   overflow: visible;
 }
 [data-opencanvas-tab-panel-id]:not([data-tab-active]) {
@@ -533,21 +581,22 @@ html, body {
   right: 0;
   bottom: 0;
   margin: 0;
-  padding: 14px 24px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0));
-  color: #fff;
-  font-size: 14px;
-  line-height: 1.4;
+  padding: var(--opencanvas-carousel-caption-pad-y, 14px) var(--opencanvas-carousel-caption-pad-x, 24px);
+  background: var(--opencanvas-carousel-caption-bg, linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0)));
+  color: var(--opencanvas-carousel-caption-color, #fff);
+  font-size: var(--opencanvas-carousel-caption-font-size, 14px);
+  font-weight: var(--opencanvas-carousel-caption-font-weight, inherit);
+  line-height: var(--opencanvas-carousel-caption-line-height, 1.4);
 }
 .opencanvas-carousel-arrow {
   position: absolute;
-  width: 40px;
-  height: 40px;
+  width: var(--opencanvas-carousel-arrow-size, 40px);
+  height: var(--opencanvas-carousel-arrow-size, 40px);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  background: var(--opencanvas-carousel-arrow-bg, rgba(0, 0, 0, 0.55));
+  color: var(--opencanvas-carousel-arrow-color, #fff);
   border: 0;
   border-radius: 50%;
   font-size: 22px;
@@ -556,7 +605,7 @@ html, body {
   z-index: 2;
   transition: background 120ms ease;
 }
-.opencanvas-carousel-arrow:hover { background: rgba(0, 0, 0, 0.78); }
+.opencanvas-carousel-arrow:hover { background: var(--opencanvas-carousel-arrow-bg, rgba(0, 0, 0, 0.78)); }
 
 /* ---- Arrow position presets --------------------------------------------
    Each preset positions both arrows independently; the default
@@ -606,15 +655,15 @@ html, body {
    the bunched-bottom-right placement.                                   */
 .opencanvas-carousel[data-opencanvas-arrow-style="round"] .opencanvas-carousel-arrow {
   border-radius: 50%;
-  width: 40px;
+  width: var(--opencanvas-carousel-arrow-size, 40px);
 }
 .opencanvas-carousel[data-opencanvas-arrow-style="square"] .opencanvas-carousel-arrow {
   border-radius: var(--opencanvas-kit-radius, 8px);
-  width: 40px;
+  width: var(--opencanvas-carousel-arrow-size, 40px);
 }
 .opencanvas-carousel[data-opencanvas-arrow-style="pill"] .opencanvas-carousel-arrow {
   border-radius: 9999px;
-  width: 56px;
+  width: calc(var(--opencanvas-carousel-arrow-size, 40px) * 1.4);
 }
 /* Bunched placement needs a tighter pill spacing when arrows are pills,
    so the two buttons don't visually overlap. */
@@ -652,17 +701,17 @@ html, body {
   bottom: 18px;
 }
 .opencanvas-carousel-dot {
-  width: 10px;
-  height: 10px;
+  width: var(--opencanvas-carousel-dot-size, 10px);
+  height: var(--opencanvas-carousel-dot-size, 10px);
   border-radius: 50%;
   border: 0;
   padding: 0;
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--opencanvas-carousel-dot-bg, rgba(255, 255, 255, 0.45));
   cursor: pointer;
   transition: background 120ms ease, transform 120ms ease;
 }
 .opencanvas-carousel-dot[aria-selected="true"] {
-  background: #fff;
+  background: var(--opencanvas-carousel-dot-active-bg, #fff);
   transform: scale(1.2);
 }
 
@@ -736,13 +785,20 @@ const variantCss = String.raw`
 .opencanvas-accordion { gap: var(--opencanvas-accordion-gap, 8px); }
 .opencanvas-accordion-item {
   background: var(--opencanvas-accordion-item-bg, var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06)));
-  border: var(--opencanvas-accordion-item-border, 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18)));
+  border: var(--opencanvas-accordion-item-border, var(--opencanvas-accordion-item-border-width, 1px) solid var(--opencanvas-accordion-item-border-color, var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18))));
   border-radius: var(--opencanvas-accordion-item-radius, var(--opencanvas-kit-radius, 8px));
   box-shadow: var(--opencanvas-accordion-item-shadow, none);
 }
 .opencanvas-accordion-header {
+  padding: var(--opencanvas-accordion-header-pad-y, 12px) var(--opencanvas-accordion-header-pad-x, 16px);
   background: var(--opencanvas-accordion-header-bg, transparent);
   color: var(--opencanvas-accordion-header-color, inherit);
+}
+.opencanvas-accordion-body {
+  padding: var(--opencanvas-accordion-body-pad-y, 0) var(--opencanvas-accordion-body-pad-x, 16px) var(--opencanvas-accordion-body-pad-y, 14px);
+  color: var(--opencanvas-accordion-body-color, inherit);
+  font-size: var(--opencanvas-accordion-body-font-size, 14px);
+  line-height: var(--opencanvas-accordion-body-line-height, 1.55);
 }
 /* list = current look (all fallbacks). VAR-SETTING arms live on the OUTER
    .opencanvas-element wrapper — the same element pinnedStyle lands on — so an
@@ -754,7 +810,7 @@ const variantCss = String.raw`
   --opencanvas-accordion-gap: 0;
   --opencanvas-accordion-item-bg: transparent;
   --opencanvas-accordion-item-radius: 0;
-  --opencanvas-accordion-item-border: 0;
+  --opencanvas-accordion-item-border-width: 0;
 }
 .opencanvas-accordion[data-variant="bordered"] .opencanvas-accordion-item {
   border-bottom: 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
@@ -772,39 +828,71 @@ const variantCss = String.raw`
   color: var(--opencanvas-kit-bg, #0c0c0d);
 }
 
-/* ---- Tabs: classic = current look (filled active-tab pill, untouched). The
-   alternates repaint the ACTIVE-tab treatment directly — these are structural
-   (they set CSS properties with no granular-override contract), so they stay on
-   the inner root rather than the wrapper. (vertical-rail was dropped: the tab
-   panels carry an inline full-width box that a CSS-only rail cannot reflow; it
-   is an ADR follow-up.) */
-.opencanvas-tabs[data-variant="underline"] .opencanvas-tab[data-tab-active] {
-  background: transparent;
-  color: var(--opencanvas-kit-accent, #7dd3fc);
-  border-radius: 0;
-  box-shadow: inset 0 -2px 0 0 var(--opencanvas-kit-accent, #7dd3fc);
+/* ---- Tabs: classic = current look (filled active-tab pill, untouched). Arms
+   set component vars on the wrapper where a modeled override must be able to
+   beat them; structural layout nudges stay on the inner root. */
+.opencanvas-tab-bar {
+  gap: var(--opencanvas-tabs-bar-gap, 8px);
+  background: var(--opencanvas-tabs-bar-bg, transparent);
+  border: var(--opencanvas-tabs-bar-border-width, 0) solid var(--opencanvas-tabs-bar-border-color, transparent);
+  border-bottom-width: var(--opencanvas-tabs-bar-border-width, 1px);
+  border-bottom-color: var(--opencanvas-tabs-bar-border-color, var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18)));
+  border-radius: var(--opencanvas-tabs-bar-radius, 0);
 }
-.opencanvas-tabs[data-variant="pill"] .opencanvas-tab { border-radius: 9999px; }
+.opencanvas-tab {
+  border-radius: var(--opencanvas-tabs-tab-radius, var(--opencanvas-kit-radius, 8px));
+  color: var(--opencanvas-tabs-tab-color, var(--opencanvas-kit-muted, #9ca3af));
+  padding: var(--opencanvas-tabs-tab-pad-y, 0) var(--opencanvas-tabs-tab-pad-x, 18px);
+  font-weight: var(--opencanvas-tabs-tab-font-weight, 600);
+}
+.opencanvas-tab[data-tab-active] {
+  background: var(--opencanvas-tabs-active-tab-bg, var(--opencanvas-kit-accent, #7dd3fc));
+  color: var(--opencanvas-tabs-active-tab-color, var(--opencanvas-kit-bg, #0c0c0d));
+  font-weight: var(--opencanvas-tabs-active-tab-font-weight, var(--opencanvas-tabs-tab-font-weight, 600));
+  box-shadow: inset 0 -2px 0 0 var(--opencanvas-tabs-active-indicator-color, transparent);
+}
+.opencanvas-tab-panel {
+  background: var(--opencanvas-tabs-panel-bg, transparent);
+  border: var(--opencanvas-tabs-panel-border-width, 0) solid var(--opencanvas-tabs-panel-border-color, transparent);
+  border-radius: var(--opencanvas-tabs-panel-radius, 0);
+}
+.opencanvas-element[data-element-type="tabs"][data-variant="underline"] {
+  --opencanvas-tabs-active-tab-bg: transparent;
+  --opencanvas-tabs-active-tab-color: var(--opencanvas-kit-accent, #7dd3fc);
+  --opencanvas-tabs-tab-radius: 0;
+  --opencanvas-tabs-active-indicator-color: var(--opencanvas-kit-accent, #7dd3fc);
+}
+.opencanvas-tabs[data-variant="underline"] .opencanvas-tab[data-tab-active] {
+  border-radius: 0;
+}
+.opencanvas-element[data-element-type="tabs"][data-variant="pill"] {
+  --opencanvas-tabs-tab-radius: 9999px;
+}
+.opencanvas-tabs[data-variant="pill"] .opencanvas-tab { border-radius: var(--opencanvas-tabs-tab-radius, 9999px); }
+.opencanvas-element[data-element-type="tabs"][data-variant="segmented"] {
+  --opencanvas-tabs-bar-gap: 0;
+  --opencanvas-tabs-bar-bg: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  --opencanvas-tabs-bar-border-width: 1px;
+  --opencanvas-tabs-bar-border-color: var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
+  --opencanvas-tabs-bar-radius: 9999px;
+  --opencanvas-tabs-tab-radius: 9999px;
+}
 .opencanvas-tabs[data-variant="segmented"] .opencanvas-tab-bar {
-  gap: 0;
   padding: 4px;
-  border: 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
-  border-bottom-width: 1px;
-  border-radius: 9999px;
-  background: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
   width: max-content;
 }
-.opencanvas-tabs[data-variant="segmented"] .opencanvas-tab { border-radius: 9999px; }
+.opencanvas-tabs[data-variant="segmented"] .opencanvas-tab { border-radius: var(--opencanvas-tabs-tab-radius, 9999px); }
 
 /* ---- Carousel: classic = current look. The other arms repaint slides. */
 .opencanvas-carousel[data-variant="ken-burns"] .opencanvas-carousel-image {
   animation: opencanvas-ken-burns 14s ease-in-out infinite alternate;
 }
-.opencanvas-carousel[data-variant="editorial"] .opencanvas-carousel-caption {
-  padding: 28px 32px;
-  font-size: 18px;
-  font-weight: 600;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0));
+.opencanvas-element[data-element-type="carousel"][data-variant="editorial"] {
+  --opencanvas-carousel-caption-pad-y: 28px;
+  --opencanvas-carousel-caption-pad-x: 32px;
+  --opencanvas-carousel-caption-font-size: 18px;
+  --opencanvas-carousel-caption-font-weight: 600;
+  --opencanvas-carousel-caption-bg: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0));
 }
 /* coverflow: the carousel runtime publishes --opencanvas-slide-offset (signed
    distance to the active slide) per slide; CSS positions/scales/dims from it.
@@ -830,29 +918,27 @@ const variantCss = String.raw`
   to { transform: scale(1.12); }
 }
 
-/* ---- Form: classic = current. Each arm SETS the existing --opencanvas-form-*
-   custom properties on the OUTER wrapper, so it composes UNDER the granular
-   layer: formStyle is emitted inline on the inner <form> (closer → wins over
-   the variant) and pinnedStyle is inline on the wrapper (same element → beats
-   the stylesheet arm). Direct descendant declarations are used ONLY for the
-   handful of properties that have no --opencanvas-form-* contract (the
-   underline bottom-rule, the card field surface, the brutalist offset shadow). */
+/* ---- Form: classic = current. Each arm SETS --opencanvas-form-* custom
+   properties on the OUTER wrapper, so typed formStyle emitted inline on that
+   wrapper can override modeled values without proximity games. Direct
+   descendant declarations are used only for unmodeled structural treatments
+   (the underline bottom-rule, brutalist offset shadow, and spotlight layout). */
 .opencanvas-element[data-element-type="form"][data-variant="underline"] {
   --opencanvas-form-input-border-width: 0;
   --opencanvas-form-input-radius: 0;
+  --opencanvas-form-input-pad-x: 0;
 }
 .opencanvas-form[data-variant="underline"] .opencanvas-form-input,
 .opencanvas-form[data-variant="underline"] .opencanvas-form select {
   border-bottom: 1px solid var(--opencanvas-form-input-border-color, var(--opencanvas-hairline));
   background: transparent;
-  padding-left: 0;
-  padding-right: 0;
 }
-.opencanvas-form[data-variant="card"] .opencanvas-form-field {
-  padding: 14px 16px;
-  border-radius: var(--opencanvas-kit-radius, 10px);
-  background: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+.opencanvas-element[data-element-type="form"][data-variant="card"] {
+  --opencanvas-form-field-surface-pad-y: 14px;
+  --opencanvas-form-field-surface-pad-x: 16px;
+  --opencanvas-form-field-surface-radius: var(--opencanvas-kit-radius, 10px);
+  --opencanvas-form-field-surface-bg: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  --opencanvas-form-field-surface-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
 }
 .opencanvas-element[data-element-type="form"][data-variant="brutalist"] {
   --opencanvas-form-input-border-width: 2px;
@@ -879,8 +965,8 @@ const variantCss = String.raw`
   border-radius: var(--opencanvas-kit-radius, 12px);
   background:
     radial-gradient(
-      240px circle at var(--opencanvas-ptr-x, 50%) var(--opencanvas-ptr-y, 50%),
-      color-mix(in oklab, var(--opencanvas-kit-accent, #7dd3fc) 22%, transparent),
+      var(--opencanvas-form-spotlight-glow-size, 240px) circle at var(--opencanvas-ptr-x, 50%) var(--opencanvas-ptr-y, 50%),
+      color-mix(in oklab, var(--opencanvas-form-spotlight-glow-color, var(--opencanvas-kit-accent, #7dd3fc)) calc(var(--opencanvas-form-spotlight-glow-opacity, 0.22) * 100%), transparent),
       transparent 70%
     ),
     var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));

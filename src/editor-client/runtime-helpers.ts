@@ -45,7 +45,8 @@ import {
   mountCarouselSlides,
   mountTableGrid,
 } from './inspector-content-mounts.js';
-import { mountFormFields, mountFormStyle } from './inspector-form-mounts.js';
+import { mountComponentStyle } from './inspector-component-style.js';
+import { mountFormFields } from './inspector-form-mounts.js';
 import { mountMediaAi, mountVideoPlayback } from './inspector-media-mounts.js';
 import {
   mountTextFontFamily,
@@ -936,7 +937,8 @@ function inspectorMountHandler(
       mountNavLogo(ctx, element as Parameters<typeof mountNavLogo>[1], host),
     'chart-data': (element, host) => mountChartData(ctx, element as ChartElement, host),
     'form-fields': (element, host) => mountFormFields(ctx, element as FormElement, host),
-    'form-style': (element, host) => mountFormStyle(ctx, element as FormElement, host),
+    'form-style': (element, host) => mountComponentStyle(ctx, element, host),
+    'component-style': (element, host) => mountComponentStyle(ctx, element, host),
     'text-font-family': (element, host) => mountTextFontFamily(ctx, element, host),
   };
   return mounts[name] || null;

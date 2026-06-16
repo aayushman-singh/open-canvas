@@ -41,6 +41,7 @@ import { templateHasAnyPlaceholder } from '../canvas/elements/collection-materia
 import { renderSectionInspector } from './section-inspector.js';
 import { renderPageInspector, replayAnimations } from './page-inspector.js';
 import { field, selectInput } from './dom-builders.js';
+import { mountComponentStyle } from './inspector-component-style.js';
 import { buildColorRow, buildKitSummary } from './inspector-leaf-builders.js';
 
 export function renderInspector(ctx: EditorContext): void {
@@ -1348,6 +1349,8 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
     ctx.renderInspector();
   });
   inspector.appendChild(field('Display', displaySelect));
+
+  mountComponentStyle(ctx, collection, inspector);
 
   // -- 5b. Custom-template controls (ADR 0065 D9) -------------------------
   // Three buttons mapped to three intents: enter, exit, reset.

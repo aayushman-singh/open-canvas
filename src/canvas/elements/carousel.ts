@@ -23,6 +23,12 @@ import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
 import type { BaseElement } from '../schema.js';
+import {
+  CAROUSEL_STYLE_SPEC,
+  componentStylePatchProperty,
+  parseComponentStylePatchValue,
+  type ComponentStyleFontWeight,
+} from './component-style.js';
 import { escapeAttr, escapeHtml } from './render-utils.js';
 
 export interface CarouselSlide {
@@ -87,6 +93,22 @@ export type CarouselMode = (typeof CAROUSEL_MODES)[number];
 export const CAROUSEL_VARIANTS = ['classic', 'coverflow', 'ken-burns', 'editorial'] as const;
 export type CarouselVariant = (typeof CAROUSEL_VARIANTS)[number];
 
+export interface CarouselStyle {
+  captionBackgroundColor?: string;
+  captionColor?: string;
+  captionFontSize?: number;
+  captionFontWeight?: ComponentStyleFontWeight;
+  captionLineHeight?: number;
+  captionPaddingX?: number;
+  captionPaddingY?: number;
+  arrowBackgroundColor?: string;
+  arrowColor?: string;
+  arrowSize?: number;
+  dotBackgroundColor?: string;
+  dotActiveBackgroundColor?: string;
+  dotSize?: number;
+}
+
 export interface CarouselElement extends BaseElement {
   type: 'carousel';
   slides: CarouselSlide[];
@@ -99,6 +121,8 @@ export interface CarouselElement extends BaseElement {
   mode?: CarouselMode;
   /** ADR 0066 — visual preset. Absent resolves to `classic` (current look). */
   variant?: CarouselVariant;
+  /** ADR 0067 — sparse per-carousel Component Style overrides. */
+  carouselStyle?: CarouselStyle;
 }
 
 export interface CarouselRenderCtx {
@@ -272,6 +296,7 @@ export const carouselInspectorSpec: InspectorSpec = {
       options: CAROUSEL_ARROW_STYLES,
       defaultValue: 'round',
     },
+    { kind: 'custom-mount', name: 'component-style' },
   ],
 };
 
@@ -339,6 +364,7 @@ export const carouselAgentToolSpec: AgentToolSpec = {
         required: ['id', 'assetId'],
       },
     },
+    carouselStyle: componentStylePatchProperty(CAROUSEL_STYLE_SPEC),
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
@@ -373,6 +399,12 @@ export const carouselAgentToolSpec: AgentToolSpec = {
     if (args.slides !== undefined) {
       if (!Array.isArray(args.slides)) throw new Error('slides must be an array');
       patch.slides = args.slides;
+    }
+    if (args.carouselStyle !== undefined) {
+      patch.carouselStyle = parseComponentStylePatchValue(
+        args.carouselStyle,
+        CAROUSEL_STYLE_SPEC,
+      );
     }
     return patch;
   },

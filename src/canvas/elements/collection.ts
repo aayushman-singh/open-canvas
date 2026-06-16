@@ -21,6 +21,11 @@
 import type { BaseElement, CanvasElement } from '../schema.js';
 import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
+import {
+  COLLECTION_STYLE_SPEC,
+  componentStylePatchProperty,
+  parseComponentStylePatchValue,
+} from './component-style.js';
 import { escapeAttr, styleFromEntries } from './render-utils.js';
 
 /**
@@ -50,6 +55,19 @@ export type CollectionDisplay = (typeof COLLECTION_DISPLAYS)[number];
  */
 export const COLLECTION_SORTS = ['date-desc', 'date-asc', 'manual'] as const;
 export type CollectionSort = (typeof COLLECTION_SORTS)[number];
+
+export interface CollectionStyle {
+  gridGap?: number;
+  cardBackgroundColor?: string;
+  cardBorderColor?: string;
+  cardBorderWidth?: number;
+  cardBorderRadius?: number;
+  cardShadow?: string;
+  cardPadding?: number;
+  cardImageRadius?: number;
+  imageOnlyGap?: number;
+  imageOnlyRadius?: number;
+}
 
 export interface CollectionElement extends BaseElement {
   type: 'collection';
@@ -120,17 +138,14 @@ export interface CollectionElement extends BaseElement {
    * `CanvasElement[]` subtree.
    */
   customTemplate?: CanvasElement[];
+
+  /** ADR 0067 — sparse host-level Collection Component Style overrides. */
+  collectionStyle?: CollectionStyle;
 }
 
 export interface CollectionRenderCtx {
   styleKit: string;
   assetBasePath: string;
-  /**
-   * @deprecated ADR 0063 dec 6 — the new Collection renderer does not emit
-   * per-child wrappers (per-entry DOM is materializer output). Kept on the
-   * ctx so the existing `RENDER_DISPATCH` wiring in `elements/index.ts`
-   * compiles unchanged until the index rewires the dispatch shape.
-   */
   renderChild?: (element: CanvasElement) => string;
 }
 
@@ -150,23 +165,69 @@ export interface CollectionRenderCtx {
  * silently coercing because the no-fallback principle (CLAUDE.md) wants
  * the caller to see exactly which element is malformed.
  */
-export function renderCollection(el: CollectionElement, _ctx: CollectionRenderCtx): string {
+export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx): string {
+  const displayAttr = readDisplayString(el);
   const frameStyle = styleFromEntries([
-    ['display', 'block'],
+    ['display', 'flex'],
+    ['flex-wrap', 'wrap'],
+    [
+      'gap',
+      displayAttr === 'image-only'
+        ? 'var(--opencanvas-collection-image-only-gap, var(--opencanvas-collection-grid-gap, 16px))'
+        : 'var(--opencanvas-collection-grid-gap, 16px)',
+    ],
+    ['align-content', 'flex-start'],
     ['position', 'relative'],
   ]);
   const slugAttr = el.collectionSlug !== undefined ? escapeAttr(el.collectionSlug) : '';
   const folderAttr = el.folder !== undefined ? escapeAttr(el.folder) : '';
   const sortAttr = readSortString(el);
-  const displayAttr = readDisplayString(el);
+  const entriesHtml = renderCollectionEntries(el, ctx);
   return (
     `<div class="opencanvas-collection" data-opencanvas-interactive="collection"` +
     ` data-collection-display="${escapeAttr(displayAttr)}"` +
     ` data-collection-sort="${escapeAttr(sortAttr)}"` +
     ` data-collection-slug="${slugAttr}"` +
     ` data-collection-folder="${folderAttr}"` +
-    ` style="${escapeAttr(frameStyle)}"></div>`
+    ` style="${escapeAttr(frameStyle)}">${entriesHtml}</div>`
   );
+}
+
+function renderCollectionEntries(el: CollectionElement, ctx: CollectionRenderCtx): string {
+  const entries = el.entries ?? [];
+  if (entries.length === 0) return '';
+  if (typeof ctx.renderChild !== 'function') {
+    throw new Error(
+      `Collection element ${el.id}: renderChild is required when entries are materialized.`,
+    );
+  }
+  return entries
+    .map((entry, idx) => {
+      const bounds = entryBounds(entry);
+      const entryStyle = styleFromEntries([
+        ['position', 'relative'],
+        ['width', `${String(bounds.w)}px`],
+        ['height', `${String(bounds.h)}px`],
+        ['flex', '0 0 auto'],
+      ]);
+      const childrenHtml = entry.map((child) => ctx.renderChild!(child)).join('');
+      return (
+        `<div class="opencanvas-collection-entry"` +
+        ` data-opencanvas-collection-entry="${String(idx)}"` +
+        ` style="${escapeAttr(entryStyle)}">${childrenHtml}</div>`
+      );
+    })
+    .join('');
+}
+
+function entryBounds(entry: readonly CanvasElement[]): { w: number; h: number } {
+  let w = 0;
+  let h = 0;
+  for (const child of entry) {
+    w = Math.max(w, child.box.x + child.box.w);
+    h = Math.max(h, child.box.y + child.box.h);
+  }
+  return { w, h };
 }
 
 function readSortString(el: CollectionElement): CollectionSort {
@@ -196,14 +257,23 @@ function readDisplayString(el: CollectionElement): CollectionDisplay {
 
 export const COLLECTION_RECIPE_ID = 'collection-grid' as const;
 
-// Collection has no per-type agent surface: the LLM cannot directly add or
-// update a collection via the cross-element tools. Shared fields (box,
-// motion, elementStyle) still apply via updateElement at canvas-tools.ts.
-// The empty spec exists so the dispatch can satisfy its mapped-type contract
-// without forcing the canvas-tools merger to special-case "missing entry."
+// The agent surface is intentionally narrow: it can set sparse host-level
+// CollectionStyle fields, while source binding / entry management stay owned
+// by the dashboard and Collection inspector workflows.
 export const collectionAgentToolSpec: AgentToolSpec = {
-  patchProperties: {},
-  parsePatch: () => ({}),
+  patchProperties: {
+    collectionStyle: componentStylePatchProperty(COLLECTION_STYLE_SPEC),
+  },
+  parsePatch: (args) => {
+    const patch: Record<string, unknown> = {};
+    if (args.collectionStyle !== undefined) {
+      patch.collectionStyle = parseComponentStylePatchValue(
+        args.collectionStyle,
+        COLLECTION_STYLE_SPEC,
+      );
+    }
+    return patch;
+  },
 };
 
 // Collection has no per-element sidebar command: bare CollectionElement

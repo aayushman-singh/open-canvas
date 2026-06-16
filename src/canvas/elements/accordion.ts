@@ -24,6 +24,11 @@ import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
 import type { BaseElement, InlineRun } from '../schema.js';
+import {
+  ACCORDION_STYLE_SPEC,
+  componentStylePatchProperty,
+  parseComponentStylePatchValue,
+} from './component-style.js';
 import { escapeAttr, escapeHtml, renderInlineRun } from './render-utils.js';
 
 export interface AccordionItem {
@@ -41,12 +46,32 @@ export interface AccordionItem {
 export const ACCORDION_VARIANTS = ['list', 'bordered', 'cards', 'filled'] as const;
 export type AccordionVariant = (typeof ACCORDION_VARIANTS)[number];
 
+export interface AccordionStyle {
+  gap?: number;
+  itemBackgroundColor?: string;
+  itemBorderColor?: string;
+  itemBorderWidth?: number;
+  itemBorderRadius?: number;
+  itemShadow?: string;
+  headerBackgroundColor?: string;
+  headerColor?: string;
+  headerPaddingX?: number;
+  headerPaddingY?: number;
+  bodyColor?: string;
+  bodyFontSize?: number;
+  bodyLineHeight?: number;
+  bodyPaddingX?: number;
+  bodyPaddingY?: number;
+}
+
 export interface AccordionElement extends BaseElement {
   type: 'accordion';
   items: AccordionItem[];
   allowMultipleOpen: boolean;
   /** ADR 0066 — visual preset. Absent resolves to `list` (current look). */
   variant?: AccordionVariant;
+  /** ADR 0067 — sparse per-accordion Component Style overrides. */
+  accordionStyle?: AccordionStyle;
 }
 
 export interface AccordionRenderCtx {
@@ -123,6 +148,7 @@ export const accordionInspectorSpec: InspectorSpec = {
     // three data points).
     { kind: 'custom-mount', name: 'accordion-items' },
     { kind: 'select', label: 'Style', path: 'variant', options: ACCORDION_VARIANTS },
+    { kind: 'custom-mount', name: 'component-style' },
     { kind: 'checkbox', label: 'Allow multiple open', path: 'allowMultipleOpen' },
   ],
 };
@@ -163,6 +189,7 @@ export const accordionAgentToolSpec: AgentToolSpec = {
         required: ['id', 'title', 'body'],
       },
     },
+    accordionStyle: componentStylePatchProperty(ACCORDION_STYLE_SPEC),
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
@@ -179,6 +206,12 @@ export const accordionAgentToolSpec: AgentToolSpec = {
     if (args.items !== undefined) {
       if (!Array.isArray(args.items)) throw new Error('items must be an array');
       patch.items = args.items;
+    }
+    if (args.accordionStyle !== undefined) {
+      patch.accordionStyle = parseComponentStylePatchValue(
+        args.accordionStyle,
+        ACCORDION_STYLE_SPEC,
+      );
     }
     return patch;
   },

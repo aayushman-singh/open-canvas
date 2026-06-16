@@ -190,6 +190,7 @@ const REGISTERED_MOUNTS = [
   'chart-data',
   'form-fields',
   'form-style',
+  'component-style',
   'text-font-family',
 ] as const;
 
