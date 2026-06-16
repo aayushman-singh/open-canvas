@@ -29,6 +29,7 @@ import type { PublishedSnapshot } from '../canvas/schema.js';
 import { INTERACTIVE_RUNTIME_SRC, INTERACTIVE_RUNTIME_SRC_CHARS } from './build.js';
 import { injectInteractiveRuntime, snapshotNeedsInteractiveRuntime } from './inject.js';
 import { ANIMEJS_WAAPI_RUNTIME_SRC } from './vendor/animejs-waapi.generated.js';
+import { FLOATING_UI_DOM_RUNTIME_SRC } from './vendor/floating-ui-dom.generated.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[interactive:smoke] ${message}`);
@@ -326,6 +327,10 @@ function makeEvent(type: string, init: { key?: string } = {}): StubEvent {
   return event;
 }
 
+async function flushMicrotasks(turns = 5): Promise<void> {
+  for (let i = 0; i < turns; i++) await Promise.resolve();
+}
+
 // Execute the runtime IIFE against a stub document. The IIFE references the
 // global `document` via the runtime entry; we pass our stub in as a parameter
 // to `new Function` and the body references it directly.
@@ -342,17 +347,17 @@ function runRuntimeAgainstDocument(doc: StubDocument, source = INTERACTIVE_RUNTI
   fn(doc);
 }
 
-function withoutGlobalAnimeAdapter(fn: () => void): void {
+function withoutGlobalAdapter(globalName: string, fn: () => void): void {
   const globals = globalThis as Record<string, unknown>;
-  const previous = globals.__opencanvasAnime;
-  delete globals.__opencanvasAnime;
+  const previous = globals[globalName];
+  delete globals[globalName];
   try {
     fn();
   } finally {
     if (previous === undefined) {
-      delete globals.__opencanvasAnime;
+      delete globals[globalName];
     } else {
-      globals.__opencanvasAnime = previous;
+      globals[globalName] = previous;
     }
   }
 }
@@ -453,6 +458,7 @@ assert(
 );
 assert(injectedHtml.includes('hydrateAccordion'), 'runtime body missing hydrateAccordion fn');
 assert(injectedHtml.includes('hydrateCarousel'), 'runtime body missing hydrateCarousel fn');
+assert(injectedHtml.includes('__opencanvasFloating'), 'runtime body missing Floating UI adapter');
 
 // First item open by default (assertion lives here so the renderer can change
 // the default state behaviour and a single line tells you).
@@ -912,6 +918,14 @@ const designerSnapshot = {
               variant: 'solid',
             },
             {
+              id: 'open-popover',
+              type: 'action',
+              box: { x: 280, y: 240, w: 180, h: 48, z: 2 },
+              label: [{ text: 'Open popover' }],
+              href: { type: 'external', url: 'https://example.com/popover' },
+              variant: 'outline',
+            },
+            {
               id: 'hero-lottie-owner',
               type: 'media',
               box: { x: 720, y: 72, w: 320, h: 320, z: 1 },
@@ -940,6 +954,24 @@ const designerSnapshot = {
           content: [{ text: 'Project detail' }],
           role: 'heading',
           fontSize: 36,
+          fontWeight: 700,
+          align: 'left',
+        },
+      ],
+    },
+    {
+      id: 'overlay-popover-section',
+      recipeId: 'custom',
+      name: 'Project Popover Overlay',
+      height: 220,
+      elements: [
+        {
+          id: 'overlay-popover-title',
+          type: 'text',
+          box: { x: 32, y: 32, w: 320, h: 56, z: 1 },
+          content: [{ text: 'Anchored popover' }],
+          role: 'heading',
+          fontSize: 28,
           fontWeight: 700,
           align: 'left',
         },
@@ -981,6 +1013,25 @@ const designerSnapshot = {
       },
       bodyScroll: 'lock',
     },
+    {
+      id: 'project-popover',
+      contentSectionId: 'overlay-popover-section',
+      trigger: { type: 'click', elementId: 'open-popover' },
+      modality: 'non-modal',
+      placement: { type: 'anchored', anchorElementId: 'open-popover', side: 'right' },
+      dismissal: {
+        closeButton: true,
+        escapeKey: true,
+        backdropClick: true,
+        routeChange: true,
+      },
+      focus: {
+        initial: { type: 'overlay' },
+        returnTo: { type: 'trigger' },
+        trap: false,
+      },
+      bodyScroll: 'allow',
+    },
   ],
   richMotionAssets: [
     {
@@ -1018,26 +1069,75 @@ const designerTitle = designerDoc.querySelector(
 const designerTrigger = designerDoc.querySelector(
   '[data-opencanvas-element="open-project"]',
 ) as StubElement;
+const designerPopoverTrigger = designerDoc.querySelector(
+  '[data-opencanvas-element="open-popover"]',
+) as StubElement;
 const designerOverlay = designerDoc.querySelector(
   '[data-opencanvas-overlay="project-detail"]',
+) as StubElement;
+const designerPopover = designerDoc.querySelector(
+  '[data-opencanvas-overlay="project-popover"]',
 ) as StubElement;
 const designerClose = designerDoc.querySelector(
   '[data-opencanvas-overlay-close="project-detail"]',
 ) as StubElement;
+const designerPopoverClose = designerDoc.querySelector(
+  '[data-opencanvas-overlay-close="project-popover"]',
+) as StubElement;
+const designerPopoverPanel = designerPopover
+  ? designerPopover.querySelector('[data-opencanvas-overlay-panel]')
+  : null;
 const designerRich = designerDoc.querySelector(
   '[data-opencanvas-rich-motion="hero-lottie"]',
 ) as StubElement;
 assert(designerTitle !== null, 'designer title target must exist');
 assert(designerTrigger !== null, 'designer overlay trigger target must exist');
+assert(designerPopoverTrigger !== null, 'designer popover trigger target must exist');
 assert(designerOverlay !== null, 'designer overlay shell must exist');
+assert(designerPopover !== null, 'designer popover shell must exist');
 assert(designerClose !== null, 'designer overlay close control must exist');
+assert(designerPopoverClose !== null, 'designer popover close control must exist');
+assert(designerPopoverPanel !== null, 'designer popover panel must exist');
 assert(designerRich !== null, 'designer rich-motion owner must exist');
 
 let richMotionFailures = 0;
 designerRich.addEventListener('opencanvas:rich-motion-failure', () => {
   richMotionFailures++;
 });
+let floatingAutoUpdateCalls = 0;
+let floatingCleanupCalls = 0;
+let floatingComputeCalls = 0;
+designerDoc.defaultView.__opencanvasFloating = {
+  autoUpdate(_reference: unknown, _floating: unknown, update: () => unknown) {
+    floatingAutoUpdateCalls++;
+    void update();
+    return () => {
+      floatingCleanupCalls++;
+    };
+  },
+  computePosition(_reference: unknown, _floating: unknown, options: { placement?: string }) {
+    floatingComputeCalls++;
+    assert(options.placement === 'right', 'anchored overlay should pass schema side as placement');
+    return Promise.resolve({ x: 321, y: 123, placement: 'right' });
+  },
+  flip() {
+    return { name: 'flip' };
+  },
+  offset(value: unknown) {
+    return { name: 'offset', value };
+  },
+  shift(options: unknown) {
+    return { name: 'shift', options };
+  },
+};
 runRuntimeAgainstDocument(designerDoc);
+const generatedFloatingAdapter = (globalThis as Record<string, unknown>).__opencanvasFloating as
+  | { computePosition?: unknown }
+  | undefined;
+assert(
+  typeof generatedFloatingAdapter?.computePosition === 'function',
+  'generated Floating UI runtime should register global computePosition adapter',
+);
 
 assert(designerTitle.animations.length > 0, 'load motion should create WAAPI animations');
 assert(
@@ -1080,6 +1180,44 @@ assert(
 assert(
   designerDoc.body.style.getPropertyValue('overflow') === '',
   'closing the modal overlay should release body scroll lock',
+);
+
+designerPopoverTrigger.dispatchEvent(makeEvent('click'));
+await flushMicrotasks();
+assert(
+  designerPopover.getAttribute('hidden') === null,
+  'anchored overlay trigger click should remove hidden from the overlay shell',
+);
+assert(
+  designerPopover.getAttribute('data-opencanvas-overlay-open') === 'true',
+  'anchored overlay trigger click should mark the overlay open',
+);
+assert(
+  floatingAutoUpdateCalls === 1,
+  'anchored overlay should subscribe to Floating UI autoUpdate',
+);
+assert(floatingComputeCalls >= 1, 'anchored overlay should compute position through Floating UI');
+assert(
+  designerPopoverPanel.style.getPropertyValue('left') === '321px',
+  'anchored overlay should apply Floating UI computed left',
+);
+assert(
+  designerPopoverPanel.style.getPropertyValue('top') === '123px',
+  'anchored overlay should apply Floating UI computed top',
+);
+assert(
+  designerPopover.getAttribute('data-opencanvas-overlay-position-adapter') === 'floating-ui-dom',
+  'anchored overlay should mark the Floating UI adapter',
+);
+assert(
+  designerPopover.getAttribute('data-opencanvas-overlay-placement-resolved') === 'right',
+  'anchored overlay should mark the resolved placement',
+);
+designerPopoverClose.dispatchEvent(makeEvent('click'));
+assert(floatingCleanupCalls === 1, 'anchored overlay close should clean up Floating UI autoUpdate');
+assert(
+  designerPopover.getAttribute('hidden') !== null,
+  'anchored overlay close control should restore hidden on the overlay shell',
 );
 
 const noAnimateDoc = new StubDocument();
@@ -1142,7 +1280,9 @@ assert(
   runtimeWithoutAnime.length < INTERACTIVE_RUNTIME_SRC.length,
   'test runtime should remove the generated Anime adapter',
 );
-withoutGlobalAnimeAdapter(() => runRuntimeAgainstDocument(missingAdapterDoc, runtimeWithoutAnime));
+withoutGlobalAdapter('__opencanvasAnime', () =>
+  runRuntimeAgainstDocument(missingAdapterDoc, runtimeWithoutAnime),
+);
 assert(adapterUnavailableFailures === 1, 'missing Anime adapter should emit one failure event');
 assert(
   missingAdapterTitle.getAttribute('data-opencanvas-motion-failed') === 'adapter-unavailable',
@@ -1151,6 +1291,110 @@ assert(
 assert(
   missingAdapterTitle.getAttribute('data-opencanvas-motion-played') === null,
   'missing Anime adapter must not mark the sequence as played',
+);
+
+const missingFloatingDoc = new StubDocument();
+const missingFloatingParsed = parseHtml(designerHtml);
+for (const child of missingFloatingParsed.children) missingFloatingDoc.root.appendChild(child);
+const missingFloatingTrigger = missingFloatingDoc.querySelector(
+  '[data-opencanvas-element="open-popover"]',
+) as StubElement;
+const missingFloatingOverlay = missingFloatingDoc.querySelector(
+  '[data-opencanvas-overlay="project-popover"]',
+) as StubElement;
+let floatingFailures = 0;
+missingFloatingOverlay.addEventListener('opencanvas:overlay-position-failure', (event) => {
+  floatingFailures++;
+  const detail = event.detail as { phase?: string; detail?: { adapter?: string } };
+  assert(
+    detail.phase === 'adapter-unavailable',
+    'missing Floating UI adapter should name the unavailable phase',
+  );
+  assert(
+    detail.detail?.adapter === 'floating-ui-dom',
+    'missing Floating UI adapter failure should name the adapter',
+  );
+});
+const runtimeWithoutFloating = INTERACTIVE_RUNTIME_SRC.replace(FLOATING_UI_DOM_RUNTIME_SRC, '');
+assert(
+  runtimeWithoutFloating.length < INTERACTIVE_RUNTIME_SRC.length,
+  'test runtime should remove the generated Floating UI adapter',
+);
+withoutGlobalAdapter('__opencanvasFloating', () => {
+  runRuntimeAgainstDocument(missingFloatingDoc, runtimeWithoutFloating);
+  missingFloatingTrigger.dispatchEvent(makeEvent('click'));
+});
+assert(floatingFailures === 1, 'missing Floating UI adapter should emit one failure event');
+assert(
+  missingFloatingOverlay.getAttribute('hidden') !== null,
+  'missing Floating UI adapter should leave the anchored overlay hidden',
+);
+assert(
+  missingFloatingOverlay.getAttribute('data-opencanvas-overlay-open') === null,
+  'missing Floating UI adapter must not mark the anchored overlay open',
+);
+assert(
+  missingFloatingOverlay.getAttribute('data-opencanvas-overlay-position-failed') ===
+    'adapter-unavailable',
+  'missing Floating UI adapter should mark the overlay as failed',
+);
+
+const rejectingFloatingDoc = new StubDocument();
+const rejectingFloatingParsed = parseHtml(designerHtml);
+for (const child of rejectingFloatingParsed.children) rejectingFloatingDoc.root.appendChild(child);
+const rejectingFloatingTrigger = rejectingFloatingDoc.querySelector(
+  '[data-opencanvas-element="open-popover"]',
+) as StubElement;
+const rejectingFloatingOverlay = rejectingFloatingDoc.querySelector(
+  '[data-opencanvas-overlay="project-popover"]',
+) as StubElement;
+let rejectingFloatingFailures = 0;
+rejectingFloatingOverlay.addEventListener('opencanvas:overlay-position-failure', (event) => {
+  rejectingFloatingFailures++;
+  const detail = event.detail as { phase?: string; detail?: { adapter?: string } };
+  assert(detail.phase === 'position-error', 'Floating UI rejection should name position-error');
+  assert(
+    detail.detail?.adapter === 'floating-ui-dom',
+    'Floating UI rejection should name the adapter',
+  );
+});
+rejectingFloatingDoc.defaultView.__opencanvasFloating = {
+  autoUpdate(_reference: unknown, _floating: unknown, update: () => unknown) {
+    void update;
+    return () => undefined;
+  },
+  computePosition() {
+    return Promise.reject(new Error('layout unavailable'));
+  },
+  flip() {
+    return { name: 'flip' };
+  },
+  offset(value: unknown) {
+    return { name: 'offset', value };
+  },
+  shift(options: unknown) {
+    return { name: 'shift', options };
+  },
+};
+runRuntimeAgainstDocument(rejectingFloatingDoc);
+rejectingFloatingTrigger.dispatchEvent(makeEvent('click'));
+await flushMicrotasks();
+assert(
+  rejectingFloatingFailures === 1,
+  'Floating UI compute rejection should emit one failure event',
+);
+assert(
+  rejectingFloatingOverlay.getAttribute('hidden') !== null,
+  'Floating UI compute rejection should leave the anchored overlay hidden',
+);
+assert(
+  rejectingFloatingOverlay.getAttribute('data-opencanvas-overlay-open') === null,
+  'Floating UI compute rejection must not mark the anchored overlay open',
+);
+assert(
+  rejectingFloatingOverlay.getAttribute('data-opencanvas-overlay-position-failed') ===
+    'position-error',
+  'Floating UI compute rejection should mark the overlay as failed',
 );
 
 // ---------------------------------------------------------------------------

@@ -31,6 +31,7 @@ import { POPUP_RUNTIME_SRC } from './popup.js';
 import { RICH_MOTION_RUNTIME_SRC } from './rich-motion.js';
 import { RUNTIME_ENTRY_SRC } from './runtime.js';
 import { ANIMEJS_WAAPI_RUNTIME_SRC } from './vendor/animejs-waapi.generated.js';
+import { FLOATING_UI_DOM_RUNTIME_SRC } from './vendor/floating-ui-dom.generated.js';
 
 /**
  * The full interactive runtime as an IIFE string. Stable across builds — same
@@ -45,6 +46,7 @@ export const INTERACTIVE_RUNTIME_SRC: string = [
   POINTER_FX_RUNTIME_SRC,
   POPUP_RUNTIME_SRC,
   DESIGNER_MOTION_RUNTIME_SRC,
+  FLOATING_UI_DOM_RUNTIME_SRC,
   OVERLAY_RUNTIME_SRC,
   RICH_MOTION_RUNTIME_SRC,
   RUNTIME_ENTRY_SRC,

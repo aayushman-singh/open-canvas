@@ -193,6 +193,7 @@
   },
   "dependencies": {
     "@clerk/backend": "^3.4.11",
+    "@floating-ui/dom": "^1.7.6",
     "@google/genai": "2.5.0",
     "@neondatabase/serverless": "^1.1.0",
     "@resvg/resvg-wasm": "2.6.2",
