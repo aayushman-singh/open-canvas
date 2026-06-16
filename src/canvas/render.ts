@@ -13,6 +13,7 @@
 // renderer never has to know how Owner Assets are addressed.
 
 import { renderElementBody, type ElementRenderCtx } from './elements/index.js';
+import { componentStyleEntriesForElement } from './elements/component-style.js';
 import {
   escapeAttr,
   escapeCssValue,
@@ -125,6 +126,9 @@ function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string)
       if (safeValue === '') continue;
       entries.push([safeKey, safeValue]);
     }
+  }
+  for (const [key, value] of componentStyleEntriesForElement(element)) {
+    entries.push([key, value]);
   }
   // CSS variable read by the kit's [data-motion-preset] rules to drive
   // animation-delay. Without this, every element animation on a page started

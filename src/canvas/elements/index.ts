@@ -57,9 +57,9 @@ export type {
   ShapeElement,
   TextElement,
 } from '../schema.js';
-export type { AccordionElement, AccordionItem, AccordionVariant } from './accordion.js';
+export type { AccordionElement, AccordionItem, AccordionStyle, AccordionVariant } from './accordion.js';
 export { ACCORDION_VARIANTS } from './accordion.js';
-export type { CarouselElement, CarouselSlide, CarouselVariant } from './carousel.js';
+export type { CarouselElement, CarouselSlide, CarouselStyle, CarouselVariant } from './carousel.js';
 export { CAROUSEL_VARIANTS } from './carousel.js';
 export type { ChartElement, ChartKind, ChartSeries } from './chart.js';
 export type { CodeElement, CodeLanguage } from './code.js';
@@ -80,8 +80,9 @@ export type {
   CollectionDisplay,
   CollectionElement,
   CollectionSort,
+  CollectionStyle,
 } from './collection.js';
-export type { Tab, TabsElement, TabsVariant } from './tabs.js';
+export type { Tab, TabsElement, TabsStyle, TabsVariant } from './tabs.js';
 export { TABS_DEFAULT_BAR_HEIGHT, TABS_VARIANTS } from './tabs.js';
 
 // Re-export recipe id constants so the recipes module + smoke tests can

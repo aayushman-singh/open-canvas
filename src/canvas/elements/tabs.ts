@@ -18,6 +18,12 @@
 import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
+import {
+  componentStylePatchProperty,
+  parseComponentStylePatchValue,
+  TABS_STYLE_SPEC,
+  type ComponentStyleFontWeight,
+} from './component-style.js';
 import { escapeAttr, renderInlineRun, styleFromEntries } from './render-utils.js';
 import type { BaseElement, CanvasElement, InlineRun } from '../schema.js';
 
@@ -40,6 +46,27 @@ export interface Tab {
 export const TABS_VARIANTS = ['classic', 'underline', 'pill', 'segmented'] as const;
 export type TabsVariant = (typeof TABS_VARIANTS)[number];
 
+export interface TabsStyle {
+  barGap?: number;
+  barBackgroundColor?: string;
+  barBorderColor?: string;
+  barBorderWidth?: number;
+  barRadius?: number;
+  tabPaddingX?: number;
+  tabPaddingY?: number;
+  tabRadius?: number;
+  tabColor?: string;
+  tabFontWeight?: ComponentStyleFontWeight;
+  activeTabBackgroundColor?: string;
+  activeTabColor?: string;
+  activeTabFontWeight?: ComponentStyleFontWeight;
+  activeIndicatorColor?: string;
+  panelBackgroundColor?: string;
+  panelBorderColor?: string;
+  panelBorderWidth?: number;
+  panelRadius?: number;
+}
+
 export interface TabsElement extends BaseElement {
   type: 'tabs';
   /** Length ≥ 2 — single-tab `TabsElement` is structurally a Container with a label. */
@@ -50,6 +77,8 @@ export interface TabsElement extends BaseElement {
   tabBarHeight?: number;
   /** ADR 0066 — visual preset. Absent resolves to `classic` (current look). */
   variant?: TabsVariant;
+  /** ADR 0067 — sparse per-tabs Component Style overrides. */
+  tabsStyle?: TabsStyle;
 }
 
 /** Default bar height when `tabBarHeight` is unset. ADR 0052 dec 3 rationale. */
@@ -117,6 +146,7 @@ export const tabsInspectorSpec: InspectorSpec = {
       path: 'tabBarHeight',
       min: 1,
     },
+    { kind: 'custom-mount', name: 'component-style' },
   ],
 };
 
@@ -153,6 +183,7 @@ export const tabsAgentToolSpec: AgentToolSpec = {
       type: 'number',
       description: `Bar height in px. Default ${String(TABS_DEFAULT_BAR_HEIGHT)} when unset.`,
     },
+    tabsStyle: componentStylePatchProperty(TABS_STYLE_SPEC),
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
@@ -171,6 +202,9 @@ export const tabsAgentToolSpec: AgentToolSpec = {
         throw new Error('tabBarHeight must be a finite number');
       }
       patch.tabBarHeight = args.tabBarHeight;
+    }
+    if (args.tabsStyle !== undefined) {
+      patch.tabsStyle = parseComponentStylePatchValue(args.tabsStyle, TABS_STYLE_SPEC);
     }
     return patch;
   },

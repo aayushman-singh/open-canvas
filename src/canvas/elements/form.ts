@@ -17,7 +17,12 @@
 import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
-import { escapeAttr, escapeCssValue, escapeHtml } from './render-utils.js';
+import {
+  componentStylePatchProperty,
+  FORM_STYLE_SPEC,
+  parseComponentStylePatchValue,
+} from './component-style.js';
+import { escapeAttr, escapeHtml } from './render-utils.js';
 import type { BaseElement } from '../schema.js';
 
 export type FormFieldKind = 'text' | 'email' | 'textarea' | 'checkbox' | 'select';
@@ -94,6 +99,16 @@ export interface FormStyle {
   submitFontSize?: number;
   submitFontWeight?: FormFontWeight;
   submitFullWidth?: boolean;
+  fieldSurfaceBackgroundColor?: string;
+  fieldSurfaceBorderColor?: string;
+  fieldSurfaceBorderWidth?: number;
+  fieldSurfaceBorderRadius?: number;
+  fieldSurfaceShadow?: string;
+  fieldSurfacePaddingX?: number;
+  fieldSurfacePaddingY?: number;
+  spotlightGlowColor?: string;
+  spotlightGlowSize?: number;
+  spotlightGlowOpacity?: number;
 }
 
 export interface FormElement extends BaseElement {
@@ -205,77 +220,14 @@ function renderField(field: FormFieldDef, formId: string): string {
 }
 
 /**
- * Map a FormStyle into a `style="..."` fragment of CSS-variable declarations
- * plus a `data-opencanvas-form-submit-full="1"` flag when submitFullWidth is on.
- * Returns an empty string for both when formStyle is absent — keeps the
- * default render byte-identical to pre-formStyle output.
+ * Map non-CSS-variable FormStyle behavior into DOM flags. Component Style CSS
+ * variables are emitted on the outer .opencanvas-element wrapper by render.ts
+ * so the cascade is variant < pinnedStyle < Component Style (ADR 0067).
  */
 function formStyleAttrs(fs: FormStyle | undefined): { styleAttr: string; flagAttr: string } {
   if (!fs) return { styleAttr: '', flagAttr: '' };
-  const decls: string[] = [];
-  const pushString = (name: string, value: string | undefined) => {
-    if (value === undefined) return;
-    const safe = escapeCssValue(value);
-    if (safe === '') return;
-    decls.push(`${name}:${safe}`);
-  };
-  const pushPx = (name: string, value: number | undefined) => {
-    if (value === undefined || !Number.isFinite(value)) return;
-    decls.push(`${name}:${String(value)}px`);
-  };
-  const pushRaw = (name: string, value: string) => {
-    decls.push(`${name}:${value}`);
-  };
-
-  if (fs.fontFamily !== undefined && fs.fontFamily !== 'inherit') {
-    if (fs.fontFamily === 'kit-display')
-      pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-display, inherit)');
-    else if (fs.fontFamily === 'kit-body')
-      pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-body, inherit)');
-    else if (fs.fontFamily === 'kit-mono')
-      pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-mono, inherit)');
-    else if (fs.fontFamily === 'custom')
-      pushString('--opencanvas-form-font-family', fs.fontFamilyCustom);
-  }
-  pushPx('--opencanvas-form-font-size', fs.fontSize);
-  pushPx('--opencanvas-form-gap', fs.fieldGap);
-
-  pushString('--opencanvas-form-label-color', fs.labelColor);
-  pushPx('--opencanvas-form-label-size', fs.labelFontSize);
-  if (fs.labelFontWeight !== undefined) {
-    const w =
-      fs.labelFontWeight === 'normal' ? '400' : fs.labelFontWeight === 'medium' ? '500' : '700';
-    pushRaw('--opencanvas-form-label-weight', w);
-  }
-
-  pushString('--opencanvas-form-input-bg', fs.inputBackgroundColor);
-  pushString('--opencanvas-form-input-color', fs.inputColor);
-  pushString('--opencanvas-form-input-border-color', fs.inputBorderColor);
-  pushPx('--opencanvas-form-input-border-width', fs.inputBorderWidth);
-  pushPx('--opencanvas-form-input-radius', fs.inputBorderRadius);
-  pushPx('--opencanvas-form-input-pad-x', fs.inputPaddingX);
-  pushPx('--opencanvas-form-input-pad-y', fs.inputPaddingY);
-  pushString('--opencanvas-form-placeholder-color', fs.inputPlaceholderColor);
-  pushString('--opencanvas-form-focus-ring', fs.inputFocusRingColor);
-
-  pushString('--opencanvas-form-submit-bg', fs.submitBackgroundColor);
-  pushString('--opencanvas-form-submit-color', fs.submitColor);
-  pushString('--opencanvas-form-submit-hover-bg', fs.submitHoverBackgroundColor);
-  pushString('--opencanvas-form-submit-border-color', fs.submitBorderColor);
-  pushPx('--opencanvas-form-submit-border-width', fs.submitBorderWidth);
-  pushPx('--opencanvas-form-submit-radius', fs.submitBorderRadius);
-  pushPx('--opencanvas-form-submit-pad-x', fs.submitPaddingX);
-  pushPx('--opencanvas-form-submit-pad-y', fs.submitPaddingY);
-  pushPx('--opencanvas-form-submit-size', fs.submitFontSize);
-  if (fs.submitFontWeight !== undefined) {
-    const w =
-      fs.submitFontWeight === 'normal' ? '400' : fs.submitFontWeight === 'medium' ? '500' : '700';
-    pushRaw('--opencanvas-form-submit-weight', w);
-  }
-
-  const styleAttr = decls.length === 0 ? '' : ` style="${decls.join(';')}"`;
   const flagAttr = fs.submitFullWidth ? ' data-opencanvas-form-submit-full="1"' : '';
-  return { styleAttr, flagAttr };
+  return { styleAttr: '', flagAttr };
 }
 
 export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
@@ -397,11 +349,9 @@ export const formInspectorSpec: InspectorSpec = {
       placeholder: 'https://...',
       noRebuild: true,
     },
-    // Per-form visual customisation — typography, label, input, and submit
-    // button overrides. Custom-mount because the section contains several
-    // nested disclosure groups; expressing every nested control declaratively
-    // would balloon InspectorSpec without adding navigability.
-    { kind: 'custom-mount', name: 'form-style' },
+    // ADR 0067 — generic Component Style mount fed by the per-element field
+    // catalog. Form controls add mode-aware field-surface / spotlight groups.
+    { kind: 'custom-mount', name: 'component-style' },
   ],
 };
 
@@ -455,6 +405,7 @@ export const formAgentToolSpec: AgentToolSpec = {
         required: ['id', 'label', 'kind', 'required'],
       },
     },
+    formStyle: componentStylePatchProperty(FORM_STYLE_SPEC),
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
@@ -479,6 +430,9 @@ export const formAgentToolSpec: AgentToolSpec = {
     if (args.fields !== undefined) {
       if (!Array.isArray(args.fields)) throw new Error('fields must be an array');
       patch.fields = args.fields;
+    }
+    if (args.formStyle !== undefined) {
+      patch.formStyle = parseComponentStylePatchValue(args.formStyle, FORM_STYLE_SPEC);
     }
     return patch;
   },

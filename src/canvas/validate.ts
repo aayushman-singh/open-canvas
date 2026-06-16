@@ -12,16 +12,21 @@ import type { CollectionDisplay, CollectionSort } from './elements/collection.js
 import { escapeCssValue } from './elements/render-utils.js';
 import { isAllowedHref } from './action-href.js';
 import {
-  FORM_FONT_FAMILIES,
-  FORM_FONT_WEIGHTS,
   FORM_VARIANTS,
-  type FormFontFamily,
-  type FormFontWeight,
 } from './elements/form.js';
 import { ICON_NAMES, isIconName } from './icons.js';
 import { TABS_DEFAULT_BAR_HEIGHT, TABS_VARIANTS } from './elements/tabs.js';
 import { CAROUSEL_MODES, CAROUSEL_VARIANTS } from './elements/carousel.js';
 import { NAV_LAYOUTS, NAV_LINK_KINDS, type NavLayout, type NavLinkKind } from './elements/nav.js';
+import {
+  ACCORDION_STYLE_SPEC,
+  CAROUSEL_STYLE_SPEC,
+  COLLECTION_STYLE_SPEC,
+  COMPONENT_STYLE_FONT_WEIGHTS,
+  FORM_STYLE_SPEC,
+  TABS_STYLE_SPEC,
+  type ComponentStyleSpec,
+} from './elements/component-style.js';
 
 // Re-export the canonical href allowlist so existing consumers (agent
 // parsers, etc.) that import from './canvas/validate.js' keep working. The
@@ -525,79 +530,73 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
   }
 }
 
-// Per-form visual customisation. Every field optional; numeric fields must be
-// finite + non-negative; string fields go through the same pinned-style safety
-// rules elementStyle uses so a malicious value cannot break out of the CSS
-// declaration the renderer emits.
-function validateFormStyle(value: unknown, basePath: string, errors: string[]): void {
+function validateComponentStyleObject(
+  value: unknown,
+  spec: ComponentStyleSpec,
+  basePath: string,
+  errors: string[],
+  pinnedStyle: unknown,
+): void {
   if (value === undefined) return;
   if (!isRecord(value)) {
-    errors.push(`${basePath}.formStyle must be an object when present`);
+    errors.push(`${basePath}.${spec.styleKey} must be an object when present`);
     return;
   }
-  const p = `${basePath}.formStyle`;
-
-  const nonNegativeNumber = (field: string, v: unknown): void => {
-    if (v === undefined) return;
-    if (!isFiniteNumber(v) || v < 0) {
-      errors.push(`${p}.${field} must be a non-negative finite number`);
+  const p = `${basePath}.${spec.styleKey}`;
+  const knownFields = new Map(spec.fields.map((field) => [field.key, field]));
+  for (const key of Object.keys(value)) {
+    if (!knownFields.has(key)) {
+      errors.push(`${p}.${key} is not a supported Component Style field`);
     }
-  };
-  const safeString = (field: string, v: unknown): void => {
-    if (v === undefined) return;
-    validateInjectionSafeString(v, field, p, errors);
-  };
-
-  if (value.fontFamily !== undefined) {
-    assertOneOf<FormFontFamily>(value.fontFamily, FORM_FONT_FAMILIES, `${p}.fontFamily`, errors);
   }
-  safeString('fontFamilyCustom', value.fontFamilyCustom);
+
+  const pinned = isRecord(pinnedStyle) ? pinnedStyle : null;
+  for (const field of spec.fields) {
+    const v: unknown = value[field.key];
+    if (v === undefined) continue;
+    if (
+      field.cssVar !== undefined &&
+      pinned !== null &&
+      Object.prototype.hasOwnProperty.call(pinned, field.cssVar)
+    ) {
+      errors.push(
+        `${p}.${field.key} duplicates modeled pinnedStyle key "${field.cssVar}"; clear pinnedStyle before setting Component Style`,
+      );
+    }
+    if (field.kind === 'boolean') {
+      if (typeof v !== 'boolean') errors.push(`${p}.${field.key} must be a boolean when present`);
+    } else if (field.kind === 'fontFamily') {
+      assertOneOf(
+        v,
+        ['inherit', 'kit-display', 'kit-body', 'kit-mono', 'custom'] as const,
+        `${p}.${field.key}`,
+        errors,
+      );
+    } else if (field.kind === 'fontWeight') {
+      assertOneOf(v, COMPONENT_STYLE_FONT_WEIGHTS, `${p}.${field.key}`, errors);
+    } else if (field.kind === 'numberPx' || field.kind === 'numberUnitless') {
+      if (!isFiniteNumber(v) || v < 0) {
+        errors.push(`${p}.${field.key} must be a non-negative finite number`);
+      }
+    } else if (field.kind === 'opacity') {
+      if (!isFiniteNumber(v) || v < 0 || v > 1) {
+        errors.push(`${p}.${field.key} must be a number in [0, 1]`);
+      }
+    } else {
+      validateInjectionSafeString(v, field.key, p, errors);
+    }
+  }
+}
+
+// Per-form visual customisation. Every field optional; the shared Component
+// Style validator owns primitives/unknown keys/conflicts; form has one
+// cross-field invariant for custom font family.
+function validateFormStyle(value: unknown, basePath: string, errors: string[], pinnedStyle: unknown): void {
+  validateComponentStyleObject(value, FORM_STYLE_SPEC, basePath, errors, pinnedStyle);
+  if (!isRecord(value)) return;
+  const p = `${basePath}.formStyle`;
   if (value.fontFamily === 'custom' && !isNonEmptyString(value.fontFamilyCustom)) {
     errors.push(`${p}.fontFamilyCustom must be a non-empty string when fontFamily === "custom"`);
-  }
-  nonNegativeNumber('fontSize', value.fontSize);
-  nonNegativeNumber('fieldGap', value.fieldGap);
-
-  safeString('labelColor', value.labelColor);
-  nonNegativeNumber('labelFontSize', value.labelFontSize);
-  if (value.labelFontWeight !== undefined) {
-    assertOneOf<FormFontWeight>(
-      value.labelFontWeight,
-      FORM_FONT_WEIGHTS,
-      `${p}.labelFontWeight`,
-      errors,
-    );
-  }
-
-  safeString('inputBackgroundColor', value.inputBackgroundColor);
-  safeString('inputColor', value.inputColor);
-  safeString('inputBorderColor', value.inputBorderColor);
-  nonNegativeNumber('inputBorderWidth', value.inputBorderWidth);
-  nonNegativeNumber('inputBorderRadius', value.inputBorderRadius);
-  nonNegativeNumber('inputPaddingX', value.inputPaddingX);
-  nonNegativeNumber('inputPaddingY', value.inputPaddingY);
-  safeString('inputPlaceholderColor', value.inputPlaceholderColor);
-  safeString('inputFocusRingColor', value.inputFocusRingColor);
-
-  safeString('submitBackgroundColor', value.submitBackgroundColor);
-  safeString('submitColor', value.submitColor);
-  safeString('submitHoverBackgroundColor', value.submitHoverBackgroundColor);
-  safeString('submitBorderColor', value.submitBorderColor);
-  nonNegativeNumber('submitBorderWidth', value.submitBorderWidth);
-  nonNegativeNumber('submitBorderRadius', value.submitBorderRadius);
-  nonNegativeNumber('submitPaddingX', value.submitPaddingX);
-  nonNegativeNumber('submitPaddingY', value.submitPaddingY);
-  nonNegativeNumber('submitFontSize', value.submitFontSize);
-  if (value.submitFontWeight !== undefined) {
-    assertOneOf<FormFontWeight>(
-      value.submitFontWeight,
-      FORM_FONT_WEIGHTS,
-      `${p}.submitFontWeight`,
-      errors,
-    );
-  }
-  if (value.submitFullWidth !== undefined && typeof value.submitFullWidth !== 'boolean') {
-    errors.push(`${p}.submitFullWidth must be a boolean when present`);
   }
 }
 
@@ -1021,6 +1020,13 @@ function validateElement(
       break;
     }
     case 'carousel': {
+      validateComponentStyleObject(
+        element.carouselStyle,
+        CAROUSEL_STYLE_SPEC,
+        basePath,
+        errors,
+        element.pinnedStyle,
+      );
       if (element.mode !== undefined) {
         assertOneOf(element.mode, CAROUSEL_MODES, `${basePath}.mode`, errors);
       }
@@ -1110,7 +1116,7 @@ function validateElement(
       break;
     }
     case 'form': {
-      validateFormStyle(element.formStyle, basePath, errors);
+      validateFormStyle(element.formStyle, basePath, errors, element.pinnedStyle);
       // ADR 0066 — optional variant-preset enum.
       if (element.variant !== undefined) {
         assertOneOf(element.variant, FORM_VARIANTS, `${basePath}.variant`, errors);
@@ -1137,6 +1143,13 @@ function validateElement(
       break;
     }
     case 'collection': {
+      validateComponentStyleObject(
+        element.collectionStyle,
+        COLLECTION_STYLE_SPEC,
+        basePath,
+        errors,
+        element.pinnedStyle,
+      );
       // ADR 0063 dec 1 — element-level binding. `collectionSlug` may be
       // undefined (the inspector shows a "Pick a source" prompt) but when
       // present it must be a non-empty string.
@@ -1266,6 +1279,13 @@ function validateElement(
       break;
     }
     case 'tabs': {
+      validateComponentStyleObject(
+        element.tabsStyle,
+        TABS_STYLE_SPEC,
+        basePath,
+        errors,
+        element.pinnedStyle,
+      );
       // ADR 0052 — `tabs.length >= 2`, each tab.id matches anchor-id charset
       // and is unique within the TabsElement, `activeTabId` references one of
       // them, each tab.label is a non-empty InlineRun[], each tab.elements
@@ -1343,6 +1363,13 @@ function validateElement(
       break;
     }
     case 'accordion': {
+      validateComponentStyleObject(
+        element.accordionStyle,
+        ACCORDION_STYLE_SPEC,
+        basePath,
+        errors,
+        element.pinnedStyle,
+      );
       // ADR 0066 — optional variant-preset enum. (Accordion items keep their
       // existing pass-through; this case exists solely to gate the variant.)
       if (element.variant !== undefined) {

@@ -138,6 +138,14 @@ import type {
   TabsElement,
 } from './elements/index.js';
 import type { IconName } from './icons.js';
+import {
+  ACCORDION_STYLE_SPEC,
+  CAROUSEL_STYLE_SPEC,
+  COLLECTION_STYLE_SPEC,
+  FORM_STYLE_SPEC,
+  TABS_STYLE_SPEC,
+  type ComponentStyleSpec,
+} from './elements/component-style.js';
 
 // ----------------------------------------------------------------------------
 // encode helpers
@@ -448,84 +456,32 @@ function encodeFormFieldDef(field: FormFieldDef): Y.Map<unknown> {
   return out;
 }
 
-function encodeFormStyle(fs: FormStyle): Y.Map<unknown> {
+function encodeComponentStyle(
+  style: Record<string, unknown>,
+  spec: ComponentStyleSpec,
+): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
-  setIfDefined(out, 'fontFamily', fs.fontFamily);
-  setIfDefined(out, 'fontFamilyCustom', fs.fontFamilyCustom);
-  setIfDefined(out, 'fontSize', fs.fontSize);
-  setIfDefined(out, 'fieldGap', fs.fieldGap);
-  setIfDefined(out, 'labelColor', fs.labelColor);
-  setIfDefined(out, 'labelFontSize', fs.labelFontSize);
-  setIfDefined(out, 'labelFontWeight', fs.labelFontWeight);
-  setIfDefined(out, 'inputBackgroundColor', fs.inputBackgroundColor);
-  setIfDefined(out, 'inputColor', fs.inputColor);
-  setIfDefined(out, 'inputBorderColor', fs.inputBorderColor);
-  setIfDefined(out, 'inputBorderWidth', fs.inputBorderWidth);
-  setIfDefined(out, 'inputBorderRadius', fs.inputBorderRadius);
-  setIfDefined(out, 'inputPaddingX', fs.inputPaddingX);
-  setIfDefined(out, 'inputPaddingY', fs.inputPaddingY);
-  setIfDefined(out, 'inputPlaceholderColor', fs.inputPlaceholderColor);
-  setIfDefined(out, 'inputFocusRingColor', fs.inputFocusRingColor);
-  setIfDefined(out, 'submitBackgroundColor', fs.submitBackgroundColor);
-  setIfDefined(out, 'submitColor', fs.submitColor);
-  setIfDefined(out, 'submitHoverBackgroundColor', fs.submitHoverBackgroundColor);
-  setIfDefined(out, 'submitBorderColor', fs.submitBorderColor);
-  setIfDefined(out, 'submitBorderWidth', fs.submitBorderWidth);
-  setIfDefined(out, 'submitBorderRadius', fs.submitBorderRadius);
-  setIfDefined(out, 'submitPaddingX', fs.submitPaddingX);
-  setIfDefined(out, 'submitPaddingY', fs.submitPaddingY);
-  setIfDefined(out, 'submitFontSize', fs.submitFontSize);
-  setIfDefined(out, 'submitFontWeight', fs.submitFontWeight);
-  setIfDefined(out, 'submitFullWidth', fs.submitFullWidth);
+  for (const field of spec.fields) {
+    setIfDefined(out, field.key, style[field.key]);
+  }
   return out;
 }
 
-const FORM_STYLE_STRING_KEYS = [
-  'fontFamily',
-  'fontFamilyCustom',
-  'labelColor',
-  'labelFontWeight',
-  'inputBackgroundColor',
-  'inputColor',
-  'inputBorderColor',
-  'inputPlaceholderColor',
-  'inputFocusRingColor',
-  'submitBackgroundColor',
-  'submitColor',
-  'submitHoverBackgroundColor',
-  'submitBorderColor',
-  'submitFontWeight',
-] as const;
-
-const FORM_STYLE_NUMBER_KEYS = [
-  'fontSize',
-  'fieldGap',
-  'labelFontSize',
-  'inputBorderWidth',
-  'inputBorderRadius',
-  'inputPaddingX',
-  'inputPaddingY',
-  'submitBorderWidth',
-  'submitBorderRadius',
-  'submitPaddingX',
-  'submitPaddingY',
-  'submitFontSize',
-] as const;
+function decodeComponentStyle(
+  map: Y.Map<unknown>,
+  spec: ComponentStyleSpec,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const field of spec.fields) {
+    if (map.has(field.key)) {
+      out[field.key] = map.get(field.key);
+    }
+  }
+  return out;
+}
 
 function decodeFormStyle(map: Y.Map<unknown>): FormStyle {
-  const fs: FormStyle = {};
-  for (const key of FORM_STYLE_STRING_KEYS) {
-    if (map.has(key)) {
-      (fs as Record<string, unknown>)[key] = map.get(key);
-    }
-  }
-  for (const key of FORM_STYLE_NUMBER_KEYS) {
-    if (map.has(key)) {
-      (fs as Record<string, unknown>)[key] = map.get(key);
-    }
-  }
-  if (map.has('submitFullWidth')) fs.submitFullWidth = map.get('submitFullWidth') as boolean;
-  return fs;
+  return decodeComponentStyle(map, FORM_STYLE_SPEC);
 }
 
 function encodeFormElement(el: FormElement): Y.Map<unknown> {
@@ -538,7 +494,9 @@ function encodeFormElement(el: FormElement): Y.Map<unknown> {
   out.set('successMessage', el.successMessage);
   setIfDefined(out, 'webhookUrl', el.webhookUrl);
   setIfDefined(out, 'variant', el.variant); // ADR 0066
-  if (el.formStyle !== undefined) out.set('formStyle', encodeFormStyle(el.formStyle));
+  if (el.formStyle !== undefined) {
+    out.set('formStyle', encodeComponentStyle(el.formStyle as Record<string, unknown>, FORM_STYLE_SPEC));
+  }
   return out;
 }
 
@@ -592,6 +550,12 @@ function encodeAccordionElement(el: AccordionElement): Y.Map<unknown> {
   out.set('items', items);
   out.set('allowMultipleOpen', el.allowMultipleOpen);
   setIfDefined(out, 'variant', el.variant); // ADR 0066
+  if (el.accordionStyle !== undefined) {
+    out.set(
+      'accordionStyle',
+      encodeComponentStyle(el.accordionStyle as Record<string, unknown>, ACCORDION_STYLE_SPEC),
+    );
+  }
   return out;
 }
 
@@ -614,6 +578,12 @@ function encodeCarouselElement(el: CarouselElement): Y.Map<unknown> {
   out.set('showDots', el.showDots);
   setIfDefined(out, 'mode', el.mode);
   setIfDefined(out, 'variant', el.variant); // ADR 0066
+  if (el.carouselStyle !== undefined) {
+    out.set(
+      'carouselStyle',
+      encodeComponentStyle(el.carouselStyle as Record<string, unknown>, CAROUSEL_STYLE_SPEC),
+    );
+  }
   return out;
 }
 
@@ -685,6 +655,9 @@ function encodeTabsElement(el: TabsElement): Y.Map<unknown> {
   out.set('activeTabId', el.activeTabId);
   setIfDefined(out, 'tabBarHeight', el.tabBarHeight);
   setIfDefined(out, 'variant', el.variant); // ADR 0066
+  if (el.tabsStyle !== undefined) {
+    out.set('tabsStyle', encodeComponentStyle(el.tabsStyle as Record<string, unknown>, TABS_STYLE_SPEC));
+  }
   const tabsArr = new Y.Array<Y.Map<unknown>>();
   for (const tab of el.tabs) {
     const tabMap = new Y.Map<unknown>();
@@ -713,6 +686,12 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
     const arr = new Y.Array<string>();
     for (const id of el.manualOrder) arr.push([id]);
     out.set('manualOrder', arr);
+  }
+  if (el.collectionStyle !== undefined) {
+    out.set(
+      'collectionStyle',
+      encodeComponentStyle(el.collectionStyle as Record<string, unknown>, COLLECTION_STYLE_SPEC),
+    );
   }
   if (el.entries !== undefined) {
     const entries = new Y.Array<Y.Array<Y.Map<unknown>>>();
@@ -1228,15 +1207,22 @@ function decodeChartElement(map: Y.Map<unknown>, base: BaseElement): ChartElemen
 
 function decodeAccordionElement(map: Y.Map<unknown>, base: BaseElement): AccordionElement {
   const items = (map.get('items') as Y.Array<Y.Map<unknown>>).map(decodeAccordionItem);
-  return {
+  const el: AccordionElement = {
     ...base,
     type: 'accordion',
     items,
     allowMultipleOpen: map.get('allowMultipleOpen') as boolean,
-    ...(map.has('variant')
-      ? { variant: map.get('variant') as NonNullable<AccordionElement['variant']> }
-      : {}), // ADR 0066
   };
+  if (map.has('variant')) {
+    el.variant = map.get('variant') as NonNullable<AccordionElement['variant']>;
+  }
+  if (map.has('accordionStyle')) {
+    el.accordionStyle = decodeComponentStyle(
+      map.get('accordionStyle') as Y.Map<unknown>,
+      ACCORDION_STYLE_SPEC,
+    );
+  }
+  return el;
 }
 
 function decodeCarouselElement(map: Y.Map<unknown>, base: BaseElement): CarouselElement {
@@ -1250,6 +1236,12 @@ function decodeCarouselElement(map: Y.Map<unknown>, base: BaseElement): Carousel
   };
   if (map.has('mode')) el.mode = map.get('mode') as NonNullable<CarouselElement['mode']>;
   if (map.has('variant')) el.variant = map.get('variant') as NonNullable<CarouselElement['variant']>; // ADR 0066
+  if (map.has('carouselStyle')) {
+    el.carouselStyle = decodeComponentStyle(
+      map.get('carouselStyle') as Y.Map<unknown>,
+      CAROUSEL_STYLE_SPEC,
+    );
+  }
   return el;
 }
 
@@ -1308,6 +1300,12 @@ function decodeTabsElement(map: Y.Map<unknown>, base: BaseElement): TabsElement 
   };
   if (map.has('tabBarHeight')) out.tabBarHeight = map.get('tabBarHeight') as number;
   if (map.has('variant')) out.variant = map.get('variant') as NonNullable<TabsElement['variant']>; // ADR 0066
+  if (map.has('tabsStyle')) {
+    out.tabsStyle = decodeComponentStyle(
+      map.get('tabsStyle') as Y.Map<unknown>,
+      TABS_STYLE_SPEC,
+    );
+  }
   return out;
 }
 
@@ -1346,6 +1344,12 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
   if (map.has('customTemplate')) {
     const tmpl = map.get('customTemplate') as Y.Array<Y.Map<unknown>>;
     el.customTemplate = tmpl.map(decodeElement);
+  }
+  if (map.has('collectionStyle')) {
+    el.collectionStyle = decodeComponentStyle(
+      map.get('collectionStyle') as Y.Map<unknown>,
+      COLLECTION_STYLE_SPEC,
+    );
   }
   return el;
 }
