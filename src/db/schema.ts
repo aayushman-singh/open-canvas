@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import type { CanvasSection, EditableSite, PublishedSnapshot, StyleKit } from '../canvas/schema';
+import type { OwnerAssetKind } from '../assets/kinds';
 
 // -- Postgres `bytea` custom column -------------------------------------------
 //
@@ -127,9 +128,7 @@ export const site = pgTable(
     // STORED generated columns evaluate the expression at write time and
     // persist the scalar value, so reads touch a narrow column. Every
     // editableState update auto-recomputes them; no manual sync.
-    visitorTheme: text('visitor_theme').generatedAlwaysAs(
-      sql`(editable_state->>'visitorTheme')`,
-    ),
+    visitorTheme: text('visitor_theme').generatedAlwaysAs(sql`(editable_state->>'visitorTheme')`),
     siteNoIndex: boolean('site_no_index').generatedAlwaysAs(
       sql`((editable_state->>'siteNoIndex')::boolean)`,
     ),
@@ -210,7 +209,7 @@ export const ownerAsset = pgTable(
     contentHash: text('content_hash').notNull(),
     r2Key: text('r2_key').notNull(),
     mediaType: text('media_type').notNull(),
-    kind: text('kind').notNull().$type<'image' | 'video'>(),
+    kind: text('kind').notNull().$type<OwnerAssetKind>(),
     alt: text('alt').notNull().default(''),
     width: integer('width'),
     height: integer('height'),
@@ -476,7 +475,7 @@ export interface AssetManifestEntry {
   contentHash: string;
   r2Key: string;
   mediaType: string;
-  kind: 'image' | 'video';
+  kind: OwnerAssetKind;
   alt: string;
   width: number | null;
   height: number | null;
@@ -530,7 +529,9 @@ export const librarySection = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex('library_section_base_slug_version_idx').on(table.baseSlug, table.version)],
+  (table) => [
+    uniqueIndex('library_section_base_slug_version_idx').on(table.baseSlug, table.version),
+  ],
 );
 
 export type LibrarySection = typeof librarySection.$inferSelect;
@@ -774,10 +775,7 @@ export const collectionEntry = pgTable(
     // wider 3-column one above for the GROUP BY rewrite because the page
     // size is smaller. Added in drizzle/0016 — see that file for the perf
     // motivation. Writes pay marginal extra btree maintenance.
-    siteCollectionIdx: index('collection_entry_site_collection_idx').on(
-      t.siteId,
-      t.collectionSlug,
-    ),
+    siteCollectionIdx: index('collection_entry_site_collection_idx').on(t.siteId, t.collectionSlug),
     siteCollectionSlugUnique: uniqueIndex('collection_entry_site_collection_slug_unique').on(
       t.siteId,
       t.collectionSlug,

@@ -28,6 +28,7 @@ import { and, eq, inArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { ownerAsset } from '../db/schema.js';
 import { getSeedAsset } from '../canvas/seed-assets.js';
+import type { OwnerAssetKind } from './kinds.js';
 import type { AssetKindRow } from './site-assets.js';
 
 /**
@@ -39,7 +40,7 @@ export interface ResolvedAssetRow {
   id: string;
   r2Key: string;
   mediaType: string;
-  kind: 'image' | 'video';
+  kind: OwnerAssetKind;
   contentHash: string;
 }
 
@@ -74,12 +75,12 @@ function seedContentHashMap(requestedIds: readonly string[]): Map<string, string
  * contract — the smoke asserts its presence.
  */
 export function mapRowsWithSeedFallback(
-  rows: readonly { id: string; kind: 'image' | 'video'; contentHash: string }[],
+  rows: readonly { id: string; kind: OwnerAssetKind; contentHash: string }[],
   requestedIds: readonly string[],
   customerId: string,
 ): AssetKindRow[] {
-  const byId = new Map<string, { kind: 'image' | 'video'; contentHash: string }>();
-  const byContentHash = new Map<string, { kind: 'image' | 'video'; contentHash: string }>();
+  const byId = new Map<string, { kind: OwnerAssetKind; contentHash: string }>();
+  const byContentHash = new Map<string, { kind: OwnerAssetKind; contentHash: string }>();
   for (const row of rows) {
     byId.set(row.id, { kind: row.kind, contentHash: row.contentHash });
     byContentHash.set(row.contentHash, { kind: row.kind, contentHash: row.contentHash });
@@ -219,10 +220,11 @@ export async function resolveAssetRowForCustomer(
     row.id !== requestedAssetId &&
     row.contentHash === seedContentHash
   ) {
-    console.warn(
-      '[seed-id-fallback] read path resolved bare seed reference via content_hash',
-      { customerId, requestedAssetId, contentHash: seedContentHash },
-    );
+    console.warn('[seed-id-fallback] read path resolved bare seed reference via content_hash', {
+      customerId,
+      requestedAssetId,
+      contentHash: seedContentHash,
+    });
   }
   return row;
 }

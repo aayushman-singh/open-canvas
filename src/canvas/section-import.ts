@@ -21,6 +21,7 @@
 // `{ ok: false, errors }`. No silent skip. No fallback bytes.
 
 import { contentHashToR2Key, extFromMediaType } from '../assets/hash.js';
+import type { MediaOwnerAssetKind } from '../assets/kinds.js';
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import type { CanvasSection } from './schema.js';
 import { newId, rolePrefix } from './util/id.js';
@@ -52,7 +53,7 @@ export interface ImportedAssetRow {
   contentHash: string;
   r2Key: string;
   mediaType: string;
-  kind: 'image' | 'video';
+  kind: MediaOwnerAssetKind;
   alt: string;
   width: number | null;
   height: number | null;
@@ -122,20 +123,32 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
   // backgroundVideoAssetId. Every reference must be materialised here, or
   // the import "succeeds" with raw seed ids that the next save rejects as
   // "missing assets" once the owner_asset row lookup runs.
-  if (cloned.backgroundVideoAssetId !== undefined && resolveTargetId(cloned.backgroundVideoAssetId) === null) {
+  if (
+    cloned.backgroundVideoAssetId !== undefined &&
+    resolveTargetId(cloned.backgroundVideoAssetId) === null
+  ) {
     errors.push(`unknown seed background video asset id: ${cloned.backgroundVideoAssetId}`);
   }
   for (const element of cloned.elements) {
-    if (element.elementStyle !== undefined && element.elementStyle.backgroundImageAssetId !== undefined) {
+    if (
+      element.elementStyle !== undefined &&
+      element.elementStyle.backgroundImageAssetId !== undefined
+    ) {
       if (resolveTargetId(element.elementStyle.backgroundImageAssetId) === null) {
-        errors.push(`unknown seed bg image asset id: ${element.elementStyle.backgroundImageAssetId}`);
+        errors.push(
+          `unknown seed bg image asset id: ${element.elementStyle.backgroundImageAssetId}`,
+        );
       }
     }
     if (element.type === 'media') {
       if (resolveTargetId(element.assetId) === null) {
         errors.push(`unknown seed asset id: ${element.assetId}`);
       }
-      if (element.mediaKind === 'video' && element.posterAssetId !== undefined && resolveTargetId(element.posterAssetId) === null) {
+      if (
+        element.mediaKind === 'video' &&
+        element.posterAssetId !== undefined &&
+        resolveTargetId(element.posterAssetId) === null
+      ) {
         errors.push(`unknown seed poster asset id: ${element.posterAssetId}`);
       }
     } else if (element.type === 'nav') {
@@ -157,8 +170,13 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
     cloned.backgroundVideoAssetId = assetIdMap.get(cloned.backgroundVideoAssetId)!;
   }
   for (const element of cloned.elements) {
-    if (element.elementStyle !== undefined && element.elementStyle.backgroundImageAssetId !== undefined) {
-      element.elementStyle.backgroundImageAssetId = assetIdMap.get(element.elementStyle.backgroundImageAssetId)!;
+    if (
+      element.elementStyle !== undefined &&
+      element.elementStyle.backgroundImageAssetId !== undefined
+    ) {
+      element.elementStyle.backgroundImageAssetId = assetIdMap.get(
+        element.elementStyle.backgroundImageAssetId,
+      )!;
     }
     if (element.type === 'media') {
       element.assetId = assetIdMap.get(element.assetId)!;

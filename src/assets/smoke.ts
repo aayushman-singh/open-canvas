@@ -22,6 +22,8 @@
 //   7. Delete with confirm removes the row and the R2 object when no
 //      siblings remain; the sibling-aware path keeps the R2 object when
 //      another ownerAsset row points at the same contentHash.
+//   8. Lottie JSON uploads are first-class owner assets and bypass image
+//      transforms on read.
 
 import { deleteOwnerAsset } from './delete.js';
 import { sha256Hex } from './hash.js';
@@ -40,6 +42,7 @@ import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
 import { prepareSeedAssetsForCustomer } from '../routes/api/sites.js';
 import type { Db } from '../db/client.js';
 import { ownerAsset, site, slotHistory } from '../db/schema.js';
+import type { OwnerAssetKind } from './kinds.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[assets:smoke] ${message}`);
@@ -304,9 +307,9 @@ function runReferenceWalkTests(): void {
       (ref) =>
         ref.assetId === 'lottie-json-id' &&
         ref.role === 'rich-motion-owner' &&
-        ref.expectedKind === 'any',
+        ref.expectedKind === 'lottie-json',
     ),
-    'expected rich-motion owner asset reference to be kind-agnostic until Owner Asset supports JSON/Rive/3D kinds',
+    'expected lottie rich-motion owner asset reference to require lottie-json owner asset kind',
   );
 
   const nestedPages: CanvasPage[] = [
@@ -747,7 +750,7 @@ interface SimulatedAssetRow {
   contentHash: string;
   r2Key: string;
   mediaType: string;
-  kind: 'image' | 'video';
+  kind: OwnerAssetKind;
   alt: string;
   width: number | null;
   height: number | null;
@@ -966,6 +969,124 @@ async function runReadTests(png32: Uint8Array, expectedHash: string): Promise<vo
   assert(missResponse === null, 'expected missing-addr lookup to return null');
 }
 
+function makeLottieJsonBytes(): Uint8Array {
+  return new TextEncoder().encode(
+    JSON.stringify({
+      v: '5.12.2',
+      fr: 60,
+      ip: 0,
+      op: 120,
+      w: 480,
+      h: 320,
+      layers: [{ ind: 1, ty: 4, ks: {}, shapes: [] }],
+    }),
+  );
+}
+
+async function runLottieAssetTests(): Promise<void> {
+  const lottieBytes = makeLottieJsonBytes();
+  const hash = await sha256Hex(lottieBytes);
+  const lottieDb = new UploadScopeDb(true);
+  const lottieR2 = new MockR2();
+  const uploaded = await uploadOwnerAsset(
+    { db: lottieDb as unknown as Db, r2: createR2Client(lottieR2) },
+    {
+      customerId: 'cust-lottie',
+      bytes: lottieBytes,
+      mediaType: 'application/json; charset=utf-8',
+      alt: 'hero motion',
+    },
+  );
+
+  assert(uploaded.kind === 'lottie-json', `expected kind lottie-json, got ${uploaded.kind}`);
+  assert(
+    uploaded.mediaType === 'application/json',
+    `expected normalised mediaType application/json, got ${uploaded.mediaType}`,
+  );
+  assert(
+    uploaded.r2Key === `assets/${hash.slice(0, 32)}.json`,
+    `expected Lottie R2 key to use .json extension, got ${uploaded.r2Key}`,
+  );
+  assert(
+    uploaded.width === null && uploaded.height === null,
+    'Lottie upload must not probe image dimensions',
+  );
+  assert(
+    lottieDb.ownerAssets[0]?.kind === 'lottie-json',
+    'inserted ownerAsset row must persist lottie-json kind',
+  );
+  assert(lottieR2.putCount === 1, 'Lottie upload must write one R2 object');
+
+  let invalidRejected = false;
+  const dbThatMustNotBeTouched = {
+    select: () => {
+      throw new Error('[assets:smoke] invalid Lottie guard reached the database');
+    },
+  } as unknown as Db;
+  const invalidR2 = new MockR2();
+  try {
+    await uploadOwnerAsset(
+      { db: dbThatMustNotBeTouched, r2: createR2Client(invalidR2) },
+      {
+        customerId: 'cust-lottie',
+        bytes: new TextEncoder().encode('{"v":"5.12.2"}'),
+        mediaType: 'application/json',
+        alt: 'invalid',
+      },
+    );
+  } catch (err) {
+    invalidRejected =
+      err instanceof UploadAssetError && err.message.includes('invalid lottie-json asset');
+  }
+  assert(invalidRejected, 'invalid Lottie JSON must fail before DB/R2 writes');
+  assert(invalidR2.putCount === 0, 'invalid Lottie upload must not write to R2');
+
+  const readR2 = new MockR2();
+  await readR2.put('assets/lottie.json', lottieBytes, {
+    httpMetadata: { contentType: 'application/json' },
+  });
+  const lottieRow = {
+    id: 'lottie-asset',
+    r2Key: 'assets/lottie.json',
+    mediaType: 'application/json',
+    kind: 'lottie-json' as const,
+    contentHash: hash,
+  };
+  const readDb = {
+    select: () => ({
+      from: () => ({
+        where: () => ({ limit: () => Promise.resolve([lottieRow]) }),
+      }),
+    }),
+  } as unknown as Db;
+  let transformCalls = 0;
+  const forbiddenCfImageFetch: CfImageFetcher = () => {
+    transformCalls += 1;
+    return Promise.resolve(new Response('should not run'));
+  };
+  const response = await readOwnerAsset(
+    {
+      db: readDb,
+      r2: createR2Client(readR2),
+      cfImageFetch: forbiddenCfImageFetch,
+      publicOrigin: 'https://opencanvas.test',
+    },
+    {
+      addr: 'lottie-asset',
+      url: new URL('https://opencanvas.test/assets/lottie-asset?w=320'),
+    },
+  );
+  assert(response !== null, 'expected Lottie read to resolve a Response');
+  assert(
+    transformCalls === 0,
+    'Lottie read must bypass cf.image transforms even with transform params',
+  );
+  assert(
+    response.headers.get('content-type') === 'application/json',
+    `expected Lottie content-type application/json, got ${response.headers.get('content-type') ?? ''}`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Slot-history scope: upload-side book-keeping must never write a site slot
 // for a site outside the uploading Owner's account.
@@ -1123,10 +1244,30 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
           sections: [
             {
               elements: [
-                { id: 'el-1', type: 'media', assetId: 'asset-uuid-2', mediaKind: 'image' },
+                {
+                  id: 'el-1',
+                  type: 'media',
+                  assetId: 'asset-uuid-2',
+                  mediaKind: 'image',
+                  richMotionAssetId: 'motion-delete',
+                },
               ],
             },
           ],
+        },
+      ],
+      richMotionAssets: [
+        {
+          id: 'motion-delete',
+          ownerAssetId: 'asset-uuid-2',
+          family: 'vector-animation',
+          source: { kind: 'lottie-json' },
+          playback: {
+            trigger: { type: 'load' },
+            loop: false,
+            speed: 1,
+            reducedMotion: 'hide',
+          },
         },
       ],
     },
@@ -1139,10 +1280,30 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
           sections: [
             {
               elements: [
-                { id: 'el-1', type: 'media', assetId: 'asset-uuid-2', mediaKind: 'image' },
+                {
+                  id: 'el-1',
+                  type: 'media',
+                  assetId: 'asset-uuid-2',
+                  mediaKind: 'image',
+                  richMotionAssetId: 'motion-delete',
+                },
               ],
             },
           ],
+        },
+      ],
+      richMotionAssets: [
+        {
+          id: 'motion-delete',
+          ownerAssetId: 'asset-uuid-2',
+          family: 'vector-animation',
+          source: { kind: 'lottie-json' },
+          playback: {
+            trigger: { type: 'load' },
+            loop: false,
+            speed: 1,
+            reducedMotion: 'hide',
+          },
         },
       ],
     },
@@ -1204,8 +1365,8 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
   );
   if (reportResult.status === 'confirm_required') {
     assert(
-      reportResult.references.length === 6,
-      `expected editable + published favicon, OG, and media references, got ${String(reportResult.references.length)}`,
+      reportResult.references.length === 8,
+      `expected editable + published favicon, OG, media, and rich-motion references, got ${String(reportResult.references.length)}`,
     );
     const editableRef = reportResult.references.find(
       (ref) => ref.source === 'editable' && ref.role === 'asset',
@@ -1219,16 +1380,27 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
     const editableOgRef = reportResult.references.find(
       (ref) => ref.source === 'editable' && ref.role === 'og-image',
     );
+    const editableMotionRef = reportResult.references.find(
+      (ref) => ref.source === 'editable' && ref.role === 'rich-motion-owner',
+    );
     assert(editableRef !== undefined, 'expected reference report to include editable source');
     assert(publishedRef !== undefined, 'expected reference report to include published source');
     assert(editableFaviconRef !== undefined, 'expected reference report to include favicon source');
     assert(editableOgRef !== undefined, 'expected reference report to include page OG source');
+    assert(
+      editableMotionRef !== undefined,
+      'expected reference report to include editable rich-motion owner source',
+    );
     assert(editableRef.siteId === 'site-1', `expected siteId site-1, got ${editableRef.siteId}`);
     assert(
       editableRef.elementId === 'el-1',
       `expected elementId el-1, got ${editableRef.elementId}`,
     );
     assert(editableRef.role === 'asset', `expected role asset, got ${editableRef.role}`);
+    assert(
+      editableMotionRef.elementId === 'motion-delete',
+      `expected rich-motion reference elementId motion-delete, got ${editableMotionRef.elementId}`,
+    );
     assert(
       publishedRef.publishedAddress === 'my-site',
       `expected published address my-site, got ${String(publishedRef.publishedAddress)}`,
@@ -1261,11 +1433,15 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
     updatedState as {
       faviconAssetId?: string;
       pages: Array<{ ogImageAssetId?: string; sections: Array<{ elements: unknown[] }> }>;
+      richMotionAssets?: unknown[];
     }
-  ).pages[0]?.sections[0]?.elements[0] as { assetId?: string } | undefined;
+  ).pages[0]?.sections[0]?.elements[0] as
+    | { assetId?: string; richMotionAssetId?: string }
+    | undefined;
   const updatedRoot = updatedState as {
     faviconAssetId?: string;
     pages: Array<{ ogImageAssetId?: string }>;
+    richMotionAssets?: unknown[];
   };
   assert(
     updatedRoot.faviconAssetId === undefined,
@@ -1278,6 +1454,14 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
   assert(
     firstElement?.assetId === '',
     `expected delete cascade to clear editable assetId, got ${String(firstElement?.assetId)}`,
+  );
+  assert(
+    firstElement?.richMotionAssetId === undefined,
+    `expected delete cascade to remove richMotionAssetId pin, got ${String(firstElement?.richMotionAssetId)}`,
+  );
+  assert(
+    Array.isArray(updatedRoot.richMotionAssets) && updatedRoot.richMotionAssets.length === 0,
+    `expected delete cascade to remove rich-motion asset, got ${JSON.stringify(updatedRoot.richMotionAssets)}`,
   );
 
   // 7b — confirm + sibling → R2 object preserved (other rows reference it).
@@ -1692,6 +1876,7 @@ const expectedHash = await sha256Hex(png32);
 runReferenceWalkTests();
 await runUploadTests(png32, expectedHash);
 await runReadTests(png32, expectedHash);
+await runLottieAssetTests();
 await runSlotHistoryScopeTests(png32);
 await runUploadMediaTypeGuardTests();
 await runDeleteTests(png32, expectedHash);

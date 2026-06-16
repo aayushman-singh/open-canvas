@@ -6,6 +6,7 @@ import {
   isAssetSubstitutionToken,
   type AssetKindExpectation,
 } from '../../assets/site-assets';
+import type { OwnerAssetKind } from '../../assets/kinds';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
@@ -68,7 +69,7 @@ type PreparedSeedAssets =
       assetKindErrors: Array<{
         assetId: string;
         expectedKind: AssetKindExpectation;
-        actualKind: MediaKind;
+        actualKind: OwnerAssetKind;
       }>;
     };
 
@@ -398,7 +399,7 @@ export function prepareSeedAssetsForCustomer(
   const assetKindErrors: Array<{
     assetId: string;
     expectedKind: AssetKindExpectation;
-    actualKind: MediaKind;
+    actualKind: OwnerAssetKind;
   }> = [];
 
   for (const reference of collectReferencedAssets(editableState)) {

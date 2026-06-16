@@ -19,6 +19,7 @@ import type { R2Client } from './r2-client.js';
 import type { Db } from '../db/client.js';
 import { ownerAsset, site } from '../db/schema.js';
 import type { EditableSite, PublishedSnapshot } from '../canvas/schema.js';
+import type { RichMotionAsset } from '../canvas/rich-motion-assets.js';
 
 export interface DeleteAssetDeps {
   db: Db;
@@ -39,7 +40,15 @@ export interface AssetReference {
   publishedAddress: string | null;
   pageSlug: string;
   elementId: string;
-  role: 'asset' | 'poster' | 'og-image' | 'favicon';
+  role:
+    | 'asset'
+    | 'poster'
+    | 'og-image'
+    | 'favicon'
+    | 'rich-motion-owner'
+    | 'rich-motion-poster'
+    | 'rich-motion-frame'
+    | 'rich-motion-scene-descriptor';
 }
 
 interface OwnerSiteAssetScanRow {
@@ -167,7 +176,14 @@ function collectFromPages(
   state:
     | EditableSite
     | PublishedSnapshot
-    | { pages: EditableSite['pages']; faviconAssetId?: string },
+    | {
+        pages: EditableSite['pages'];
+        faviconAssetId?: string;
+        header?: EditableSite['header'];
+        footer?: EditableSite['footer'];
+        overlaySections?: EditableSite['overlaySections'];
+        richMotionAssets?: RichMotionAsset[];
+      },
   assetId: string,
 ): void {
   const seen = new Set<string>();
@@ -215,6 +231,57 @@ function collectFromPages(
       }
     }
   }
+  if (state.header !== undefined) {
+    collectFromSection(out, {
+      siteId,
+      siteName,
+      source,
+      publishedAddress,
+      pageSlug: 'header',
+      section: state.header,
+      assetId,
+      seen,
+    });
+  }
+  if (state.footer !== undefined) {
+    collectFromSection(out, {
+      siteId,
+      siteName,
+      source,
+      publishedAddress,
+      pageSlug: 'footer',
+      section: state.footer,
+      assetId,
+      seen,
+    });
+  }
+  if (Array.isArray(state.overlaySections)) {
+    for (const section of state.overlaySections) {
+      collectFromSection(out, {
+        siteId,
+        siteName,
+        source,
+        publishedAddress,
+        pageSlug: `overlay:${section.id}`,
+        section,
+        assetId,
+        seen,
+      });
+    }
+  }
+  if (Array.isArray(state.richMotionAssets)) {
+    for (const motionAsset of state.richMotionAssets) {
+      collectFromRichMotionAsset(out, {
+        siteId,
+        siteName,
+        source,
+        publishedAddress,
+        assetId,
+        seen,
+        motionAsset,
+      });
+    }
+  }
 }
 
 // ADR 0065 D2 + codex review pass 5 finding 2 + pass 6 finding 3 — the
@@ -257,6 +324,33 @@ interface CollectFromElementParams {
   element: unknown;
   assetId: string;
   seen: Set<string>;
+}
+
+interface CollectFromSectionParams {
+  siteId: string;
+  siteName: string;
+  source: 'editable' | 'published';
+  publishedAddress: string | null;
+  pageSlug: string;
+  section: EditableSite['pages'][number]['sections'][number];
+  assetId: string;
+  seen: Set<string>;
+}
+
+interface CollectFromRichMotionAssetParams {
+  siteId: string;
+  siteName: string;
+  source: 'editable' | 'published';
+  publishedAddress: string | null;
+  assetId: string;
+  seen: Set<string>;
+  motionAsset: RichMotionAsset;
+}
+
+function collectFromSection(out: AssetReference[], params: CollectFromSectionParams): void {
+  for (const element of params.section.elements) {
+    collectFromElement(out, { ...params, element });
+  }
 }
 
 function pushElementReference(
@@ -354,32 +448,78 @@ function collectFromElement(out: AssetReference[], params: CollectFromElementPar
   }
 }
 
+function pushRichMotionReference(
+  out: AssetReference[],
+  params: CollectFromRichMotionAssetParams,
+  role: AssetReference['role'],
+  keySuffix: string,
+): void {
+  const key = `rich-motion|${params.motionAsset.id}|${keySuffix}`;
+  if (params.seen.has(key)) return;
+  params.seen.add(key);
+  out.push({
+    siteId: params.siteId,
+    siteName: params.siteName,
+    source: params.source,
+    publishedAddress: params.publishedAddress,
+    pageSlug: '',
+    elementId: params.motionAsset.id,
+    role,
+  });
+}
+
+function collectFromRichMotionAsset(
+  out: AssetReference[],
+  params: CollectFromRichMotionAssetParams,
+): void {
+  const { motionAsset, assetId } = params;
+  if (motionAsset.ownerAssetId === assetId) {
+    pushRichMotionReference(out, params, 'rich-motion-owner', 'owner');
+  }
+  if (motionAsset.posterAssetId === assetId) {
+    pushRichMotionReference(out, params, 'rich-motion-poster', 'poster');
+  }
+  if (motionAsset.source.kind === 'image-sequence') {
+    motionAsset.source.frameAssetIds.forEach((frameAssetId, frameIdx) => {
+      if (frameAssetId === assetId) {
+        pushRichMotionReference(out, params, 'rich-motion-frame', `frame-${String(frameIdx)}`);
+      }
+    });
+  }
+  if (
+    motionAsset.source.kind === 'bounded-3d' &&
+    motionAsset.source.sceneDescriptorAssetId === assetId
+  ) {
+    pushRichMotionReference(out, params, 'rich-motion-scene-descriptor', 'scene-descriptor');
+  }
+}
+
 function clearAssetReferences(
   state: EditableSite,
   assetId: string,
 ): { changed: false; state: EditableSite } | { changed: true; state: EditableSite } {
   let rootChanged = false;
   let rootState = state;
+  const richMotionClear = clearRichMotionAssetReferences(state.richMotionAssets, assetId);
+  const removedRichMotionAssetIds = richMotionClear.removedIds;
   if (state.faviconAssetId === assetId) {
     const { faviconAssetId: _removed, ...rest } = state;
     void _removed;
     rootState = rest;
     rootChanged = true;
   }
+  if (richMotionClear.changed) {
+    rootState = { ...rootState, richMotionAssets: richMotionClear.assets };
+    rootChanged = true;
+  }
   let pagesChanged = false;
   const pages = rootState.pages.map((page) => {
     let pageChanged = page.ogImageAssetId === assetId;
     const sections = page.sections.map((section) => {
-      let sectionChanged = false;
-      const elements = section.elements.map((element) => {
-        const cleared = clearElementAssetReferences(element, assetId);
-        if (cleared === element) return element;
-        sectionChanged = true;
-        return cleared as (typeof section.elements)[number];
-      });
-      if (!sectionChanged) return section;
+      const cleared = clearSectionAssetReferences(section, assetId, removedRichMotionAssetIds);
+      if (cleared === section) return section;
       pageChanged = true;
-      return { ...section, elements };
+      return cleared;
     });
     if (!pageChanged) return page;
     pagesChanged = true;
@@ -390,8 +530,95 @@ function clearAssetReferences(
     return nextPage;
   });
 
-  if (!rootChanged && !pagesChanged) return { changed: false, state };
-  return { changed: true, state: { ...rootState, pages } };
+  const headerClear =
+    rootState.header !== undefined
+      ? clearSectionAssetReferences(rootState.header, assetId, removedRichMotionAssetIds)
+      : undefined;
+  const footerClear =
+    rootState.footer !== undefined
+      ? clearSectionAssetReferences(rootState.footer, assetId, removedRichMotionAssetIds)
+      : undefined;
+  const overlaySectionsClear =
+    rootState.overlaySections !== undefined
+      ? rootState.overlaySections.map((section) =>
+          clearSectionAssetReferences(section, assetId, removedRichMotionAssetIds),
+        )
+      : undefined;
+  const headerChanged = headerClear !== undefined && headerClear !== rootState.header;
+  const footerChanged = footerClear !== undefined && footerClear !== rootState.footer;
+  const overlayChanged =
+    overlaySectionsClear !== undefined &&
+    rootState.overlaySections !== undefined &&
+    overlaySectionsClear.some((section, idx) => section !== rootState.overlaySections?.[idx]);
+
+  if (!rootChanged && !pagesChanged && !headerChanged && !footerChanged && !overlayChanged) {
+    return { changed: false, state };
+  }
+  return {
+    changed: true,
+    state: {
+      ...rootState,
+      pages,
+      ...(headerClear !== undefined ? { header: headerClear } : {}),
+      ...(footerClear !== undefined ? { footer: footerClear } : {}),
+      ...(overlaySectionsClear !== undefined ? { overlaySections: overlaySectionsClear } : {}),
+    },
+  };
+}
+
+function clearRichMotionAssetReferences(
+  assets: RichMotionAsset[] | undefined,
+  assetId: string,
+):
+  | { changed: false; assets: RichMotionAsset[]; removedIds: Set<string> }
+  | { changed: true; assets: RichMotionAsset[]; removedIds: Set<string> } {
+  if (assets === undefined) return { changed: false, assets: [], removedIds: new Set() };
+  let changed = false;
+  const removedIds = new Set<string>();
+  const next: RichMotionAsset[] = [];
+  for (const asset of assets) {
+    if (richMotionAssetUsesDeletedSource(asset, assetId)) {
+      removedIds.add(asset.id);
+      changed = true;
+      continue;
+    }
+    if (asset.posterAssetId === assetId) {
+      const { posterAssetId: _removed, ...rest } = asset;
+      void _removed;
+      next.push(rest);
+      changed = true;
+      continue;
+    }
+    next.push(asset);
+  }
+  return { changed, assets: next, removedIds };
+}
+
+function richMotionAssetUsesDeletedSource(asset: RichMotionAsset, assetId: string): boolean {
+  if (asset.ownerAssetId === assetId) return true;
+  if (asset.source.kind === 'image-sequence' && asset.source.frameAssetIds.includes(assetId)) {
+    return true;
+  }
+  return asset.source.kind === 'bounded-3d' && asset.source.sceneDescriptorAssetId === assetId;
+}
+
+function clearSectionAssetReferences(
+  section: EditableSite['pages'][number]['sections'][number],
+  assetId: string,
+  removedRichMotionAssetIds: ReadonlySet<string>,
+): EditableSite['pages'][number]['sections'][number] {
+  let sectionChanged = false;
+  const elements = section.elements.map((element) => {
+    let cleared = clearElementAssetReferences(element, assetId);
+    if (removedRichMotionAssetIds.size > 0) {
+      cleared = clearElementRichMotionReferences(cleared, removedRichMotionAssetIds);
+    }
+    if (cleared === element) return element;
+    sectionChanged = true;
+    return cleared as (typeof section.elements)[number];
+  });
+  if (!sectionChanged) return section;
+  return { ...section, elements };
 }
 
 // ADR 0065 D2 + codex review pass 5 finding 2 + pass 6 finding 3 —
@@ -516,5 +743,67 @@ function clearElementAssetReferences(element: unknown, assetId: string): unknown
     }
     return changed ? next : element;
   }
+  return changed ? next : element;
+}
+
+function clearElementRichMotionReferences(
+  element: unknown,
+  removedRichMotionAssetIds: ReadonlySet<string>,
+): unknown {
+  if (typeof element !== 'object' || element === null) return element;
+  const el = element as Record<string, unknown>;
+  let next: Record<string, unknown> = el;
+  let changed = false;
+
+  if (
+    typeof next.richMotionAssetId === 'string' &&
+    removedRichMotionAssetIds.has(next.richMotionAssetId)
+  ) {
+    const { richMotionAssetId: _removed, ...rest } = next;
+    void _removed;
+    next = rest;
+    changed = true;
+  }
+
+  if (Array.isArray(next.tabs)) {
+    const tabsIn = next.tabs as unknown[];
+    let tabsChanged = false;
+    const tabs = tabsIn.map((tab) => {
+      if (typeof tab !== 'object' || tab === null) return tab;
+      const tabRec = tab as Record<string, unknown>;
+      if (!Array.isArray(tabRec.elements)) return tab;
+      const panelIn = tabRec.elements as unknown[];
+      let panelChanged = false;
+      const panelElements = panelIn.map((child) => {
+        const cleared = clearElementRichMotionReferences(child, removedRichMotionAssetIds);
+        if (cleared === child) return child;
+        panelChanged = true;
+        return cleared;
+      });
+      if (!panelChanged) return tab;
+      tabsChanged = true;
+      return { ...tabRec, elements: panelElements };
+    });
+    if (tabsChanged) {
+      next = { ...next, tabs };
+      changed = true;
+    }
+  }
+
+  if (Array.isArray(next.customTemplate)) {
+    const templateIn = next.customTemplate as unknown[];
+    let templateChanged = false;
+    const customTemplate = templateIn.map((child) => {
+      const cleared = clearElementRichMotionReferences(child, removedRichMotionAssetIds);
+      if (cleared === child) return child;
+      templateChanged = true;
+      return cleared;
+    });
+    if (templateChanged) {
+      next = { ...next, customTemplate };
+      changed = true;
+    }
+  }
+
   return changed ? next : element;
 }

@@ -110,10 +110,9 @@ export async function readOwnerAsset(
 
   const transform = parseTransformParams(req.url);
 
-  // Video bypasses cf.image entirely per ADR 0006 decision 4; the original
-  // bytes stream straight from R2 with range-request support handled by the
-  // R2 binding.
-  if (row.kind === 'video' || transform === null || !deps.cfImageFetch || !deps.publicOrigin) {
+  // Only images can use cf.image. Video and motion JSON bytes stream straight
+  // from R2 with the original content type.
+  if (row.kind !== 'image' || transform === null || !deps.cfImageFetch || !deps.publicOrigin) {
     const object = await deps.r2.get(row.r2Key);
     if (!object) {
       // The DB row exists but the R2 object does not. This is a referential

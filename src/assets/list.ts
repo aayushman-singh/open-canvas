@@ -7,6 +7,7 @@
 // never been slotted yet (e.g. just uploaded, not applied).
 
 import { desc, eq, sql } from 'drizzle-orm';
+import type { OwnerAssetKind } from './kinds.js';
 import type { Db } from '../db/client.js';
 import { ownerAsset, slotHistory } from '../db/schema.js';
 
@@ -15,7 +16,7 @@ export interface OwnerAssetGalleryEntry {
   contentHash: string;
   r2Key: string;
   mediaType: string;
-  kind: 'image' | 'video';
+  kind: OwnerAssetKind;
   alt: string;
   width: number | null;
   height: number | null;

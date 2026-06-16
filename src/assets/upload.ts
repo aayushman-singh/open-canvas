@@ -24,6 +24,7 @@
 import { and, eq } from 'drizzle-orm';
 import { contentHashToR2Key, extFromMediaType, sha256Hex } from './hash.js';
 import { probeImageDimensions } from './image-probe.js';
+import type { OwnerAssetKind } from './kinds.js';
 import type { R2Client } from './r2-client.js';
 import type { Db } from '../db/client.js';
 import { ownerAsset, site, slotHistory } from '../db/schema.js';
@@ -50,7 +51,7 @@ export interface UploadAssetResult {
   contentHash: string;
   r2Key: string;
   mediaType: string;
-  kind: 'image' | 'video';
+  kind: OwnerAssetKind;
   alt: string;
   width: number | null;
   height: number | null;
@@ -75,7 +76,11 @@ export interface UploadAssetDeps {
   r2: R2Client;
 }
 
-const ALLOWED_MEDIA_PREFIXES = ['image/', 'video/'];
+const LOTTIE_JSON_MEDIA_TYPES = new Set([
+  'application/json',
+  'application/lottie+json',
+  'text/json',
+]);
 
 // SVG carries executable script content; serving an Owner-uploaded SVG from
 // the same origin as the editor and dashboard is a stored-XSS surface. The
@@ -97,9 +102,61 @@ export class UploadAssetError extends Error {
 function normaliseMediaType(mediaType: string): string {
   const base = mediaType.split(';', 1)[0]?.trim().toLowerCase() ?? '';
   if (base.length === 0) {
-    throw new UploadAssetError('media type must include a concrete image/* or video/* type');
+    throw new UploadAssetError(
+      'media type must include a concrete image/*, video/*, or Lottie JSON type',
+    );
   }
   return base;
+}
+
+function classifyUploadAssetKind(mediaType: string, bytes: Uint8Array): OwnerAssetKind {
+  if (mediaType.startsWith('image/')) return 'image';
+  if (mediaType.startsWith('video/')) return 'video';
+  if (LOTTIE_JSON_MEDIA_TYPES.has(mediaType)) {
+    assertLottieJson(bytes);
+    return 'lottie-json';
+  }
+  throw new UploadAssetError(
+    `unsupported media type: ${mediaType} (must start with image/ or video/, or be application/json Lottie)`,
+  );
+}
+
+function assertLottieJson(bytes: Uint8Array): void {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new UploadAssetError(`invalid lottie-json asset: JSON parse failed (${message})`);
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new UploadAssetError('invalid lottie-json asset: root must be an object');
+  }
+  const root = parsed as Record<string, unknown>;
+  if (typeof root.v !== 'string' || root.v.trim().length === 0) {
+    throw new UploadAssetError('invalid lottie-json asset: v must be a non-empty string');
+  }
+  if (!Number.isFinite(root.fr) || Number(root.fr) <= 0) {
+    throw new UploadAssetError('invalid lottie-json asset: fr must be a positive number');
+  }
+  if (
+    !Number.isFinite(root.ip) ||
+    !Number.isFinite(root.op) ||
+    Number(root.op) <= Number(root.ip)
+  ) {
+    throw new UploadAssetError('invalid lottie-json asset: op must be greater than ip');
+  }
+  if (
+    !Number.isFinite(root.w) ||
+    Number(root.w) <= 0 ||
+    !Number.isFinite(root.h) ||
+    Number(root.h) <= 0
+  ) {
+    throw new UploadAssetError('invalid lottie-json asset: w and h must be positive numbers');
+  }
+  if (!Array.isArray(root.layers) || root.layers.length === 0) {
+    throw new UploadAssetError('invalid lottie-json asset: layers must contain at least one layer');
+  }
 }
 
 /**
@@ -117,11 +174,6 @@ export async function uploadOwnerAsset(
     throw new UploadAssetError('siteId and elementId must be provided together');
   }
   const mediaType = normaliseMediaType(input.mediaType);
-  if (!ALLOWED_MEDIA_PREFIXES.some((prefix) => mediaType.startsWith(prefix))) {
-    throw new UploadAssetError(
-      `unsupported media type: ${input.mediaType} (must start with image/ or video/)`,
-    );
-  }
   if (DENIED_MEDIA_TYPES.has(mediaType)) {
     throw new UploadAssetError(
       `unsupported media type: ${input.mediaType} (SVG uploads are not permitted)`,
@@ -130,7 +182,7 @@ export async function uploadOwnerAsset(
   if (input.bytes.byteLength === 0) {
     throw new UploadAssetError('upload bytes must not be empty');
   }
-  const kind: 'image' | 'video' = mediaType.startsWith('image/') ? 'image' : 'video';
+  const kind = classifyUploadAssetKind(mediaType, input.bytes);
 
   const contentHash = await sha256Hex(input.bytes);
   const r2Key = contentHashToR2Key(contentHash, extFromMediaType(mediaType));

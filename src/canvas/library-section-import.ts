@@ -10,6 +10,7 @@
 
 import type { CanvasSection } from './schema.js';
 import type { AssetManifestEntry } from '../db/schema.js';
+import type { OwnerAssetKind } from '../assets/kinds.js';
 import { newId, rolePrefix } from './util/id.js';
 
 export interface LibraryImportInput {
@@ -25,7 +26,7 @@ export interface ImportedAssetRow {
   contentHash: string;
   r2Key: string;
   mediaType: string;
-  kind: 'image' | 'video';
+  kind: OwnerAssetKind;
   alt: string;
   width: number | null;
   height: number | null;
@@ -106,7 +107,10 @@ export function importLibrarySectionIntoSite(input: LibraryImportInput): Library
     recordRef(cloned.backgroundVideoAssetId);
   }
   for (const element of cloned.elements) {
-    if (element.elementStyle !== undefined && element.elementStyle.backgroundImageAssetId !== undefined) {
+    if (
+      element.elementStyle !== undefined &&
+      element.elementStyle.backgroundImageAssetId !== undefined
+    ) {
       recordRef(element.elementStyle.backgroundImageAssetId);
     }
     if (element.type === 'media') {
@@ -130,7 +134,10 @@ export function importLibrarySectionIntoSite(input: LibraryImportInput): Library
     if (mapped) cloned.backgroundVideoAssetId = mapped;
   }
   for (const element of cloned.elements) {
-    if (element.elementStyle !== undefined && element.elementStyle.backgroundImageAssetId !== undefined) {
+    if (
+      element.elementStyle !== undefined &&
+      element.elementStyle.backgroundImageAssetId !== undefined
+    ) {
       const mapped = assetIdMap.get(element.elementStyle.backgroundImageAssetId);
       if (mapped) element.elementStyle.backgroundImageAssetId = mapped;
     }

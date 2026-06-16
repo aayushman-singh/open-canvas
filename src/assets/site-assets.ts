@@ -14,12 +14,12 @@ import type {
   CanvasPage,
   CanvasSection,
   EditableSite,
-  MediaKind,
   PublishedSnapshot,
 } from '../canvas/schema.js';
-import type { RichMotionAsset } from '../canvas/rich-motion-assets.js';
+import type { RichMotionAsset, RichMotionAssetSource } from '../canvas/rich-motion-assets.js';
+import type { OwnerAssetKind } from './kinds.js';
 
-export type AssetKindExpectation = MediaKind | 'any';
+export type AssetKindExpectation = OwnerAssetKind | 'any';
 
 export interface ReferencedAsset {
   assetId: string;
@@ -43,12 +43,12 @@ export interface ReferencedAsset {
 
 export interface AssetKindRow {
   id: string;
-  kind: MediaKind;
+  kind: OwnerAssetKind;
 }
 
 export interface AssetReferenceError extends ReferencedAsset {
   reason: 'missing' | 'kind-mismatch';
-  actualKind?: MediaKind;
+  actualKind?: OwnerAssetKind;
 }
 
 export interface UnfilledAssetReference {
@@ -287,7 +287,13 @@ function collectRichMotionAssetReferences(
   assetPath: string,
   out: ReferencedAsset[],
 ): void {
-  pushReference(out, asset.ownerAssetId, 'any', 'rich-motion-owner', `${assetPath}.ownerAssetId`);
+  pushReference(
+    out,
+    asset.ownerAssetId,
+    expectedRichMotionOwnerKind(asset.source),
+    'rich-motion-owner',
+    `${assetPath}.ownerAssetId`,
+  );
   pushReference(
     out,
     asset.posterAssetId,
@@ -315,6 +321,11 @@ function collectRichMotionAssetReferences(
       `${assetPath}.source.sceneDescriptorAssetId`,
     );
   }
+}
+
+function expectedRichMotionOwnerKind(source: RichMotionAssetSource): AssetKindExpectation {
+  if (source.kind === 'lottie-json') return 'lottie-json';
+  return 'any';
 }
 
 /**
