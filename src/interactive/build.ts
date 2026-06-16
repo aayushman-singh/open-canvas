@@ -30,6 +30,7 @@ import { POINTER_FX_RUNTIME_SRC } from './pointer-fx.js';
 import { POPUP_RUNTIME_SRC } from './popup.js';
 import { RICH_MOTION_RUNTIME_SRC } from './rich-motion.js';
 import { RUNTIME_ENTRY_SRC } from './runtime.js';
+import { ANIMEJS_WAAPI_RUNTIME_SRC } from './vendor/animejs-waapi.generated.js';
 
 /**
  * The full interactive runtime as an IIFE string. Stable across builds — same
@@ -38,6 +39,7 @@ import { RUNTIME_ENTRY_SRC } from './runtime.js';
  */
 export const INTERACTIVE_RUNTIME_SRC: string = [
   '(function(){',
+  ANIMEJS_WAAPI_RUNTIME_SRC,
   ACCORDION_RUNTIME_SRC,
   CAROUSEL_RUNTIME_SRC,
   POINTER_FX_RUNTIME_SRC,

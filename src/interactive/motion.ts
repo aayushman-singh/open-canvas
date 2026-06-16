@@ -14,6 +14,10 @@ function ocMotionFailure(el,phase,detail){
   }
   if(el)ocRuntimeEvent(el,'opencanvas:motion-failure',{phase:phase,detail:detail});
 }
+function ocMarkMotionFailed(el,phase,detail){
+  if(el)el.setAttribute('data-opencanvas-motion-failed',phase);
+  ocMotionFailure(el,phase,detail);
+}
 function ocReadDesignerPayload(scope){
   var scanRoot=scope||document;
   var script=scanRoot.querySelector('[data-opencanvas-designer-interactions]');
@@ -43,6 +47,45 @@ function ocEasing(value){
   if(value==='in-out-cubic')return 'cubic-bezier(.65,0,.35,1)';
   return value;
 }
+function ocAnimeAdapter(){
+  var view=document.defaultView||(typeof window!=='undefined'?window:null);
+  var adapter=(view&&view.__opencanvasAnime)||(typeof globalThis!=='undefined'&&globalThis.__opencanvasAnime);
+  if(adapter&&adapter.waapi&&typeof adapter.waapi.animate==='function')return adapter;
+  return null;
+}
+function ocMotionRange(properties,key,format){
+  if(!Object.prototype.hasOwnProperty.call(properties,key))return null;
+  var range=properties[key];
+  return [format(range[0]),format(range[1])];
+}
+function ocRawMotionValue(value){
+  return value;
+}
+function ocBuildAnimeMotionParams(step,targetCount){
+  var properties=step.properties;
+  var params={
+    duration:step.durationMs,
+    delay:function(_el,index){return (step.delayMs||0)+(step.staggerMs||0)*index;},
+    ease:ocEasing(step.easing),
+    composition:'replace'
+  };
+  var range;
+  range=ocMotionRange(properties,'x',ocFormatLength);if(range)params.x=range;
+  range=ocMotionRange(properties,'y',ocFormatLength);if(range)params.y=range;
+  range=ocMotionRange(properties,'scale',ocRawMotionValue);if(range)params.scale=range;
+  range=ocMotionRange(properties,'scaleX',ocRawMotionValue);if(range)params.scaleX=range;
+  range=ocMotionRange(properties,'scaleY',ocRawMotionValue);if(range)params.scaleY=range;
+  range=ocMotionRange(properties,'rotate',ocFormatAngle);if(range)params.rotate=range;
+  range=ocMotionRange(properties,'opacity',ocRawMotionValue);if(range)params.opacity=range;
+  range=ocMotionRange(properties,'backgroundColor',String);if(range)params.backgroundColor=range;
+  range=ocMotionRange(properties,'color',String);if(range)params.color=range;
+  range=ocMotionRange(properties,'clipPath',String);if(range)params.clipPath=range;
+  range=ocMotionRange(properties,'strokeDashoffset',ocRawMotionValue);if(range)params.strokeDashoffset=range;
+  range=ocMotionRange(properties,'filter',String);if(range)params.filter=range;
+  else{range=ocMotionRange(properties,'blur',ocFormatBlur);if(range)params.filter=range;}
+  if(targetCount<2)params.delay=step.delayMs||0;
+  return params;
+}
 function ocBuildMotionFrame(properties,index){
   var frame={};
   var transforms=[];
@@ -65,12 +108,6 @@ function ocBuildMotionFrame(properties,index){
 function ocCssPropertyName(key){
   return key.replace(/[A-Z]/g,function(ch){return '-'+ch.toLowerCase();});
 }
-function ocApplyMotionFrame(el,frame){
-  for(var key in frame){
-    if(!Object.prototype.hasOwnProperty.call(frame,key))continue;
-    el.style.setProperty(ocCssPropertyName(key),frame[key]);
-  }
-}
 function ocResolveMotionTargets(target){
   if(!target||!target.type)return [];
   if(target.type==='page')return Array.prototype.slice.call(document.querySelectorAll(ocAttrSelector('data-opencanvas-page',target.pageId)));
@@ -81,30 +118,32 @@ function ocResolveMotionTargets(target){
 }
 function ocPlayMotionSequence(sequence){
   if(!sequence||!sequence.steps)return;
+  var adapter=ocAnimeAdapter();
   for(var i=0;i<sequence.steps.length;i++){
     var step=sequence.steps[i];
     var targets=ocResolveMotionTargets(step.target);
     if(targets.length===0){
       ocMotionFailure(null,'missing-target',{sequenceId:sequence.id,stepId:step.id,target:step.target});
-      continue;
+      return;
     }
-    for(var t=0;t<targets.length;t++){
-      var el=targets[t];
-      var from=ocBuildMotionFrame(step.properties,0);
-      var to=ocBuildMotionFrame(step.properties,1);
-      if(typeof el.animate!=='function'){
-        ocMotionFailure(el,'animate-unavailable',{sequenceId:sequence.id,stepId:step.id});
-        ocApplyMotionFrame(el,to);
-        el.setAttribute('data-opencanvas-motion-played',sequence.id);
-        continue;
+    if(!adapter){
+      for(var a=0;a<targets.length;a++){
+        ocMarkMotionFailed(targets[a],'adapter-unavailable',{sequenceId:sequence.id,stepId:step.id,adapter:'animejs-waapi'});
       }
-      el.animate([from,to],{
-        duration:step.durationMs,
-        delay:(step.delayMs||0)+(step.staggerMs||0)*t,
-        easing:ocEasing(step.easing),
-        fill:'both'
-      });
-      el.setAttribute('data-opencanvas-motion-played',sequence.id);
+      return;
+    }
+    try{
+      adapter.waapi.animate(targets,ocBuildAnimeMotionParams(step,targets.length));
+      for(var p=0;p<targets.length;p++){
+        targets[p].setAttribute('data-opencanvas-motion-played',sequence.id);
+        targets[p].setAttribute('data-opencanvas-motion-adapter','animejs-waapi');
+      }
+    }catch(err){
+      for(var t=0;t<targets.length;t++){
+        var el=targets[t];
+        ocMarkMotionFailed(el,'adapter-error',{sequenceId:sequence.id,stepId:step.id,adapter:'animejs-waapi',error:String(err&&err.message?err.message:err)});
+      }
+      return;
     }
   }
 }

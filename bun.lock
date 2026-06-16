@@ -9,6 +9,7 @@
         "@google/genai": "2.5.0",
         "@neondatabase/serverless": "^1.1.0",
         "@resvg/resvg-wasm": "2.6.2",
+        "animejs": "4.3.0",
         "drizzle-orm": "^0.45.2",
         "hono": "^4.12.21",
         "katex": "^0.17.0",
@@ -314,6 +315,8 @@
     "agent-base": ["agent-base@7.1.4", "", {}, "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ=="],
 
     "ajv": ["ajv@6.15.0", "", { "dependencies": { "fast-deep-equal": "^3.1.1", "fast-json-stable-stringify": "^2.0.0", "json-schema-traverse": "^0.4.1", "uri-js": "^4.2.2" } }, "sha512-fgFx7Hfoq60ytK2c7DhnF8jIvzYgOMxfugjLOSMHjLIPgenqa7S7oaagATUq99mV6IYvN2tRmC0wnTYX6iPbMw=="],
+
+    "animejs": ["animejs@4.3.0", "", {}, "sha512-68OxbkOYV/+0h8c45Quv277jPs93TEKM2tq8SxtF7S4ftICcTgG7MNOCRMIE1PlOXcXl/nndPCcgAKBEsYakNg=="],
 
     "ansi-escapes": ["ansi-escapes@7.3.0", "", { "dependencies": { "environment": "^1.0.0" } }, "sha512-BvU8nYgGQBxcmMuEeUEmNTvrMVjJNSH7RgW24vXexN4Ven6qCvy4TntnvlnwnMLTVlcRQQdbRY8NKnaIoeWDNg=="],
 

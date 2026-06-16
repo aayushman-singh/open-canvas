@@ -28,6 +28,7 @@ import { renderCanvasSnapshot } from '../canvas/render.js';
 import type { PublishedSnapshot } from '../canvas/schema.js';
 import { INTERACTIVE_RUNTIME_SRC, INTERACTIVE_RUNTIME_SRC_CHARS } from './build.js';
 import { injectInteractiveRuntime, snapshotNeedsInteractiveRuntime } from './inject.js';
+import { ANIMEJS_WAAPI_RUNTIME_SRC } from './vendor/animejs-waapi.generated.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[interactive:smoke] ${message}`);
@@ -71,6 +72,7 @@ class StubStyle {
 }
 
 class StubElement {
+  readonly nodeType = 1;
   tagName: string;
   attributes = new Map<string, string>();
   children: StubElement[] = [];
@@ -327,7 +329,7 @@ function makeEvent(type: string, init: { key?: string } = {}): StubEvent {
 // Execute the runtime IIFE against a stub document. The IIFE references the
 // global `document` via the runtime entry; we pass our stub in as a parameter
 // to `new Function` and the body references it directly.
-function runRuntimeAgainstDocument(doc: StubDocument): void {
+function runRuntimeAgainstDocument(doc: StubDocument, source = INTERACTIVE_RUNTIME_SRC): void {
   // The IIFE wraps `function hydrateX(root) { ... }` declarations + the
   // hydrateAll dispatch + the readyState branch. `new Function('document', ...)`
   // gives the runtime a fresh scope where `document` resolves to our stub.
@@ -336,8 +338,23 @@ function runRuntimeAgainstDocument(doc: StubDocument): void {
   // the TS modules directly) would let a divergence between source-of-truth
   // and shipped bytes slip through.
   // eslint-disable-next-line @typescript-eslint/no-implied-eval -- see comment above.
-  const fn = new Function('document', INTERACTIVE_RUNTIME_SRC) as (d: StubDocument) => void;
+  const fn = new Function('document', source) as (d: StubDocument) => void;
   fn(doc);
+}
+
+function withoutGlobalAnimeAdapter(fn: () => void): void {
+  const globals = globalThis as Record<string, unknown>;
+  const previous = globals.__opencanvasAnime;
+  delete globals.__opencanvasAnime;
+  try {
+    fn();
+  } finally {
+    if (previous === undefined) {
+      delete globals.__opencanvasAnime;
+    } else {
+      globals.__opencanvasAnime = previous;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1022,10 +1039,14 @@ designerRich.addEventListener('opencanvas:rich-motion-failure', () => {
 });
 runRuntimeAgainstDocument(designerDoc);
 
-assert(designerTitle.animations.length === 1, 'load motion should call element.animate once');
+assert(designerTitle.animations.length > 0, 'load motion should create WAAPI animations');
 assert(
   designerTitle.getAttribute('data-opencanvas-motion-played') === 'hero-intro',
   'load motion should mark the played sequence id',
+);
+assert(
+  designerTitle.getAttribute('data-opencanvas-motion-adapter') === 'animejs-waapi',
+  'load motion should run through the Anime.js WAAPI adapter',
 );
 assert(richMotionFailures === 1, 'rich motion unsupported runtime should emit one failure event');
 assert(
@@ -1067,15 +1088,69 @@ for (const child of noAnimateParsed.children) noAnimateDoc.root.appendChild(chil
 const noAnimateTitle = noAnimateDoc.querySelector(
   '[data-opencanvas-element="hero-title"]',
 ) as StubElement;
+let motionFailures = 0;
+noAnimateTitle.addEventListener('opencanvas:motion-failure', (event) => {
+  motionFailures++;
+  const detail = event.detail as { phase?: string; detail?: { adapter?: string } };
+  assert(detail.phase === 'adapter-error', 'motion failure should name the adapter error phase');
+  assert(
+    detail.detail?.adapter === 'animejs-waapi',
+    'motion failure should name the Anime.js WAAPI adapter',
+  );
+});
 noAnimateTitle.animate = undefined as never;
 runRuntimeAgainstDocument(noAnimateDoc);
+assert(motionFailures === 1, 'motion without element.animate should emit one failure event');
 assert(
-  noAnimateTitle.style.getPropertyValue('opacity') === '1',
-  'motion without element.animate should apply final opacity directly',
+  noAnimateTitle.getAttribute('data-opencanvas-motion-failed') === 'adapter-error',
+  'motion without element.animate should mark the target as failed',
 );
 assert(
-  noAnimateTitle.style.getPropertyValue('transform') === 'translateY(0px)',
-  'motion without element.animate should apply final transform directly',
+  noAnimateTitle.getAttribute('data-opencanvas-motion-played') === null,
+  'motion adapter failure must not mark the sequence as played',
+);
+assert(
+  noAnimateTitle.style.getPropertyValue('opacity') === '',
+  'motion adapter failure must not write a final opacity fallback',
+);
+assert(
+  noAnimateTitle.style.getPropertyValue('transform') === '',
+  'motion adapter failure must not write a final transform fallback',
+);
+
+const missingAdapterDoc = new StubDocument();
+const missingAdapterParsed = parseHtml(designerHtml);
+for (const child of missingAdapterParsed.children) missingAdapterDoc.root.appendChild(child);
+const missingAdapterTitle = missingAdapterDoc.querySelector(
+  '[data-opencanvas-element="hero-title"]',
+) as StubElement;
+let adapterUnavailableFailures = 0;
+missingAdapterTitle.addEventListener('opencanvas:motion-failure', (event) => {
+  adapterUnavailableFailures++;
+  const detail = event.detail as { phase?: string; detail?: { adapter?: string } };
+  assert(
+    detail.phase === 'adapter-unavailable',
+    'missing Anime adapter should name the unavailable phase',
+  );
+  assert(
+    detail.detail?.adapter === 'animejs-waapi',
+    'missing Anime adapter failure should name the adapter',
+  );
+});
+const runtimeWithoutAnime = INTERACTIVE_RUNTIME_SRC.replace(ANIMEJS_WAAPI_RUNTIME_SRC, '');
+assert(
+  runtimeWithoutAnime.length < INTERACTIVE_RUNTIME_SRC.length,
+  'test runtime should remove the generated Anime adapter',
+);
+withoutGlobalAnimeAdapter(() => runRuntimeAgainstDocument(missingAdapterDoc, runtimeWithoutAnime));
+assert(adapterUnavailableFailures === 1, 'missing Anime adapter should emit one failure event');
+assert(
+  missingAdapterTitle.getAttribute('data-opencanvas-motion-failed') === 'adapter-unavailable',
+  'missing Anime adapter should mark the target as failed',
+);
+assert(
+  missingAdapterTitle.getAttribute('data-opencanvas-motion-played') === null,
+  'missing Anime adapter must not mark the sequence as played',
 );
 
 // ---------------------------------------------------------------------------
