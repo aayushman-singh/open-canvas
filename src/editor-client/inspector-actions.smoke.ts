@@ -444,6 +444,9 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     buildElementNode: () => {
       throw new Error('buildElementNode stub: smoke does not exercise wrapper building');
     },
+    buildHostedElementNode: () => {
+      throw new Error('buildHostedElementNode stub: smoke does not exercise flow body building');
+    },
     applyElementStyle: () => {},
     applyPinnedStyle: () => {},
     buildElementMenu: () => {

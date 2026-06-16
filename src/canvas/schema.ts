@@ -47,6 +47,7 @@ export const ELEMENT_TYPES = [
   'nav',
   'collection',
   'tabs',
+  'flow-container',
 ] as const;
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 
@@ -399,6 +400,7 @@ import type { NavElement } from './elements/nav.js';
 import type { TableElement } from './elements/table.js';
 import type { CollectionElement } from './elements/collection.js';
 import type { TabsElement } from './elements/tabs.js';
+import type { FlowContainerElement } from './elements/flow-container.js';
 
 // Re-export so callers can keep importing element types from schema. Adding
 // a new element type only requires updating the import block above + the
@@ -414,6 +416,7 @@ export type {
   ShapeElement,
   ContainerElement,
   TabsElement,
+  FlowContainerElement,
 };
 
 export type CanvasElement =
@@ -431,7 +434,8 @@ export type CanvasElement =
   | CodeElement
   | NavElement
   | CollectionElement
-  | TabsElement;
+  | TabsElement
+  | FlowContainerElement;
 
 // Compile-time invariants: ELEMENT_TYPES and CanvasElement['type'] must
 // stay bidirectionally exhaustive — adding a new element interface without
@@ -439,21 +443,21 @@ export type CanvasElement =
 // type-check on one of these two consts. Split into two checks instead of
 // an intersection so `@typescript-eslint/no-duplicate-type-constituents`
 // doesn't flatten the bidirectional pair.
- 
+
 const _ELEMENT_TYPES_COVERS_UNION: Exclude<ElementType, CanvasElement['type']> extends never
   ? true
   : never = true;
- 
+
 const _UNION_COVERS_ELEMENT_TYPES: Exclude<CanvasElement['type'], ElementType> extends never
   ? true
   : never = true;
 
 // Same invariants for inline mark types ↔ InlineMark variants.
- 
+
 const _MARK_TYPES_COVERS_UNION: Exclude<InlineMarkType, InlineMark['type']> extends never
   ? true
   : never = true;
- 
+
 const _UNION_COVERS_MARK_TYPES: Exclude<InlineMark['type'], InlineMarkType> extends never
   ? true
   : never = true;

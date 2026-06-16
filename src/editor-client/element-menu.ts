@@ -91,6 +91,11 @@ export type BuildElementNodeContext = SelectionContext &
     'setBoxStyle' | 'applyElementStyle' | 'applyPinnedStyle' | 'buildElementBody'
   >;
 
+export type BuildHostedElementNodeContext = Pick<
+  EditorContext,
+  'applyElementStyle' | 'applyPinnedStyle' | 'buildElementBody' | 'selectedElementId'
+>;
+
 // ADR 0064 — `rebuildElementImpl` re-renders a single element in place. It
 // walks the section tree (StateContext), reads the live DOM (DomContext.root),
 // drives a fall-back full renderAll (RenderContext), reports the inline-text
@@ -102,7 +107,10 @@ export type RebuildElementContext = StateContext &
   RenderContext &
   SelectionContext &
   StatusEmitterContext &
-  Pick<EditorContext, 'activeEditFinish' | 'buildElementNode' | 'setBoxStyle'>;
+  Pick<
+    EditorContext,
+    'activeEditFinish' | 'buildElementNode' | 'buildHostedElementNode' | 'setBoxStyle'
+  >;
 
 /**
  * Eight-direction resize-handle layout (N/S/E/W + four corners). Order is
@@ -234,41 +242,45 @@ export function buildElementMenuImpl(
   div2.className = 'menu-divider';
   menu.appendChild(div2);
 
-  const dupBtn = document.createElement('button');
-  dupBtn.type = 'button';
-  dupBtn.className = 'menu-item';
-  dupBtn.textContent = 'Duplicate';
-  dupBtn.addEventListener('click', function () {
-    const arr = parentArrayFor(ctx, section, element);
-    const idx = arr.indexOf(element);
-    if (idx < 0) throw new Error('duplicate element: parent array does not contain ' + element.id);
-    const copy = JSON.parse(JSON.stringify(element)) as CanvasElement;
-    copy.id = newElementId();
-    if (copy.box && typeof copy.box === 'object') {
-      if (typeof copy.box.x === 'number') copy.box.x = copy.box.x + 20;
-      if (typeof copy.box.y === 'number') copy.box.y = copy.box.y + 20;
-      if (parentArrayFor(ctx, section, element) === section.elements) {
-        // Section-level duplicates can be clamped against the artboard.
-        // Nested containers use panel-local coordinates, so there is no
-        // section-sized bound to apply here.
-        const page = ctx.currentPage();
-        if (!page) {
-          throw new Error(
-            'duplicate element: no current page; cannot clamp duplicate within artboard',
-          );
-        }
-        copy.box.x = Math.min(copy.box.x, page.width - copy.box.w);
-        copy.box.y = Math.min(copy.box.y, section.height - copy.box.h);
+  if (element.type !== 'flow-container') {
+    const dupBtn = document.createElement('button');
+    dupBtn.type = 'button';
+    dupBtn.className = 'menu-item';
+    dupBtn.textContent = 'Duplicate';
+    dupBtn.addEventListener('click', function () {
+      const arr = parentArrayFor(ctx, section, element);
+      const idx = arr.indexOf(element);
+      if (idx < 0) {
+        throw new Error('duplicate element: parent array does not contain ' + element.id);
       }
-      copy.box.z = nextZInArray(arr);
-    }
-    arr.splice(idx + 1, 0, copy);
-    ctx.closeElementMenu();
-    ctx.renderAll();
-    ctx.selectElement(copy.id);
-    ctx.scheduleSave();
-  });
-  menu.appendChild(dupBtn);
+      const copy = JSON.parse(JSON.stringify(element)) as CanvasElement;
+      copy.id = newElementId();
+      if (copy.box && typeof copy.box === 'object') {
+        if (typeof copy.box.x === 'number') copy.box.x = copy.box.x + 20;
+        if (typeof copy.box.y === 'number') copy.box.y = copy.box.y + 20;
+        if (parentArrayFor(ctx, section, element) === section.elements) {
+          // Section-level duplicates can be clamped against the artboard.
+          // Nested containers use panel-local coordinates, so there is no
+          // section-sized bound to apply here.
+          const page = ctx.currentPage();
+          if (!page) {
+            throw new Error(
+              'duplicate element: no current page; cannot clamp duplicate within artboard',
+            );
+          }
+          copy.box.x = Math.min(copy.box.x, page.width - copy.box.w);
+          copy.box.y = Math.min(copy.box.y, section.height - copy.box.h);
+        }
+        copy.box.z = nextZInArray(arr);
+      }
+      arr.splice(idx + 1, 0, copy);
+      ctx.closeElementMenu();
+      ctx.renderAll();
+      ctx.selectElement(copy.id);
+      ctx.scheduleSave();
+    });
+    menu.appendChild(dupBtn);
+  }
 
   const delBtn = document.createElement('button');
   delBtn.type = 'button';
@@ -315,31 +327,7 @@ export function buildElementNodeImpl(
 ): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'opencanvas-element';
-  wrapper.setAttribute('data-opencanvas-element', element.id);
-  wrapper.setAttribute('data-element-type', element.type);
-  // Mirror the public renderer: stamp data-variant for action/shape/
-  // container and data-role for text so kit CSS selectors of the form
-  // [data-style-kit="X"] [data-element-type="action"][data-variant="Y"]
-  // match in the editor preview exactly like they do in the published HTML.
-  if (element.type === 'action' || element.type === 'shape' || element.type === 'container') {
-    if (typeof element.variant === 'string') {
-      wrapper.setAttribute('data-variant', element.variant);
-    }
-  } else if (element.type === 'text') {
-    if (typeof element.role === 'string') {
-      wrapper.setAttribute('data-role', element.role);
-    }
-  }
-  if (element.motion) {
-    wrapper.setAttribute('data-motion-preset', element.motion.preset);
-    wrapper.setAttribute('data-motion-delay-ms', String(element.motion.delayMs || 0));
-    // Drive animation-delay via the same CSS variable the kit rules read on
-    // the published page; without this the data-motion-delay-ms attr was a
-    // dead label and every element on the page animated at t=0.
-    if (element.motion.delayMs && element.motion.delayMs > 0) {
-      wrapper.style.setProperty('--opencanvas-motion-delay', String(element.motion.delayMs) + 'ms');
-    }
-  }
+  applyCommonElementWrapperAttrs(wrapper, element);
   ctx.setBoxStyle(wrapper, element.box);
   ctx.applyElementStyle(wrapper, element);
   ctx.applyPinnedStyle(wrapper, element);
@@ -366,6 +354,54 @@ export function buildElementNodeImpl(
   return wrapper;
 }
 
+export function buildHostedElementNodeImpl(
+  ctx: BuildHostedElementNodeContext,
+  element: CanvasElement,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'opencanvas-element opencanvas-flow-content';
+  applyCommonElementWrapperAttrs(wrapper, element);
+  wrapper.style.position = 'relative';
+  wrapper.style.width = '100%';
+  wrapper.style.height = '100%';
+  wrapper.style.boxSizing = 'border-box';
+  ctx.applyElementStyle(wrapper, element);
+  ctx.applyPinnedStyle(wrapper, element);
+  wrapper.appendChild(ctx.buildElementBody(element));
+  if (ctx.selectedElementId === element.id) {
+    wrapper.setAttribute('data-selected', 'true');
+  }
+  return wrapper;
+}
+
+function applyCommonElementWrapperAttrs(wrapper: HTMLElement, element: CanvasElement): void {
+  wrapper.setAttribute('data-opencanvas-element', element.id);
+  wrapper.setAttribute('data-element-type', element.type);
+  // Mirror the public renderer: stamp data-variant for action/shape/
+  // container and data-role for text so kit CSS selectors of the form
+  // [data-style-kit="X"] [data-element-type="action"][data-variant="Y"]
+  // match in the editor preview exactly like they do in the published HTML.
+  if (element.type === 'action' || element.type === 'shape' || element.type === 'container') {
+    if (typeof element.variant === 'string') {
+      wrapper.setAttribute('data-variant', element.variant);
+    }
+  } else if (element.type === 'text') {
+    if (typeof element.role === 'string') {
+      wrapper.setAttribute('data-role', element.role);
+    }
+  }
+  if (element.motion) {
+    wrapper.setAttribute('data-motion-preset', element.motion.preset);
+    wrapper.setAttribute('data-motion-delay-ms', String(element.motion.delayMs || 0));
+    // Drive animation-delay via the same CSS variable the kit rules read on
+    // the published page; without this the data-motion-delay-ms attr was a
+    // dead label and every element on the page animated at t=0.
+    if (element.motion.delayMs && element.motion.delayMs > 0) {
+      wrapper.style.setProperty('--opencanvas-motion-delay', String(element.motion.delayMs) + 'ms');
+    }
+  }
+}
+
 export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string): void {
   if (ctx.editingElementId === elementId && ctx.activeEditFinish) {
     const commit = ctx.activeEditFinish;
@@ -386,10 +422,13 @@ export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string
     ctx.renderAll();
     return;
   }
+  const hosted = found.parentKind === 'flow-item';
   for (let i = 0; i < existingNodes.length; i++) {
     const existing = existingNodes[i];
     if (!existing || !existing.parentNode) continue;
-    const replacement = ctx.buildElementNode(found.element);
+    const replacement = hosted
+      ? ctx.buildHostedElementNode(found.element)
+      : ctx.buildElementNode(found.element);
     // Entrance animations are for first paint, not inspector tweaks. Without
     // this, every variant/opacity/etc. change re-fires the kit data-motion-preset
     // animation (fade-up etc.) so the wrapper flickers from opacity 0 to
@@ -406,7 +445,7 @@ export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string
         const textH = inner.scrollHeight;
         if (textH > found.element.box.h) {
           found.element.box.h = textH;
-          ctx.setBoxStyle(replacement, found.element.box);
+          if (!hosted) ctx.setBoxStyle(replacement, found.element.box);
         }
       }
     }

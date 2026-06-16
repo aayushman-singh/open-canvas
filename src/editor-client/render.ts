@@ -182,11 +182,7 @@ export function applyCameraTransform(ctx: CameraTransformContext): void {
 // CameraTransform surface plus a writable camera; the latter rides
 // inside CameraTransformContext (camera is a non-readonly field on
 // EditorContext, so the Pick stays mutable).
-export function setZoom(
-  ctx: CameraTransformContext,
-  newZoom: number,
-  maxClamp?: number,
-): void {
+export function setZoom(ctx: CameraTransformContext, newZoom: number, maxClamp?: number): void {
   ctx.camera.zoom = clampZoom(newZoom, maxClamp);
   applyCameraTransform(ctx);
 }
@@ -286,8 +282,7 @@ export function panToPage(ctx: PanToPageContext, pageId: string | null): void {
 // height + header/footer). Writes the result back onto ctx.pagePositions
 // in place, so the param surface needs both the state reader and the
 // pagePositions slot.
-export type ComputePagePositionsContext = Pick<EditorContext, 'state'> &
-  PagePositionsReaderContext;
+export type ComputePagePositionsContext = Pick<EditorContext, 'state'> & PagePositionsReaderContext;
 
 export function computePagePositions(ctx: ComputePagePositionsContext): void {
   if (!ctx.state || !ctx.state.pages) {
@@ -525,6 +520,7 @@ export function autoGrowTextElements(ctx: AutoGrowTextElementsContext): void {
   const wrappers = ctx.root!.querySelectorAll('[data-element-type="text"]');
   for (let i = 0; i < wrappers.length; i++) {
     const w = wrappers[i] as HTMLElement;
+    if (w.classList?.contains('opencanvas-flow-content')) continue;
     const inner = w.querySelector('.opencanvas-text');
     if (!inner) continue;
     const eid = w.getAttribute('data-opencanvas-element');

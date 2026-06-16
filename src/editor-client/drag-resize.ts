@@ -84,8 +84,7 @@ export type DragGestureContext = StateContext &
 // ADR 0064 — resize adds the min-size clamp constant to the drag
 // surface. Kept as a distinct alias so beginDragImpl doesn't have to
 // pretend to need MIN_ELEMENT_SIZE_PX.
-export type ResizeGestureContext = DragGestureContext &
-  Pick<EditorContext, 'MIN_ELEMENT_SIZE_PX'>;
+export type ResizeGestureContext = DragGestureContext & Pick<EditorContext, 'MIN_ELEMENT_SIZE_PX'>;
 
 // ADR 0064 — the root mousedown wiring touches DomContext for the
 // canvas root, SelectionContext for the click→select→drag latch, then
@@ -170,8 +169,7 @@ export function attachPointerHandlersImpl(ctx: AttachPointerHandlersContext): vo
       )
     )
       return;
-    const handle =
-      ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
+    const handle = ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
     if (handle) {
       const wrapper = handle.closest('.opencanvas-element');
       const dir = handle.getAttribute('data-resize-dir') || 'se';
@@ -205,6 +203,7 @@ export function beginDragImpl(
   startEv: PointerEvent | MouseEvent,
   wrapper: HTMLElement,
 ): void {
+  if (wrapper.classList.contains('opencanvas-flow-content')) return;
   const elementId = wrapper.getAttribute('data-opencanvas-element');
   if (!elementId) return;
   const found = ctx.findElement(elementId);
@@ -288,6 +287,7 @@ export function beginResizeImpl(
   wrapper: HTMLElement,
   dir: string,
 ): void {
+  if (wrapper.classList.contains('opencanvas-flow-content')) return;
   const elementId = wrapper.getAttribute('data-opencanvas-element');
   if (!elementId) return;
   const found = ctx.findElement(elementId);

@@ -62,6 +62,7 @@ function growTextWrappersOnce(ctx: EditorContext): boolean {
   let grew = false;
   for (let i = 0; i < wrappers.length; i++) {
     const w = wrappers[i] as HTMLElement;
+    if (w.classList?.contains('opencanvas-flow-content')) continue;
     const inner = w.querySelector('.opencanvas-text');
     if (!inner) continue;
     const eid = w.getAttribute('data-opencanvas-element');

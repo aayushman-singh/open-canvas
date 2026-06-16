@@ -37,6 +37,11 @@ import {
 } from './container.js';
 import { embedAgentToolSpec, embedInspectorSpec, embedSidebarSpec, renderEmbed } from './embed.js';
 import { formAgentToolSpec, formInspectorSpec, formSidebarSpec, renderForm } from './form.js';
+import {
+  flowContainerAgentToolSpec,
+  flowContainerSidebarSpec,
+  renderFlowContainer,
+} from './flow-container.js';
 import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
@@ -57,7 +62,12 @@ export type {
   ShapeElement,
   TextElement,
 } from '../schema.js';
-export type { AccordionElement, AccordionItem, AccordionStyle, AccordionVariant } from './accordion.js';
+export type {
+  AccordionElement,
+  AccordionItem,
+  AccordionStyle,
+  AccordionVariant,
+} from './accordion.js';
 export { ACCORDION_VARIANTS } from './accordion.js';
 export type { CarouselElement, CarouselSlide, CarouselStyle, CarouselVariant } from './carousel.js';
 export { CAROUSEL_VARIANTS } from './carousel.js';
@@ -84,6 +94,25 @@ export type {
 } from './collection.js';
 export type { Tab, TabsElement, TabsStyle, TabsVariant } from './tabs.js';
 export { TABS_DEFAULT_BAR_HEIGHT, TABS_VARIANTS } from './tabs.js';
+export type {
+  FlowAlign,
+  FlowBreakpoint,
+  FlowContainerElement,
+  FlowItem,
+  FlowItemResponsiveOverride,
+  FlowJustify,
+  FlowLayout,
+  FlowLayoutMode,
+  FlowLayoutResponsiveOverride,
+  FlowPadding,
+  FlowSpacing,
+} from './flow-container.js';
+export {
+  FLOW_ALIGNMENTS,
+  FLOW_BREAKPOINTS,
+  FLOW_JUSTIFY_VALUES,
+  FLOW_LAYOUT_MODES,
+} from './flow-container.js';
 
 // Re-export recipe id constants so the recipes module + smoke tests can
 // reference them without depending directly on individual element files.
@@ -97,6 +126,7 @@ export { NAV_RECIPE_ID } from './nav.js';
 export { TABLE_RECIPE_ID } from './table.js';
 export { COLLECTION_RECIPE_ID } from './collection.js';
 export { TABS_RECIPE_ID } from './tabs.js';
+export { FLOW_CONTAINER_RECIPE_ID } from './flow-container.js';
 
 /**
  * Single shared context shape passed to every render function. Element files
@@ -130,6 +160,12 @@ export interface ElementRenderCtx {
    * (not as a direct import) to break the renderer/dispatch import cycle.
    */
   renderElement: (element: CanvasElement, ctx: ElementRenderCtx) => string;
+  /**
+   * Placement-neutral renderer for Content Elements hosted by Flow Items.
+   * It preserves element attrs/body/style but deliberately omits section
+   * absolute positioning; Flow Item owns placement.
+   */
+  renderHostedElement: (element: CanvasElement, ctx: ElementRenderCtx) => string;
 }
 
 /**
@@ -217,6 +253,10 @@ export const RENDER_DISPATCH: RenderDispatch = {
       styleKit: ctx.styleKit,
       renderChild: (child) => ctx.renderElement(child, ctx),
     }),
+  'flow-container': (el, ctx) =>
+    renderFlowContainer(el, {
+      renderHostedElement: (child) => ctx.renderHostedElement(child, ctx),
+    }),
 };
 
 // ---------------------------------------------------------------------------
@@ -237,7 +277,10 @@ export const RENDER_DISPATCH: RenderDispatch = {
 // than a runtime no-op, matching the failure mode RENDER_DISPATCH catches.
 // A future element type that legitimately wants no inspector adds itself
 // to the Exclude<...> list as an explicit opt-out.
-export type InspectorDispatch = Record<Exclude<CanvasElement['type'], 'collection'>, InspectorSpec>;
+export type InspectorDispatch = Record<
+  Exclude<CanvasElement['type'], 'collection' | 'flow-container'>,
+  InspectorSpec
+>;
 
 export const INSPECTOR_DISPATCH: InspectorDispatch = {
   shape: shapeInspectorSpec,
@@ -310,6 +353,7 @@ export const SIDEBAR_DISPATCH: SidebarDispatch = {
   nav: navSidebarSpec,
   collection: collectionSidebarSpec,
   tabs: tabsSidebarSpec,
+  'flow-container': flowContainerSidebarSpec,
 };
 
 export const AGENT_TOOL_DISPATCH: AgentToolDispatch = {
@@ -328,4 +372,5 @@ export const AGENT_TOOL_DISPATCH: AgentToolDispatch = {
   form: formAgentToolSpec,
   chart: chartAgentToolSpec,
   tabs: tabsAgentToolSpec,
+  'flow-container': flowContainerAgentToolSpec,
 };

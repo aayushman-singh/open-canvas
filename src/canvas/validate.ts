@@ -11,12 +11,19 @@ import { COLLECTION_DISPLAYS, COLLECTION_SORTS } from './elements/collection.js'
 import type { CollectionDisplay, CollectionSort } from './elements/collection.js';
 import { escapeCssValue } from './elements/render-utils.js';
 import { isAllowedHref } from './action-href.js';
-import {
-  FORM_VARIANTS,
-} from './elements/form.js';
+import { FORM_VARIANTS } from './elements/form.js';
 import { ICON_NAMES, isIconName } from './icons.js';
 import { TABS_DEFAULT_BAR_HEIGHT, TABS_VARIANTS } from './elements/tabs.js';
 import { CAROUSEL_MODES, CAROUSEL_VARIANTS } from './elements/carousel.js';
+import {
+  FLOW_ALIGNMENTS,
+  FLOW_BREAKPOINTS,
+  FLOW_JUSTIFY_VALUES,
+  FLOW_LAYOUT_MODES,
+  type FlowAlign,
+  type FlowJustify,
+  type FlowLayoutMode,
+} from './elements/flow-container.js';
 import { NAV_LAYOUTS, NAV_LINK_KINDS, type NavLayout, type NavLinkKind } from './elements/nav.js';
 import {
   ACCORDION_STYLE_SPEC,
@@ -591,7 +598,12 @@ function validateComponentStyleObject(
 // Per-form visual customisation. Every field optional; the shared Component
 // Style validator owns primitives/unknown keys/conflicts; form has one
 // cross-field invariant for custom font family.
-function validateFormStyle(value: unknown, basePath: string, errors: string[], pinnedStyle: unknown): void {
+function validateFormStyle(
+  value: unknown,
+  basePath: string,
+  errors: string[],
+  pinnedStyle: unknown,
+): void {
   validateComponentStyleObject(value, FORM_STYLE_SPEC, basePath, errors, pinnedStyle);
   if (!isRecord(value)) return;
   const p = `${basePath}.formStyle`;
@@ -732,7 +744,9 @@ function validateTextContent(
       if (!isRecord(run.math)) {
         errors.push(`${runPath}.math must be an object when present`);
       } else if (typeof run.math.tex !== 'string' || run.math.tex.length === 0) {
-        errors.push(`${runPath}.math.tex must be a non-empty string (got ${describe(run.math.tex)})`);
+        errors.push(
+          `${runPath}.math.tex must be a non-empty string (got ${describe(run.math.tex)})`,
+        );
       } else if (run.math.tex.length > INLINE_MATH_TEX_MAX_LEN) {
         errors.push(
           `${runPath}.math.tex exceeds the ${String(INLINE_MATH_TEX_MAX_LEN)}-char cap (got ${String(run.math.tex.length)})`,
@@ -829,6 +843,262 @@ function validateAnchorId(value: unknown, basePath: string, errors: string[]): v
     errors.push(
       `${basePath}.anchorId must match /^[a-z][a-z0-9-]*$/ (lowercase ASCII letters, digits, hyphens; must start with a letter) (got ${describe(value)})`,
     );
+  }
+}
+
+const FLOW_GRID_COLUMNS_MIN = 1;
+const FLOW_GRID_COLUMNS_MAX = 12;
+
+function validateFlowSpacing(value: unknown, basePath: string, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push(`${basePath} must be an object with row and column numbers`);
+    return;
+  }
+  validateAllowedKeys(value, FLOW_SPACING_KEYS, basePath, errors);
+  for (const key of ['row', 'column'] as const) {
+    const raw = value[key];
+    if (!isFiniteNumber(raw) || raw < 0) {
+      errors.push(`${basePath}.${key} must be a finite number >= 0 (got ${describe(raw)})`);
+    }
+  }
+}
+
+function validateFlowPadding(value: unknown, basePath: string, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push(`${basePath} must be an object with top/right/bottom/left numbers`);
+    return;
+  }
+  validateAllowedKeys(value, FLOW_PADDING_KEYS, basePath, errors);
+  for (const key of ['top', 'right', 'bottom', 'left'] as const) {
+    const raw = value[key];
+    if (!isFiniteNumber(raw) || raw < 0) {
+      errors.push(`${basePath}.${key} must be a finite number >= 0 (got ${describe(raw)})`);
+    }
+  }
+}
+
+function validateFlowColumns(value: unknown, basePath: string, errors: string[]): boolean {
+  if (
+    !Number.isInteger(value) ||
+    (value as number) < FLOW_GRID_COLUMNS_MIN ||
+    (value as number) > FLOW_GRID_COLUMNS_MAX
+  ) {
+    errors.push(
+      `${basePath} must be an integer in [${String(FLOW_GRID_COLUMNS_MIN)}, ${String(FLOW_GRID_COLUMNS_MAX)}] (got ${describe(value)})`,
+    );
+    return false;
+  }
+  return true;
+}
+
+function validateAllowedKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  basePath: string,
+  errors: string[],
+): void {
+  const allowedSet = new Set<string>(allowed);
+  for (const key of Object.keys(value)) {
+    if (!allowedSet.has(key)) errors.push(`${basePath}.${key} is not supported`);
+  }
+}
+
+const FLOW_SPACING_KEYS = ['row', 'column'] as const;
+const FLOW_PADDING_KEYS = ['top', 'right', 'bottom', 'left'] as const;
+const FLOW_LAYOUT_KEYS = [
+  'mode',
+  'gap',
+  'padding',
+  'align',
+  'justify',
+  'wrap',
+  'columns',
+  'responsive',
+] as const;
+const FLOW_LAYOUT_RESPONSIVE_KEYS = [
+  'gap',
+  'padding',
+  'align',
+  'justify',
+  'wrap',
+  'columns',
+] as const;
+const FLOW_ITEM_KEYS = ['id', 'element', 'span', 'align', 'responsive'] as const;
+const FLOW_ITEM_RESPONSIVE_KEYS = ['span', 'align', 'hidden', 'order'] as const;
+
+function validateFlowLayout(value: unknown, basePath: string, errors: string[]): number | null {
+  if (!isRecord(value)) {
+    errors.push(`${basePath} must be an object`);
+    return null;
+  }
+  validateAllowedKeys(value, FLOW_LAYOUT_KEYS, basePath, errors);
+  const modeOk = assertOneOf<FlowLayoutMode>(
+    value.mode,
+    FLOW_LAYOUT_MODES,
+    `${basePath}.mode`,
+    errors,
+  );
+  validateFlowSpacing(value.gap, `${basePath}.gap`, errors);
+  validateFlowPadding(value.padding, `${basePath}.padding`, errors);
+  assertOneOf<FlowAlign>(value.align, FLOW_ALIGNMENTS, `${basePath}.align`, errors);
+  assertOneOf<FlowJustify>(value.justify, FLOW_JUSTIFY_VALUES, `${basePath}.justify`, errors);
+
+  let baseColumns: number | null = null;
+  if (modeOk && value.mode === 'grid') {
+    if (validateFlowColumns(value.columns, `${basePath}.columns`, errors)) {
+      baseColumns = value.columns as number;
+    }
+    if (value.wrap !== undefined) {
+      errors.push(`${basePath}.wrap is only allowed when mode === "row"`);
+    }
+  } else if (modeOk && value.mode === 'row') {
+    if (typeof value.wrap !== 'boolean') {
+      errors.push(`${basePath}.wrap must be a boolean when mode === "row"`);
+    }
+    if (value.columns !== undefined) {
+      errors.push(`${basePath}.columns is only allowed when mode === "grid"`);
+    }
+  } else if (modeOk && value.mode === 'stack') {
+    if (value.wrap !== undefined) {
+      errors.push(`${basePath}.wrap is only allowed when mode === "row"`);
+    }
+    if (value.columns !== undefined) {
+      errors.push(`${basePath}.columns is only allowed when mode === "grid"`);
+    }
+  }
+
+  if (value.responsive !== undefined) {
+    if (!isRecord(value.responsive)) {
+      errors.push(`${basePath}.responsive must be an object when present`);
+    } else {
+      const allowed = new Set<string>(FLOW_BREAKPOINTS);
+      for (const [bp, override] of Object.entries(value.responsive)) {
+        const bpPath = `${basePath}.responsive.${bp}`;
+        if (!allowed.has(bp)) {
+          errors.push(`${bpPath} is not a supported Flow breakpoint`);
+          continue;
+        }
+        if (!isRecord(override)) {
+          errors.push(`${bpPath} must be an object`);
+          continue;
+        }
+        validateAllowedKeys(override, FLOW_LAYOUT_RESPONSIVE_KEYS, bpPath, errors);
+        if (override.gap !== undefined) validateFlowSpacing(override.gap, `${bpPath}.gap`, errors);
+        if (override.padding !== undefined) {
+          validateFlowPadding(override.padding, `${bpPath}.padding`, errors);
+        }
+        if (override.align !== undefined) {
+          assertOneOf<FlowAlign>(override.align, FLOW_ALIGNMENTS, `${bpPath}.align`, errors);
+        }
+        if (override.justify !== undefined) {
+          assertOneOf<FlowJustify>(
+            override.justify,
+            FLOW_JUSTIFY_VALUES,
+            `${bpPath}.justify`,
+            errors,
+          );
+        }
+        if (override.wrap !== undefined) {
+          if (modeOk && value.mode !== 'row') {
+            errors.push(`${bpPath}.wrap is only allowed when mode === "row"`);
+          } else if (typeof override.wrap !== 'boolean') {
+            errors.push(`${bpPath}.wrap must be a boolean when present`);
+          }
+        }
+        if (override.columns !== undefined) {
+          if (modeOk && value.mode !== 'grid') {
+            errors.push(`${bpPath}.columns is only allowed when mode === "grid"`);
+          } else {
+            validateFlowColumns(override.columns, `${bpPath}.columns`, errors);
+          }
+        }
+      }
+    }
+  }
+  return baseColumns;
+}
+
+function validateFlowHostedElementBox(element: unknown, basePath: string, errors: string[]): void {
+  if (!isRecord(element) || !isRecord(element.box)) return;
+  if (element.box.x !== 0) {
+    errors.push(`${basePath}.box.x must be 0 inside a Flow Item (got ${describe(element.box.x)})`);
+  }
+  if (element.box.y !== 0) {
+    errors.push(`${basePath}.box.y must be 0 inside a Flow Item (got ${describe(element.box.y)})`);
+  }
+  if (element.box.w !== 0) {
+    errors.push(`${basePath}.box.w must be 0 inside a Flow Item (got ${describe(element.box.w)})`);
+  }
+  if (element.box.h !== 0) {
+    errors.push(`${basePath}.box.h must be 0 inside a Flow Item (got ${describe(element.box.h)})`);
+  }
+  if (element.box.z !== 0) {
+    errors.push(`${basePath}.box.z must be 0 inside a Flow Item (got ${describe(element.box.z)})`);
+  }
+  if (element.box.rotation !== undefined) {
+    errors.push(`${basePath}.box.rotation is not supported inside a Flow Item`);
+  }
+  if (element.responsive !== undefined) {
+    errors.push(`${basePath}.responsive is not supported inside a Flow Item`);
+  }
+  if (element.stickyOffset !== undefined) {
+    errors.push(`${basePath}.stickyOffset is not supported inside a Flow Item`);
+  }
+}
+
+function validateFlowItemResponsive(
+  value: unknown,
+  basePath: string,
+  errors: string[],
+  layoutMode: unknown,
+  baseColumns: number | null,
+  layoutResponsive: unknown,
+): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`${basePath}.responsive must be an object when present`);
+    return;
+  }
+  const allowed = new Set<string>(FLOW_BREAKPOINTS);
+  for (const [bp, override] of Object.entries(value)) {
+    const bpPath = `${basePath}.responsive.${bp}`;
+    if (!allowed.has(bp)) {
+      errors.push(`${bpPath} is not a supported Flow breakpoint`);
+      continue;
+    }
+    if (!isRecord(override)) {
+      errors.push(`${bpPath} must be an object`);
+      continue;
+    }
+    validateAllowedKeys(override, FLOW_ITEM_RESPONSIVE_KEYS, bpPath, errors);
+    const layoutOverride =
+      isRecord(layoutResponsive) && isRecord(layoutResponsive[bp])
+        ? layoutResponsive[bp]
+        : undefined;
+    const effectiveColumns =
+      isRecord(layoutOverride) && Number.isInteger(layoutOverride.columns)
+        ? (layoutOverride.columns as number)
+        : baseColumns;
+    if (override.span !== undefined) {
+      if (layoutMode !== 'grid') {
+        errors.push(`${bpPath}.span is only allowed when layout.mode === "grid"`);
+      } else if (!Number.isInteger(override.span) || (override.span as number) < 1) {
+        errors.push(`${bpPath}.span must be an integer >= 1 (got ${describe(override.span)})`);
+      } else if (effectiveColumns !== null && (override.span as number) > effectiveColumns) {
+        errors.push(
+          `${bpPath}.span must be <= columns (${String(effectiveColumns)}) at this breakpoint`,
+        );
+      }
+    }
+    if (override.align !== undefined) {
+      assertOneOf<FlowAlign>(override.align, FLOW_ALIGNMENTS, `${bpPath}.align`, errors);
+    }
+    if (override.hidden !== undefined && typeof override.hidden !== 'boolean') {
+      errors.push(`${bpPath}.hidden must be a boolean when present`);
+    }
+    if (override.order !== undefined && !Number.isInteger(override.order)) {
+      errors.push(`${bpPath}.order must be an integer when present`);
+    }
   }
 }
 
@@ -1049,9 +1319,7 @@ function validateElement(
       const iconOnlyOk = isIconName(element.iconKind);
       if (Array.isArray(element.label)) {
         const concat = element.label
-          .map((run) =>
-            isRecord(run) && typeof run.text === 'string' ? run.text : '',
-          )
+          .map((run) => (isRecord(run) && typeof run.text === 'string' ? run.text : ''))
           .join('');
         if (concat.length === 0 && !iconOnlyOk) {
           element.label = [{ text: 'Button' }];
@@ -1181,12 +1449,7 @@ function validateElement(
       // `sort` and `display` are optional during the multi-commit migration
       // (Phase 1 lands the shape; Phase 2B tightens to required-on-insert).
       if (element.sort !== undefined) {
-        assertOneOf<CollectionSort>(
-          element.sort,
-          COLLECTION_SORTS,
-          `${basePath}.sort`,
-          errors,
-        );
+        assertOneOf<CollectionSort>(element.sort, COLLECTION_SORTS, `${basePath}.sort`, errors);
       }
       if (element.display !== undefined) {
         assertOneOf<CollectionDisplay>(
@@ -1362,6 +1625,76 @@ function validateElement(
       }
       break;
     }
+    case 'flow-container': {
+      const baseColumns = validateFlowLayout(element.layout, `${basePath}.layout`, errors);
+      if (!Array.isArray(element.items)) {
+        errors.push(`${basePath}.items must be an array`);
+        break;
+      }
+      const childWidth =
+        isRecord(element.box) && isFiniteNumber(element.box.w) && element.box.w > 0
+          ? element.box.w
+          : pageWidth;
+      const childHeight =
+        isRecord(element.box) && isFiniteNumber(element.box.h) && element.box.h > 0
+          ? element.box.h
+          : sectionHeight;
+      const itemIds = new Set<string>();
+      const layoutMode = isRecord(element.layout) ? element.layout.mode : undefined;
+      const layoutResponsive = isRecord(element.layout) ? element.layout.responsive : undefined;
+      element.items.forEach((item, itemIdx) => {
+        const itemPath = `${basePath}.items[${String(itemIdx)}]`;
+        if (!isRecord(item)) {
+          errors.push(`${itemPath} must be an object`);
+          return;
+        }
+        validateAllowedKeys(item, FLOW_ITEM_KEYS, itemPath, errors);
+        if (typeof item.id !== 'string' || !ANCHOR_ID_RE.test(item.id)) {
+          errors.push(`${itemPath}.id must match /^[a-z][a-z0-9-]*$/ (got ${describe(item.id)})`);
+        } else if (itemIds.has(item.id)) {
+          errors.push(`${itemPath}.id "${item.id}" is already used by another Flow Item`);
+        } else {
+          itemIds.add(item.id);
+        }
+        if (item.span !== undefined) {
+          if (layoutMode !== 'grid') {
+            errors.push(`${itemPath}.span is only allowed when layout.mode === "grid"`);
+          } else if (!Number.isInteger(item.span) || (item.span as number) < 1) {
+            errors.push(`${itemPath}.span must be an integer >= 1 (got ${describe(item.span)})`);
+          } else if (baseColumns !== null && (item.span as number) > baseColumns) {
+            errors.push(`${itemPath}.span must be <= layout.columns (${String(baseColumns)})`);
+          }
+        }
+        if (item.align !== undefined) {
+          assertOneOf<FlowAlign>(item.align, FLOW_ALIGNMENTS, `${itemPath}.align`, errors);
+        }
+        validateFlowItemResponsive(
+          item.responsive,
+          itemPath,
+          errors,
+          layoutMode,
+          baseColumns,
+          layoutResponsive,
+        );
+        if (!isRecord(item.element)) {
+          errors.push(`${itemPath}.element must be an object`);
+          return;
+        }
+        const childPath = `${itemPath}.element`;
+        validateFlowHostedElementBox(item.element, childPath, errors);
+        assertUniqueElementId(item.element, childPath, pageIds, errors);
+        validateElement(
+          item.element,
+          childWidth,
+          childHeight,
+          childPath,
+          errors,
+          validPageIds,
+          pageIds,
+        );
+      });
+      break;
+    }
     case 'accordion': {
       validateComponentStyleObject(
         element.accordionStyle,
@@ -1450,7 +1783,10 @@ function validateSection(
   // must satisfy `/^[a-z][a-z0-9]*$/`. Optional — Library rows never carry
   // it; only sections materialised from a TemplateSeed composition do.
   if (section.instanceScope !== undefined) {
-    if (typeof section.instanceScope !== 'string' || !/^[a-z][a-z0-9]*$/.test(section.instanceScope)) {
+    if (
+      typeof section.instanceScope !== 'string' ||
+      !/^[a-z][a-z0-9]*$/.test(section.instanceScope)
+    ) {
       errors.push(
         `${basePath}.instanceScope must match /^[a-z][a-z0-9]*$/ (got ${describe(section.instanceScope)})`,
       );
@@ -1508,7 +1844,9 @@ function validateAccentBorder(value: unknown, basePath: string, errors: string[]
       );
     }
     if ('width' in value || 'radius' in value || 'spread' in value) {
-      errors.push(`${basePath} must not carry width/radius/spread on a ${value.type} accent border`);
+      errors.push(
+        `${basePath} must not carry width/radius/spread on a ${value.type} accent border`,
+      );
     }
   } else if (value.type === 'glow') {
     if (!isFiniteNumber(value.radius) || value.radius <= 0) {
@@ -1616,12 +1954,7 @@ function validatePage(
         `${basePath}.pageKind 'collection-index' is retired; this Collection's binding lives on the CollectionElement itself per ADR 0063.`,
       );
     } else {
-      assertOneOf(
-        page.pageKind,
-        COLLECTION_PAGE_KINDS,
-        `${basePath}.pageKind`,
-        errors,
-      );
+      assertOneOf(page.pageKind, COLLECTION_PAGE_KINDS, `${basePath}.pageKind`, errors);
       if (page.collectionSlug === undefined) {
         errors.push(
           `${basePath}.collectionSlug is required when pageKind is set (ADR 0060: a CMS-marked page must name its collection)`,
@@ -1744,9 +2077,16 @@ function validatePageAnchorIdUniqueness(
     // enforce uniqueness on the editable surface.
     if (el.type === 'collection' && Array.isArray(el.customTemplate)) {
       el.customTemplate.forEach((child, childIdx) => {
+        visitElementTree(child, pathJoin(pathJoin(elementPath, 'customTemplate'), childIdx));
+      });
+      return;
+    }
+    if (el.type === 'flow-container' && Array.isArray(el.items)) {
+      el.items.forEach((item, itemIdx) => {
+        if (!isRecord(item)) return;
         visitElementTree(
-          child,
-          pathJoin(pathJoin(elementPath, 'customTemplate'), childIdx),
+          item.element,
+          pathJoin(pathJoin(pathJoin(elementPath, 'items'), itemIdx), 'element'),
         );
       });
       return;
@@ -1951,11 +2291,27 @@ function validateSiteShape(state: unknown, errors: string[]): void {
   // `isPinnedSiteSection: true` flag selects the lower height minimum (ADR 0059).
   if (isRecord(state.header)) {
     const headerIds = new Set<string>();
-    validateSection(state.header, PAGE_WIDTH_MAX, 'state.header', errors, headerIds, validPageIds, true);
+    validateSection(
+      state.header,
+      PAGE_WIDTH_MAX,
+      'state.header',
+      errors,
+      headerIds,
+      validPageIds,
+      true,
+    );
   }
   if (isRecord(state.footer)) {
     const footerIds = new Set<string>();
-    validateSection(state.footer, PAGE_WIDTH_MAX, 'state.footer', errors, footerIds, validPageIds, true);
+    validateSection(
+      state.footer,
+      PAGE_WIDTH_MAX,
+      'state.footer',
+      errors,
+      footerIds,
+      validPageIds,
+      true,
+    );
   }
   // ADR 0050 dec 2 — per-page anchor uniqueness across (header + sections + footer).
   if (Array.isArray(state.pages)) {
@@ -1979,15 +2335,73 @@ function validatePublishedMediaReferencesInSection(
 ): void {
   if (!isRecord(section) || !Array.isArray(section.elements)) return;
   section.elements.forEach((element, elementIdx) => {
-    if (!isRecord(element) || element.type !== 'media') return;
     const elementPath = `${basePath}.elements[${String(elementIdx)}]`;
+    validatePublishedMediaReferencesInElement(element, elementPath, errors);
+  });
+}
+
+function validatePublishedMediaReferencesInElement(
+  element: unknown,
+  elementPath: string,
+  errors: string[],
+): void {
+  if (!isRecord(element)) return;
+  if (element.type === 'media') {
     if (element.assetId === '') {
       errors.push(`${elementPath}.assetId must be non-empty in published snapshots`);
     }
     if (typeof element.posterAssetId === 'string' && element.posterAssetId === '') {
       errors.push(`${elementPath}.posterAssetId must be non-empty in published snapshots`);
     }
-  });
+    return;
+  }
+  if (element.type === 'tabs' && Array.isArray(element.tabs)) {
+    element.tabs.forEach((tab, tabIdx) => {
+      if (!isRecord(tab) || !Array.isArray(tab.elements)) return;
+      tab.elements.forEach((child, childIdx) => {
+        validatePublishedMediaReferencesInElement(
+          child,
+          pathJoin(pathJoin(pathJoin(pathJoin(elementPath, 'tabs'), tabIdx), 'elements'), childIdx),
+          errors,
+        );
+      });
+    });
+    return;
+  }
+  if (element.type === 'collection') {
+    if (Array.isArray(element.customTemplate)) {
+      element.customTemplate.forEach((child, childIdx) => {
+        validatePublishedMediaReferencesInElement(
+          child,
+          pathJoin(pathJoin(elementPath, 'customTemplate'), childIdx),
+          errors,
+        );
+      });
+    }
+    if (Array.isArray(element.entries)) {
+      element.entries.forEach((entry, entryIdx) => {
+        if (!Array.isArray(entry)) return;
+        entry.forEach((child, childIdx) => {
+          validatePublishedMediaReferencesInElement(
+            child,
+            pathJoin(pathJoin(pathJoin(elementPath, 'entries'), entryIdx), childIdx),
+            errors,
+          );
+        });
+      });
+    }
+    return;
+  }
+  if (element.type === 'flow-container' && Array.isArray(element.items)) {
+    element.items.forEach((item, itemIdx) => {
+      if (!isRecord(item)) return;
+      validatePublishedMediaReferencesInElement(
+        item.element,
+        pathJoin(pathJoin(pathJoin(elementPath, 'items'), itemIdx), 'element'),
+        errors,
+      );
+    });
+  }
 }
 
 function validatePublishedMediaReferences(snapshot: unknown, errors: string[]): void {

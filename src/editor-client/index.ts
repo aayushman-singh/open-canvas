@@ -82,6 +82,7 @@ import {
 import { buildElementBodyImpl } from './body-builders-data.js';
 import {
   buildElementMenuImpl,
+  buildHostedElementNodeImpl,
   buildElementNodeImpl,
   closeElementMenuImpl,
   rebuildElementImpl,
@@ -624,6 +625,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     applyPinnedStyle: (wrapper, element) => applyPinnedStyleImpl(ctx, wrapper, element),
     buildElementBody: (element) => buildElementBodyImpl(ctx, element),
     buildElementNode: (element) => buildElementNodeImpl(ctx, element),
+    buildHostedElementNode: (element) => buildHostedElementNodeImpl(ctx, element),
     buildElementMenu: (element, section, wrapper) =>
       buildElementMenuImpl(ctx, element, section, wrapper),
     toggleElementMenu: (elementId, wrapper) => toggleElementMenuImpl(ctx, elementId, wrapper),

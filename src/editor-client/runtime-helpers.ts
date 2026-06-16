@@ -48,10 +48,7 @@ import {
 import { mountComponentStyle } from './inspector-component-style.js';
 import { mountFormFields } from './inspector-form-mounts.js';
 import { mountMediaAi, mountVideoPlayback } from './inspector-media-mounts.js';
-import {
-  mountTextFontFamily,
-  refreshCustomFontsImpl,
-} from './inspector-text-font-family.js';
+import { mountTextFontFamily, refreshCustomFontsImpl } from './inspector-text-font-family.js';
 import {
   mountMediaPicker,
   mountNavLinks,
@@ -111,8 +108,7 @@ export type CurrentPageContext = Pick<EditorContext, 'state' | 'activePageId'>;
 // node (DomContext.statusEl) and the auto-clear timer slot the IIFE pins on
 // ctx — a tight pair that no canonical alias owns. Exported so the boot
 // binder + any future direct caller picks up the same shape.
-export type SetStatusContext = Pick<DomContext, 'statusEl'> &
-  Pick<EditorContext, 'statusTimer'>;
+export type SetStatusContext = Pick<DomContext, 'statusEl'> & Pick<EditorContext, 'statusTimer'>;
 
 // ADR 0064 — preserving the inspector's scroll position across renders
 // pairs the inspector DOM ref (DomContext) with the per-subject latch the
@@ -455,10 +451,7 @@ export function currentPageImpl(ctx: CurrentPageContext): CanvasPage | null {
   return ctx.state.pages[0] ?? null;
 }
 
-export function findSectionImpl(
-  ctx: StateContext,
-  sectionId: string | null,
-): CanvasSection | null {
+export function findSectionImpl(ctx: StateContext, sectionId: string | null): CanvasSection | null {
   if (!sectionId || !ctx.state) return null;
   if (ctx.state.header && ctx.state.header.id === sectionId) return ctx.state.header;
   if (ctx.state.footer && ctx.state.footer.id === sectionId) return ctx.state.footer;
@@ -520,6 +513,30 @@ function findElementIn(section: CanvasSection, elementId: string): FindElementRe
         if (Array.isArray(customTemplate)) {
           const hit = searchArray(customTemplate as CanvasElement[], 'collection-custom-template', {
             collectionElement: el,
+          });
+          if (hit) return hit;
+        }
+      } else if (el.type === 'flow-container' && Array.isArray((el as { items?: unknown }).items)) {
+        const items = (el as { items: unknown[] }).items;
+        for (let ii = 0; ii < items.length; ii++) {
+          const item = items[ii];
+          if (!item || typeof item !== 'object') continue;
+          const itemRecord = item as { id?: unknown; element?: unknown };
+          if (!itemRecord.element || typeof itemRecord.element !== 'object') continue;
+          const hosted = itemRecord.element as CanvasElement;
+          const itemId = typeof itemRecord.id === 'string' ? itemRecord.id : String(ii);
+          if (hosted.id === elementId) {
+            return {
+              section,
+              element: hosted,
+              parentArray: null,
+              parentKind: 'flow-item',
+              parentMeta: { flowContainerElement: el, itemId },
+            };
+          }
+          const hit = searchArray([hosted], 'flow-item', {
+            flowContainerElement: el,
+            itemId,
           });
           if (hit) return hit;
         }
@@ -654,10 +671,7 @@ export function applyPageStylePropertiesImpl(
 // (the section's per-recipe add-element buttons row). It threads ctx
 // only to satisfy the legacy IIFE shape — the impl `void`s ctx — so
 // the surface alias is empty.
-function buildSectionToolbar(
-  ctx: Pick<EditorContext, never>,
-  section: CanvasSection,
-): HTMLElement {
+function buildSectionToolbar(ctx: Pick<EditorContext, never>, section: CanvasSection): HTMLElement {
   const bar = document.createElement('div');
   bar.className = 'section-toolbar';
   const specs = Object.values(SIDEBAR_DISPATCH);
@@ -2301,9 +2315,7 @@ export function wireCoEditPresenceListeners(ctx: WireCoEditPresenceListenersCont
   document.addEventListener('selectionchange', () => schedulePublishLocalPresence(ctx));
 }
 
-export function wireMarkToolbarReflowListeners(
-  ctx: WireMarkToolbarReflowListenersContext,
-): void {
+export function wireMarkToolbarReflowListeners(ctx: WireMarkToolbarReflowListenersContext): void {
   window.addEventListener(
     'scroll',
     () => {

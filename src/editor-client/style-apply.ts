@@ -34,7 +34,17 @@ import type { EditorContext } from './editor-context.js';
 // stampers share the type to keep the wrapper-style triplet uniform.
 export type StyleApplyContext = Pick<EditorContext, 'siteBase'>;
 
-export function setBoxStyleImpl(_ctx: StyleApplyContext, wrapper: HTMLElement, box: PositionedBox): void {
+export function setBoxStyleImpl(
+  _ctx: StyleApplyContext,
+  wrapper: HTMLElement,
+  box: PositionedBox,
+): void {
+  if (wrapper.classList?.contains('opencanvas-flow-content')) {
+    throw new Error(
+      'setBoxStyle: refusing to apply section positioning to Flow-hosted element ' +
+        String(wrapper.getAttribute('data-opencanvas-element') || '<unknown>'),
+    );
+  }
   wrapper.style.position = 'absolute';
   wrapper.style.left = box.x + 'px';
   wrapper.style.top = box.y + 'px';
@@ -56,7 +66,11 @@ export function setBoxStyleImpl(_ctx: StyleApplyContext, wrapper: HTMLElement, b
 // local pre-flight so a forbidden value never renders even before save.
 // If you change either rule, mirror it in validate.ts or the editor will
 // accept what the server rejects (and vice versa).
-export function applyPinnedStyleImpl(_ctx: StyleApplyContext, wrapper: HTMLElement, element: CanvasElement): void {
+export function applyPinnedStyleImpl(
+  _ctx: StyleApplyContext,
+  wrapper: HTMLElement,
+  element: CanvasElement,
+): void {
   if (!element.pinnedStyle) return;
   for (const key of Object.keys(element.pinnedStyle)) {
     if (!/^[a-zA-Z-]+$/.test(key)) continue;
@@ -68,7 +82,11 @@ export function applyPinnedStyleImpl(_ctx: StyleApplyContext, wrapper: HTMLEleme
   }
 }
 
-export function applyElementStyleImpl(ctx: StyleApplyContext, wrapper: HTMLElement, element: CanvasElement): void {
+export function applyElementStyleImpl(
+  ctx: StyleApplyContext,
+  wrapper: HTMLElement,
+  element: CanvasElement,
+): void {
   const es = element.elementStyle;
   if (!es) return;
   if (es.backgroundColor) {

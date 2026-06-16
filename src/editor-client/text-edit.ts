@@ -56,11 +56,7 @@ import type {
   BuildMarkToolbarContext,
   RemoveMarkToolbarContext,
 } from './mark-toolbar.js';
-import {
-  buildMarkToolbarImpl,
-  removeMarkToolbar,
-  applyMarkImpl,
-} from './mark-toolbar.js';
+import { buildMarkToolbarImpl, removeMarkToolbar, applyMarkImpl } from './mark-toolbar.js';
 import type { OnSelectionChangeForLinkPopoverContext } from './link-popover.js';
 import {
   onLinkMouseEnter,
@@ -122,7 +118,7 @@ export function beginTextEditImpl(
   elementId: string,
   clickedWrapper?: HTMLElement | null,
 ): void {
-const found = ctx.findElement(elementId);
+  const found = ctx.findElement(elementId);
   if (!found || found.element.type !== 'text') return;
   if (!ctx.root) return;
   // Local alias so the text-narrowing survives closure capture in
@@ -141,7 +137,7 @@ const found = ctx.findElement(elementId);
   const inner = wrapper.querySelector<HTMLElement>('.opencanvas-text');
   if (!inner) return;
   const textH = inner.scrollHeight;
-  if (textH > textElement.box.h) {
+  if (!wrapper.classList?.contains('opencanvas-flow-content') && textH > textElement.box.h) {
     textElement.box.h = textH;
     ctx.setBoxStyle(wrapper, textElement.box);
     ctx.scheduleSave();
@@ -155,7 +151,7 @@ const found = ctx.findElement(elementId);
   // line during inline edit would push the caret past the clipped right
   // edge and leave the Owner typing into an invisible region. finish()
   // removes the flag so the clip resumes the moment the edit ends.
-  (wrapper).setAttribute('data-editing', 'true');
+  wrapper.setAttribute('data-editing', 'true');
   inner.setAttribute('contenteditable', 'true');
   inner.focus();
 

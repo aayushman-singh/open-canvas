@@ -28,6 +28,13 @@ import type { ChartElement } from '../canvas/elements/chart.js';
 import type { CodeElement } from '../canvas/elements/code.js';
 import type { CollectionElement } from '../canvas/elements/collection.js';
 import type { EmbedElement } from '../canvas/elements/embed.js';
+import type {
+  FlowAlign,
+  FlowContainerElement,
+  FlowItem,
+  FlowLayout,
+  FlowJustify,
+} from '../canvas/elements/flow-container.js';
 import type { FormElement } from '../canvas/elements/form.js';
 import { formPointerFx } from '../canvas/elements/form.js';
 import type { NavElement } from '../canvas/elements/nav.js';
@@ -109,6 +116,8 @@ export type BuildTabsBodyContext = RenderContext &
   PersistContext &
   Pick<EditorContext, 'buildElementNode'>;
 
+export type BuildFlowContainerBodyContext = Pick<EditorContext, 'buildHostedElementNode'>;
+
 // ADR 0064 — buildElementBody is the per-type dispatcher; its parameter
 // surface is the union of every per-builder narrow context plus the five
 // primitive contexts re-exported from body-builders-basic.ts. The wiring
@@ -130,7 +139,8 @@ export type BuildElementBodyContext = BuildTextBodyContext &
   BuildTableBodyContext &
   BuildNavBodyContext &
   BuildCollectionBodyContext &
-  BuildTabsBodyContext;
+  BuildTabsBodyContext &
+  BuildFlowContainerBodyContext;
 
 // -- Chart editor preview ----------------------------------------------
 //
@@ -885,6 +895,87 @@ export function buildTabsBodyImpl(ctx: BuildTabsBodyContext, element: TabsElemen
   return node;
 }
 
+function flowAlignToCss(value: FlowAlign): string {
+  if (value === 'start') return 'flex-start';
+  if (value === 'end') return 'flex-end';
+  return value;
+}
+
+function flowJustifyToCss(value: FlowJustify): string {
+  if (value === 'start') return 'flex-start';
+  if (value === 'end') return 'flex-end';
+  return value;
+}
+
+function applyFlowLayoutStyle(node: HTMLElement, layout: FlowLayout): void {
+  node.style.boxSizing = 'border-box';
+  node.style.width = '100%';
+  node.style.height = '100%';
+  node.style.gap = String(layout.gap.row) + 'px ' + String(layout.gap.column) + 'px';
+  node.style.padding =
+    String(layout.padding.top) +
+    'px ' +
+    String(layout.padding.right) +
+    'px ' +
+    String(layout.padding.bottom) +
+    'px ' +
+    String(layout.padding.left) +
+    'px';
+  node.style.overflow = 'hidden';
+  if (layout.mode === 'grid') {
+    node.style.display = 'grid';
+    node.style.gridTemplateColumns = 'repeat(' + String(layout.columns ?? 1) + ', minmax(0, 1fr))';
+    node.style.alignItems = flowAlignToCss(layout.align);
+    node.style.justifyContent = flowJustifyToCss(layout.justify);
+    return;
+  }
+  node.style.display = 'flex';
+  node.style.flexDirection = layout.mode === 'stack' ? 'column' : 'row';
+  node.style.alignItems = flowAlignToCss(layout.align);
+  node.style.justifyContent = flowJustifyToCss(layout.justify);
+  if (layout.mode === 'row') {
+    node.style.flexWrap = layout.wrap === true ? 'wrap' : 'nowrap';
+  }
+}
+
+function buildFlowItemNode(
+  ctx: BuildFlowContainerBodyContext,
+  item: FlowItem,
+  layout: FlowLayout,
+): HTMLElement {
+  const node = document.createElement('div');
+  node.className = 'opencanvas-flow-item';
+  node.setAttribute('data-opencanvas-flow-item', item.id);
+  node.style.position = 'relative';
+  node.style.minWidth = '0';
+  node.style.minHeight = '0';
+  if (layout.mode === 'grid' && item.span !== undefined) {
+    node.style.gridColumn = 'span ' + String(item.span);
+  }
+  if (item.align !== undefined) {
+    node.style.alignSelf = flowAlignToCss(item.align);
+  }
+  node.appendChild(ctx.buildHostedElementNode(item.element));
+  return node;
+}
+
+export function buildFlowContainerBodyImpl(
+  ctx: BuildFlowContainerBodyContext,
+  element: FlowContainerElement,
+): HTMLElement {
+  const node = document.createElement('div');
+  node.className = 'opencanvas-flow-container';
+  node.setAttribute('data-opencanvas-flow-container', element.id);
+  node.setAttribute('data-flow-layout-mode', element.layout.mode);
+  applyFlowLayoutStyle(node, element.layout);
+  const items = Array.isArray(element.items) ? element.items : [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item !== undefined) node.appendChild(buildFlowItemNode(ctx, item, element.layout));
+  }
+  return node;
+}
+
 export function buildElementBodyImpl(
   ctx: BuildElementBodyContext,
   element: CanvasElement,
@@ -920,6 +1011,8 @@ export function buildElementBodyImpl(
       return buildCollectionBodyImpl(ctx, element);
     case 'tabs':
       return buildTabsBodyImpl(ctx, element);
+    case 'flow-container':
+      return buildFlowContainerBodyImpl(ctx, element);
   }
   // Exhaustive switch above — TypeScript proves this is unreachable.
   // Throw loudly anyway so a hand-rolled element type added without a

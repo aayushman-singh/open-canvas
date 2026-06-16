@@ -129,6 +129,13 @@ import type {
   FormElement,
   FormFieldDef,
   FormStyle,
+  FlowContainerElement,
+  FlowItem,
+  FlowItemResponsiveOverride,
+  FlowLayout,
+  FlowLayoutResponsiveOverride,
+  FlowPadding,
+  FlowSpacing,
   NavElement,
   NavLink,
   TableColumn,
@@ -495,7 +502,10 @@ function encodeFormElement(el: FormElement): Y.Map<unknown> {
   setIfDefined(out, 'webhookUrl', el.webhookUrl);
   setIfDefined(out, 'variant', el.variant); // ADR 0066
   if (el.formStyle !== undefined) {
-    out.set('formStyle', encodeComponentStyle(el.formStyle as Record<string, unknown>, FORM_STYLE_SPEC));
+    out.set(
+      'formStyle',
+      encodeComponentStyle(el.formStyle as Record<string, unknown>, FORM_STYLE_SPEC),
+    );
   }
   return out;
 }
@@ -656,7 +666,10 @@ function encodeTabsElement(el: TabsElement): Y.Map<unknown> {
   setIfDefined(out, 'tabBarHeight', el.tabBarHeight);
   setIfDefined(out, 'variant', el.variant); // ADR 0066
   if (el.tabsStyle !== undefined) {
-    out.set('tabsStyle', encodeComponentStyle(el.tabsStyle as Record<string, unknown>, TABS_STYLE_SPEC));
+    out.set(
+      'tabsStyle',
+      encodeComponentStyle(el.tabsStyle as Record<string, unknown>, TABS_STYLE_SPEC),
+    );
   }
   const tabsArr = new Y.Array<Y.Map<unknown>>();
   for (const tab of el.tabs) {
@@ -669,6 +682,95 @@ function encodeTabsElement(el: TabsElement): Y.Map<unknown> {
     tabsArr.push([tabMap]);
   }
   out.set('tabs', tabsArr);
+  return out;
+}
+
+function encodeFlowSpacing(spacing: FlowSpacing): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  out.set('row', spacing.row);
+  out.set('column', spacing.column);
+  return out;
+}
+
+function encodeFlowPadding(padding: FlowPadding): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  out.set('top', padding.top);
+  out.set('right', padding.right);
+  out.set('bottom', padding.bottom);
+  out.set('left', padding.left);
+  return out;
+}
+
+function encodeFlowLayoutResponsiveOverride(
+  override: FlowLayoutResponsiveOverride,
+): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  if (override.gap !== undefined) out.set('gap', encodeFlowSpacing(override.gap));
+  if (override.padding !== undefined) out.set('padding', encodeFlowPadding(override.padding));
+  setIfDefined(out, 'align', override.align);
+  setIfDefined(out, 'justify', override.justify);
+  setIfDefined(out, 'wrap', override.wrap);
+  setIfDefined(out, 'columns', override.columns);
+  return out;
+}
+
+function encodeFlowLayout(layout: FlowLayout): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  out.set('mode', layout.mode);
+  out.set('gap', encodeFlowSpacing(layout.gap));
+  out.set('padding', encodeFlowPadding(layout.padding));
+  out.set('align', layout.align);
+  out.set('justify', layout.justify);
+  setIfDefined(out, 'wrap', layout.wrap);
+  setIfDefined(out, 'columns', layout.columns);
+  if (layout.responsive !== undefined) {
+    const responsive = new Y.Map<unknown>();
+    for (const bp of ['tablet', 'phone'] as const) {
+      const override = layout.responsive[bp];
+      if (override !== undefined) {
+        responsive.set(bp, encodeFlowLayoutResponsiveOverride(override));
+      }
+    }
+    out.set('responsive', responsive);
+  }
+  return out;
+}
+
+function encodeFlowItemResponsiveOverride(override: FlowItemResponsiveOverride): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  setIfDefined(out, 'span', override.span);
+  setIfDefined(out, 'align', override.align);
+  setIfDefined(out, 'hidden', override.hidden);
+  setIfDefined(out, 'order', override.order);
+  return out;
+}
+
+function encodeFlowItem(item: FlowItem): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  out.set('id', item.id);
+  out.set('element', encodeElement(item.element));
+  setIfDefined(out, 'span', item.span);
+  setIfDefined(out, 'align', item.align);
+  if (item.responsive !== undefined) {
+    const responsive = new Y.Map<unknown>();
+    for (const bp of ['tablet', 'phone'] as const) {
+      const override = item.responsive[bp];
+      if (override !== undefined) {
+        responsive.set(bp, encodeFlowItemResponsiveOverride(override));
+      }
+    }
+    out.set('responsive', responsive);
+  }
+  return out;
+}
+
+function encodeFlowContainerElement(el: FlowContainerElement): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  encodeBaseElementFields(out, el);
+  out.set('layout', encodeFlowLayout(el.layout));
+  const items = new Y.Array<Y.Map<unknown>>();
+  for (const item of el.items) items.push([encodeFlowItem(item)]);
+  out.set('items', items);
   return out;
 }
 
@@ -746,6 +848,7 @@ export const Y_ENCODE_DISPATCH: YEncodeDispatch = {
   nav: encodeNavElement,
   collection: encodeCollectionElement,
   tabs: encodeTabsElement,
+  'flow-container': encodeFlowContainerElement,
 };
 
 function encodeElement(el: CanvasElement): Y.Map<unknown> {
@@ -1235,7 +1338,8 @@ function decodeCarouselElement(map: Y.Map<unknown>, base: BaseElement): Carousel
     showDots: map.get('showDots') as boolean,
   };
   if (map.has('mode')) el.mode = map.get('mode') as NonNullable<CarouselElement['mode']>;
-  if (map.has('variant')) el.variant = map.get('variant') as NonNullable<CarouselElement['variant']>; // ADR 0066
+  if (map.has('variant'))
+    el.variant = map.get('variant') as NonNullable<CarouselElement['variant']>; // ADR 0066
   if (map.has('carouselStyle')) {
     el.carouselStyle = decodeComponentStyle(
       map.get('carouselStyle') as Y.Map<unknown>,
@@ -1301,12 +1405,98 @@ function decodeTabsElement(map: Y.Map<unknown>, base: BaseElement): TabsElement 
   if (map.has('tabBarHeight')) out.tabBarHeight = map.get('tabBarHeight') as number;
   if (map.has('variant')) out.variant = map.get('variant') as NonNullable<TabsElement['variant']>; // ADR 0066
   if (map.has('tabsStyle')) {
-    out.tabsStyle = decodeComponentStyle(
-      map.get('tabsStyle') as Y.Map<unknown>,
-      TABS_STYLE_SPEC,
-    );
+    out.tabsStyle = decodeComponentStyle(map.get('tabsStyle') as Y.Map<unknown>, TABS_STYLE_SPEC);
   }
   return out;
+}
+
+function decodeFlowSpacing(map: Y.Map<unknown>): FlowSpacing {
+  return {
+    row: map.get('row') as number,
+    column: map.get('column') as number,
+  };
+}
+
+function decodeFlowPadding(map: Y.Map<unknown>): FlowPadding {
+  return {
+    top: map.get('top') as number,
+    right: map.get('right') as number,
+    bottom: map.get('bottom') as number,
+    left: map.get('left') as number,
+  };
+}
+
+function decodeFlowLayoutResponsiveOverride(map: Y.Map<unknown>): FlowLayoutResponsiveOverride {
+  const out: FlowLayoutResponsiveOverride = {};
+  if (map.has('gap')) out.gap = decodeFlowSpacing(map.get('gap') as Y.Map<unknown>);
+  if (map.has('padding')) out.padding = decodeFlowPadding(map.get('padding') as Y.Map<unknown>);
+  if (map.has('align')) out.align = map.get('align') as NonNullable<typeof out.align>;
+  if (map.has('justify')) out.justify = map.get('justify') as NonNullable<typeof out.justify>;
+  if (map.has('wrap')) out.wrap = map.get('wrap') as boolean;
+  if (map.has('columns')) out.columns = map.get('columns') as number;
+  return out;
+}
+
+function decodeFlowLayout(map: Y.Map<unknown>): FlowLayout {
+  const out: FlowLayout = {
+    mode: map.get('mode') as FlowLayout['mode'],
+    gap: decodeFlowSpacing(map.get('gap') as Y.Map<unknown>),
+    padding: decodeFlowPadding(map.get('padding') as Y.Map<unknown>),
+    align: map.get('align') as FlowLayout['align'],
+    justify: map.get('justify') as FlowLayout['justify'],
+  };
+  if (map.has('wrap')) out.wrap = map.get('wrap') as boolean;
+  if (map.has('columns')) out.columns = map.get('columns') as number;
+  if (map.has('responsive')) {
+    const responsiveMap = map.get('responsive') as Y.Map<Y.Map<unknown>>;
+    const responsive: NonNullable<FlowLayout['responsive']> = {};
+    for (const bp of ['tablet', 'phone'] as const) {
+      if (responsiveMap.has(bp)) {
+        responsive[bp] = decodeFlowLayoutResponsiveOverride(responsiveMap.get(bp)!);
+      }
+    }
+    out.responsive = responsive;
+  }
+  return out;
+}
+
+function decodeFlowItemResponsiveOverride(map: Y.Map<unknown>): FlowItemResponsiveOverride {
+  const out: FlowItemResponsiveOverride = {};
+  if (map.has('span')) out.span = map.get('span') as number;
+  if (map.has('align')) out.align = map.get('align') as NonNullable<typeof out.align>;
+  if (map.has('hidden')) out.hidden = map.get('hidden') as boolean;
+  if (map.has('order')) out.order = map.get('order') as number;
+  return out;
+}
+
+function decodeFlowItem(map: Y.Map<unknown>): FlowItem {
+  const out: FlowItem = {
+    id: map.get('id') as string,
+    element: decodeElement(map.get('element') as Y.Map<unknown>),
+  };
+  if (map.has('span')) out.span = map.get('span') as number;
+  if (map.has('align')) out.align = map.get('align') as NonNullable<typeof out.align>;
+  if (map.has('responsive')) {
+    const responsiveMap = map.get('responsive') as Y.Map<Y.Map<unknown>>;
+    const responsive: NonNullable<FlowItem['responsive']> = {};
+    for (const bp of ['tablet', 'phone'] as const) {
+      if (responsiveMap.has(bp)) {
+        responsive[bp] = decodeFlowItemResponsiveOverride(responsiveMap.get(bp)!);
+      }
+    }
+    out.responsive = responsive;
+  }
+  return out;
+}
+
+function decodeFlowContainerElement(map: Y.Map<unknown>, base: BaseElement): FlowContainerElement {
+  const items = (map.get('items') as Y.Array<Y.Map<unknown>>).map(decodeFlowItem);
+  return {
+    ...base,
+    type: 'flow-container',
+    layout: decodeFlowLayout(map.get('layout') as Y.Map<unknown>),
+    items,
+  };
 }
 
 function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): CollectionElement {
@@ -1386,6 +1576,7 @@ export const Y_DECODE_DISPATCH: YDecodeDispatch = {
   nav: decodeNavElement,
   collection: decodeCollectionElement,
   tabs: decodeTabsElement,
+  'flow-container': decodeFlowContainerElement,
 };
 
 function decodeElement(map: Y.Map<unknown>): CanvasElement {

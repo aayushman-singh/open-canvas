@@ -124,7 +124,7 @@ export function selectElement(ctx: SelectElementContext, elementId: string | nul
         // single element id; mounting on each keeps handle behaviour
         // consistent across pages instead of clinging to the first match
         // in document order.
-        mountResizeHandles(nextEl);
+        if (!nextEl.classList.contains('opencanvas-flow-content')) mountResizeHandles(nextEl);
       }
     }
     const found = ctx.findElement(elementId);

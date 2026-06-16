@@ -44,6 +44,7 @@ const ELEMENT_TYPE_FILL: Record<ElementType, string> = {
   nav: '#e5e7eb',
   collection: '#fde68a',
   tabs: '#f0abfc',
+  'flow-container': '#99f6e4',
 };
 
 /**

@@ -25,11 +25,17 @@ import type { Tab } from '../canvas/elements/tabs.js';
 export interface FindElementResult {
   section: CanvasSection;
   element: CanvasElement;
-  parentArray: CanvasElement[];
-  parentKind: 'section' | 'tab-panel' | 'collection-entry' | 'collection-custom-template';
+  parentArray: CanvasElement[] | null;
+  parentKind:
+    | 'section'
+    | 'tab-panel'
+    | 'collection-entry'
+    | 'collection-custom-template'
+    | 'flow-item';
   parentMeta:
     | null
     | { tabsElement: CanvasElement; tab: Tab }
     | { collectionElement: CanvasElement; entryIndex: number }
-    | { collectionElement: CanvasElement };
+    | { collectionElement: CanvasElement }
+    | { flowContainerElement: CanvasElement; itemId: string };
 }

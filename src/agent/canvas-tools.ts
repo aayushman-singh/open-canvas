@@ -37,12 +37,16 @@ import {
 } from '../canvas/layout/tree.js';
 import type { JsonSchema, LlmTool } from './llm.js';
 
+const ADD_ELEMENT_TYPES = ELEMENT_TYPES.filter((type) => type !== 'flow-container');
+
 // ---------------------------------------------------------------------------
 // Per-element schema fragment merger (ADR 0011 Step 2 cutover)
 // ---------------------------------------------------------------------------
 //
-// `updateElement` and `addElement` advertise the union of every element
-// type's editable fields. The shape used to live inline (one giant
+// `updateElement` advertises every element type's editable fields. `addElement`
+// reuses this field union for creatable element types, but excludes compound
+// types whose required nested graph has no agent creation contract yet. The
+// shape used to live inline (one giant
 // "X elements only"-annotated bag per tool). It now comes from
 // `AGENT_TOOL_DISPATCH` — each per-element module contributes its own
 // `patchProperties`; this merger unions them.
@@ -433,7 +437,7 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
         sectionId: { type: 'string', description: 'The section to add the element to.' },
         elementType: {
           type: 'string',
-          enum: [...ELEMENT_TYPES],
+          enum: [...ADD_ELEMENT_TYPES],
           description: 'The type of element to create.',
         },
         box: {

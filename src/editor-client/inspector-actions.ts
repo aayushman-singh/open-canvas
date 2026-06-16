@@ -52,8 +52,7 @@ export type InspectorActionContext = StateContext &
 // single non-canonical verb `closeElementMenu`, which dismisses the
 // per-element popover before the mutation lands. Exported so the
 // downstream button carve picks up the same shape.
-export type DeleteElementContext = InspectorActionContext &
-  Pick<EditorContext, 'closeElementMenu'>;
+export type DeleteElementContext = InspectorActionContext & Pick<EditorContext, 'closeElementMenu'>;
 
 /** Resolve the immediate elements array an element lives in. Exported
  *  so Phase 2h.1.b (buildElementMenu et al.) can reuse it instead of
@@ -65,6 +64,15 @@ export function parentArrayFor(
   element: CanvasElement,
 ): CanvasElement[] {
   const found = ctx.findElement(element.id);
+  if (found?.parentKind === 'flow-item') {
+    throw new Error(
+      'parentArrayFor: element ' +
+        element.id +
+        ' is hosted by a Flow Item in section ' +
+        section.id +
+        ' and does not have a sibling array',
+    );
+  }
   if (found && Array.isArray(found.parentArray)) return found.parentArray;
   throw new Error(
     'parentArrayFor: element ' + element.id + ' is not present in section ' + section.id,

@@ -699,7 +699,9 @@ const ciRenamed = applyCanvasAgentOp(ciFixture, {
   to: 'Briar',
   caseSensitive: false,
 });
-const ciContent = (ciRenamed.pages[0]?.sections[0]?.elements[0] as { content: Array<{ text: string }> }).content;
+const ciContent = (
+  ciRenamed.pages[0]?.sections[0]?.elements[0] as { content: Array<{ text: string }> }
+).content;
 assert(
   ciContent[0]?.text === 'Briar Briar Briar Briar',
   'renameToken caseSensitive:false must replace all casings with the literal `to`',
@@ -810,9 +812,7 @@ const exhaustiveFixture = {
               type: 'accordion',
               box: { x: 0, y: 750, w: 600, h: 200, z: 1 },
               allowMultipleOpen: false,
-              items: [
-                { id: 'i1', title: 'What is Apogee?', body: [{ text: 'Apogee answer.' }] },
-              ],
+              items: [{ id: 'i1', title: 'What is Apogee?', body: [{ text: 'Apogee answer.' }] }],
             },
             {
               id: 'el-carousel',
@@ -926,6 +926,34 @@ const exhaustiveFixture = {
                 ],
               ],
             },
+            {
+              id: 'el-flow',
+              type: 'flow-container',
+              box: { x: 0, y: 2200, w: 900, h: 260, z: 1 },
+              layout: {
+                mode: 'grid',
+                columns: 2,
+                gap: { row: 16, column: 16 },
+                padding: { top: 0, right: 0, bottom: 0, left: 0 },
+                align: 'stretch',
+                justify: 'start',
+              },
+              items: [
+                {
+                  id: 'flow-copy',
+                  element: {
+                    id: 'el-flow-text',
+                    type: 'text',
+                    box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+                    role: 'body',
+                    align: 'left',
+                    fontSize: 14,
+                    fontWeight: 400,
+                    content: [{ text: 'Apogee inside Flow.' }],
+                  },
+                },
+              ],
+            },
           ],
         },
       ],
@@ -955,20 +983,19 @@ if (exhaustiveJson.includes('Apogee')) {
       return;
     }
     if (value && typeof value === 'object') {
-      for (const k of Object.keys(value)) track((value as Record<string, unknown>)[k], `${path}.${k}`);
+      for (const k of Object.keys(value))
+        track((value as Record<string, unknown>)[k], `${path}.${k}`);
     }
   }
   track(exhaustiveRenamed, '$');
-  throw new Error(
-    `renameToken exhaustive coverage failed — residues:\n  ${residues.join('\n  ')}`,
-  );
+  throw new Error(`renameToken exhaustive coverage failed — residues:\n  ${residues.join('\n  ')}`);
 }
 
 // Spot-check a handful of fields the JSON-stringify guard already covered;
 // these stay as named asserts so a future regression points at the exact
 // field that broke, not just the JSON sweep.
 assert(
-  ((exhaustiveRenamed.header as { elements: Array<{ siteTitle?: string }> }).elements[0])
+  (exhaustiveRenamed.header as { elements: Array<{ siteTitle?: string }> }).elements[0]
     ?.siteTitle === 'Briar',
   'renameToken must rewrite nav.siteTitle',
 );
@@ -1097,6 +1124,30 @@ if (acceptedAddAction?.ok) {
     'expected addElement action to preserve an ActionHref object',
   );
 }
+
+const addFlowToolCall = translateToolCall({
+  id: 'add-flow-rejected',
+  name: 'addElement',
+  arguments: {
+    sectionId: baseSection.id,
+    elementType: 'flow-container',
+    layout: {
+      mode: 'grid',
+      columns: 2,
+      gap: { row: 16, column: 16 },
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      align: 'stretch',
+      justify: 'start',
+    },
+    items: [],
+  },
+});
+assert(
+  !addFlowToolCall.ok && addFlowToolCall.error.includes('flow-container'),
+  addFlowToolCall.ok
+    ? 'addElement must reject flow-container until hosted items have an agent creation contract'
+    : `addElement flow-container rejection must name the unsupported type: ${addFlowToolCall.error}`,
+);
 
 const missingTextProps = parseDesignSectionToolArgs({
   sectionName: 'Bad text',

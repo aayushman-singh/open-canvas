@@ -128,6 +128,18 @@ function makeCtx(opts: {
               parentMeta: null,
             };
           }
+          if (el.type === 'flow-container' && Array.isArray(el.items)) {
+            for (const item of el.items) {
+              if (!item || !item.element || item.element.id !== elementId) continue;
+              return {
+                section: s,
+                element: item.element,
+                parentArray: null,
+                parentKind: 'flow-item',
+                parentMeta: { flowContainerElement: el, itemId: item.id },
+              };
+            }
+          }
         }
       }
       return null;
@@ -219,12 +231,18 @@ function makeEvent(
 
   const outcome = handleDeleteShortcut(ctx, makeEvent('Delete'));
 
-  assert(outcome === 'element', `Delete on element selection: outcome must be 'element' (got '${outcome}')`);
+  assert(
+    outcome === 'element',
+    `Delete on element selection: outcome must be 'element' (got '${outcome}')`,
+  );
   assert(
     section.elements.length === 1 && section.elements[0]!.id === 'el-b',
     'Delete must splice el-a out of the section, leaving el-b',
   );
-  assert(ctx.selectedElementId === null, 'Delete must clear ctx.selectedElementId for the removed element');
+  assert(
+    ctx.selectedElementId === null,
+    'Delete must clear ctx.selectedElementId for the removed element',
+  );
   assert(
     log.deleteElementCalls.length === 1 && log.deleteElementCalls[0]!.elementId === 'el-a',
     'Delete must call ctx.deleteElement exactly once for the selected element',
@@ -249,12 +267,67 @@ function makeEvent(
 
   const outcome = handleDeleteShortcut(ctx, makeEvent('Backspace'));
 
-  assert(outcome === 'element', `Backspace on element selection: outcome must be 'element' (got '${outcome}')`);
+  assert(
+    outcome === 'element',
+    `Backspace on element selection: outcome must be 'element' (got '${outcome}')`,
+  );
   assert(
     section.elements.length === 1 && section.elements[0]!.id === 'el-a',
     'Backspace must splice el-b out, leaving el-a',
   );
-  assert(ctx.selectedElementId === null, 'Backspace must clear ctx.selectedElementId for the removed element');
+  assert(
+    ctx.selectedElementId === null,
+    'Backspace must clear ctx.selectedElementId for the removed element',
+  );
+})();
+
+// ---- Spec 3: Flow-hosted children refuse direct delete -----------------
+
+(function flowHostedElementDeleteIsBlocked() {
+  const hosted = makeText('flow-copy');
+  hosted.box = { x: 0, y: 0, w: 0, h: 0, z: 0 };
+  const flow = {
+    id: 'flow-container',
+    type: 'flow-container',
+    box: { x: 40, y: 40, w: 640, h: 240, z: 1 },
+    layout: {
+      mode: 'grid',
+      columns: 2,
+      gap: { row: 16, column: 16 },
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      align: 'stretch',
+      justify: 'start',
+    },
+    items: [{ id: 'copy', element: hosted }],
+  } as unknown as CanvasElement;
+  const section = makeSection('sec-flow', [flow]);
+  const page = makePage('p1', [section]);
+  const state = makeSite({ page });
+  const { ctx, log } = makeCtx({ state, activeSection: section });
+  ctx.selectedElementId = 'flow-copy';
+
+  const outcome = handleDeleteShortcut(ctx, makeEvent('Delete')) as string;
+
+  assert(
+    outcome === 'element-blocked',
+    `Delete on Flow-hosted child must return 'element-blocked' (got '${outcome}')`,
+  );
+  assert(
+    (flow as unknown as { items: Array<{ element: CanvasElement }> }).items[0]?.element.id ===
+      'flow-copy',
+    'Delete on Flow-hosted child must not remove the hosted element',
+  );
+  assert(
+    log.deleteElementCalls.length === 0,
+    'Flow-hosted child delete must not call ctx.deleteElement',
+  );
+  const toast = log.statuses[log.statuses.length - 1];
+  assert(
+    toast !== undefined &&
+      toast.text === 'Flow item content cannot be deleted directly' &&
+      toast.tone === 'error',
+    `Flow-hosted child delete must surface a refusal toast (got ${JSON.stringify(toast)})`,
+  );
 })();
 
 // ---- Spec 3: Focus inside an input is a no-op --------------------------
@@ -284,7 +357,10 @@ function makeEvent(
     section.elements.length === 1 && section.elements[0]!.id === 'el-a',
     'Delete with input focused must NOT remove the element',
   );
-  assert(log.deleteElementCalls.length === 0, 'Delete with input focused must NOT call ctx.deleteElement');
+  assert(
+    log.deleteElementCalls.length === 0,
+    'Delete with input focused must NOT call ctx.deleteElement',
+  );
   assert(log.statuses.length === 0, 'Delete with input focused must NOT surface a toast');
 })();
 
@@ -364,7 +440,10 @@ function makeEvent(
     section.elements.length === 1 && section.elements[0]!.id === 'el-a',
     'Modifier-held Delete/Backspace must NOT remove the element',
   );
-  assert(log.deleteElementCalls.length === 0, 'Modifier-held shortcut must NOT call ctx.deleteElement');
+  assert(
+    log.deleteElementCalls.length === 0,
+    'Modifier-held shortcut must NOT call ctx.deleteElement',
+  );
 })();
 
 // ---- Spec 7: Inline text edit in progress blocks the shortcut ---------
@@ -381,7 +460,10 @@ function makeEvent(
 
   assert(outcome === 'none', `Delete while editing: outcome must be 'none' (got '${outcome}')`);
   assert(section.elements.length === 1, 'Delete while editing must NOT remove the element');
-  assert(log.deleteElementCalls.length === 0, 'Delete while editing must NOT call ctx.deleteElement');
+  assert(
+    log.deleteElementCalls.length === 0,
+    'Delete while editing must NOT call ctx.deleteElement',
+  );
 })();
 
 // ---- Spec 8: Non-pinned section delete on a page with >1 sections -----
@@ -396,7 +478,10 @@ function makeEvent(
 
   const outcome = handleDeleteShortcut(ctx, makeEvent('Delete'));
 
-  assert(outcome === 'section', `Delete on body section: outcome must be 'section' (got '${outcome}')`);
+  assert(
+    outcome === 'section',
+    `Delete on body section: outcome must be 'section' (got '${outcome}')`,
+  );
   assert(page.sections.length === 1, 'Delete on body section must splice it out of page.sections');
   assert(page.sections[0]!.id === 'sec-body-2', 'Survivor must be the other body section');
   assert(
@@ -423,7 +508,10 @@ function makeEvent(
 
   const outcome = handleDeleteShortcut(ctx, makeEvent('Delete'));
 
-  assert(outcome === 'section', `Delete on last section: outcome must be 'section' (got '${outcome}')`);
+  assert(
+    outcome === 'section',
+    `Delete on last section: outcome must be 'section' (got '${outcome}')`,
+  );
   assert(page.sections.length === 1, 'Last-section guard must keep the section in place');
   const toast = log.statuses[log.statuses.length - 1];
   assert(
@@ -449,7 +537,10 @@ function makeEvent(
     `Delete with no selection: outcome must be 'no-selection' (got '${outcome}')`,
   );
   assert(section.elements.length === 1, 'Delete with no selection must NOT remove anything');
-  assert(log.deleteElementCalls.length === 0, 'Delete with no selection must NOT call ctx.deleteElement');
+  assert(
+    log.deleteElementCalls.length === 0,
+    'Delete with no selection must NOT call ctx.deleteElement',
+  );
   assert(
     log.handleSectionActionCalls.length === 0,
     'Delete with no selection must NOT call ctx.handleSectionAction',

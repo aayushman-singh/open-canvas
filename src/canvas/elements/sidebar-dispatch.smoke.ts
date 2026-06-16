@@ -46,6 +46,7 @@ const REGISTERED_FACTORIES = [
   'table',
   'nav',
   'tabs',
+  'flow-container',
 ] as const;
 
 const validTypeSet = new Set<string>(ELEMENT_TYPES);

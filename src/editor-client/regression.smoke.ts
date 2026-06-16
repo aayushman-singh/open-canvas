@@ -97,6 +97,23 @@ assert(
   ).length >= 4,
   'selection.ts must querySelectorAll all four section/element add+remove paths',
 );
+assert(
+  selection.includes("!nextEl.classList.contains('opencanvas-flow-content')"),
+  'Flow-hosted element selection must not mount resize handles; Flow Item layout owns placement',
+);
+
+const runtimeHelpers = await source('./runtime-helpers.ts');
+assert(
+  runtimeHelpers.includes("el.type === 'flow-container'") &&
+    runtimeHelpers.includes("parentKind: 'flow-item'"),
+  'findElement must recurse into flow-container.items so hosted child selection resolves',
+);
+
+const flowDragResize = await source('./drag-resize.ts');
+assert(
+  flowDragResize.includes("wrapper.classList.contains('opencanvas-flow-content')"),
+  'Flow-hosted elements must not enter section drag/resize gestures',
+);
 
 // setActivePage clears selection — must route through selectElement/
 // selectSection so the DOM data-selected attribute is scrubbed on every

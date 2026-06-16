@@ -49,11 +49,12 @@ export type DeleteShortcutContext = SelectionContext &
   Pick<EditorContext, 'isEditableShortcutTarget' | 'deleteElement' | 'handleSectionAction'>;
 
 export type DeleteShortcutOutcome =
-  | 'none'           // shortcut did not apply — caller must NOT preventDefault
-  | 'element'        // element deleted
-  | 'section'        // page section deleted
+  | 'none' // shortcut did not apply — caller must NOT preventDefault
+  | 'element' // element deleted
+  | 'element-blocked' // element selection refused
+  | 'section' // page section deleted
   | 'pinned-blocked' // section selection refused (site header/footer)
-  | 'no-selection';  // shortcut applied (consume key) but nothing was selected
+  | 'no-selection'; // shortcut applied (consume key) but nothing was selected
 
 export interface DeleteShortcutEvent {
   readonly key: string;
@@ -82,6 +83,10 @@ export function handleDeleteShortcut(
   if (ctx.selectedElementId) {
     const found = ctx.findElement(ctx.selectedElementId);
     if (!found) return 'no-selection';
+    if (found.parentKind === 'flow-item') {
+      ctx.setStatus('Flow item content cannot be deleted directly', 'error');
+      return 'element-blocked';
+    }
     const elementType = found.element.type;
     ctx.deleteElement(found.section, found.element);
     ctx.setStatus('Deleted ' + elementType, 'ok');

@@ -879,8 +879,7 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       // transition; fall through to the loud "missing entry" path when the
       // field is absent rather than silently materialising an empty parent.
       const legacyEntries = collectionElement.entries;
-      const entry =
-        legacyEntries === undefined ? undefined : legacyEntries[op.entryIndex];
+      const entry = legacyEntries === undefined ? undefined : legacyEntries[op.entryIndex];
       if (!Array.isArray(entry)) {
         throw new Error(
           `restoreElement: collection entry ${String(op.entryIndex)} missing on ${op.collectionElementId}`,
@@ -990,10 +989,7 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       }
       return out;
     }
-    function replaceStringField(
-      target: Record<string, unknown>,
-      key: string,
-    ): void {
+    function replaceStringField(target: Record<string, unknown>, key: string): void {
       const v = target[key];
       if (typeof v === 'string') target[key] = replaceIn(v);
     }
@@ -1135,6 +1131,14 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
             if (Array.isArray(el.entries)) {
               for (const entry of el.entries as CanvasElement[][]) {
                 walkElements(entry);
+              }
+            }
+            break;
+          case 'flow-container':
+            if (Array.isArray(el.items)) {
+              for (const item of el.items as Array<Record<string, unknown>>) {
+                if (!item || !item.element || typeof item.element !== 'object') continue;
+                walkElements([item.element as CanvasElement]);
               }
             }
             break;

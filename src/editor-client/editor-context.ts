@@ -318,7 +318,10 @@ export interface EditorContext {
    *  excluded from the static dispatch table (children render their own
    *  inspectors), so the runtime lookup returns undefined for it and the
    *  inspector body stays empty. */
-  INSPECTOR_DISPATCH: Record<Exclude<CanvasElement['type'], 'collection'>, InspectorSpec>;
+  INSPECTOR_DISPATCH: Record<
+    Exclude<CanvasElement['type'], 'collection' | 'flow-container'>,
+    InspectorSpec
+  >;
   /** Walk an InspectorSpec into DOM, appending fields to ctx.inspector.
    *  The walker owns kind-by-kind branches for select / select-mapped /
    *  text / textarea / checkbox / number / button-action / action-href /
@@ -626,6 +629,10 @@ export interface EditorContext {
    *  lives in element-menu.ts; collection/tabs body builders thread back
    *  through ctx to recursively build their children. */
   buildElementNode(element: CanvasElement): HTMLElement;
+  /** Build a placement-neutral wrapper for an element hosted by a Flow Item.
+   *  It preserves element attrs/body/style but intentionally omits section
+   *  box positioning, resize handles, and menu chrome. */
+  buildHostedElementNode(element: CanvasElement): HTMLElement;
   /** Apply (x, y, w, h, z, rotation) from a PositionedBox onto an absolute-
    *  positioned wrapper. Forward-declared on ctx since Phase 2l (the
    *  Phase 2l comment said impl stays inline during Phase 2); Phase 2q.d

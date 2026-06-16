@@ -23,7 +23,14 @@ import {
 import { renderResponsiveCss } from './responsive/index.js';
 import { resolveActionHref } from './action-href.js';
 import { getStyleKitPreset, resolveStyleKitWithCustom } from './style-kits.js';
-import type { CanvasElement, CanvasPage, CanvasSection, ElementStyle, PublishedSnapshot, StyleKitPreset } from './schema.js';
+import type {
+  CanvasElement,
+  CanvasPage,
+  CanvasSection,
+  ElementStyle,
+  PublishedSnapshot,
+  StyleKitPreset,
+} from './schema.js';
 
 function applyElementStyle(
   entries: Array<[string, string]>,
@@ -84,36 +91,11 @@ function buildElementStyleDataAttrs(es: ElementStyle | undefined): string {
   return attrs;
 }
 
-function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string): string {
-  const { box } = element;
-  const stickyOffset =
-    element.stickyOffset !== undefined && Number.isFinite(element.stickyOffset)
-      ? element.stickyOffset
-      : null;
-  // ADR 0054 dec 1 — sticky elements drop out of absolute layout and use
-  // margins for the authored initial offset, reserving `top` for the sticky
-  // viewport offset. Non-sticky elements continue to use absolute layout.
-  const entries: Array<[string, string]> = stickyOffset !== null
-    ? [
-        ['position', 'sticky'],
-        ['margin-left', `${String(box.x)}px`],
-        ['margin-top', `${String(box.y)}px`],
-        ['top', `${String(stickyOffset)}px`],
-        ['width', `${String(box.w)}px`],
-        ['height', `${String(box.h)}px`],
-        ['z-index', String(box.z)],
-      ]
-    : [
-        ['position', 'absolute'],
-        ['left', `${String(box.x)}px`],
-        ['top', `${String(box.y)}px`],
-        ['width', `${String(box.w)}px`],
-        ['height', `${String(box.h)}px`],
-        ['z-index', String(box.z)],
-      ];
-  if (typeof box.rotation === 'number' && box.rotation !== 0) {
-    entries.push(['transform', `rotate(${String(box.rotation)}deg)`]);
-  }
+function appendAuthoredElementStyleEntries(
+  entries: Array<[string, string]>,
+  element: CanvasElement,
+  assetBasePath: string,
+): void {
   if (element.elementStyle) {
     applyElementStyle(entries, element.elementStyle, assetBasePath);
   }
@@ -138,6 +120,51 @@ function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string)
     const delay = element.motion.delayMs ?? 0;
     if (delay > 0) entries.push(['--opencanvas-motion-delay', `${String(delay)}ms`]);
   }
+}
+
+function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string): string {
+  const { box } = element;
+  const stickyOffset =
+    element.stickyOffset !== undefined && Number.isFinite(element.stickyOffset)
+      ? element.stickyOffset
+      : null;
+  // ADR 0054 dec 1 — sticky elements drop out of absolute layout and use
+  // margins for the authored initial offset, reserving `top` for the sticky
+  // viewport offset. Non-sticky elements continue to use absolute layout.
+  const entries: Array<[string, string]> =
+    stickyOffset !== null
+      ? [
+          ['position', 'sticky'],
+          ['margin-left', `${String(box.x)}px`],
+          ['margin-top', `${String(box.y)}px`],
+          ['top', `${String(stickyOffset)}px`],
+          ['width', `${String(box.w)}px`],
+          ['height', `${String(box.h)}px`],
+          ['z-index', String(box.z)],
+        ]
+      : [
+          ['position', 'absolute'],
+          ['left', `${String(box.x)}px`],
+          ['top', `${String(box.y)}px`],
+          ['width', `${String(box.w)}px`],
+          ['height', `${String(box.h)}px`],
+          ['z-index', String(box.z)],
+        ];
+  if (typeof box.rotation === 'number' && box.rotation !== 0) {
+    entries.push(['transform', `rotate(${String(box.rotation)}deg)`]);
+  }
+  appendAuthoredElementStyleEntries(entries, element, assetBasePath);
+  return styleFromEntries(entries);
+}
+
+function buildHostedElementWrapperStyle(element: CanvasElement, assetBasePath: string): string {
+  const entries: Array<[string, string]> = [
+    ['position', 'relative'],
+    ['width', '100%'],
+    ['height', '100%'],
+    ['box-sizing', 'border-box'],
+  ];
+  appendAuthoredElementStyleEntries(entries, element, assetBasePath);
   return styleFromEntries(entries);
 }
 
@@ -171,6 +198,7 @@ function buildAriaWrapperAttrs(element: CanvasElement): string {
     case 'nav':
     case 'collection':
     case 'tabs':
+    case 'flow-container':
       return '';
   }
 }
@@ -212,6 +240,7 @@ function variantAttr(element: CanvasElement): string {
     case 'table':
     case 'nav':
     case 'collection':
+    case 'flow-container':
       return '';
   }
 }
@@ -239,23 +268,32 @@ function resolveTintColour(
   return safe === '' ? null : safe;
 }
 
-function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
-  const inner = renderElementBody(element, ctx);
-  let wrapperStyle = buildElementWrapperStyle(element, ctx.assetBasePath);
-  let tintAttr = '';
-  // Gap #17 — tint emits --opencanvas-tint + a subtle gradient overlay on
-  // the container wrapper. Authors can override via pinnedStyle when they
-  // want a different intensity / direction; pinnedStyle is applied LAST in
-  // buildElementWrapperStyle, so the override wins.
-  if (element.type === 'container' && typeof element.tint === 'string' && element.tint.length > 0) {
-    const colour = resolveTintColour(element.tint, ctx.customPreset);
-    if (colour !== null) {
-      wrapperStyle +=
-        `;--opencanvas-tint:${colour}` +
-        `;background-image:linear-gradient(135deg,color-mix(in oklab,var(--opencanvas-tint) 25%,transparent) 0%,transparent 70%)`;
-      tintAttr = ` data-tint="${escapeAttr(element.tint)}"`;
-    }
+function applyContainerTint(
+  element: CanvasElement,
+  ctx: ElementRenderCtx,
+  wrapperStyle: string,
+): { wrapperStyle: string; tintAttr: string } {
+  if (
+    element.type !== 'container' ||
+    typeof element.tint !== 'string' ||
+    element.tint.length === 0
+  ) {
+    return { wrapperStyle, tintAttr: '' };
   }
+  const colour = resolveTintColour(element.tint, ctx.customPreset);
+  if (colour === null) {
+    return { wrapperStyle, tintAttr: '' };
+  }
+  return {
+    wrapperStyle:
+      wrapperStyle +
+      `;--opencanvas-tint:${colour}` +
+      `;background-image:linear-gradient(135deg,color-mix(in oklab,var(--opencanvas-tint) 25%,transparent) 0%,transparent 70%)`,
+    tintAttr: ` data-tint="${escapeAttr(element.tint)}"`,
+  };
+}
+
+function buildElementCommonAttrs(element: CanvasElement, tintAttr: string): string {
   const motionAttrs =
     element.motion !== undefined
       ? ` data-motion-preset="${escapeAttr(element.motion.preset)}" data-motion-delay-ms="${escapeAttr(String(element.motion.delayMs ?? 0))}"`
@@ -269,7 +307,15 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
     typeof element.anchorId === 'string' && element.anchorId.length > 0
       ? ` id="${escapeAttr(element.anchorId)}"`
       : '';
-  const commonAttrs = `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs}${esAttrs}`;
+  return `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs}${esAttrs}`;
+}
+
+function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
+  const inner = renderElementBody(element, ctx);
+  let wrapperStyle = buildElementWrapperStyle(element, ctx.assetBasePath);
+  const tinted = applyContainerTint(element, ctx, wrapperStyle);
+  wrapperStyle = tinted.wrapperStyle;
+  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr);
 
   // ADR 0051 dec 5 — container with linkHref emits the outer wrapper as
   // <a href="…"> instead of <div>. Every other attribute, the inner body
@@ -284,6 +330,24 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
     return `<a class="opencanvas-element" href="${escapeAttr(resolved)}"${ariaLabelAttr}${commonAttrs} style="${wrapperStyle}">${inner}</a>`;
   }
   return `<div class="opencanvas-element"${commonAttrs} style="${wrapperStyle}">${inner}</div>`;
+}
+
+function renderHostedElement(element: CanvasElement, ctx: ElementRenderCtx): string {
+  const inner = renderElementBody(element, ctx, 'flow-hosted');
+  let wrapperStyle = buildHostedElementWrapperStyle(element, ctx.assetBasePath);
+  const tinted = applyContainerTint(element, ctx, wrapperStyle);
+  wrapperStyle = tinted.wrapperStyle;
+  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr);
+
+  if (element.type === 'container' && element.linkHref !== undefined) {
+    const resolved = resolveActionHref(element.linkHref, ctx.pages);
+    const ariaLabelAttr =
+      typeof element.linkLabel === 'string' && element.linkLabel.length > 0
+        ? ` aria-label="${escapeAttr(element.linkLabel)}"`
+        : '';
+    return `<a class="opencanvas-element opencanvas-flow-content" href="${escapeAttr(resolved)}"${ariaLabelAttr}${commonAttrs} style="${wrapperStyle}">${inner}</a>`;
+  }
+  return `<div class="opencanvas-element opencanvas-flow-content"${commonAttrs} style="${wrapperStyle}">${inner}</div>`;
 }
 
 function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRenderCtx): string {
@@ -311,15 +375,9 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
         styleEntries.push(['border', `${String(ab.width)}px solid ${safeColor}`]);
         styleEntries.push(['box-sizing', 'border-box']);
       } else if (ab.type === 'top') {
-        styleEntries.push([
-          'box-shadow',
-          `inset 0 ${String(ab.thickness)}px 0 0 ${safeColor}`,
-        ]);
+        styleEntries.push(['box-shadow', `inset 0 ${String(ab.thickness)}px 0 0 ${safeColor}`]);
       } else if (ab.type === 'left') {
-        styleEntries.push([
-          'box-shadow',
-          `inset ${String(ab.thickness)}px 0 0 0 ${safeColor}`,
-        ]);
+        styleEntries.push(['box-shadow', `inset ${String(ab.thickness)}px 0 0 0 ${safeColor}`]);
       } else {
         const spread = ab.spread ?? 0;
         styleEntries.push([
@@ -335,7 +393,10 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   // emits them, which is what assistive tech reads. Owner-side reorder tools
   // (T5.7) are the Owner's lever for changing it independent of visual z/x/y.
   const elementsHtml = section.elements.map((element) => renderElement(element, ctx)).join('');
-  const roleAttr = section.role && section.role !== 'body' ? ` data-section-role="${escapeAttr(section.role)}"` : '';
+  const roleAttr =
+    section.role && section.role !== 'body'
+      ? ` data-section-role="${escapeAttr(section.role)}"`
+      : '';
   const triggerAttrs = section.trigger
     ? (() => {
         const t = section.trigger;
@@ -470,8 +531,7 @@ export function renderCanvasSnapshot(
     snapshot.styleKit === 'custom'
       ? resolveStyleKitWithCustom(snapshot)
       : getStyleKitPreset(snapshot.styleKit);
-  const customPreset: StyleKitPreset | null =
-    snapshot.styleKit === 'custom' ? preset : null;
+  const customPreset: StyleKitPreset | null = snapshot.styleKit === 'custom' ? preset : null;
   const baseCtx: Omit<ElementRenderCtx, 'pageSlug'> = {
     assetBasePath,
     styleKit: snapshot.styleKit,
@@ -480,6 +540,7 @@ export function renderCanvasSnapshot(
     pages: snapshot.pages,
     turnstileSiteKey: opts.turnstileSiteKey,
     renderElement,
+    renderHostedElement,
   };
   const pagesToRender = opts.renderPages ?? snapshot.pages;
   const pagesHtml = pagesToRender
@@ -538,10 +599,7 @@ function snapshotHasTabsElement(snapshot: PublishedSnapshot): boolean {
  * 0052 dec 4 (tabs nesting tabs is allowed) and the existing collection
  * nesting need without a per-call-site bespoke walk.
  */
-function walkElements(
-  snapshot: PublishedSnapshot,
-  pred: (el: CanvasElement) => boolean,
-): boolean {
+function walkElements(snapshot: PublishedSnapshot, pred: (el: CanvasElement) => boolean): boolean {
   const sections: CanvasSection[] = [];
   if (snapshot.header) sections.push(snapshot.header);
   if (snapshot.footer) sections.push(snapshot.footer);
@@ -565,6 +623,10 @@ function walkElements(
           if (visit(child)) return true;
         }
       }
+    } else if (el.type === 'flow-container') {
+      for (const item of el.items) {
+        if (visit(item.element)) return true;
+      }
     }
     return false;
   };
@@ -582,9 +644,7 @@ function walkElements(
  * sticky header instead of under it. Absence (or all-fields-absent) emits
  * nothing — there is no zero-padding default.
  */
-function renderScrollBehaviourCss(
-  scrollBehavior: PublishedSnapshot['scrollBehavior'],
-): string {
+function renderScrollBehaviourCss(scrollBehavior: PublishedSnapshot['scrollBehavior']): string {
   if (!scrollBehavior) return '';
   const rules: string[] = [];
   if (scrollBehavior.smooth === true) rules.push('scroll-behavior:smooth');

@@ -309,6 +309,51 @@ const syntheticElements: CanvasElement[] = [
       },
     ],
   },
+  {
+    id: 'el-flow-container',
+    type: 'flow-container',
+    box: { x: 0, y: 3560, w: 720, h: 320, z: 1 },
+    layout: {
+      mode: 'grid',
+      columns: 2,
+      gap: { row: 16, column: 12 },
+      padding: { top: 12, right: 12, bottom: 12, left: 12 },
+      align: 'stretch',
+      justify: 'start',
+      responsive: {
+        tablet: { columns: 2 },
+        phone: { columns: 1, gap: { row: 10, column: 10 } },
+      },
+    },
+    items: [
+      {
+        id: 'flow-copy',
+        span: 1,
+        element: {
+          id: 'el-flow-copy',
+          type: 'text',
+          box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+          content: [{ text: 'Flow item' }],
+          role: 'body',
+          fontSize: 16,
+          fontWeight: 400,
+          align: 'left',
+        },
+      },
+      {
+        id: 'flow-action',
+        responsive: { phone: { order: -1 } },
+        element: {
+          id: 'el-flow-action',
+          type: 'action',
+          box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+          label: [{ text: 'Flow CTA' }],
+          href: { type: 'external', url: '#' },
+          variant: 'outline',
+        },
+      },
+    ],
+  },
 ];
 
 const syntheticSection: CanvasSection = {
