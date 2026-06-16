@@ -4,6 +4,7 @@ import {
   listRouteFocusTargets,
   removeLoadExperience,
   removeRouteTransition,
+  routeTransitionInspectorConfigForSmoke,
   upsertLoadExperience,
   upsertRouteTransition,
 } from './load-route-transition-inspector.js';
@@ -228,6 +229,20 @@ assert(
   updatedRoute.focusTarget?.type === 'element' &&
     updatedRoute.focusTarget.elementId === 'route-next-title',
   'route update must store element focus target',
+);
+
+const existingRouteWithoutFocus = {
+  id: 'route-existing-no-focus',
+  trigger: { type: 'same-site-navigation' },
+  swapAt: 'after-outgoing',
+  scrollRestoration: 'top',
+  hydrate: true,
+  failureEvent: 'route-transition-failed',
+} satisfies NonNullable<EditableSite['routeTransition']>;
+const noFocusConfig = routeTransitionInspectorConfigForSmoke(existingRouteWithoutFocus);
+assert(
+  noFocusConfig.focusTarget === undefined,
+  'existing route without focus target must not render with page focus selected',
 );
 
 assertThrowsWithField(

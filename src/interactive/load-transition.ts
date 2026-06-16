@@ -370,8 +370,8 @@ function ocBindRouteTransition(route){
   var handler=function(ev){
     var url=ocRouteUrlFromEvent(route,ev);
     if(url===null)return;
-    if(ev&&typeof ev.preventDefault==='function')ev.preventDefault();
     if(url===false)return;
+    if(ev&&typeof ev.preventDefault==='function')ev.preventDefault();
     ocRunRouteTransition(route,url);
   };
   document.addEventListener('click',handler);

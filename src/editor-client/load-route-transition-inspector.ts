@@ -136,6 +136,12 @@ export function listRouteFocusTargets(state: EditableSite): RouteFocusTargetOpti
   return options;
 }
 
+export function routeTransitionInspectorConfigForSmoke(
+  routeTransition: RouteTransition | undefined,
+): RouteTransitionInspectorConfig {
+  return configFromRouteTransition(routeTransition);
+}
+
 function appendLoadExperienceControls(
   ctx: LoadRouteTransitionInspectorContext,
   state: EditableSite,
@@ -362,7 +368,7 @@ function configFromRouteTransition(
     incomingSequenceId: routeTransition?.incomingSequenceId,
     swapAt: routeTransition?.swapAt ?? 'after-outgoing',
     scrollRestoration: routeTransition?.scrollRestoration ?? 'top',
-    focusTarget: routeTransition?.focusTarget ?? { type: 'page' },
+    focusTarget: routeTransition === undefined ? { type: 'page' } : routeTransition.focusTarget,
   };
 }
 

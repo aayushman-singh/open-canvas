@@ -1301,9 +1301,7 @@ designerDoc.defaultView.__opencanvasFloating = {
     return { name: 'shift', options };
   },
 };
-let motionObserverCallback:
-  | ((entries: Array<{ isIntersecting: boolean }>) => void)
-  | undefined;
+let motionObserverCallback: ((entries: Array<{ isIntersecting: boolean }>) => void) | undefined;
 let motionObserverTarget = null as StubElement | null;
 let motionObserverDisconnects = 0;
 designerDoc.defaultView.IntersectionObserver = class StubMotionIntersectionObserver {
@@ -1340,7 +1338,10 @@ assert(
 );
 const observedMotionTargetId =
   motionObserverTarget?.getAttribute('data-opencanvas-element') ?? null;
-assert(observedMotionTargetId === 'hero-title', 'viewport-enter motion should observe the trigger element');
+assert(
+  observedMotionTargetId === 'hero-title',
+  'viewport-enter motion should observe the trigger element',
+);
 assert(motionObserverCallback !== undefined, 'viewport-enter motion should install observer');
 motionObserverCallback([{ isIntersecting: false }]);
 assert(
@@ -1356,10 +1357,7 @@ assert(
   designerTitle.getAttribute('data-opencanvas-motion-played') === 'hero-viewport-reveal',
   'viewport-enter motion should mark the played sequence id',
 );
-assert(
-  motionObserverDisconnects === 1,
-  'viewport-enter motion should disconnect after first play',
-);
+assert(motionObserverDisconnects === 1, 'viewport-enter motion should disconnect after first play');
 const clickMotionAnimationsBefore = designerTrigger.animations.length;
 designerTrigger.dispatchEvent(makeEvent('click'));
 assert(
@@ -2114,9 +2112,7 @@ function installRouteDocumentServices(
 
 const routeDoc = new StubDocument();
 routeDoc.title = 'Current Route';
-const routeParsed = parseHtml(
-  `<div data-opencanvas-public-root>${routeCurrentHtml}</div>`,
-);
+const routeParsed = parseHtml(`<div data-opencanvas-public-root>${routeCurrentHtml}</div>`);
 for (const child of routeParsed.children) routeDoc.root.appendChild(child);
 const routeServices = installRouteDocumentServices(routeDoc, { nextHtml: routeNextDocumentHtml });
 const routePublicRoot = routeDoc.querySelector('[data-opencanvas-public-root]') as StubElement;
@@ -2141,12 +2137,21 @@ const routeNextTitle = routeDoc.querySelector(
   '[data-opencanvas-element="route-next-title"]',
 ) as StubElement;
 assert(routeClick.defaultPrevented, 'route transition should intercept same-site link click');
-assert(routeServices.fetchUrls[0] === 'https://route.example/next', 'route transition should fetch the same-site target document');
+assert(
+  routeServices.fetchUrls[0] === 'https://route.example/next',
+  'route transition should fetch the same-site target document',
+);
 assert(routeCurrentTitle.animations.length > 0, 'route transition should play outgoing sequence');
 assert(routeNextTitle !== null, 'route transition should swap in the next public root HTML');
-assert(routeNextTitle.animations.length > 0, 'route transition should play incoming sequence after hydrate');
+assert(
+  routeNextTitle.animations.length > 0,
+  'route transition should play incoming sequence after hydrate',
+);
 assert(routeNextTitle.focused, 'route transition should focus the configured element target');
-assert(routeDoc.title === 'Next Route', 'route transition should update document title from fetched HTML');
+assert(
+  routeDoc.title === 'Next Route',
+  'route transition should update document title from fetched HTML',
+);
 assert(
   routeServices.pushedUrls[0] === 'https://route.example/next',
   'route transition should push history after successful hydrate',
@@ -2175,7 +2180,9 @@ const routeHydrateFailureServices = installRouteDocumentServices(routeHydrateFai
   nextHtml: routeNextDocumentHtml,
   hydrateThrows: true,
 });
-const routeHydrateFailureLink = routeHydrateFailureDoc.querySelector('[href="/next"]') as StubElement;
+const routeHydrateFailureLink = routeHydrateFailureDoc.querySelector(
+  '[href="/next"]',
+) as StubElement;
 let routeFailureEvents = 0;
 let routeFailureDetail: { id?: string; phase?: string; url?: string; error?: string } | undefined;
 routeHydrateFailureDoc.addEventListener('opencanvas:route-transition-failure', (event) => {
@@ -2210,6 +2217,42 @@ assert(routeFailureDetail?.phase === 'hydrate', 'route failure detail should nam
 assert(
   routeFailureDetail?.id === 'route-swap',
   'route failure detail should include transition id',
+);
+
+const routeUrlFailureDoc = new StubDocument();
+const routeUrlFailureParsed = parseHtml(
+  `<div data-opencanvas-public-root>${routeCurrentHtml}</div>`,
+);
+for (const child of routeUrlFailureParsed.children) routeUrlFailureDoc.root.appendChild(child);
+const routeUrlFailureServices = installRouteDocumentServices(routeUrlFailureDoc, {
+  nextHtml: routeNextDocumentHtml,
+});
+routeUrlFailureDoc.defaultView.location = {
+  href: '',
+};
+const routeUrlFailureLink = routeUrlFailureDoc.querySelector('[href="/next"]') as StubElement;
+let routeUrlFailureEvents = 0;
+let routeUrlFailureDetail: { id?: string; phase?: string } | undefined;
+routeUrlFailureDoc.addEventListener('opencanvas:route-transition-failure', (event) => {
+  routeUrlFailureEvents++;
+  routeUrlFailureDetail = event.detail as typeof routeUrlFailureDetail;
+});
+runRuntimeAgainstDocument(routeUrlFailureDoc);
+const routeUrlFailureClick = makeEvent('click', { button: 0 });
+routeUrlFailureLink.dispatchEvent(routeUrlFailureClick);
+await flushMicrotasks(2);
+assert(
+  !routeUrlFailureClick.defaultPrevented,
+  'route URL resolution failure must leave native navigation uncancelled',
+);
+assert(
+  routeUrlFailureServices.fetchUrls.length === 0,
+  'route URL resolution failure must not fetch a transition document',
+);
+assert(routeUrlFailureEvents === 1, 'route URL resolution failure should emit one failure event');
+assert(
+  routeUrlFailureDetail?.phase === 'url',
+  'route URL resolution failure detail should name url phase',
 );
 
 // ---------------------------------------------------------------------------
