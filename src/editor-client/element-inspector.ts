@@ -42,6 +42,7 @@ import { renderSectionInspector } from './section-inspector.js';
 import { renderPageInspector, replayAnimations } from './page-inspector.js';
 import { field, selectInput } from './dom-builders.js';
 import { buildColorRow, buildKitSummary } from './inspector-leaf-builders.js';
+import { appendMotionSequenceInspector } from './motion-sequence-inspector.js';
 import { appendRichMotionInspector } from './rich-motion-inspector.js';
 
 export function renderInspector(ctx: EditorContext): void {
@@ -573,6 +574,7 @@ export function renderInspector(ctx: EditorContext): void {
   });
   ctx.inspector.appendChild(elPlayBtn);
 
+  appendMotionSequenceInspector(ctx, element);
   appendRichMotionInspector(ctx, element);
 }
 
