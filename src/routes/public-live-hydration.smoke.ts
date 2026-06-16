@@ -7,6 +7,42 @@ function assert(condition: boolean, message: string): asserts condition {
 
 type Listener = (event?: unknown) => void;
 
+class FakeNode {
+  constructor(readonly html: string) {}
+}
+
+class FakeRoot {
+  childNodes: FakeNode[];
+  readonly replaceCalls: FakeNode[][] = [];
+  readonly innerAssignments: string[] = [];
+
+  constructor(initialHtml: string) {
+    this.childNodes = [new FakeNode(initialHtml)];
+  }
+
+  get innerHTML(): string {
+    return this.childNodes.map((node) => node.html).join('');
+  }
+
+  set innerHTML(value: string) {
+    this.innerAssignments.push(value);
+    this.childNodes = [new FakeNode(value)];
+  }
+
+  replaceChildren(...nodes: FakeNode[]): void {
+    this.replaceCalls.push(nodes);
+    this.childNodes = nodes;
+  }
+}
+
+class FakeTemplate {
+  readonly content: { childNodes: FakeNode[] } = { childNodes: [] };
+
+  set innerHTML(value: string) {
+    this.content.childNodes = [new FakeNode(value)];
+  }
+}
+
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
   readonly listeners = new Map<string, Listener[]>();
@@ -36,17 +72,23 @@ interface HarnessOptions {
 }
 
 function makeHarness(options: HarnessOptions = {}): {
-  root: { innerHTML: string };
+  root: FakeRoot;
   ws: FakeWebSocket;
   hydrateCalls: () => number;
   consoleErrors: string[];
 } {
   FakeWebSocket.instances = [];
-  const root = { innerHTML: options.initialHtml ?? '<main>old</main>' };
+  const root = new FakeRoot(options.initialHtml ?? '<main>old</main>');
   const documentStub = {
     visibilityState: 'visible',
     addEventListener() {
       return undefined;
+    },
+    createElement(tagName: string) {
+      if (tagName !== 'template') {
+        throw new Error('[public-live-hydration:smoke] unexpected createElement ' + tagName);
+      }
+      return new FakeTemplate();
     },
     querySelector(selector: string) {
       return selector === '[data-opencanvas-public-root]' ? root : null;
@@ -92,6 +134,10 @@ function makeHarness(options: HarnessOptions = {}): {
   return { root, ws, hydrateCalls: () => hydrateCount, consoleErrors };
 }
 
+function replaceCallCount(root: FakeRoot): number {
+  return root.replaceCalls.length;
+}
+
 function publish(ws: FakeWebSocket, version: number, html: string): void {
   ws.emit('message', {
     data: JSON.stringify({ version, html }),
@@ -112,16 +158,23 @@ assert(
   ok.root.innerHTML.includes('data-opencanvas-interactive="accordion"'),
   'live update should replace public root HTML',
 );
+assert(replaceCallCount(ok.root) === 1, 'interactive live update should use replaceChildren');
+assert(ok.root.innerAssignments.length === 0, 'interactive live update must not assign innerHTML');
 assert(ok.hydrateCalls() === 1, 'interactive live update should call hydrator once');
 assert(ok.consoleErrors.length === 0, 'hydrated live update should not log errors');
 
 publish(ok.ws, 3, '<main><p>No interactions</p></main>');
+assert(replaceCallCount(ok.root) === 2, 'static live update should use replaceChildren');
 assert(ok.hydrateCalls() === 1, 'static live update should not call the hydrator');
 
 publish(ok.ws, 4, designerInteractiveHtml);
 assert(
   ok.root.innerHTML.includes('data-opencanvas-designer-interactions'),
   'designer interaction live update should replace public root HTML',
+);
+assert(
+  replaceCallCount(ok.root) === 3,
+  'designer interaction live update should use replaceChildren',
 );
 assert(ok.hydrateCalls() === 2, 'designer interaction live update should call hydrator once');
 
@@ -130,6 +183,10 @@ publish(missingHydrator.ws, 2, interactiveHtml);
 assert(
   missingHydrator.root.innerHTML === '<main>old-static</main>',
   'missing hydrator must keep the current page active',
+);
+assert(
+  replaceCallCount(missingHydrator.root) === 0,
+  'missing hydrator must not swap public root nodes',
 );
 assert(
   missingHydrator.consoleErrors.some((message) => message.includes('hydrator missing')),
@@ -146,6 +203,10 @@ assert(
   'missing hydrator must keep current page active for designer interaction HTML',
 );
 assert(
+  replaceCallCount(missingDesignerHydrator.root) === 0,
+  'missing designer hydrator must not swap public root nodes',
+);
+assert(
   missingDesignerHydrator.consoleErrors.some((message) => message.includes('hydrator missing')),
   'missing designer hydrator must emit an explicit error',
 );
@@ -154,11 +215,25 @@ const throwingHydrator = makeHarness({
   initialHtml: '<main>old-before-throw</main>',
   hydrate: 'throw',
 });
+const originalThrowingChild = throwingHydrator.root.childNodes[0];
 publish(throwingHydrator.ws, 2, interactiveHtml);
 assert(throwingHydrator.hydrateCalls() === 1, 'throwing hydrator should be attempted once');
 assert(
   throwingHydrator.root.innerHTML === '<main>old-before-throw</main>',
   'hydrator failure must restore the current page',
+);
+assert(
+  replaceCallCount(throwingHydrator.root) === 2,
+  'hydrator failure must swap and restore with replaceChildren',
+);
+assert(
+  throwingHydrator.root.childNodes.length === 1 &&
+    throwingHydrator.root.childNodes[0] === originalThrowingChild,
+  'hydrator failure must restore the original public root child nodes',
+);
+assert(
+  throwingHydrator.root.innerAssignments.length === 0,
+  'hydrator failure must not rebuild the current page through innerHTML',
 );
 assert(
   throwingHydrator.consoleErrors.some((message) => message.includes('hydration failed')),
@@ -177,6 +252,10 @@ publish(
 assert(
   collectionOnly.root.innerHTML.includes('data-opencanvas-interactive="collection"'),
   'collection-only HTML should not require the interactive runtime hydrator',
+);
+assert(
+  replaceCallCount(collectionOnly.root) === 1,
+  'collection-only update should use replaceChildren',
 );
 assert(collectionOnly.consoleErrors.length === 0, 'collection-only update should not log errors');
 

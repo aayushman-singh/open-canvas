@@ -94,6 +94,49 @@ Route Transition.
    navigation were the product contract during a transition. Once a Route
    Transition owns navigation, it owns failure too.
 
+8. **Swup remains an approved future adapter, not the current route runtime.**
+
+   **Why:** Swup v4 is still the right free/MIT candidate when Open Canvas
+   needs a broader MPA lifecycle surface: the docs call out server-rendered page
+   transitions, cache, native browser history, scroll handling, hooks, plugins,
+   preloading, accessibility, and head updates
+   (<https://swup.js.org/getting-started/>,
+   <https://swup.js.org/hooks/>,
+   <https://swup.js.org/plugins/head-plugin/>). The current Route Transition
+   implementation does not yet duplicate enough of that surface to justify
+   another runtime owner. It already performs the required fetch, parse, Motion
+   Sequence timing, `replaceChildren` swap, Runtime Hydrator call, focus, scroll,
+   history update, and current-DOM restore. A Swup adapter becomes justified when
+   Open Canvas adds cache, preload, head-management, or richer history semantics;
+   until then it would mostly wrap behavior the Open Canvas contract already has
+   to control directly. This would be wrong if the native runtime were growing
+   its own cache/preload/head system today. It is not.
+
+9. **View Transition API is allowed only as a same-document adapter behind the
+   existing Route Transition runtime in v1.**
+
+   **Why:** same-document View Transitions can wrap a controlled DOM update via
+   `document.startViewTransition()`, and same-document support is now Baseline
+   newly available across the major engines
+   (<https://web.dev/blog/same-document-view-transitions-are-now-baseline-newly-available>).
+   That fits Open Canvas because the runtime still owns fetch, validation,
+   `replaceChildren`, hydration, focus, scroll, history, and failure events.
+   Cross-document View Transitions are not a Route Transition mode in v1:
+   browser docs describe them as same-origin, CSS-opted-in navigations triggered
+   by normal navigation rather than an imperative route-swap API
+   (<https://developer.chrome.com/docs/web-platform/view-transitions/cross-document>,
+   <https://developer.mozilla.org/en-US/docs/Web/API/View_Transition_API>). That
+   bypasses the Open Canvas contract that a failed hydration keeps the current
+   page active. Allowed v1 modes are therefore:
+   - Root transition: the whole public root participates in a same-document
+     transition around the existing route swap.
+   - Named target transition: schema-validated targets receive deterministic,
+     unique `view-transition-name` values before the same-document transition.
+
+   Disallowed v1 modes are cross-document `@view-transition` navigation opt-in
+   as the Route Transition owner, and auto-named `match-element` target matching
+   without schema-owned target identity.
+
 ## Out of scope
 
 - Defining every preloader visual style.
@@ -132,12 +175,16 @@ Route Transition.
   inspector can enable a Load Experience or Route Transition, bind existing
   Motion Sequences, choose readiness/run/swap/scroll/focus controls, and remove
   either contract without touching unrelated interaction state.
+- **Live publish update hydration shipped in the designer-interactions branch.**
+  The visitor live-update script parses broadcast HTML into detached template
+  child nodes, swaps `[data-opencanvas-public-root]` with `replaceChildren`, and
+  restores the exact previous child nodes if Runtime Hydrator work fails.
+- **Adapter follow-ups resolved.** Swup is accepted as a future adapter only
+  when cache/preload/head/history concerns become load-bearing; View Transition
+  API is accepted only as a same-document adapter behind the existing route
+  runtime in v1.
 
 ## Follow-ups
 
-- Evaluate a Swup adapter behind the Runtime Hydrator if native lifecycle code
-  starts duplicating cache/preload/history concerns.
-- Decide which View Transition API modes are allowed once browser support and
-  validation rules are explicit.
-- Replace the live-update `innerHTML` restore path with node-preserving
-  `replaceChildren` semantics like Route Transition uses.
+- Add schema and editor controls for View Transition same-document modes when a
+  template needs native shared-target snapshots beyond Motion Sequences.

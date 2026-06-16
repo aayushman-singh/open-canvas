@@ -132,11 +132,11 @@ const APP_HOSTS = new Set([
 
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 
-// Visitor script: opens a WebSocket to /__live, reacts to publish broadcasts
-// by swapping the snapshot HTML inside [data-opencanvas-public-root]. innerHTML is
-// safe here because the publish endpoint is the only writer and it always
-// runs the snapshot through validate + renderCanvasSnapshot before broadcast
-// — there is no path from visitor input to this innerHTML assignment.
+// Visitor script: opens a WebSocket to /__live and reacts to publish
+// broadcasts by replacing the child nodes inside
+// [data-opencanvas-public-root]. The broadcast HTML is parsed through a
+// detached <template>; the live root is mutated only through replaceChildren
+// so a hydration failure can restore the exact prior node objects.
 //
 // The script is built per-request with the server-rendered snapshot version
 // baked in as an integer literal (see `buildVisitorLiveScript`). Stale or
@@ -256,14 +256,45 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
     return hydrate;
   }
 
-  function hydrateSwappedRoot(root, hydrate, previousHtml) {
+  function htmlToChildNodes(html, payload) {
+    if (typeof document.createElement !== 'function') {
+      console.error('[opencanvas-visitor] document.createElement unavailable before live update', payload);
+      return false;
+    }
+    const template = document.createElement('template');
+    if (!template || !template.content || !template.content.childNodes) {
+      console.error('[opencanvas-visitor] template content unavailable before live update', payload);
+      return false;
+    }
+    template.innerHTML = html;
+    return Array.prototype.slice.call(template.content.childNodes);
+  }
+
+  function currentRootChildNodes(root, payload) {
+    if (!root.childNodes) {
+      console.error('[opencanvas-visitor] public root childNodes unavailable before live update', payload);
+      return false;
+    }
+    return Array.prototype.slice.call(root.childNodes);
+  }
+
+  function replaceRootChildren(root, nodes, phase, detail) {
+    if (typeof root.replaceChildren !== 'function') {
+      console.error('[opencanvas-visitor] public root replaceChildren unavailable during ' + phase, detail);
+      return false;
+    }
+    root.replaceChildren.apply(root, nodes);
+    return true;
+  }
+
+  function hydrateSwappedRoot(root, hydrate, previousNodes) {
     if (hydrate === null) return true;
     try {
       hydrate(root);
       return true;
     } catch (err) {
       console.error('[opencanvas-visitor] interactive runtime hydration failed after live update', err);
-      root.innerHTML = previousHtml;
+      replaceRootChildren(root, previousNodes, 'restore', err);
       return false;
     }
   }
@@ -307,12 +338,12 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
           if (hydrate === false) return;
           const root = document.querySelector(ROOT_SELECTOR);
           if (root) {
-            // The server-rendered HTML is the only writer. The publish
-            // endpoint validates the snapshot before broadcast; there is no
-            // visitor-controlled path into this assignment.
-            const previousHtml = root.innerHTML;
-            root.innerHTML = selectedHtml;
-            if (!hydrateSwappedRoot(root, hydrate, previousHtml)) return;
+            const previousNodes = currentRootChildNodes(root, payload);
+            if (previousNodes === false) return;
+            const selectedNodes = htmlToChildNodes(selectedHtml, payload);
+            if (selectedNodes === false) return;
+            if (!replaceRootChildren(root, selectedNodes, 'swap', payload)) return;
+            if (!hydrateSwappedRoot(root, hydrate, previousNodes)) return;
           }
           currentVersion = payload.version;
           return;
