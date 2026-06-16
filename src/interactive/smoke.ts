@@ -1736,6 +1736,119 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
+// (8) Load Experience hydration: bounded gates play intro + exit sequences.
+// ---------------------------------------------------------------------------
+
+const loadExperienceSnapshot = {
+  version: 1,
+  publishedAt: '2026-06-16T00:00:00.000Z',
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'page-load',
+      slug: 'load',
+      title: 'Load',
+      width: 1200,
+      sections: [
+        {
+          id: 'section-load',
+          recipeId: 'custom',
+          name: 'Load section',
+          height: 360,
+          elements: [
+            {
+              id: 'load-intro-target',
+              type: 'text',
+              box: { x: 80, y: 64, w: 420, h: 72, z: 1 },
+              content: [{ text: 'Intro' }],
+              role: 'heading',
+              fontSize: 40,
+              fontWeight: 700,
+              align: 'left',
+            },
+            {
+              id: 'load-exit-target',
+              type: 'text',
+              box: { x: 80, y: 164, w: 420, h: 72, z: 1 },
+              content: [{ text: 'Exit' }],
+              role: 'heading',
+              fontSize: 40,
+              fontWeight: 700,
+              align: 'left',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  motionSequences: [
+    {
+      id: 'load-intro-sequence',
+      trigger: { type: 'click', elementId: 'load-intro-target' },
+      steps: [
+        {
+          id: 'load-intro-step',
+          target: { type: 'element', elementId: 'load-intro-target' },
+          properties: { opacity: [0, 1] },
+          durationMs: 160,
+          easing: 'out-cubic',
+        },
+      ],
+    },
+    {
+      id: 'load-exit-sequence',
+      trigger: { type: 'click', elementId: 'load-exit-target' },
+      steps: [
+        {
+          id: 'load-exit-step',
+          target: { type: 'element', elementId: 'load-exit-target' },
+          properties: { y: [12, 0] },
+          durationMs: 160,
+          easing: 'out-cubic',
+        },
+      ],
+    },
+  ],
+  loadExperience: {
+    id: 'site-load',
+    run: 'every-visit',
+    gates: [{ type: 'document-ready' }],
+    timeoutMs: 1000,
+    introSequenceId: 'load-intro-sequence',
+    exitSequenceId: 'load-exit-sequence',
+    failureEvent: 'opencanvas:load-experience-failed',
+  },
+} as unknown as PublishedSnapshot;
+
+const loadExperienceHtml = injectInteractiveRuntime(
+  renderCanvasSnapshot(loadExperienceSnapshot, '/assets', 'load-site', {
+    turnstileSiteKey: 'turnstile-test-key',
+  }),
+  loadExperienceSnapshot,
+);
+const loadExperienceDoc = new StubDocument();
+const loadExperienceParsed = parseHtml(loadExperienceHtml);
+for (const child of loadExperienceParsed.children) loadExperienceDoc.root.appendChild(child);
+const loadIntroTarget = loadExperienceDoc.querySelector(
+  '[data-opencanvas-element="load-intro-target"]',
+) as StubElement;
+const loadExitTarget = loadExperienceDoc.querySelector(
+  '[data-opencanvas-element="load-exit-target"]',
+) as StubElement;
+let loadReadyEvents = 0;
+let loadReadyDetail: { id?: string } | undefined;
+loadExperienceDoc.addEventListener('opencanvas:load-experience-ready', (event) => {
+  loadReadyEvents++;
+  loadReadyDetail = event.detail as typeof loadReadyDetail;
+});
+runRuntimeAgainstDocument(loadExperienceDoc);
+await flushMicrotasks();
+assert(loadIntroTarget.animations.length > 0, 'load experience should play intro sequence');
+assert(loadExitTarget.animations.length > 0, 'load experience should play exit sequence');
+assert(loadReadyEvents === 1, 'load experience should emit one ready event');
+assert(loadReadyDetail?.id === 'site-load', 'load experience ready event should include id');
+
+// ---------------------------------------------------------------------------
 // All assertions passed.
 // ---------------------------------------------------------------------------
 

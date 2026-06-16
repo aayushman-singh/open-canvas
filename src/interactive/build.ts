@@ -24,6 +24,7 @@
 
 import { ACCORDION_RUNTIME_SRC } from './accordion.js';
 import { CAROUSEL_RUNTIME_SRC } from './carousel.js';
+import { LOAD_TRANSITION_RUNTIME_SRC } from './load-transition.js';
 import { DESIGNER_MOTION_RUNTIME_SRC } from './motion.js';
 import { OVERLAY_RUNTIME_SRC } from './overlay.js';
 import { POINTER_FX_RUNTIME_SRC } from './pointer-fx.js';
@@ -48,6 +49,7 @@ export function buildInteractiveRuntimeSource(options: { lottie?: boolean } = {}
     POINTER_FX_RUNTIME_SRC,
     POPUP_RUNTIME_SRC,
     DESIGNER_MOTION_RUNTIME_SRC,
+    LOAD_TRANSITION_RUNTIME_SRC,
     FLOATING_UI_DOM_RUNTIME_SRC,
     OVERLAY_RUNTIME_SRC,
     ...(options.lottie === true ? [LOTTIE_WEB_LIGHT_RUNTIME_SRC] : []),

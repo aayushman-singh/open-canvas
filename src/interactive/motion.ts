@@ -18,18 +18,42 @@ function ocMarkMotionFailed(el,phase,detail){
   if(el)el.setAttribute('data-opencanvas-motion-failed',phase);
   ocMotionFailure(el,phase,detail);
 }
-function ocReadDesignerPayload(scope){
+function ocDesignerWindow(){
+  return document.defaultView||(typeof window!=='undefined'?window:null);
+}
+function ocFindDesignerPayloadScript(scope){
   var scanRoot=scope||document;
   var script=scanRoot.querySelector('[data-opencanvas-designer-interactions]');
   if(!script&&scanRoot!==document)script=document.querySelector('[data-opencanvas-designer-interactions]');
+  return script;
+}
+function ocGetDesignerPayload(scope){
+  var script=ocFindDesignerPayloadScript(scope);
   if(!script)return null;
-  if(script.getAttribute('data-opencanvas-designer-interactions-hydrated')==='true')return null;
-  script.setAttribute('data-opencanvas-designer-interactions-hydrated','true');
-  try{return JSON.parse(script.textContent||'{}');}
+  var raw=script.textContent||'{}';
+  var view=ocDesignerWindow();
+  if(view&&view.__opencanvasDesignerInteractionsRaw===raw&&view.__opencanvasDesignerInteractionsPayload){
+    return view.__opencanvasDesignerInteractionsPayload;
+  }
+  try{
+    var payload=JSON.parse(raw);
+    if(view){
+      view.__opencanvasDesignerInteractionsRaw=raw;
+      view.__opencanvasDesignerInteractionsPayload=payload;
+    }
+    return payload;
+  }
   catch(err){
     if(typeof console!=='undefined'&&console.error)console.error('[opencanvas motion] invalid designer interaction payload',err);
     throw err;
   }
+}
+function ocReadDesignerPayload(scope){
+  var script=ocFindDesignerPayloadScript(scope);
+  if(!script)return null;
+  if(script.getAttribute('data-opencanvas-designer-interactions-hydrated')==='true')return null;
+  script.setAttribute('data-opencanvas-designer-interactions-hydrated','true');
+  return ocGetDesignerPayload(scope);
 }
 function ocFormatLength(value){
   return typeof value==='number'?value+'px':String(value);
@@ -238,7 +262,7 @@ function hydrateDesignerMotion(scope){
   var byId={};
   for(var i=0;i<sequences.length;i++)byId[sequences[i].id]=sequences[i];
   var view=document.defaultView||(typeof window!=='undefined'?window:null);
-  if(view)view.__opencanvasPlayMotionSequence=function(id){if(byId[id])ocPlayMotionSequence(byId[id]);};
+  if(view)view.__opencanvasPlayMotionSequence=function(id){if(byId[id]){ocPlayMotionSequence(byId[id]);return true;}return false;};
   for(var s=0;s<sequences.length;s++){
     var seq=sequences[s];
     if(seq.trigger&&seq.trigger.type==='load')ocPlayMotionSequence(seq);

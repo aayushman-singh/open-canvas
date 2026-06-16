@@ -37,6 +37,7 @@ function hydrateAll(scope) {
   hydratePointerFx(scanRoot);
   if (typeof initPopups === 'function') initPopups(scanRoot);
   if (typeof hydrateDesignerMotion === 'function') hydrateDesignerMotion(scanRoot);
+  if (typeof hydrateLoadAndRouteTransitions === 'function') hydrateLoadAndRouteTransitions(scanRoot);
   if (typeof hydrateOverlays === 'function') hydrateOverlays(scanRoot);
   if (typeof hydrateRichMotionAssets === 'function') hydrateRichMotionAssets(scanRoot);
 }
