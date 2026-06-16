@@ -6,6 +6,7 @@
 // `src/canvas/schema.ts`; the rest live in per-element files in this
 // directory. Each render fn has the uniform signature `(el, ctx)`.
 
+import type { RichMotionAsset } from '../rich-motion-assets.js';
 import type { CanvasElement, CanvasPage, StyleKitPreset } from '../schema.js';
 
 import {
@@ -76,11 +77,7 @@ export type {
 export { FORM_FONT_FAMILIES, FORM_FONT_WEIGHTS, FORM_VARIANTS } from './form.js';
 export type { NavElement, NavLayout, NavLink, NavLinkKind } from './nav.js';
 export type { TableColumn, TableElement, TableRow } from './table.js';
-export type {
-  CollectionDisplay,
-  CollectionElement,
-  CollectionSort,
-} from './collection.js';
+export type { CollectionDisplay, CollectionElement, CollectionSort } from './collection.js';
 export type { Tab, TabsElement, TabsVariant } from './tabs.js';
 export { TABS_DEFAULT_BAR_HEIGHT, TABS_VARIANTS } from './tabs.js';
 
@@ -120,6 +117,8 @@ export interface ElementRenderCtx {
    * if the env var is missing.
    */
   turnstileSiteKey: string;
+  /** Site-level rich-motion metadata keyed by RichMotionAsset.id. */
+  richMotionAssets?: ReadonlyMap<string, RichMotionAsset>;
   /**
    * Wrapper-emitting renderer for a single element. Threaded through ctx so
    * the collection dispatch can render children with the same `opencanvas-element`

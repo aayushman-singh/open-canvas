@@ -62,6 +62,9 @@ export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): bo
   const elementNeedsRuntime = (element: CanvasElement): boolean => {
     if (INTERACTIVE_ELEMENT_TYPES.has(element.type)) return true;
     if (elementHasPointerFx(element)) return true; // ADR 0066 dec 5
+    if (typeof element.richMotionAssetId === 'string' && element.richMotionAssetId.length > 0) {
+      return true;
+    }
     if (element.type === 'tabs') {
       return element.tabs.some((tab) => tab.elements.some(elementNeedsRuntime));
     }
@@ -75,6 +78,19 @@ export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): bo
   };
   if (snapshot.header && sectionNeedsRuntime(snapshot.header)) return true;
   if (snapshot.footer && sectionNeedsRuntime(snapshot.footer)) return true;
+  if (
+    (snapshot.motionSequences?.length ?? 0) > 0 ||
+    (snapshot.scrollScenes?.length ?? 0) > 0 ||
+    (snapshot.overlays?.length ?? 0) > 0 ||
+    (snapshot.richMotionAssets?.length ?? 0) > 0 ||
+    snapshot.loadExperience !== undefined ||
+    snapshot.routeTransition !== undefined
+  ) {
+    return true;
+  }
+  for (const section of snapshot.overlaySections ?? []) {
+    if (sectionNeedsRuntime(section)) return true;
+  }
   for (const page of snapshot.pages) {
     for (const section of page.sections) {
       if (sectionNeedsRuntime(section)) return true;

@@ -240,6 +240,75 @@ function runReferenceWalkTests(): void {
   );
   assert(siteIds.has('slide-image-id'), 'expected footer carousel slide asset to be reachable');
 
+  const designerInteractionState: EditableSite = {
+    styleKit: 'charcoal',
+    pages,
+    overlaySections: [
+      {
+        id: 'overlay-gallery',
+        recipeId: 'custom',
+        name: 'Overlay Gallery',
+        height: 360,
+        elements: [
+          {
+            id: 'overlay-image',
+            type: 'media',
+            mediaKind: 'image',
+            assetId: 'overlay-image-id',
+            alt: '',
+            fit: 'cover',
+            box: { x: 0, y: 0, w: 320, h: 220, z: 1 },
+          },
+        ],
+      },
+    ],
+    richMotionAssets: [
+      {
+        id: 'hero-lottie',
+        ownerAssetId: 'lottie-json-id',
+        family: 'vector-animation',
+        source: { kind: 'lottie-json' },
+        playback: {
+          trigger: { type: 'load' },
+          loop: false,
+          speed: 1,
+          reducedMotion: 'poster',
+        },
+        posterAssetId: 'lottie-poster-id',
+      },
+      {
+        id: 'scrub-sequence',
+        ownerAssetId: 'sequence-manifest-id',
+        family: 'image-sequence',
+        source: { kind: 'image-sequence', frameAssetIds: ['frame-1-id', 'frame-2-id'] },
+        playback: {
+          trigger: { type: 'scroll-progress', sectionId: 'section-media' },
+          loop: false,
+          speed: 1,
+          reducedMotion: 'poster',
+        },
+      },
+    ],
+  };
+  const designerIds = collectReferencedAssetIds(designerInteractionState);
+  assert(designerIds.has('overlay-image-id'), 'expected overlay section media to be reachable');
+  assert(designerIds.has('lottie-json-id'), 'expected rich-motion owner asset to be reachable');
+  assert(designerIds.has('lottie-poster-id'), 'expected rich-motion poster asset to be reachable');
+  assert(
+    designerIds.has('frame-1-id'),
+    'expected rich-motion image-sequence frame to be reachable',
+  );
+  const designerRefs = collectReferencedAssets(designerInteractionState);
+  assert(
+    designerRefs.some(
+      (ref) =>
+        ref.assetId === 'lottie-json-id' &&
+        ref.role === 'rich-motion-owner' &&
+        ref.expectedKind === 'any',
+    ),
+    'expected rich-motion owner asset reference to be kind-agnostic until Owner Asset supports JSON/Rive/3D kinds',
+  );
+
   const nestedPages: CanvasPage[] = [
     {
       id: 'page-nested-assets',
@@ -552,10 +621,7 @@ function runReferenceWalkTests(): void {
     !isAssetSubstitutionToken('seed-customer-x-blog-hero'),
     'isAssetSubstitutionToken must REJECT a real asset id',
   );
-  assert(
-    !isAssetSubstitutionToken(''),
-    'isAssetSubstitutionToken must REJECT the empty string',
-  );
+  assert(!isAssetSubstitutionToken(''), 'isAssetSubstitutionToken must REJECT the empty string');
   assert(
     !isAssetSubstitutionToken('{{ogImageAssetId'),
     'isAssetSubstitutionToken must REJECT truncated placeholder (open brace, no close)',

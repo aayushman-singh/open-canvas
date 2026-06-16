@@ -1,7 +1,11 @@
 import { count, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { contentHashToR2Key, extFromMediaType } from '../../assets/hash';
-import { collectReferencedAssets, isAssetSubstitutionToken } from '../../assets/site-assets';
+import {
+  collectReferencedAssets,
+  isAssetSubstitutionToken,
+  type AssetKindExpectation,
+} from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
@@ -61,7 +65,11 @@ type PreparedSeedAssets =
   | {
       ok: false;
       unknownSeedIds: string[];
-      assetKindErrors: Array<{ assetId: string; expectedKind: MediaKind; actualKind: MediaKind }>;
+      assetKindErrors: Array<{
+        assetId: string;
+        expectedKind: AssetKindExpectation;
+        actualKind: MediaKind;
+      }>;
     };
 
 export function validateSubdomain(value: string): ValidSubdomain | InvalidSubdomain {
@@ -389,7 +397,7 @@ export function prepareSeedAssetsForCustomer(
   const unknownSeedIds = new Set<string>();
   const assetKindErrors: Array<{
     assetId: string;
-    expectedKind: MediaKind;
+    expectedKind: AssetKindExpectation;
     actualKind: MediaKind;
   }> = [];
 
@@ -399,7 +407,7 @@ export function prepareSeedAssetsForCustomer(
       unknownSeedIds.add(reference.assetId);
       continue;
     }
-    if (seed.kind !== reference.expectedKind) {
+    if (reference.expectedKind !== 'any' && seed.kind !== reference.expectedKind) {
       assetKindErrors.push({
         assetId: reference.assetId,
         expectedKind: reference.expectedKind,

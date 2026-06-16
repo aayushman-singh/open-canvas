@@ -17,10 +17,13 @@ import type {
   MediaKind,
   PublishedSnapshot,
 } from '../canvas/schema.js';
+import type { RichMotionAsset } from '../canvas/rich-motion-assets.js';
+
+export type AssetKindExpectation = MediaKind | 'any';
 
 export interface ReferencedAsset {
   assetId: string;
-  expectedKind: MediaKind;
+  expectedKind: AssetKindExpectation;
   role:
     | 'asset'
     | 'poster'
@@ -29,7 +32,11 @@ export interface ReferencedAsset {
     | 'background-video'
     | 'nav-logo'
     | 'carousel-slide'
-    | 'element-bg-image';
+    | 'element-bg-image'
+    | 'rich-motion-owner'
+    | 'rich-motion-poster'
+    | 'rich-motion-frame'
+    | 'rich-motion-scene-descriptor';
   path: string;
   mediaElementId?: string;
 }
@@ -55,6 +62,8 @@ export interface AssetReferenceRoot {
   faviconAssetId?: string;
   header?: CanvasSection;
   footer?: CanvasSection;
+  overlaySections?: CanvasSection[];
+  richMotionAssets?: RichMotionAsset[];
 }
 
 export type AssetReferenceSource =
@@ -129,6 +138,8 @@ function referenceRootFrom(source: AssetReferenceSource): AssetReferenceRoot {
     pages: source.pages,
     ...(source.header !== undefined ? { header: source.header } : {}),
     ...(source.footer !== undefined ? { footer: source.footer } : {}),
+    ...(source.overlaySections !== undefined ? { overlaySections: source.overlaySections } : {}),
+    ...(source.richMotionAssets !== undefined ? { richMotionAssets: source.richMotionAssets } : {}),
     ...(favicon !== undefined ? { faviconAssetId: favicon } : {}),
   };
 }
@@ -136,7 +147,7 @@ function referenceRootFrom(source: AssetReferenceSource): AssetReferenceRoot {
 function pushReference(
   out: ReferencedAsset[],
   assetId: string | undefined,
-  expectedKind: MediaKind,
+  expectedKind: AssetKindExpectation,
   role: ReferencedAsset['role'],
   path: string,
   mediaElementId?: string,
@@ -249,11 +260,7 @@ function collectElementReferences(
     // customTemplate path is the only place a fixed assetId survives the
     // editor's save round-trip.
     (element.customTemplate ?? []).forEach((child, childIdx) => {
-      collectElementReferences(
-        child,
-        `${elementPath}.customTemplate[${String(childIdx)}]`,
-        out,
-      );
+      collectElementReferences(child, `${elementPath}.customTemplate[${String(childIdx)}]`, out);
     });
   }
 }
@@ -272,6 +279,41 @@ function collectSectionReferences(
   );
   for (const [elementIdx, element] of section.elements.entries()) {
     collectElementReferences(element, `${sectionPath}.elements[${String(elementIdx)}]`, out);
+  }
+}
+
+function collectRichMotionAssetReferences(
+  asset: RichMotionAsset,
+  assetPath: string,
+  out: ReferencedAsset[],
+): void {
+  pushReference(out, asset.ownerAssetId, 'any', 'rich-motion-owner', `${assetPath}.ownerAssetId`);
+  pushReference(
+    out,
+    asset.posterAssetId,
+    'image',
+    'rich-motion-poster',
+    `${assetPath}.posterAssetId`,
+  );
+  if (asset.source.kind === 'image-sequence') {
+    asset.source.frameAssetIds.forEach((frameAssetId, frameIdx) => {
+      pushReference(
+        out,
+        frameAssetId,
+        'image',
+        'rich-motion-frame',
+        `${assetPath}.source.frameAssetIds[${String(frameIdx)}]`,
+      );
+    });
+  }
+  if (asset.source.kind === 'bounded-3d') {
+    pushReference(
+      out,
+      asset.source.sceneDescriptorAssetId,
+      'any',
+      'rich-motion-scene-descriptor',
+      `${assetPath}.source.sceneDescriptorAssetId`,
+    );
   }
 }
 
@@ -309,6 +351,12 @@ export function collectReferencedAssets(source: AssetReferenceSource): Reference
   }
   if (root.header !== undefined) collectSectionReferences(root.header, 'header', out);
   if (root.footer !== undefined) collectSectionReferences(root.footer, 'footer', out);
+  root.overlaySections?.forEach((section, sectionIdx) => {
+    collectSectionReferences(section, `overlaySections[${String(sectionIdx)}]`, out);
+  });
+  root.richMotionAssets?.forEach((asset, assetIdx) => {
+    collectRichMotionAssetReferences(asset, `richMotionAssets[${String(assetIdx)}]`, out);
+  });
   return out;
 }
 
@@ -417,6 +465,9 @@ export function collectUnfilledAssetReferences(
   }
   if (root.header !== undefined) collectUnfilledSectionReferences(root.header, 'header', out);
   if (root.footer !== undefined) collectUnfilledSectionReferences(root.footer, 'footer', out);
+  root.overlaySections?.forEach((section, sectionIdx) => {
+    collectUnfilledSectionReferences(section, `overlaySections[${String(sectionIdx)}]`, out);
+  });
   return out;
 }
 
@@ -432,7 +483,7 @@ export function findAssetReferenceErrors(
       errors.push({ ...reference, reason: 'missing' });
       continue;
     }
-    if (actualKind !== reference.expectedKind) {
+    if (reference.expectedKind !== 'any' && actualKind !== reference.expectedKind) {
       errors.push({ ...reference, reason: 'kind-mismatch', actualKind });
     }
   }

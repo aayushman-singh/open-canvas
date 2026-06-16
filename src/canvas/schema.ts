@@ -369,6 +369,13 @@ export interface BaseElement {
    * pixel offset lives under a distinct name here to avoid type collision.
    */
   stickyOffset?: number;
+  /**
+   * Optional reference to a site-level Rich Motion Asset contract. The
+   * element remains the semantic owner in the rendered page; the rich-motion
+   * runtime reads this marker and either attaches the matching adapter or
+   * emits an explicit failure event.
+   */
+  richMotionAssetId?: string;
 }
 
 export const TEXT_ROLES = ['heading', 'body', 'label'] as const;
@@ -399,6 +406,10 @@ import type { NavElement } from './elements/nav.js';
 import type { TableElement } from './elements/table.js';
 import type { CollectionElement } from './elements/collection.js';
 import type { TabsElement } from './elements/tabs.js';
+import type { MotionSequence, ScrollScene } from './interactions.js';
+import type { LoadExperience, RouteTransition } from './load-transitions.js';
+import type { Overlay } from './overlays.js';
+import type { RichMotionAsset } from './rich-motion-assets.js';
 
 // Re-export so callers can keep importing element types from schema. Adding
 // a new element type only requires updating the import block above + the
@@ -439,21 +450,21 @@ export type CanvasElement =
 // type-check on one of these two consts. Split into two checks instead of
 // an intersection so `@typescript-eslint/no-duplicate-type-constituents`
 // doesn't flatten the bidirectional pair.
- 
+
 const _ELEMENT_TYPES_COVERS_UNION: Exclude<ElementType, CanvasElement['type']> extends never
   ? true
   : never = true;
- 
+
 const _UNION_COVERS_ELEMENT_TYPES: Exclude<CanvasElement['type'], ElementType> extends never
   ? true
   : never = true;
 
 // Same invariants for inline mark types ↔ InlineMark variants.
- 
+
 const _MARK_TYPES_COVERS_UNION: Exclude<InlineMarkType, InlineMark['type']> extends never
   ? true
   : never = true;
- 
+
 const _UNION_COVERS_MARK_TYPES: Exclude<InlineMark['type'], InlineMarkType> extends never
   ? true
   : never = true;
@@ -636,6 +647,20 @@ export interface EditableSiteBase {
     smooth?: boolean;
     paddingTop?: number;
   };
+  /** Authored choreography sequences shared by page, overlay, and route behaviours. */
+  motionSequences?: MotionSequence[];
+  /** Scroll-progress scenes that drive a Motion Sequence from page position. */
+  scrollScenes?: ScrollScene[];
+  /** Section-shaped overlay content surfaces excluded from normal page body order. */
+  overlaySections?: CanvasSection[];
+  /** First-class overlay behaviours: trigger, placement, dismissal, focus, and scroll lock. */
+  overlays?: Overlay[];
+  /** Rich animated media metadata consumed by the visitor Runtime Hydrator. */
+  richMotionAssets?: RichMotionAsset[];
+  /** Optional branded first-load gate and handoff sequence. */
+  loadExperience?: LoadExperience;
+  /** Optional same-site navigation transition contract. */
+  routeTransition?: RouteTransition;
 }
 
 export type EditableSite = EditableSiteBase & EditableSiteStyleKit;

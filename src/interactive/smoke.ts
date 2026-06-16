@@ -24,6 +24,7 @@ import type { AccordionElement } from '../canvas/elements/accordion.js';
 import { renderAccordion } from '../canvas/elements/accordion.js';
 import type { CarouselElement } from '../canvas/elements/carousel.js';
 import { renderCarousel } from '../canvas/elements/carousel.js';
+import { renderCanvasSnapshot } from '../canvas/render.js';
 import type { PublishedSnapshot } from '../canvas/schema.js';
 import { INTERACTIVE_RUNTIME_SRC, INTERACTIVE_RUNTIME_SRC_CHARS } from './build.js';
 import { injectInteractiveRuntime, snapshotNeedsInteractiveRuntime } from './inject.js';
@@ -47,6 +48,7 @@ function assert(condition: boolean, message: string): asserts condition {
 interface StubEvent {
   type: string;
   key?: string;
+  detail?: unknown;
   defaultPrevented: boolean;
   preventDefault(): void;
   target: StubElement | null;
@@ -56,13 +58,29 @@ interface StubEvent {
 
 type Listener = (event: StubEvent) => void;
 
+class StubStyle {
+  private readonly values = new Map<string, string>();
+
+  setProperty(name: string, value: string): void {
+    this.values.set(name, value);
+  }
+
+  getPropertyValue(name: string): string {
+    return this.values.get(name) ?? '';
+  }
+}
+
 class StubElement {
   tagName: string;
   attributes = new Map<string, string>();
   children: StubElement[] = [];
   parent: StubElement | null = null;
   listeners = new Map<string, Listener[]>();
+  animations: Array<{ keyframes: unknown; options: unknown }> = [];
+  style = new StubStyle();
   textContent = '';
+  ownerDocument: StubDocument | null = null;
+  focused = false;
 
   constructor(tagName: string) {
     this.tagName = tagName.toLowerCase();
@@ -79,6 +97,7 @@ class StubElement {
   }
   appendChild(child: StubElement): void {
     child.parent = this;
+    child.ownerDocument = this.ownerDocument;
     this.children.push(child);
   }
 
@@ -92,7 +111,7 @@ class StubElement {
   }
 
   dispatchEvent(event: StubEvent): void {
-    event.target = this;
+    if (event.target === null) event.target = this;
     // Bubble: this element + every ancestor.
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- intentional: walking up the parent chain from `this`.
     let node: StubElement | null = this;
@@ -104,6 +123,15 @@ class StubElement {
       }
       node = node.parent;
     }
+  }
+
+  animate(keyframes: unknown, options: unknown): { finished: Promise<void> } {
+    this.animations.push({ keyframes, options });
+    return { finished: Promise.resolve() };
+  }
+
+  focus(): void {
+    this.focused = true;
   }
 
   // Selector grammar accepted: `[attr]`, `[attr="value"]`, `[attr='value']`,
@@ -158,17 +186,59 @@ class StubElement {
 class StubDocument {
   readyState: 'loading' | 'interactive' | 'complete' = 'complete';
   root: StubElement = new StubElement('html');
+  body: StubElement = new StubElement('body');
+  defaultView: Record<string, unknown> = {
+    CustomEvent: class StubCustomEvent implements StubEvent {
+      defaultPrevented = false;
+      target: StubElement | null = null;
+      currentTarget: StubElement | null = null;
+
+      constructor(
+        readonly type: string,
+        init: { detail?: unknown } = {},
+      ) {
+        this.detail = init.detail;
+      }
+
+      detail?: unknown;
+
+      preventDefault(): void {
+        this.defaultPrevented = true;
+      }
+    },
+  };
   domContentLoadedListeners: Listener[] = [];
+  listeners = new Map<string, Listener[]>();
+
+  constructor() {
+    this.root.ownerDocument = this;
+    this.body.ownerDocument = this;
+    this.root.appendChild(this.body);
+  }
 
   addEventListener(type: string, listener: Listener): void {
     if (type === 'DOMContentLoaded') {
       this.domContentLoadedListeners.push(listener);
-    } else {
-      throw new Error(`[stub] document.addEventListener type "${type}" not supported`);
+      return;
     }
+    let listeners = this.listeners.get(type);
+    if (!listeners) {
+      listeners = [];
+      this.listeners.set(type, listeners);
+    }
+    listeners.push(listener);
   }
   querySelectorAll(selector: string): StubElement[] {
     return this.root.querySelectorAll(selector);
+  }
+  querySelector(selector: string): StubElement | null {
+    return this.root.querySelector(selector);
+  }
+  dispatchEvent(event: StubEvent): void {
+    event.target = null;
+    const listeners = this.listeners.get(event.type);
+    if (!listeners) return;
+    for (const listener of listeners) listener(event);
   }
 }
 
@@ -511,6 +581,11 @@ for (const child of parsed1.children) {
 }
 runRuntimeAgainstDocument(doc1);
 
+assert(
+  typeof doc1.defaultView.__opencanvasHydrate === 'function',
+  'runtime must expose window.__opencanvasHydrate for live DOM swaps',
+);
+
 const accRoot = doc1.querySelectorAll('[data-opencanvas-interactive="accordion"]')[0];
 assert(accRoot !== undefined, 'accordion root not found in parsed DOM');
 const itemA = accRoot.querySelector('[data-opencanvas-acc-item="a"]');
@@ -569,6 +644,28 @@ const stateAfterOneClick = itemB.getAttribute('data-opencanvas-acc-open');
 assert(
   stateBeforeRehydrate !== stateAfterOneClick,
   'one click after re-hydrate should toggle item b once (not twice)',
+);
+
+const lateAccordionHtml = renderAccordion(
+  {
+    ...accordionEl,
+    id: 'late-acc',
+    items: [{ id: 'late', title: 'Late Question', body: [{ text: 'Late answer.' }] }],
+  },
+  { styleKit: 'charcoal' },
+);
+const lateParsed = parseHtml(lateAccordionHtml);
+for (const child of lateParsed.children) doc1.root.appendChild(child);
+const lateRoot = doc1.querySelectorAll('[data-opencanvas-interactive="accordion"]').at(-1);
+assert(lateRoot !== undefined, 'late accordion root not found after append');
+assert(
+  lateRoot.getAttribute('data-opencanvas-hydrated') === null,
+  'late accordion must start unhydrated before global hydrator call',
+);
+(doc1.defaultView.__opencanvasHydrate as () => void)();
+assert(
+  lateRoot.getAttribute('data-opencanvas-hydrated') === 'true',
+  'global hydrator must hydrate late-inserted interactive roots',
 );
 
 // Accordion with allowMultipleOpen: true — opening b should NOT close a.
@@ -756,6 +853,229 @@ toggleLoadingB.dispatchEvent(makeEvent('click'));
 assert(
   itemLoadingB.getAttribute('data-opencanvas-acc-open') === 'true',
   'click after DOMContentLoaded should toggle (runtime hydrated)',
+);
+
+// ---------------------------------------------------------------------------
+// (7) Designer interaction hydration: motion, overlay, and rich-motion failure.
+// ---------------------------------------------------------------------------
+
+const designerSnapshot = {
+  version: 1,
+  publishedAt: '2026-06-16T00:00:00.000Z',
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'page-designer',
+      slug: 'designer',
+      title: 'Designer',
+      width: 1200,
+      sections: [
+        {
+          id: 'section-hero',
+          recipeId: 'hero-split',
+          name: 'Hero',
+          height: 560,
+          elements: [
+            {
+              id: 'hero-title',
+              type: 'text',
+              box: { x: 80, y: 90, w: 560, h: 120, z: 1 },
+              content: [{ text: 'Designer motion' }],
+              role: 'heading',
+              fontSize: 56,
+              fontWeight: 700,
+              align: 'left',
+            },
+            {
+              id: 'open-project',
+              type: 'action',
+              box: { x: 80, y: 240, w: 180, h: 48, z: 2 },
+              label: [{ text: 'Open project' }],
+              href: { type: 'external', url: 'https://example.com/project' },
+              variant: 'solid',
+            },
+            {
+              id: 'hero-lottie-owner',
+              type: 'media',
+              box: { x: 720, y: 72, w: 320, h: 320, z: 1 },
+              mediaKind: 'image',
+              assetId: 'asset-lottie',
+              alt: '',
+              fit: 'cover',
+              richMotionAssetId: 'hero-lottie',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  overlaySections: [
+    {
+      id: 'overlay-project-detail-section',
+      recipeId: 'custom',
+      name: 'Project Detail Overlay',
+      height: 420,
+      elements: [
+        {
+          id: 'overlay-title',
+          type: 'text',
+          box: { x: 48, y: 48, w: 640, h: 72, z: 1 },
+          content: [{ text: 'Project detail' }],
+          role: 'heading',
+          fontSize: 36,
+          fontWeight: 700,
+          align: 'left',
+        },
+      ],
+    },
+  ],
+  motionSequences: [
+    {
+      id: 'hero-intro',
+      trigger: { type: 'load' },
+      steps: [
+        {
+          id: 'headline-in',
+          target: { type: 'element', elementId: 'hero-title' },
+          properties: { opacity: [0, 1], y: [24, 0] },
+          durationMs: 500,
+          easing: 'out-cubic',
+        },
+      ],
+    },
+  ],
+  overlays: [
+    {
+      id: 'project-detail',
+      contentSectionId: 'overlay-project-detail-section',
+      trigger: { type: 'click', elementId: 'open-project' },
+      modality: 'modal',
+      placement: { type: 'center' },
+      dismissal: {
+        closeButton: true,
+        escapeKey: true,
+        backdropClick: true,
+        routeChange: true,
+      },
+      focus: {
+        initial: { type: 'overlay' },
+        returnTo: { type: 'trigger' },
+        trap: true,
+      },
+      bodyScroll: 'lock',
+    },
+  ],
+  richMotionAssets: [
+    {
+      id: 'hero-lottie',
+      ownerAssetId: 'asset-lottie',
+      family: 'vector-animation',
+      source: { kind: 'lottie-json' },
+      playback: {
+        trigger: { type: 'viewport-enter', elementId: 'hero-lottie-owner' },
+        loop: false,
+        speed: 1,
+        reducedMotion: 'poster',
+      },
+    },
+  ],
+} as unknown as PublishedSnapshot;
+
+assert(
+  snapshotNeedsInteractiveRuntime(designerSnapshot) === true,
+  'designer interaction fields should require interactive runtime injection',
+);
+
+const designerHtml = injectInteractiveRuntime(
+  renderCanvasSnapshot(designerSnapshot, '/assets', 'smoke-site', {
+    turnstileSiteKey: 'turnstile-test-key',
+  }),
+  designerSnapshot,
+);
+const designerDoc = new StubDocument();
+const designerParsed = parseHtml(designerHtml);
+for (const child of designerParsed.children) designerDoc.root.appendChild(child);
+const designerTitle = designerDoc.querySelector(
+  '[data-opencanvas-element="hero-title"]',
+) as StubElement;
+const designerTrigger = designerDoc.querySelector(
+  '[data-opencanvas-element="open-project"]',
+) as StubElement;
+const designerOverlay = designerDoc.querySelector(
+  '[data-opencanvas-overlay="project-detail"]',
+) as StubElement;
+const designerClose = designerDoc.querySelector(
+  '[data-opencanvas-overlay-close="project-detail"]',
+) as StubElement;
+const designerRich = designerDoc.querySelector(
+  '[data-opencanvas-rich-motion="hero-lottie"]',
+) as StubElement;
+assert(designerTitle !== null, 'designer title target must exist');
+assert(designerTrigger !== null, 'designer overlay trigger target must exist');
+assert(designerOverlay !== null, 'designer overlay shell must exist');
+assert(designerClose !== null, 'designer overlay close control must exist');
+assert(designerRich !== null, 'designer rich-motion owner must exist');
+
+let richMotionFailures = 0;
+designerRich.addEventListener('opencanvas:rich-motion-failure', () => {
+  richMotionFailures++;
+});
+runRuntimeAgainstDocument(designerDoc);
+
+assert(designerTitle.animations.length === 1, 'load motion should call element.animate once');
+assert(
+  designerTitle.getAttribute('data-opencanvas-motion-played') === 'hero-intro',
+  'load motion should mark the played sequence id',
+);
+assert(richMotionFailures === 1, 'rich motion unsupported runtime should emit one failure event');
+assert(
+  designerRich.getAttribute('data-opencanvas-rich-motion-failed') === 'unsupported-runtime',
+  'rich motion unsupported runtime should mark the element as failed',
+);
+
+designerTrigger.dispatchEvent(makeEvent('click'));
+assert(
+  designerOverlay.getAttribute('hidden') === null,
+  'overlay trigger click should remove hidden from the overlay shell',
+);
+assert(
+  designerOverlay.getAttribute('data-opencanvas-overlay-open') === 'true',
+  'overlay trigger click should mark the overlay open',
+);
+assert(
+  designerDoc.body.style.getPropertyValue('overflow') === 'hidden',
+  'modal overlay with bodyScroll=lock should lock body scroll',
+);
+
+designerClose.dispatchEvent(makeEvent('click'));
+assert(
+  designerOverlay.getAttribute('hidden') !== null,
+  'overlay close control should restore hidden on the overlay shell',
+);
+assert(
+  designerOverlay.getAttribute('data-opencanvas-overlay-open') === null,
+  'overlay close control should clear the open marker',
+);
+assert(
+  designerDoc.body.style.getPropertyValue('overflow') === '',
+  'closing the modal overlay should release body scroll lock',
+);
+
+const noAnimateDoc = new StubDocument();
+const noAnimateParsed = parseHtml(designerHtml);
+for (const child of noAnimateParsed.children) noAnimateDoc.root.appendChild(child);
+const noAnimateTitle = noAnimateDoc.querySelector(
+  '[data-opencanvas-element="hero-title"]',
+) as StubElement;
+noAnimateTitle.animate = undefined as never;
+runRuntimeAgainstDocument(noAnimateDoc);
+assert(
+  noAnimateTitle.style.getPropertyValue('opacity') === '1',
+  'motion without element.animate should apply final opacity directly',
+);
+assert(
+  noAnimateTitle.style.getPropertyValue('transform') === 'translateY(0px)',
+  'motion without element.animate should apply final transform directly',
 );
 
 // ---------------------------------------------------------------------------

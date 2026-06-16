@@ -22,7 +22,15 @@ import {
 import { renderResponsiveCss } from './responsive/index.js';
 import { resolveActionHref } from './action-href.js';
 import { getStyleKitPreset, resolveStyleKitWithCustom } from './style-kits.js';
-import type { CanvasElement, CanvasPage, CanvasSection, ElementStyle, PublishedSnapshot, StyleKitPreset } from './schema.js';
+import type { Overlay } from './overlays.js';
+import type {
+  CanvasElement,
+  CanvasPage,
+  CanvasSection,
+  ElementStyle,
+  PublishedSnapshot,
+  StyleKitPreset,
+} from './schema.js';
 
 function applyElementStyle(
   entries: Array<[string, string]>,
@@ -92,24 +100,25 @@ function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string)
   // ADR 0054 dec 1 — sticky elements drop out of absolute layout and use
   // margins for the authored initial offset, reserving `top` for the sticky
   // viewport offset. Non-sticky elements continue to use absolute layout.
-  const entries: Array<[string, string]> = stickyOffset !== null
-    ? [
-        ['position', 'sticky'],
-        ['margin-left', `${String(box.x)}px`],
-        ['margin-top', `${String(box.y)}px`],
-        ['top', `${String(stickyOffset)}px`],
-        ['width', `${String(box.w)}px`],
-        ['height', `${String(box.h)}px`],
-        ['z-index', String(box.z)],
-      ]
-    : [
-        ['position', 'absolute'],
-        ['left', `${String(box.x)}px`],
-        ['top', `${String(box.y)}px`],
-        ['width', `${String(box.w)}px`],
-        ['height', `${String(box.h)}px`],
-        ['z-index', String(box.z)],
-      ];
+  const entries: Array<[string, string]> =
+    stickyOffset !== null
+      ? [
+          ['position', 'sticky'],
+          ['margin-left', `${String(box.x)}px`],
+          ['margin-top', `${String(box.y)}px`],
+          ['top', `${String(stickyOffset)}px`],
+          ['width', `${String(box.w)}px`],
+          ['height', `${String(box.h)}px`],
+          ['z-index', String(box.z)],
+        ]
+      : [
+          ['position', 'absolute'],
+          ['left', `${String(box.x)}px`],
+          ['top', `${String(box.y)}px`],
+          ['width', `${String(box.w)}px`],
+          ['height', `${String(box.h)}px`],
+          ['z-index', String(box.z)],
+        ];
   if (typeof box.rotation === 'number' && box.rotation !== 0) {
     entries.push(['transform', `rotate(${String(box.rotation)}deg)`]);
   }
@@ -259,13 +268,23 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
   const ariaAttrs = buildAriaWrapperAttrs(element);
   const variant = variantAttr(element);
   const esAttrs = buildElementStyleDataAttrs(element.elementStyle);
+  const richMotion =
+    typeof element.richMotionAssetId === 'string' && element.richMotionAssetId.length > 0
+      ? ctx.richMotionAssets?.get(element.richMotionAssetId)
+      : undefined;
+  const richMotionAttrs =
+    richMotion !== undefined
+      ? ` data-opencanvas-rich-motion="${escapeAttr(richMotion.id)}" data-opencanvas-rich-motion-family="${escapeAttr(richMotion.family)}" data-opencanvas-rich-motion-source="${escapeAttr(richMotion.source.kind)}"`
+      : element.richMotionAssetId !== undefined
+        ? ` data-opencanvas-rich-motion="${escapeAttr(element.richMotionAssetId)}"`
+        : '';
   // ADR 0050 dec 2 — anchor ids emit as DOM id="..." on the wrapper.
   // Validator enforces the strict charset, so escapeAttr is belt-and-braces.
   const idAttr =
     typeof element.anchorId === 'string' && element.anchorId.length > 0
       ? ` id="${escapeAttr(element.anchorId)}"`
       : '';
-  const commonAttrs = `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs}${esAttrs}`;
+  const commonAttrs = `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${richMotionAttrs}${ariaAttrs}${esAttrs}`;
 
   // ADR 0051 dec 5 — container with linkHref emits the outer wrapper as
   // <a href="…"> instead of <div>. Every other attribute, the inner body
@@ -307,15 +326,9 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
         styleEntries.push(['border', `${String(ab.width)}px solid ${safeColor}`]);
         styleEntries.push(['box-sizing', 'border-box']);
       } else if (ab.type === 'top') {
-        styleEntries.push([
-          'box-shadow',
-          `inset 0 ${String(ab.thickness)}px 0 0 ${safeColor}`,
-        ]);
+        styleEntries.push(['box-shadow', `inset 0 ${String(ab.thickness)}px 0 0 ${safeColor}`]);
       } else if (ab.type === 'left') {
-        styleEntries.push([
-          'box-shadow',
-          `inset ${String(ab.thickness)}px 0 0 0 ${safeColor}`,
-        ]);
+        styleEntries.push(['box-shadow', `inset ${String(ab.thickness)}px 0 0 0 ${safeColor}`]);
       } else {
         const spread = ab.spread ?? 0;
         styleEntries.push([
@@ -331,7 +344,10 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   // emits them, which is what assistive tech reads. Owner-side reorder tools
   // (T5.7) are the Owner's lever for changing it independent of visual z/x/y.
   const elementsHtml = section.elements.map((element) => renderElement(element, ctx)).join('');
-  const roleAttr = section.role && section.role !== 'body' ? ` data-section-role="${escapeAttr(section.role)}"` : '';
+  const roleAttr =
+    section.role && section.role !== 'body'
+      ? ` data-section-role="${escapeAttr(section.role)}"`
+      : '';
   const triggerAttrs = section.trigger
     ? (() => {
         const t = section.trigger;
@@ -412,6 +428,121 @@ function renderPage(
   return `<article class="opencanvas-page" data-opencanvas-page="${escapeAttr(page.id)}"${motionAttr}${entranceAttr}${triggerAttr} style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
 }
 
+function buildRichMotionAssetMap(
+  snapshot: PublishedSnapshot,
+): NonNullable<ElementRenderCtx['richMotionAssets']> {
+  const map = new Map<string, NonNullable<PublishedSnapshot['richMotionAssets']>[number]>();
+  for (const asset of snapshot.richMotionAssets ?? []) map.set(asset.id, asset);
+  return map;
+}
+
+function escapeJsonScript(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/&/g, '\\u0026')
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+function snapshotHasDesignerInteractions(snapshot: PublishedSnapshot): boolean {
+  return (
+    (snapshot.motionSequences?.length ?? 0) > 0 ||
+    (snapshot.scrollScenes?.length ?? 0) > 0 ||
+    (snapshot.richMotionAssets?.length ?? 0) > 0 ||
+    snapshot.loadExperience !== undefined ||
+    snapshot.routeTransition !== undefined
+  );
+}
+
+function renderDesignerInteractionPayload(snapshot: PublishedSnapshot): string {
+  if (!snapshotHasDesignerInteractions(snapshot)) return '';
+  const payload = {
+    motionSequences: snapshot.motionSequences ?? [],
+    scrollScenes: snapshot.scrollScenes ?? [],
+    richMotionAssets: snapshot.richMotionAssets ?? [],
+    ...(snapshot.loadExperience !== undefined ? { loadExperience: snapshot.loadExperience } : {}),
+    ...(snapshot.routeTransition !== undefined
+      ? { routeTransition: snapshot.routeTransition }
+      : {}),
+  };
+  return `<script type="application/json" data-opencanvas-designer-interactions>${escapeJsonScript(payload)}</script>`;
+}
+
+function renderOverlayLayer(
+  snapshot: PublishedSnapshot,
+  pageWidth: number,
+  ctx: Omit<ElementRenderCtx, 'pageSlug'>,
+): string {
+  if ((snapshot.overlays?.length ?? 0) === 0) return '';
+  const sections = new Map<string, CanvasSection>();
+  for (const section of snapshot.overlaySections ?? []) sections.set(section.id, section);
+  const overlayHtml = (snapshot.overlays ?? []).map((overlay) => {
+    const content = sections.get(overlay.contentSectionId);
+    if (content === undefined) {
+      throw new Error(
+        `renderOverlayLayer: overlay ${JSON.stringify(overlay.id)} references missing contentSectionId ${JSON.stringify(overlay.contentSectionId)}`,
+      );
+    }
+    return renderOverlayShell(overlay, content, pageWidth, ctx);
+  });
+  return `<div class="opencanvas-overlay-layer" data-opencanvas-overlay-layer>${overlayHtml.join('')}</div>`;
+}
+
+function renderOverlayShell(
+  overlay: Overlay,
+  content: CanvasSection,
+  pageWidth: number,
+  ctx: Omit<ElementRenderCtx, 'pageSlug'>,
+): string {
+  const triggerElementId = overlay.trigger.type === 'click' ? overlay.trigger.elementId : '';
+  const modalAttrs =
+    overlay.modality === 'modal' ? ' role="dialog" aria-modal="true"' : ' role="region"';
+  const closeButton = overlay.dismissal.closeButton
+    ? `<button class="opencanvas-overlay-close" type="button" data-opencanvas-overlay-close="${escapeAttr(overlay.id)}" aria-label="Close overlay">×</button>`
+    : '';
+  const overlayCtx: ElementRenderCtx = { ...ctx, pageSlug: '__overlay__' };
+  const sectionHtml = renderSection(content, pageWidth, overlayCtx);
+  const openSequenceAttr =
+    overlay.openSequenceId !== undefined
+      ? ` data-opencanvas-overlay-open-sequence="${escapeAttr(overlay.openSequenceId)}"`
+      : '';
+  const closeSequenceAttr =
+    overlay.closeSequenceId !== undefined
+      ? ` data-opencanvas-overlay-close-sequence="${escapeAttr(overlay.closeSequenceId)}"`
+      : '';
+  const anchoredAttrs =
+    overlay.placement.type === 'anchored'
+      ? ` data-opencanvas-overlay-anchor-element="${escapeAttr(overlay.placement.anchorElementId)}" data-opencanvas-overlay-anchor-side="${escapeAttr(overlay.placement.side)}"`
+      : '';
+  return `<div class="opencanvas-overlay" data-opencanvas-overlay="${escapeAttr(overlay.id)}" data-opencanvas-overlay-content-section="${escapeAttr(overlay.contentSectionId)}" data-opencanvas-overlay-modality="${escapeAttr(overlay.modality)}" data-opencanvas-overlay-placement="${escapeAttr(overlay.placement.type)}"${anchoredAttrs} data-opencanvas-overlay-body-scroll="${escapeAttr(overlay.bodyScroll)}" data-opencanvas-overlay-trigger-type="${escapeAttr(overlay.trigger.type)}" data-opencanvas-overlay-trigger-element="${escapeAttr(triggerElementId)}" data-opencanvas-overlay-dismiss-escape="${String(overlay.dismissal.escapeKey)}" data-opencanvas-overlay-dismiss-backdrop="${String(overlay.dismissal.backdropClick)}"${openSequenceAttr}${closeSequenceAttr} hidden><div class="opencanvas-overlay-backdrop" data-opencanvas-overlay-backdrop="${escapeAttr(overlay.id)}"></div><div class="opencanvas-overlay-panel" data-opencanvas-overlay-panel${modalAttrs} tabindex="-1">${closeButton}${sectionHtml}</div></div>`;
+}
+
+function buildDesignerInteractionRootAttrs(snapshot: PublishedSnapshot): string {
+  const attrs: string[] = [];
+  if ((snapshot.motionSequences?.length ?? 0) > 0) {
+    attrs.push(
+      `data-opencanvas-motion-sequence-count="${escapeAttr(String(snapshot.motionSequences?.length ?? 0))}"`,
+    );
+  }
+  if ((snapshot.scrollScenes?.length ?? 0) > 0) {
+    attrs.push(
+      `data-opencanvas-scroll-scene-count="${escapeAttr(String(snapshot.scrollScenes?.length ?? 0))}"`,
+    );
+  }
+  if ((snapshot.overlays?.length ?? 0) > 0) {
+    attrs.push(
+      `data-opencanvas-overlay-count="${escapeAttr(String(snapshot.overlays?.length ?? 0))}"`,
+    );
+  }
+  if ((snapshot.richMotionAssets?.length ?? 0) > 0) {
+    attrs.push(
+      `data-opencanvas-rich-motion-count="${escapeAttr(String(snapshot.richMotionAssets?.length ?? 0))}"`,
+    );
+  }
+  return attrs.length === 0 ? '' : ` ${attrs.join(' ')}`;
+}
+
 /**
  * Renderer options collected into one object so callers don't bloat the
  * positional signature each time a new optional hook lands. New optional
@@ -466,8 +597,8 @@ export function renderCanvasSnapshot(
     snapshot.styleKit === 'custom'
       ? resolveStyleKitWithCustom(snapshot)
       : getStyleKitPreset(snapshot.styleKit);
-  const customPreset: StyleKitPreset | null =
-    snapshot.styleKit === 'custom' ? preset : null;
+  const customPreset: StyleKitPreset | null = snapshot.styleKit === 'custom' ? preset : null;
+  const richMotionAssets = buildRichMotionAssetMap(snapshot);
   const baseCtx: Omit<ElementRenderCtx, 'pageSlug'> = {
     assetBasePath,
     styleKit: snapshot.styleKit,
@@ -475,18 +606,26 @@ export function renderCanvasSnapshot(
     siteId,
     pages: snapshot.pages,
     turnstileSiteKey: opts.turnstileSiteKey,
+    richMotionAssets,
     renderElement,
   };
   const pagesToRender = opts.renderPages ?? snapshot.pages;
   const pagesHtml = pagesToRender
     .map((page) => renderPage(page, baseCtx, snapshot.header, snapshot.footer))
     .join('');
+  const overlayWidth = Math.min(
+    snapshot.pages[0]?.maxWidth ?? Infinity,
+    snapshot.pages[0]?.width ?? 1440,
+  );
+  const overlayLayer = renderOverlayLayer(snapshot, overlayWidth, baseCtx);
+  const designerInteractionPayload = renderDesignerInteractionPayload(snapshot);
   const responsiveStyle = renderResponsiveCss(snapshot);
   const scrollStyle = renderScrollBehaviourCss(snapshot.scrollBehavior);
   const copyScript = renderCopyHandlerScript(snapshot);
   const tabsScript = renderTabsHandlerScript(snapshot);
   const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${pagesHtml}${copyScript}${tabsScript}</main>`;
+  const designerInteractionAttrs = buildDesignerInteractionRootAttrs(snapshot);
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}"${designerInteractionAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${pagesHtml}${overlayLayer}${designerInteractionPayload}${copyScript}${tabsScript}</main>`;
 }
 
 /**
@@ -534,10 +673,7 @@ function snapshotHasTabsElement(snapshot: PublishedSnapshot): boolean {
  * 0052 dec 4 (tabs nesting tabs is allowed) and the existing collection
  * nesting need without a per-call-site bespoke walk.
  */
-function walkElements(
-  snapshot: PublishedSnapshot,
-  pred: (el: CanvasElement) => boolean,
-): boolean {
+function walkElements(snapshot: PublishedSnapshot, pred: (el: CanvasElement) => boolean): boolean {
   const sections: CanvasSection[] = [];
   if (snapshot.header) sections.push(snapshot.header);
   if (snapshot.footer) sections.push(snapshot.footer);
@@ -578,9 +714,7 @@ function walkElements(
  * sticky header instead of under it. Absence (or all-fields-absent) emits
  * nothing — there is no zero-padding default.
  */
-function renderScrollBehaviourCss(
-  scrollBehavior: PublishedSnapshot['scrollBehavior'],
-): string {
+function renderScrollBehaviourCss(scrollBehavior: PublishedSnapshot['scrollBehavior']): string {
   if (!scrollBehavior) return '';
   const rules: string[] = [];
   if (scrollBehavior.smooth === true) rules.push('scroll-behavior:smooth');

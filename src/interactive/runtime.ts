@@ -15,8 +15,9 @@
 // `src/routes/public.ts`) re-hydrate cleanly.
 
 export const RUNTIME_ENTRY_SRC = String.raw`
-function hydrateAll() {
-  var roots = document.querySelectorAll('[data-opencanvas-interactive]');
+function hydrateAll(scope) {
+  var scanRoot = scope || document;
+  var roots = scanRoot.querySelectorAll('[data-opencanvas-interactive]');
   for (var i = 0; i < roots.length; i++) {
     var root = roots[i];
     if (root.getAttribute('data-opencanvas-hydrated') === 'true') continue;
@@ -33,10 +34,16 @@ function hydrateAll() {
   // arm (a pointer-fx element need not be an interactive element type). It is
   // idempotent, so running it every hydrateAll (incl. live-publish re-hydrate)
   // is safe.
-  hydratePointerFx(document);
+  hydratePointerFx(scanRoot);
+  if (typeof initPopups === 'function') initPopups(scanRoot);
+  if (typeof hydrateDesignerMotion === 'function') hydrateDesignerMotion(scanRoot);
+  if (typeof hydrateOverlays === 'function') hydrateOverlays(scanRoot);
+  if (typeof hydrateRichMotionAssets === 'function') hydrateRichMotionAssets(scanRoot);
 }
+var ocWindow = document.defaultView || (typeof window !== 'undefined' ? window : null);
+if (ocWindow) ocWindow.__opencanvasHydrate = hydrateAll;
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', hydrateAll);
+  document.addEventListener('DOMContentLoaded', function(){ hydrateAll(); });
 } else {
   hydrateAll();
 }

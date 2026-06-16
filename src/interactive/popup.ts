@@ -19,9 +19,12 @@
 // visitor per section.
 
 export const POPUP_RUNTIME_SRC = String.raw`
-function initPopups(){
-var els=document.querySelectorAll('[data-opencanvas-popup="true"]');
+function initPopups(scope){
+var scanRoot=scope||document;
+var els=scanRoot.querySelectorAll('[data-opencanvas-popup="true"]');
 for(var i=0;i<els.length;i++){(function(sec){
+if(sec.getAttribute('data-opencanvas-popup-hydrated')==='true')return;
+sec.setAttribute('data-opencanvas-popup-hydrated','true');
 var id=sec.getAttribute('data-opencanvas-section');
 var type=sec.getAttribute('data-opencanvas-trigger-type');
 var val=parseInt(sec.getAttribute('data-opencanvas-trigger-value')||'0',10);
@@ -71,5 +74,4 @@ if(pct>=thr)show();
 }
 })(els[i]);}
 }
-initPopups();
 `;

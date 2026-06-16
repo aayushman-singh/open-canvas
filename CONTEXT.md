@@ -52,12 +52,56 @@ _Avoid_: Custom animation code, interaction script, pointer-reactive effect
 A curated visual behaviour on an element that responds continuously to the visitor's cursor position (e.g. a glow that follows the pointer, a tilt toward it). Distinct from a Motion Preset, which is time- or scroll-triggered and ignores the cursor.
 _Avoid_: Motion preset, animation, hover state, interaction script
 
+**Interaction Trigger**:
+A schema-owned visitor or owner-preview event that starts or updates an authored behaviour, such as load, viewport entry, scroll progress, hover, pointer movement, click, route navigation, or media readiness.
+_Avoid_: Event listener, hook, script callback
+
+**Interaction Target**:
+A named page, section, element, component part, text fragment, or overlay surface that an authored behaviour can affect.
+_Avoid_: CSS selector, DOM node, query target
+
+**Motion Sequence**:
+An ordered animation relation from one Interaction Trigger to one or more Interaction Targets. It carries explicit steps, timings, easing, target parts, and animated properties.
+_Avoid_: Keyframe blob, custom animation code, motion preset
+
+**Scroll Scene**:
+A scroll-position relation that binds progress through a page or section range to a Motion Sequence.
+_Avoid_: Scroll trigger, parallax preset, scroll script
+
+**Runtime Hydrator**:
+The shared behaviour runner that reads schema-owned interactions and attaches the visitor/editor state needed to execute them.
+_Avoid_: Per-component script, custom code, visitor-only runtime
+
+**Overlay**:
+A temporary visitor-facing surface opened above the current page from an explicit Interaction Trigger and closed by an explicit dismissal rule.
+_Avoid_: Popup, modal widget, iframe drill-in
+
+**Load Experience**:
+An authored first-load choreography that can wait on explicit readiness gates before handing control to the page.
+_Avoid_: Spinner, preloader script, loading state
+
+**Route Transition**:
+An authored navigation choreography between two page states that can define outgoing, incoming, and shared-target movement.
+_Avoid_: Router hook, page animation, navigation script
+
+**Layout Transition**:
+An authored state-change relation between two named Interaction Targets whose geometry changes while the visitor should perceive continuity.
+_Avoid_: FLIP script, shared-element hack, layout animation code
+
+**Rich Motion Asset**:
+A non-static media asset whose playback is schema-owned and rendered by a dedicated runtime, such as vector animation, interactive animation, or a 3D scene.
+_Avoid_: Animation blob, embed, custom canvas script
+
 **Variant**:
 A named, designed look for a single element that the owner selects with one choice, applying a complete coherent presentation at once. Sits above the granular per-element style: a Variant sets the base, the owner's explicit style choices override it. Each element kind that offers Variants exposes a fixed, curated set.
 _Avoid_: Theme, skin, preset, template, style kit
 
+**Component Style**:
+A named group of owner-chosen visual values for the meaningful parts of one Content Element.
+_Avoid_: Variant, theme, preset, raw CSS, pinned style
+
 **Pinned Style**:
-An explicit element-level visual choice that is not changed by a theme choice.
+An explicit element-level visual choice for a Positioned Element when no named Component Style owns that choice.
 _Avoid_: Override, custom CSS, inline style
 
 **Presence Indicator**:
@@ -182,7 +226,16 @@ _Avoid_: Undo stack, version history, asset trail
 - A **Published Snapshot** reflects the owner's live editable state at the moment publish is requested
 - A **Theme Choice** applies to the whole **Editable Site** and is included in the **Published Snapshot**
 - A **Style Kit** controls the default look of **Design Primitives**
-- A **Pinned Style** belongs to one **Positioned Element** and survives **Theme Choice** changes
+- A **Variant** gives one **Content Element** a complete base look
+- A **Component Style** belongs to one **Content Element** and overrides that element's **Variant**
+- A **Pinned Style** belongs to one **Positioned Element**, does not duplicate its **Component Style**, and survives **Theme Choice** changes
+- A **Motion Sequence** starts from one **Interaction Trigger** and affects one or more **Interaction Targets**
+- A **Scroll Scene** drives one **Motion Sequence** from scroll progress rather than elapsed time
+- An **Overlay** opens from one **Interaction Trigger** and closes by one explicit dismissal rule
+- A **Load Experience** belongs to an **Editable Site** or **Page** and hands off to the initial page state
+- A **Route Transition** belongs to page navigation and may include one or more **Layout Transitions**
+- A **Runtime Hydrator** runs schema-owned interactions for both the **Editable Site** preview and the **Published Site**
+- A **Rich Motion Asset** belongs to one **Owner** and may be referenced by media elements in any of that owner's editable sites
 - A **Media Element** references an **Owner Asset**
 - An **Owner Asset** belongs to one **Owner** and may be referenced by media elements in any of that owner's editable sites
 - An **Owner Asset** survives deletion of any single editable site that references it

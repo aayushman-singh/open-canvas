@@ -24,8 +24,11 @@
 
 import { ACCORDION_RUNTIME_SRC } from './accordion.js';
 import { CAROUSEL_RUNTIME_SRC } from './carousel.js';
+import { DESIGNER_MOTION_RUNTIME_SRC } from './motion.js';
+import { OVERLAY_RUNTIME_SRC } from './overlay.js';
 import { POINTER_FX_RUNTIME_SRC } from './pointer-fx.js';
 import { POPUP_RUNTIME_SRC } from './popup.js';
+import { RICH_MOTION_RUNTIME_SRC } from './rich-motion.js';
 import { RUNTIME_ENTRY_SRC } from './runtime.js';
 
 /**
@@ -39,6 +42,9 @@ export const INTERACTIVE_RUNTIME_SRC: string = [
   CAROUSEL_RUNTIME_SRC,
   POINTER_FX_RUNTIME_SRC,
   POPUP_RUNTIME_SRC,
+  DESIGNER_MOTION_RUNTIME_SRC,
+  OVERLAY_RUNTIME_SRC,
+  RICH_MOTION_RUNTIME_SRC,
   RUNTIME_ENTRY_SRC,
   '})();',
 ].join('\n');

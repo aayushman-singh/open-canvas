@@ -54,6 +54,74 @@ html, body {
   position: relative;
 }
 
+.opencanvas-overlay-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+}
+.opencanvas-overlay[hidden] {
+  display: none;
+}
+.opencanvas-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  pointer-events: auto;
+}
+.opencanvas-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(10px);
+}
+.opencanvas-overlay-panel {
+  position: relative;
+  max-width: min(100%, 960px);
+  max-height: min(100%, 86vh);
+  overflow: auto;
+  background: var(--opencanvas-kit-panel, #151821);
+  color: var(--opencanvas-kit-text, #f6f6f6);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--opencanvas-kit-radius, 8px);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+}
+.opencanvas-overlay[data-opencanvas-overlay-placement="fullscreen"] {
+  padding: 0;
+  place-items: stretch;
+}
+.opencanvas-overlay[data-opencanvas-overlay-placement="fullscreen"] .opencanvas-overlay-panel {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+}
+.opencanvas-overlay[data-opencanvas-overlay-placement="anchored"] {
+  place-items: start;
+}
+.opencanvas-overlay[data-opencanvas-overlay-placement="anchored"] .opencanvas-overlay-panel {
+  position: fixed;
+  max-width: min(420px, calc(100vw - 24px));
+}
+.opencanvas-overlay-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.34);
+  color: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .opencanvas-text { color: inherit; }
 
 /* Text element wrappers clip overflow by default so a long line typed into

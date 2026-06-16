@@ -22,6 +22,21 @@ import { ICON_NAMES, isIconName } from './icons.js';
 import { TABS_DEFAULT_BAR_HEIGHT, TABS_VARIANTS } from './elements/tabs.js';
 import { CAROUSEL_MODES, CAROUSEL_VARIANTS } from './elements/carousel.js';
 import { NAV_LAYOUTS, NAV_LINK_KINDS, type NavLayout, type NavLinkKind } from './elements/nav.js';
+import {
+  validateMotionSequence,
+  validateScrollScene,
+  type InteractionTarget,
+  type MotionSequence,
+  type ScrollScene,
+} from './interactions.js';
+import {
+  validateLoadExperience,
+  validateRouteTransition,
+  type LoadExperience,
+  type RouteTransition,
+} from './load-transitions.js';
+import { validateOverlay, type Overlay, type OverlayFocusTarget } from './overlays.js';
+import { validateRichMotionAsset, type RichMotionAsset } from './rich-motion-assets.js';
 
 // Re-export the canonical href allowlist so existing consumers (agent
 // parsers, etc.) that import from './canvas/validate.js' keep working. The
@@ -733,7 +748,9 @@ function validateTextContent(
       if (!isRecord(run.math)) {
         errors.push(`${runPath}.math must be an object when present`);
       } else if (typeof run.math.tex !== 'string' || run.math.tex.length === 0) {
-        errors.push(`${runPath}.math.tex must be a non-empty string (got ${describe(run.math.tex)})`);
+        errors.push(
+          `${runPath}.math.tex must be a non-empty string (got ${describe(run.math.tex)})`,
+        );
       } else if (run.math.tex.length > INLINE_MATH_TEX_MAX_LEN) {
         errors.push(
           `${runPath}.math.tex exceeds the ${String(INLINE_MATH_TEX_MAX_LEN)}-char cap (got ${String(run.math.tex.length)})`,
@@ -871,6 +888,9 @@ function validateElement(
         `${basePath}.stickyOffset must be a finite number >= 0 when present (got ${describe(element.stickyOffset)})`,
       );
     }
+  }
+  if (element.richMotionAssetId !== undefined) {
+    assertNonEmptyString(element.richMotionAssetId, `${basePath}.richMotionAssetId`, errors);
   }
 
   if (!knownType) return;
@@ -1043,9 +1063,7 @@ function validateElement(
       const iconOnlyOk = isIconName(element.iconKind);
       if (Array.isArray(element.label)) {
         const concat = element.label
-          .map((run) =>
-            isRecord(run) && typeof run.text === 'string' ? run.text : '',
-          )
+          .map((run) => (isRecord(run) && typeof run.text === 'string' ? run.text : ''))
           .join('');
         if (concat.length === 0 && !iconOnlyOk) {
           element.label = [{ text: 'Button' }];
@@ -1168,12 +1186,7 @@ function validateElement(
       // `sort` and `display` are optional during the multi-commit migration
       // (Phase 1 lands the shape; Phase 2B tightens to required-on-insert).
       if (element.sort !== undefined) {
-        assertOneOf<CollectionSort>(
-          element.sort,
-          COLLECTION_SORTS,
-          `${basePath}.sort`,
-          errors,
-        );
+        assertOneOf<CollectionSort>(element.sort, COLLECTION_SORTS, `${basePath}.sort`, errors);
       }
       if (element.display !== undefined) {
         assertOneOf<CollectionDisplay>(
@@ -1423,7 +1436,10 @@ function validateSection(
   // must satisfy `/^[a-z][a-z0-9]*$/`. Optional — Library rows never carry
   // it; only sections materialised from a TemplateSeed composition do.
   if (section.instanceScope !== undefined) {
-    if (typeof section.instanceScope !== 'string' || !/^[a-z][a-z0-9]*$/.test(section.instanceScope)) {
+    if (
+      typeof section.instanceScope !== 'string' ||
+      !/^[a-z][a-z0-9]*$/.test(section.instanceScope)
+    ) {
       errors.push(
         `${basePath}.instanceScope must match /^[a-z][a-z0-9]*$/ (got ${describe(section.instanceScope)})`,
       );
@@ -1481,7 +1497,9 @@ function validateAccentBorder(value: unknown, basePath: string, errors: string[]
       );
     }
     if ('width' in value || 'radius' in value || 'spread' in value) {
-      errors.push(`${basePath} must not carry width/radius/spread on a ${value.type} accent border`);
+      errors.push(
+        `${basePath} must not carry width/radius/spread on a ${value.type} accent border`,
+      );
     }
   } else if (value.type === 'glow') {
     if (!isFiniteNumber(value.radius) || value.radius <= 0) {
@@ -1589,12 +1607,7 @@ function validatePage(
         `${basePath}.pageKind 'collection-index' is retired; this Collection's binding lives on the CollectionElement itself per ADR 0063.`,
       );
     } else {
-      assertOneOf(
-        page.pageKind,
-        COLLECTION_PAGE_KINDS,
-        `${basePath}.pageKind`,
-        errors,
-      );
+      assertOneOf(page.pageKind, COLLECTION_PAGE_KINDS, `${basePath}.pageKind`, errors);
       if (page.collectionSlug === undefined) {
         errors.push(
           `${basePath}.collectionSlug is required when pageKind is set (ADR 0060: a CMS-marked page must name its collection)`,
@@ -1717,10 +1730,7 @@ function validatePageAnchorIdUniqueness(
     // enforce uniqueness on the editable surface.
     if (el.type === 'collection' && Array.isArray(el.customTemplate)) {
       el.customTemplate.forEach((child, childIdx) => {
-        visitElementTree(
-          child,
-          pathJoin(pathJoin(elementPath, 'customTemplate'), childIdx),
-        );
+        visitElementTree(child, pathJoin(pathJoin(elementPath, 'customTemplate'), childIdx));
       });
       return;
     }
@@ -1785,6 +1795,36 @@ interface SiteFieldValidatorCtx {
 }
 
 type SiteFieldValidator = (ctx: SiteFieldValidatorCtx) => void;
+
+function validateOptionalDomainObject(
+  value: unknown,
+  path: string,
+  validate: (value: unknown) => void,
+  errors: string[],
+): void {
+  if (value === undefined) return;
+  try {
+    validate(value);
+  } catch (err) {
+    errors.push(`${path}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+function validateDomainArray(
+  value: unknown,
+  path: string,
+  validate: (value: unknown) => void,
+  errors: string[],
+): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    errors.push(`${path} must be an array when present (got ${describe(value)})`);
+    return;
+  }
+  value.forEach((item, index) => {
+    validateOptionalDomainObject(item, `${path}[${String(index)}]`, validate, errors);
+  });
+}
 
 const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } = {
   // ADR 0016 — `styleKit` and `customStyleKit` are a discriminated union at
@@ -1886,6 +1926,61 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
       }
     }
   },
+  motionSequences: ({ state, errors }) => {
+    validateDomainArray(
+      state.motionSequences,
+      'motionSequences',
+      (value) => validateMotionSequence(value as MotionSequence),
+      errors,
+    );
+  },
+  scrollScenes: ({ state, errors }) => {
+    validateDomainArray(
+      state.scrollScenes,
+      'scrollScenes',
+      (value) => validateScrollScene(value as ScrollScene),
+      errors,
+    );
+  },
+  overlaySections: ({ state, errors }) => {
+    if (state.overlaySections !== undefined && !Array.isArray(state.overlaySections)) {
+      errors.push(
+        `overlaySections must be an array when present (got ${describe(state.overlaySections)})`,
+      );
+    }
+  },
+  overlays: ({ state, errors }) => {
+    validateDomainArray(
+      state.overlays,
+      'overlays',
+      (value) => validateOverlay(value as Overlay),
+      errors,
+    );
+  },
+  richMotionAssets: ({ state, errors }) => {
+    validateDomainArray(
+      state.richMotionAssets,
+      'richMotionAssets',
+      (value) => validateRichMotionAsset(value as RichMotionAsset),
+      errors,
+    );
+  },
+  loadExperience: ({ state, errors }) => {
+    validateOptionalDomainObject(
+      state.loadExperience,
+      'loadExperience',
+      (value) => validateLoadExperience(value as LoadExperience),
+      errors,
+    );
+  },
+  routeTransition: ({ state, errors }) => {
+    validateOptionalDomainObject(
+      state.routeTransition,
+      'routeTransition',
+      (value) => validateRouteTransition(value as RouteTransition),
+      errors,
+    );
+  },
 };
 
 function validateSiteShape(state: unknown, errors: string[]): void {
@@ -1924,12 +2019,42 @@ function validateSiteShape(state: unknown, errors: string[]): void {
   // `isPinnedSiteSection: true` flag selects the lower height minimum (ADR 0059).
   if (isRecord(state.header)) {
     const headerIds = new Set<string>();
-    validateSection(state.header, PAGE_WIDTH_MAX, 'state.header', errors, headerIds, validPageIds, true);
+    validateSection(
+      state.header,
+      PAGE_WIDTH_MAX,
+      'state.header',
+      errors,
+      headerIds,
+      validPageIds,
+      true,
+    );
   }
   if (isRecord(state.footer)) {
     const footerIds = new Set<string>();
-    validateSection(state.footer, PAGE_WIDTH_MAX, 'state.footer', errors, footerIds, validPageIds, true);
+    validateSection(
+      state.footer,
+      PAGE_WIDTH_MAX,
+      'state.footer',
+      errors,
+      footerIds,
+      validPageIds,
+      true,
+    );
   }
+  if (Array.isArray(state.overlaySections)) {
+    const overlayIds = new Set<string>();
+    state.overlaySections.forEach((section, idx) => {
+      validateSection(
+        section,
+        PAGE_WIDTH_MAX,
+        `overlaySections[${String(idx)}]`,
+        errors,
+        overlayIds,
+        validPageIds,
+      );
+    });
+  }
+  validateDesignerInteractionRelations(state, errors);
   // ADR 0050 dec 2 — per-page anchor uniqueness across (header + sections + footer).
   if (Array.isArray(state.pages)) {
     state.pages.forEach((page, idx) => {
@@ -1942,6 +2067,486 @@ function validateSiteShape(state: unknown, errors: string[]): void {
         errors,
       );
     });
+  }
+}
+
+interface DesignerInteractionIdIndex {
+  pageIds: Set<string>;
+  sectionIds: Set<string>;
+  overlaySectionIds: Set<string>;
+  elementIds: Set<string>;
+  motionSequenceIds: Set<string>;
+  overlayIds: Set<string>;
+  richMotionAssetIds: Set<string>;
+  richMotionReferences: Array<{ path: string; richMotionAssetId: string }>;
+}
+
+function collectStringId(value: unknown, ids: Set<string>): void {
+  if (typeof value === 'string' && value.length > 0) ids.add(value);
+}
+
+function collectUniqueDesignerId(
+  value: unknown,
+  ids: Set<string>,
+  path: string,
+  collectionLabel: string,
+  errors: string[],
+): void {
+  if (typeof value !== 'string' || value.length === 0) return;
+  if (ids.has(value)) {
+    errors.push(`${collectionLabel} id "${value}" is duplicated at ${path}`);
+    return;
+  }
+  ids.add(value);
+}
+
+function collectElementInteractionIds(
+  element: unknown,
+  elementPath: string,
+  index: DesignerInteractionIdIndex,
+): void {
+  if (!isRecord(element)) return;
+  collectStringId(element.id, index.elementIds);
+  if (typeof element.richMotionAssetId === 'string' && element.richMotionAssetId.length > 0) {
+    index.richMotionReferences.push({
+      path: `${elementPath}.richMotionAssetId`,
+      richMotionAssetId: element.richMotionAssetId,
+    });
+  }
+  if (element.type === 'tabs' && Array.isArray(element.tabs)) {
+    element.tabs.forEach((tab, tabIdx) => {
+      if (!isRecord(tab) || !Array.isArray(tab.elements)) return;
+      tab.elements.forEach((child, childIdx) => {
+        collectElementInteractionIds(
+          child,
+          pathJoin(pathJoin(pathJoin(pathJoin(elementPath, 'tabs'), tabIdx), 'elements'), childIdx),
+          index,
+        );
+      });
+    });
+  }
+  if (element.type === 'collection' && Array.isArray(element.entries)) {
+    element.entries.forEach((entry, entryIdx) => {
+      if (!Array.isArray(entry)) return;
+      entry.forEach((child, childIdx) => {
+        collectElementInteractionIds(
+          child,
+          pathJoin(pathJoin(pathJoin(elementPath, 'entries'), entryIdx), childIdx),
+          index,
+        );
+      });
+    });
+  }
+}
+
+function collectSectionInteractionIds(
+  section: unknown,
+  sectionPath: string,
+  index: DesignerInteractionIdIndex,
+  errors: string[],
+  options: { overlaySection?: boolean } = {},
+): void {
+  if (!isRecord(section)) return;
+  const id = section.id;
+  if (typeof id === 'string' && id.length > 0) {
+    if (options.overlaySection && index.sectionIds.has(id)) {
+      errors.push(`${sectionPath}.id "${id}" duplicates a rendered page/header/footer section id`);
+    }
+    index.sectionIds.add(id);
+    if (options.overlaySection) index.overlaySectionIds.add(id);
+  }
+  if (!Array.isArray(section.elements)) return;
+  section.elements.forEach((element, elementIdx) => {
+    collectElementInteractionIds(
+      element,
+      pathJoin(pathJoin(sectionPath, 'elements'), elementIdx),
+      index,
+    );
+  });
+}
+
+function buildDesignerInteractionIdIndex(
+  state: Record<string, unknown>,
+  errors: string[],
+): DesignerInteractionIdIndex {
+  const index: DesignerInteractionIdIndex = {
+    pageIds: new Set<string>(),
+    sectionIds: new Set<string>(),
+    overlaySectionIds: new Set<string>(),
+    elementIds: new Set<string>(),
+    motionSequenceIds: new Set<string>(),
+    overlayIds: new Set<string>(),
+    richMotionAssetIds: new Set<string>(),
+    richMotionReferences: [],
+  };
+
+  if (Array.isArray(state.pages)) {
+    state.pages.forEach((page, pageIdx) => {
+      if (!isRecord(page)) return;
+      collectStringId(page.id, index.pageIds);
+      if (Array.isArray(page.sections)) {
+        page.sections.forEach((section, sectionIdx) => {
+          collectSectionInteractionIds(
+            section,
+            pathJoin(pathJoin(`pages[${String(pageIdx)}]`, 'sections'), sectionIdx),
+            index,
+            errors,
+          );
+        });
+      }
+    });
+  }
+  collectSectionInteractionIds(state.header, 'state.header', index, errors);
+  collectSectionInteractionIds(state.footer, 'state.footer', index, errors);
+
+  if (Array.isArray(state.overlaySections)) {
+    state.overlaySections.forEach((section, sectionIdx) => {
+      collectSectionInteractionIds(
+        section,
+        `overlaySections[${String(sectionIdx)}]`,
+        index,
+        errors,
+        { overlaySection: true },
+      );
+    });
+  }
+
+  if (Array.isArray(state.motionSequences)) {
+    state.motionSequences.forEach((sequence, sequenceIdx) => {
+      if (!isRecord(sequence)) return;
+      collectUniqueDesignerId(
+        sequence.id,
+        index.motionSequenceIds,
+        `motionSequences[${String(sequenceIdx)}].id`,
+        'motionSequences',
+        errors,
+      );
+    });
+  }
+  if (Array.isArray(state.overlays)) {
+    state.overlays.forEach((overlay, overlayIdx) => {
+      if (!isRecord(overlay)) return;
+      collectUniqueDesignerId(
+        overlay.id,
+        index.overlayIds,
+        `overlays[${String(overlayIdx)}].id`,
+        'overlays',
+        errors,
+      );
+    });
+  }
+  if (Array.isArray(state.richMotionAssets)) {
+    state.richMotionAssets.forEach((asset, assetIdx) => {
+      if (!isRecord(asset)) return;
+      collectUniqueDesignerId(
+        asset.id,
+        index.richMotionAssetIds,
+        `richMotionAssets[${String(assetIdx)}].id`,
+        'richMotionAssets',
+        errors,
+      );
+    });
+  }
+
+  return index;
+}
+
+function assertKnownId(
+  ids: Set<string>,
+  value: unknown,
+  path: string,
+  label: string,
+  errors: string[],
+): void {
+  if (typeof value !== 'string' || value.length === 0) return;
+  if (!ids.has(value)) errors.push(`${path} "${value}" does not resolve to a known ${label}`);
+}
+
+function validateInteractionTriggerRelations(
+  trigger: unknown,
+  basePath: string,
+  index: DesignerInteractionIdIndex,
+  errors: string[],
+): void {
+  if (!isRecord(trigger) || typeof trigger.type !== 'string') return;
+  if (trigger.type === 'viewport-enter' || trigger.type === 'scroll-progress') {
+    assertKnownId(
+      index.sectionIds,
+      trigger.sectionId,
+      `${basePath}.sectionId`,
+      'section id',
+      errors,
+    );
+    assertKnownId(
+      index.elementIds,
+      trigger.elementId,
+      `${basePath}.elementId`,
+      'element id',
+      errors,
+    );
+  } else if (trigger.type === 'hover' || trigger.type === 'click') {
+    assertKnownId(
+      index.elementIds,
+      trigger.elementId,
+      `${basePath}.elementId`,
+      'element id',
+      errors,
+    );
+  } else if (trigger.type === 'pointer-move') {
+    assertKnownId(
+      index.elementIds,
+      trigger.elementId,
+      `${basePath}.elementId`,
+      'element id',
+      errors,
+    );
+  } else if (trigger.type === 'route-navigation') {
+    assertKnownId(index.pageIds, trigger.fromPageId, `${basePath}.fromPageId`, 'page id', errors);
+    assertKnownId(index.pageIds, trigger.toPageId, `${basePath}.toPageId`, 'page id', errors);
+  }
+}
+
+function validateInteractionTargetRelations(
+  target: unknown,
+  basePath: string,
+  index: DesignerInteractionIdIndex,
+  errors: string[],
+): void {
+  if (!isRecord(target) || typeof target.type !== 'string') return;
+  const typedTarget = target as InteractionTarget;
+  if (typedTarget.type === 'page') {
+    assertKnownId(index.pageIds, typedTarget.pageId, `${basePath}.pageId`, 'page id', errors);
+  } else if (typedTarget.type === 'section') {
+    assertKnownId(
+      index.sectionIds,
+      typedTarget.sectionId,
+      `${basePath}.sectionId`,
+      'section id',
+      errors,
+    );
+  } else if (typedTarget.type === 'element') {
+    assertKnownId(
+      index.elementIds,
+      typedTarget.elementId,
+      `${basePath}.elementId`,
+      'element id',
+      errors,
+    );
+  } else if (typedTarget.type === 'component-part') {
+    assertKnownId(
+      index.elementIds,
+      typedTarget.elementId,
+      `${basePath}.elementId`,
+      'element id',
+      errors,
+    );
+  } else if (typedTarget.type === 'text-split') {
+    assertKnownId(
+      index.elementIds,
+      typedTarget.elementId,
+      `${basePath}.elementId`,
+      'element id',
+      errors,
+    );
+  } else if (typedTarget.type === 'overlay') {
+    assertKnownId(
+      index.overlayIds,
+      typedTarget.overlayId,
+      `${basePath}.overlayId`,
+      'overlay id',
+      errors,
+    );
+  }
+}
+
+function validateMotionSequenceRelations(
+  sequence: unknown,
+  basePath: string,
+  index: DesignerInteractionIdIndex,
+  errors: string[],
+): void {
+  if (!isRecord(sequence)) return;
+  validateInteractionTriggerRelations(sequence.trigger, `${basePath}.trigger`, index, errors);
+  if (!Array.isArray(sequence.steps)) return;
+  sequence.steps.forEach((step, stepIdx) => {
+    if (!isRecord(step)) return;
+    validateInteractionTargetRelations(
+      step.target,
+      `${basePath}.steps[${String(stepIdx)}].target`,
+      index,
+      errors,
+    );
+  });
+}
+
+function validateOverlayFocusTargetRelations(
+  target: unknown,
+  basePath: string,
+  index: DesignerInteractionIdIndex,
+  errors: string[],
+): void {
+  if (!isRecord(target) || target.type !== 'element') return;
+  const typedTarget = target as Extract<OverlayFocusTarget, { type: 'element' }>;
+  assertKnownId(
+    index.elementIds,
+    typedTarget.elementId,
+    `${basePath}.elementId`,
+    'element id',
+    errors,
+  );
+}
+
+function validateDesignerInteractionRelations(
+  state: Record<string, unknown>,
+  errors: string[],
+): void {
+  const index = buildDesignerInteractionIdIndex(state, errors);
+
+  if (Array.isArray(state.motionSequences)) {
+    state.motionSequences.forEach((sequence, sequenceIdx) => {
+      validateMotionSequenceRelations(
+        sequence,
+        `motionSequences[${String(sequenceIdx)}]`,
+        index,
+        errors,
+      );
+    });
+  }
+
+  if (Array.isArray(state.scrollScenes)) {
+    state.scrollScenes.forEach((scene, sceneIdx) => {
+      if (!isRecord(scene)) return;
+      validateInteractionTriggerRelations(
+        scene.trigger,
+        `scrollScenes[${String(sceneIdx)}].trigger`,
+        index,
+        errors,
+      );
+      validateMotionSequenceRelations(
+        scene.sequence,
+        `scrollScenes[${String(sceneIdx)}].sequence`,
+        index,
+        errors,
+      );
+    });
+  }
+
+  if (Array.isArray(state.overlays)) {
+    state.overlays.forEach((overlay, overlayIdx) => {
+      if (!isRecord(overlay)) return;
+      const overlayPath = `overlays[${String(overlayIdx)}]`;
+      assertKnownId(
+        index.overlaySectionIds,
+        overlay.contentSectionId,
+        `${overlayPath}.contentSectionId`,
+        'overlay section id',
+        errors,
+      );
+      validateInteractionTriggerRelations(overlay.trigger, `${overlayPath}.trigger`, index, errors);
+      if (isRecord(overlay.placement) && overlay.placement.type === 'anchored') {
+        assertKnownId(
+          index.elementIds,
+          overlay.placement.anchorElementId,
+          `${overlayPath}.placement.anchorElementId`,
+          'element id',
+          errors,
+        );
+      }
+      assertKnownId(
+        index.motionSequenceIds,
+        overlay.openSequenceId,
+        `${overlayPath}.openSequenceId`,
+        'motion sequence id',
+        errors,
+      );
+      assertKnownId(
+        index.motionSequenceIds,
+        overlay.closeSequenceId,
+        `${overlayPath}.closeSequenceId`,
+        'motion sequence id',
+        errors,
+      );
+      if (isRecord(overlay.focus)) {
+        validateOverlayFocusTargetRelations(
+          overlay.focus.initial,
+          `${overlayPath}.focus.initial`,
+          index,
+          errors,
+        );
+        validateOverlayFocusTargetRelations(
+          overlay.focus.returnTo,
+          `${overlayPath}.focus.returnTo`,
+          index,
+          errors,
+        );
+      }
+    });
+  }
+
+  if (Array.isArray(state.richMotionAssets)) {
+    state.richMotionAssets.forEach((asset, assetIdx) => {
+      if (!isRecord(asset) || !isRecord(asset.playback)) return;
+      validateInteractionTriggerRelations(
+        asset.playback.trigger,
+        `richMotionAssets[${String(assetIdx)}].playback.trigger`,
+        index,
+        errors,
+      );
+    });
+  }
+  index.richMotionReferences.forEach((ref) => {
+    assertKnownId(
+      index.richMotionAssetIds,
+      ref.richMotionAssetId,
+      ref.path,
+      'rich motion asset id',
+      errors,
+    );
+  });
+
+  if (isRecord(state.loadExperience)) {
+    const loadExperience = state.loadExperience as unknown as LoadExperience;
+    assertKnownId(
+      index.motionSequenceIds,
+      loadExperience.introSequenceId,
+      'loadExperience.introSequenceId',
+      'motion sequence id',
+      errors,
+    );
+    assertKnownId(
+      index.motionSequenceIds,
+      loadExperience.exitSequenceId,
+      'loadExperience.exitSequenceId',
+      'motion sequence id',
+      errors,
+    );
+  }
+
+  if (isRecord(state.routeTransition)) {
+    const routeTransition = state.routeTransition as unknown as RouteTransition;
+    assertKnownId(
+      index.motionSequenceIds,
+      routeTransition.outgoingSequenceId,
+      'routeTransition.outgoingSequenceId',
+      'motion sequence id',
+      errors,
+    );
+    assertKnownId(
+      index.motionSequenceIds,
+      routeTransition.incomingSequenceId,
+      'routeTransition.incomingSequenceId',
+      'motion sequence id',
+      errors,
+    );
+    if (isRecord(routeTransition.focusTarget) && routeTransition.focusTarget.type === 'element') {
+      assertKnownId(
+        index.elementIds,
+        routeTransition.focusTarget.elementId,
+        'routeTransition.focusTarget.elementId',
+        'element id',
+        errors,
+      );
+    }
   }
 }
 

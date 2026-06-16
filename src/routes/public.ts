@@ -113,7 +113,7 @@ type Bindings = HostConfigEnv & {
   RESEND_API_KEY: string;
   // ADR 0043 Phase D — SSE pub-sub hub for live notif push to dashboards.
   NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
-}
+};
 
 export type PublicEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
@@ -234,6 +234,40 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
     return typeof payload.html === 'string' ? payload.html : null;
   }
 
+  function htmlNeedsHydration(html) {
+    return /data-opencanvas-interactive=(["'])(accordion|carousel)\1/.test(html) ||
+      html.indexOf('data-opencanvas-pointer-fx') !== -1 ||
+      /data-opencanvas-popup=(["'])true\1/.test(html) ||
+      html.indexOf('data-opencanvas-designer-interactions') !== -1 ||
+      html.indexOf('data-opencanvas-overlay=') !== -1 ||
+      html.indexOf('data-opencanvas-overlay-layer') !== -1 ||
+      html.indexOf('data-opencanvas-rich-motion=') !== -1 ||
+      html.indexOf('data-opencanvas-motion-sequence-count') !== -1 ||
+      html.indexOf('data-opencanvas-scroll-scene-count') !== -1;
+  }
+
+  function selectHydrator(selectedHtml, payload) {
+    if (!htmlNeedsHydration(selectedHtml)) return null;
+    const hydrate = window.__opencanvasHydrate;
+    if (typeof hydrate !== 'function') {
+      console.error('[opencanvas-visitor] interactive runtime hydrator missing before live update', payload);
+      return false;
+    }
+    return hydrate;
+  }
+
+  function hydrateSwappedRoot(root, hydrate, previousHtml) {
+    if (hydrate === null) return true;
+    try {
+      hydrate(root);
+      return true;
+    } catch (err) {
+      console.error('[opencanvas-visitor] interactive runtime hydration failed after live update', err);
+      root.innerHTML = previousHtml;
+      return false;
+    }
+  }
+
   function connect() {
     // Hidden tabs don't need live publish updates — they aren't painting.
     // Skip the WebSocket entirely; visibilitychange will reconnect when the
@@ -269,12 +303,16 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
           if (payload.version <= currentVersion) {
             return;
           }
+          const hydrate = selectHydrator(selectedHtml, payload);
+          if (hydrate === false) return;
           const root = document.querySelector(ROOT_SELECTOR);
           if (root) {
             // The server-rendered HTML is the only writer. The publish
             // endpoint validates the snapshot before broadcast; there is no
             // visitor-controlled path into this assignment.
+            const previousHtml = root.innerHTML;
             root.innerHTML = selectedHtml;
+            if (!hydrateSwappedRoot(root, hydrate, previousHtml)) return;
           }
           currentVersion = payload.version;
           return;
@@ -318,6 +356,8 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
 })();
 `;
 }
+
+export const __test_buildVisitorLiveScript = buildVisitorLiveScript;
 
 const HTML_ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -1216,9 +1256,8 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   let modeSetterScript = '';
   if (themeEmitsCss) {
     dualModeCss = emitDualModeCss(resolvedKit, renderSnapshot.styleKit);
-    modeSetterScript = visitorTheme === 'dark'
-      ? getDarkModeSetterScript()
-      : getModeSetterScript(c.env);
+    modeSetterScript =
+      visitorTheme === 'dark' ? getDarkModeSetterScript() : getModeSetterScript(c.env);
   }
   // Without this, `visitorTheme === 'toggleable'` only emits the
   // dual-palette CSS and the cookie-reader script — there is no button
@@ -1253,8 +1292,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
         </head>
         <body>
           <div data-opencanvas-public-root>${raw(snapshotHtml)}</div>
-          ${modeToggleHtml ? raw(modeToggleHtml) : ''}
-          ${raw(buildPublishedFooterHtml(c.env))}
+          ${modeToggleHtml ? raw(modeToggleHtml) : ''} ${raw(buildPublishedFooterHtml(c.env))}
           <script type="module">
             ${raw(visitorScript)};
           </script>
