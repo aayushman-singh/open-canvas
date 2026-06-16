@@ -134,9 +134,14 @@ class StubElement {
     }
   }
 
-  animate(keyframes: unknown, options: unknown): { finished: Promise<void> } {
+  animate(keyframes: unknown, options: unknown): { finished: Promise<void>; cancel(): void } {
     this.animations.push({ keyframes, options });
-    return { finished: Promise.resolve() };
+    return {
+      finished: Promise.resolve(),
+      cancel() {
+        return undefined;
+      },
+    };
   }
 
   focus(): void {
@@ -340,6 +345,18 @@ function makeEvent(type: string, init: { key?: string } = {}): StubEvent {
 
 async function flushMicrotasks(turns = 5): Promise<void> {
   for (let i = 0; i < turns; i++) await Promise.resolve();
+}
+
+function installNoopIntersectionObserver(doc: StubDocument): void {
+  doc.defaultView.IntersectionObserver = class StubNoopIntersectionObserver {
+    observe(): void {
+      return undefined;
+    }
+
+    disconnect(): void {
+      return undefined;
+    }
+  };
 }
 
 // Execute the runtime IIFE against a stub document. The IIFE references the
@@ -1003,6 +1020,45 @@ const designerSnapshot = {
         },
       ],
     },
+    {
+      id: 'hero-viewport-reveal',
+      trigger: { type: 'viewport-enter', elementId: 'hero-title' },
+      steps: [
+        {
+          id: 'headline-viewport',
+          target: { type: 'element', elementId: 'hero-title' },
+          properties: { opacity: [0, 1], y: [18, 0] },
+          durationMs: 320,
+          easing: 'out-cubic',
+        },
+      ],
+    },
+    {
+      id: 'project-click-pulse',
+      trigger: { type: 'click', elementId: 'open-project' },
+      steps: [
+        {
+          id: 'project-pulse',
+          target: { type: 'element', elementId: 'open-project' },
+          properties: { scale: [1, 1.08] },
+          durationMs: 180,
+          easing: 'out-cubic',
+        },
+      ],
+    },
+    {
+      id: 'popover-hover-lift',
+      trigger: { type: 'hover', elementId: 'open-popover' },
+      steps: [
+        {
+          id: 'popover-lift',
+          target: { type: 'element', elementId: 'open-popover' },
+          properties: { y: [0, -8] },
+          durationMs: 180,
+          easing: 'out-cubic',
+        },
+      ],
+    },
   ],
   overlays: [
     {
@@ -1181,6 +1237,24 @@ designerDoc.defaultView.__opencanvasFloating = {
     return { name: 'shift', options };
   },
 };
+let motionObserverCallback:
+  | ((entries: Array<{ isIntersecting: boolean }>) => void)
+  | undefined;
+let motionObserverTarget = null as StubElement | null;
+let motionObserverDisconnects = 0;
+designerDoc.defaultView.IntersectionObserver = class StubMotionIntersectionObserver {
+  constructor(callback: (entries: Array<{ isIntersecting: boolean }>) => void) {
+    motionObserverCallback = callback;
+  }
+
+  observe(target: StubElement): void {
+    motionObserverTarget = target;
+  }
+
+  disconnect(): void {
+    motionObserverDisconnects++;
+  }
+};
 runRuntimeAgainstDocument(designerDoc);
 const generatedFloatingAdapter = (globalThis as Record<string, unknown>).__opencanvasFloating as
   | { computePosition?: unknown }
@@ -1191,6 +1265,7 @@ assert(
 );
 
 assert(designerTitle.animations.length > 0, 'load motion should create WAAPI animations');
+const titleAnimationsAfterLoad = designerTitle.animations.length;
 assert(
   designerTitle.getAttribute('data-opencanvas-motion-played') === 'hero-intro',
   'load motion should mark the played sequence id',
@@ -1198,6 +1273,48 @@ assert(
 assert(
   designerTitle.getAttribute('data-opencanvas-motion-adapter') === 'animejs-waapi',
   'load motion should run through the Anime.js WAAPI adapter',
+);
+const observedMotionTargetId =
+  motionObserverTarget?.getAttribute('data-opencanvas-element') ?? null;
+assert(observedMotionTargetId === 'hero-title', 'viewport-enter motion should observe the trigger element');
+assert(motionObserverCallback !== undefined, 'viewport-enter motion should install observer');
+motionObserverCallback([{ isIntersecting: false }]);
+assert(
+  designerTitle.animations.length === titleAnimationsAfterLoad,
+  'non-intersecting viewport entry should not play sequence',
+);
+motionObserverCallback([{ isIntersecting: true }]);
+assert(
+  designerTitle.animations.length > titleAnimationsAfterLoad,
+  'intersecting viewport entry should play the sequence once',
+);
+assert(
+  designerTitle.getAttribute('data-opencanvas-motion-played') === 'hero-viewport-reveal',
+  'viewport-enter motion should mark the played sequence id',
+);
+assert(
+  motionObserverDisconnects === 1,
+  'viewport-enter motion should disconnect after first play',
+);
+const clickMotionAnimationsBefore = designerTrigger.animations.length;
+designerTrigger.dispatchEvent(makeEvent('click'));
+assert(
+  designerTrigger.animations.length === clickMotionAnimationsBefore + 1,
+  'click-triggered motion should play when the trigger is clicked',
+);
+assert(
+  designerTrigger.getAttribute('data-opencanvas-motion-played') === 'project-click-pulse',
+  'click-triggered motion should mark the clicked target',
+);
+const hoverMotionAnimationsBefore = designerPopoverTrigger.animations.length;
+designerPopoverTrigger.dispatchEvent(makeEvent('mouseenter'));
+assert(
+  designerPopoverTrigger.animations.length === hoverMotionAnimationsBefore + 1,
+  'hover-triggered motion should play on pointer entry',
+);
+assert(
+  designerPopoverTrigger.getAttribute('data-opencanvas-motion-played') === 'popover-hover-lift',
+  'hover-triggered motion should mark the hovered target',
 );
 assert(richMotionFailures === 1, 'rich motion unsupported runtime should emit one failure event');
 assert(
@@ -1442,6 +1559,7 @@ assert(
 const noAnimateDoc = new StubDocument();
 const noAnimateParsed = parseHtml(designerHtml);
 for (const child of noAnimateParsed.children) noAnimateDoc.root.appendChild(child);
+installNoopIntersectionObserver(noAnimateDoc);
 const noAnimateTitle = noAnimateDoc.querySelector(
   '[data-opencanvas-element="hero-title"]',
 ) as StubElement;
@@ -1478,6 +1596,7 @@ assert(
 const missingAdapterDoc = new StubDocument();
 const missingAdapterParsed = parseHtml(designerHtml);
 for (const child of missingAdapterParsed.children) missingAdapterDoc.root.appendChild(child);
+installNoopIntersectionObserver(missingAdapterDoc);
 const missingAdapterTitle = missingAdapterDoc.querySelector(
   '[data-opencanvas-element="hero-title"]',
 ) as StubElement;

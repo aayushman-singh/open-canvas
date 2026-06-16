@@ -116,6 +116,12 @@ function ocResolveMotionTargets(target){
   if(target.type==='overlay')return Array.prototype.slice.call(document.querySelectorAll(ocAttrSelector('data-opencanvas-overlay',target.overlayId)));
   return [];
 }
+function ocResolveMotionTriggerElement(trigger){
+  if(!trigger)return null;
+  if(trigger.elementId)return document.querySelector(ocAttrSelector('data-opencanvas-element',trigger.elementId));
+  if(trigger.sectionId)return document.querySelector(ocAttrSelector('data-opencanvas-section',trigger.sectionId));
+  return null;
+}
 function ocPlayMotionSequence(sequence){
   if(!sequence||!sequence.steps)return;
   var adapter=ocAnimeAdapter();
@@ -146,6 +152,48 @@ function ocPlayMotionSequence(sequence){
       return;
     }
   }
+}
+function ocBindViewportMotionSequence(sequence){
+  var anchor=ocResolveMotionTriggerElement(sequence.trigger);
+  if(!anchor){
+    ocMotionFailure(null,'missing-trigger-target',{sequenceId:sequence.id,trigger:sequence.trigger});
+    return;
+  }
+  var view=document.defaultView||(typeof window!=='undefined'?window:null);
+  if(!view||typeof view.IntersectionObserver!=='function'){
+    ocMarkMotionFailed(anchor,'viewport-observer-unavailable',{sequenceId:sequence.id,trigger:sequence.trigger});
+    return;
+  }
+  var observer=new view.IntersectionObserver(function(entries){
+    for(var i=0;i<entries.length;i++){
+      if(entries[i].isIntersecting){
+        ocPlayMotionSequence(sequence);
+        observer.disconnect();
+        return;
+      }
+    }
+  },{threshold:0.15});
+  observer.observe(anchor);
+}
+function ocBindClickMotionSequence(sequence){
+  var trigger=ocResolveMotionTriggerElement(sequence.trigger);
+  if(!trigger){
+    ocMotionFailure(null,'missing-trigger-target',{sequenceId:sequence.id,trigger:sequence.trigger});
+    return;
+  }
+  trigger.addEventListener('click',function(){
+    ocPlayMotionSequence(sequence);
+  });
+}
+function ocBindHoverMotionSequence(sequence){
+  var trigger=ocResolveMotionTriggerElement(sequence.trigger);
+  if(!trigger){
+    ocMotionFailure(null,'missing-trigger-target',{sequenceId:sequence.id,trigger:sequence.trigger});
+    return;
+  }
+  trigger.addEventListener('mouseenter',function(){
+    ocPlayMotionSequence(sequence);
+  });
 }
 function ocApplyScrollScene(scene){
   if(!scene||!scene.sequence)return;
@@ -194,6 +242,9 @@ function hydrateDesignerMotion(scope){
   for(var s=0;s<sequences.length;s++){
     var seq=sequences[s];
     if(seq.trigger&&seq.trigger.type==='load')ocPlayMotionSequence(seq);
+    else if(seq.trigger&&seq.trigger.type==='viewport-enter')ocBindViewportMotionSequence(seq);
+    else if(seq.trigger&&seq.trigger.type==='click')ocBindClickMotionSequence(seq);
+    else if(seq.trigger&&seq.trigger.type==='hover')ocBindHoverMotionSequence(seq);
   }
   var scenes=payload.scrollScenes||[];
   for(var j=0;j<scenes.length;j++)ocApplyScrollScene(scenes[j]);
