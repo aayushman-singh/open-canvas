@@ -181,6 +181,33 @@ function renderHtml(state: EditableSite): string {
   );
 }
 
+// Renderer: narrower breakpoint overrides can unhide an item hidden at tablet.
+{
+  const html = renderHtml(
+    siteWith([
+      flowElement({
+        items: [
+          {
+            id: 'toggle-copy',
+            element: textElement({ id: 'toggle-copy' }),
+            responsive: {
+              tablet: { hidden: true },
+              phone: { hidden: false },
+            },
+          },
+        ],
+      }),
+    ]),
+  );
+  assert(
+    html.includes('@media (max-width: 1023px)') &&
+      html.includes('[data-opencanvas-flow-item="toggle-copy"]{display:none !important') &&
+      html.includes('@media (max-width: 767px)') &&
+      html.includes('[data-opencanvas-flow-item="toggle-copy"]{display:block !important'),
+    `phone hidden:false should override tablet hidden:true for Flow Items: ${html}`,
+  );
+}
+
 // Renderer: hosted child keeps element attrs/body but is not section-positioned.
 {
   const html = renderHtml(siteWith([flowElement()]));

@@ -8,7 +8,14 @@
 //
 // Run with `bun run src/editor-client/flow-container-editor.smoke.ts`.
 
-import type { CanvasElement, CanvasSection, TextElement } from '../canvas/schema.js';
+import type {
+  CanvasElement,
+  CanvasPage,
+  CanvasSection,
+  EditableSite,
+  TextElement,
+} from '../canvas/schema.js';
+import { validateEditableSite } from '../canvas/validate.js';
 import type { FindElementResult } from './editor-context-types.js';
 import {
   buildElementMenuImpl,
@@ -16,6 +23,7 @@ import {
   rebuildElementImpl,
 } from './element-menu.js';
 import { autoGrowTextElements } from './render.js';
+import { handleSectionActionImpl } from './section-toolbar.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[flow-container-editor:smoke] ${message}`);
@@ -399,6 +407,70 @@ function buildWrapper(id: string, hosted: boolean): StubElement {
   const labels = (menu as unknown as StubElement).children.map((child) => child.textContent);
   assert(labels.includes('Delete'), 'Flow Container menu should still expose Delete');
   assert(!labels.includes('Duplicate'), 'Flow Container menu must not expose Duplicate in v1');
+}
+
+{
+  const hosted = textElement('flow-duplicate-child');
+  const flow = {
+    id: 'flow-section-duplicate',
+    type: 'flow-container',
+    box: { x: 40, y: 40, w: 640, h: 240, z: 1 },
+    layout: {
+      mode: 'grid',
+      columns: 1,
+      gap: { row: 16, column: 16 },
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      align: 'stretch',
+      justify: 'start',
+    },
+    items: [{ id: 'copy', element: hosted }],
+  } as unknown as CanvasElement;
+  const section: CanvasSection = {
+    id: 'section-duplicate-source',
+    recipeId: 'custom',
+    name: 'Flow duplicate source',
+    height: 640,
+    elements: [flow],
+  };
+  const page: CanvasPage = {
+    id: 'page-duplicate',
+    slug: 'duplicate',
+    title: 'Duplicate',
+    width: 1200,
+    sections: [section],
+  };
+  const state: EditableSite = { styleKit: 'charcoal', pages: [page] };
+  const ctx = {
+    state,
+    SIDEBAR_COMMANDS: {},
+    currentPage: () => page,
+    insertElementForSidebarCommand(): void {},
+    renderAll(): void {},
+    selectSection(): void {},
+    scheduleSave(): void {},
+    setStatus(): void {},
+    captureForUndo(): void {},
+    selectedSectionId: null,
+    selectedElementId: null,
+  };
+
+  handleSectionActionImpl(ctx as never, 'duplicate-section', section.id);
+
+  const validation = validateEditableSite(state);
+  assert(
+    validation.valid,
+    validation.valid
+      ? ''
+      : `editor duplicate-section must remap Flow-hosted child ids: ${validation.errors.join('; ')}`,
+  );
+  const originalFlow = page.sections[0]?.elements[0];
+  const clonedFlow = page.sections[1]?.elements[0];
+  assert(
+    originalFlow?.type === 'flow-container' &&
+      clonedFlow?.type === 'flow-container' &&
+      originalFlow.items[0]?.element.id !== clonedFlow.items[0]?.element.id,
+    'editor duplicate-section clone must not preserve Flow-hosted element ids',
+  );
 }
 
 console.log('[flow-container-editor:smoke] OK');

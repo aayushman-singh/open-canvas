@@ -73,6 +73,18 @@ assert(
   'expected action page refs inside collection entries to be detected',
 );
 
+const flowRefs = refsFor([
+  {
+    id: 'flow',
+    type: 'flow-container',
+    items: [{ id: 'item', element: pageRefAction('flow-cta', 'Flow CTA') }],
+  },
+]);
+assert(
+  flowRefs.includes('Home / Main / Flow CTA'),
+  'expected action page refs inside Flow Items to be detected',
+);
+
 async function flushSeoOpenMicrotasks(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();

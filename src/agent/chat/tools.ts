@@ -16,12 +16,8 @@
 
 import { CANVAS_AGENT_TOOLS } from '../canvas-tools.js';
 import type { JsonSchema, LlmTool } from '../llm.js';
-import type {
-  CanvasPage,
-  CanvasSection,
-  EditableSite,
-  ElementType,
-} from '../../canvas/schema.js';
+import type { CanvasPage, CanvasSection, EditableSite, ElementType } from '../../canvas/schema.js';
+import { flattenElementForest } from '../../canvas/element-tree.js';
 import type { SiteFont } from '../../db/schema.js';
 import { QUERY_SITE_TOKEN_CAP, estimateTokens } from './session.js';
 
@@ -293,19 +289,20 @@ function summariseSection(
   section: CanvasSection,
   detail: QuerySiteDetail,
 ): QuerySiteSectionSummary {
+  const elements = flattenElementForest(section.elements);
   const counts: Partial<Record<ElementType, number>> = {};
-  for (const el of section.elements) {
+  for (const el of elements) {
     counts[el.type] = (counts[el.type] ?? 0) + 1;
   }
   const out: QuerySiteSectionSummary = {
     id: section.id,
     recipeId: section.recipeId,
     name: section.name,
-    elementCount: section.elements.length,
+    elementCount: elements.length,
     elementTypeCounts: counts,
   };
   if (detail === 'full') {
-    out.elements = section.elements.map((el) => ({ id: el.id, type: el.type }));
+    out.elements = elements.map((el) => ({ id: el.id, type: el.type }));
   }
   return out;
 }

@@ -26,6 +26,12 @@
 import { resolveDesignSection } from '../canvas/layout/engine.js';
 import type { DesignSectionInput, DesignSectionResult } from '../canvas/layout/tree.js';
 import { createSectionFromRecipe, type RecipeFactoryInput } from '../canvas/recipes.js';
+import {
+  findElementInForest,
+  remapElementForestIdsInPlace,
+  visitElementForest,
+  type ElementTreeParentKind,
+} from '../canvas/element-tree.js';
 import type {
   BuiltInStyleKit,
   CanvasElement,
@@ -196,12 +202,13 @@ export type CanvasAgentOp =
       kind: 'restoreElement';
       sectionId: string;
       /** Where inside the section's element tree to insert. */
-      parentKind: 'section' | 'tab-panel' | 'collection-entry';
+      parentKind: 'section' | 'tab-panel' | 'collection-entry' | 'collection-custom-template';
       /** Required for tab-panel: tabsElementId + tabId. */
       tabsElementId?: string;
       tabId?: string;
-      /** Required for collection-entry: collectionElementId + entryIndex. */
+      /** Required for collection-entry / collection-custom-template. */
       collectionElementId?: string;
+      /** Required for collection-entry. */
       entryIndex?: number;
       /** Insertion index inside the resolved parent array. */
       index: number;
@@ -268,28 +275,35 @@ export type CanvasAgentOp =
 function findElementAcrossSite(
   state: EditableSite,
   elementId: string,
-): { element: CanvasElement; section: CanvasSection } {
+): {
+  element: CanvasElement;
+  section: CanvasSection;
+  parentArray: CanvasElement[] | null;
+  parentKind: ElementTreeParentKind;
+} {
   // Check header
   if (state.header) {
-    for (const el of state.header.elements) {
-      if (el.id === elementId) return { element: el, section: state.header };
-    }
+    const found = findElementInForest(state.header.elements, elementId);
+    if (found !== null) return { ...found, section: state.header };
   }
   // Check footer
   if (state.footer) {
-    for (const el of state.footer.elements) {
-      if (el.id === elementId) return { element: el, section: state.footer };
-    }
+    const found = findElementInForest(state.footer.elements, elementId);
+    if (found !== null) return { ...found, section: state.footer };
   }
   // Check all pages
   for (const page of state.pages) {
     for (const section of page.sections) {
-      for (const el of section.elements) {
-        if (el.id === elementId) return { element: el, section };
-      }
+      const found = findElementInForest(section.elements, elementId);
+      if (found !== null) return { ...found, section };
     }
   }
   throw new Error(`element not found: ${elementId}`);
+}
+
+function cloneElementId(previousId: string): string {
+  const prefix = previousId.includes('-') ? previousId.split('-').slice(0, -1).join('-') : 'el';
+  return `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
 }
 
 type SectionLocation =
@@ -521,12 +535,19 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
 
   // -- deleteElement --------------------------------------------------------
   if (op.kind === 'deleteElement') {
-    const { section } = findElementAcrossSite(next, op.elementId);
-    const idx = section.elements.findIndex((e) => e.id === op.elementId);
-    if (idx < 0) {
-      throw new Error(`deleteElement: element not found in section: ${op.elementId}`);
+    const { parentArray, parentKind } = findElementAcrossSite(next, op.elementId);
+    if (parentArray === null) {
+      throw new Error(
+        `deleteElement: element ${op.elementId} is hosted by a Flow Item and cannot be deleted directly`,
+      );
     }
-    section.elements.splice(idx, 1);
+    const idx = parentArray.findIndex((e) => e.id === op.elementId);
+    if (idx < 0) {
+      throw new Error(
+        `deleteElement: element ${op.elementId} not found in resolved ${parentKind} parent array`,
+      );
+    }
+    parentArray.splice(idx, 1);
     return next;
   }
 
@@ -701,10 +722,8 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
     const clone: CanvasSection = structuredClone(original);
     clone.id = `sec-${clone.recipeId}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
     clone.name = original.name + ' copy';
-    for (const el of clone.elements) {
-      const prefix = el.id.includes('-') ? el.id.split('-').slice(0, -1).join('-') : 'el';
-      el.id = `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
-    }
+    remapElementForestIdsInPlace(clone.elements, (previousId) => cloneElementId(previousId));
+    delete (clone as { anchorId?: string }).anchorId;
     if (clone.role) delete clone.role;
     dupPage.sections.splice(location.sectionIndex + 1, 0, clone);
     return next;
@@ -802,7 +821,7 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
     if (next.header) sectionsToScan.push(next.header);
     if (next.footer) sectionsToScan.push(next.footer);
     for (const section of sectionsToScan) {
-      for (const element of section.elements) {
+      visitElementForest(section.elements, (element) => {
         if (
           element.type === 'action' &&
           typeof element.href === 'object' &&
@@ -812,7 +831,7 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
         ) {
           element.href = { type: 'external', url: '#' };
         }
-      }
+      });
     }
     return next;
   }
@@ -856,7 +875,7 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       if (typeof op.tabsElementId !== 'string' || typeof op.tabId !== 'string') {
         throw new Error('restoreElement(tab-panel): tabsElementId + tabId required');
       }
-      const tabsElement = section.elements.find((el) => el.id === op.tabsElementId);
+      const tabsElement = findElementInForest(section.elements, op.tabsElementId)?.element;
       if (!tabsElement || tabsElement.type !== 'tabs') {
         throw new Error(`restoreElement: tabs element not found: ${op.tabsElementId}`);
       }
@@ -871,7 +890,10 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
           'restoreElement(collection-entry): collectionElementId + entryIndex required',
         );
       }
-      const collectionElement = section.elements.find((el) => el.id === op.collectionElementId);
+      const collectionElement = findElementInForest(
+        section.elements,
+        op.collectionElementId,
+      )?.element;
       if (!collectionElement || collectionElement.type !== 'collection') {
         throw new Error(`restoreElement: collection element not found: ${op.collectionElementId}`);
       }
@@ -886,6 +908,24 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
         );
       }
       parentArray = entry;
+    } else if (op.parentKind === 'collection-custom-template') {
+      if (typeof op.collectionElementId !== 'string') {
+        throw new Error('restoreElement(collection-custom-template): collectionElementId required');
+      }
+      const collectionElement = findElementInForest(
+        section.elements,
+        op.collectionElementId,
+      )?.element;
+      if (!collectionElement || collectionElement.type !== 'collection') {
+        throw new Error(`restoreElement: collection element not found: ${op.collectionElementId}`);
+      }
+      const customTemplate = collectionElement.customTemplate;
+      if (!Array.isArray(customTemplate)) {
+        throw new Error(
+          `restoreElement: collection customTemplate missing on ${op.collectionElementId}`,
+        );
+      }
+      parentArray = customTemplate;
     } else {
       throw new Error(`restoreElement: unknown parentKind: ${String(op.parentKind)}`);
     }
@@ -937,7 +977,7 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       for (const restore of op.actionHrefRestores) {
         const section = sectionsToScan.find((s) => s.id === restore.sectionId);
         if (!section) continue;
-        const element = section.elements.find((el) => el.id === restore.elementId);
+        const element = findElementInForest(section.elements, restore.elementId)?.element;
         if (!element || element.type !== 'action') continue;
         // Only undo the deletePage-introduced '#' rewrite. If the Owner has
         // since pointed the action elsewhere (different href shape, or a

@@ -215,6 +215,34 @@ function collectFromPages(
       }
     }
   }
+  if ('header' in state && state.header) {
+    for (const element of state.header.elements) {
+      collectFromElement(out, {
+        siteId,
+        siteName,
+        source,
+        publishedAddress,
+        pageSlug: '',
+        element,
+        assetId,
+        seen,
+      });
+    }
+  }
+  if ('footer' in state && state.footer) {
+    for (const element of state.footer.elements) {
+      collectFromElement(out, {
+        siteId,
+        siteName,
+        source,
+        publishedAddress,
+        pageSlug: '',
+        element,
+        assetId,
+        seen,
+      });
+    }
+  }
 }
 
 // ADR 0065 D2 + codex review pass 5 finding 2 + pass 6 finding 3 — the
@@ -294,6 +322,7 @@ function collectFromElement(out: AssetReference[], params: CollectFromElementPar
     slides?: Array<{ assetId?: string }>;
     tabs?: Array<{ elements?: unknown[] }>;
     customTemplate?: unknown[];
+    items?: Array<{ element?: unknown }>;
   };
   const elementId = typeof el.id === 'string' ? el.id : '';
 
@@ -351,6 +380,13 @@ function collectFromElement(out: AssetReference[], params: CollectFromElementPar
     for (const child of el.customTemplate) {
       collectFromElement(out, { ...params, element: child });
     }
+    return;
+  }
+  if (el.type === 'flow-container' && Array.isArray(el.items)) {
+    for (const item of el.items) {
+      if (!item || typeof item !== 'object') continue;
+      collectFromElement(out, { ...params, element: item.element });
+    }
   }
 }
 
@@ -366,20 +402,30 @@ function clearAssetReferences(
     rootState = rest;
     rootChanged = true;
   }
+  function clearSection(section: EditableSite['pages'][number]['sections'][number]): {
+    changed: boolean;
+    section: EditableSite['pages'][number]['sections'][number];
+  } {
+    let sectionChanged = false;
+    const elements = section.elements.map((element) => {
+      const cleared = clearElementAssetReferences(element, assetId);
+      if (cleared === element) return element;
+      sectionChanged = true;
+      return cleared as (typeof section.elements)[number];
+    });
+    return {
+      changed: sectionChanged,
+      section: sectionChanged ? { ...section, elements } : section,
+    };
+  }
   let pagesChanged = false;
   const pages = rootState.pages.map((page) => {
     let pageChanged = page.ogImageAssetId === assetId;
     const sections = page.sections.map((section) => {
-      let sectionChanged = false;
-      const elements = section.elements.map((element) => {
-        const cleared = clearElementAssetReferences(element, assetId);
-        if (cleared === element) return element;
-        sectionChanged = true;
-        return cleared as (typeof section.elements)[number];
-      });
-      if (!sectionChanged) return section;
+      const cleared = clearSection(section);
+      if (!cleared.changed) return section;
       pageChanged = true;
-      return { ...section, elements };
+      return cleared.section;
     });
     if (!pageChanged) return page;
     pagesChanged = true;
@@ -390,8 +436,34 @@ function clearAssetReferences(
     return nextPage;
   });
 
-  if (!rootChanged && !pagesChanged) return { changed: false, state };
-  return { changed: true, state: { ...rootState, pages } };
+  let headerChanged = false;
+  let header = rootState.header;
+  if (header !== undefined) {
+    const cleared = clearSection(header);
+    if (cleared.changed) {
+      header = cleared.section;
+      headerChanged = true;
+    }
+  }
+
+  let footerChanged = false;
+  let footer = rootState.footer;
+  if (footer !== undefined) {
+    const cleared = clearSection(footer);
+    if (cleared.changed) {
+      footer = cleared.section;
+      footerChanged = true;
+    }
+  }
+
+  if (!rootChanged && !pagesChanged && !headerChanged && !footerChanged) {
+    return { changed: false, state };
+  }
+
+  const nextState: EditableSite = { ...rootState, pages };
+  if (headerChanged && header !== undefined) nextState.header = header;
+  if (footerChanged && footer !== undefined) nextState.footer = footer;
+  return { changed: true, state: nextState };
 }
 
 // ADR 0065 D2 + codex review pass 5 finding 2 + pass 6 finding 3 —
@@ -512,6 +584,23 @@ function clearElementAssetReferences(element: unknown, assetId: string): unknown
     });
     if (templateChanged) {
       next = { ...next, customTemplate };
+      changed = true;
+    }
+    return changed ? next : element;
+  }
+  if (el.type === 'flow-container' && Array.isArray(el.items)) {
+    const itemsIn = el.items as unknown[];
+    let itemsChanged = false;
+    const items = itemsIn.map((item) => {
+      if (typeof item !== 'object' || item === null) return item;
+      const itemRec = item as Record<string, unknown>;
+      const cleared = clearElementAssetReferences(itemRec.element, assetId);
+      if (cleared === itemRec.element) return item;
+      itemsChanged = true;
+      return { ...itemRec, element: cleared };
+    });
+    if (itemsChanged) {
+      next = { ...next, items };
       changed = true;
     }
     return changed ? next : element;

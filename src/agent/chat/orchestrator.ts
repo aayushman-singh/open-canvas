@@ -44,7 +44,13 @@ import type {
   LlmTool,
 } from '../llm.js';
 import type { CanvasAgentOp } from '../canvas-ops.js';
-import type { CanvasPage, CanvasSection, EditableSite } from '../../canvas/schema.js';
+import type {
+  CanvasElement,
+  CanvasPage,
+  CanvasSection,
+  EditableSite,
+} from '../../canvas/schema.js';
+import { findElementInForest, remapElementForestIdsInPlace } from '../../canvas/element-tree.js';
 import type { SiteFont } from '../../db/schema.js';
 import { createSectionFromRecipe } from '../../canvas/recipes.js';
 import { resolveDesignSection } from '../../canvas/layout/engine.js';
@@ -386,15 +392,13 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
           // happens inline and any failure surfaces as a loud SSE error event.
           const dispatched = await dispatchGenerateImage({ call, ctx, history, writer });
           if (dispatched.preview) {
-            const event: Extract<
-              Parameters<ChatStreamWriter['write']>[0],
-              { kind: 'op-preview' }
-            > = {
-              kind: 'op-preview',
-              id: call.id,
-              toolName: call.name,
-              op: dispatched.preview.op,
-            };
+            const event: Extract<Parameters<ChatStreamWriter['write']>[0], { kind: 'op-preview' }> =
+              {
+                kind: 'op-preview',
+                id: call.id,
+                toolName: call.name,
+                op: dispatched.preview.op,
+              };
             await writer.write(event);
             previewOps.push({ id: call.id, toolName: call.name, op: dispatched.preview.op });
           }
@@ -416,15 +420,13 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
               await writer.write({ kind: 'done', reason: 'other' });
               return { messages: history, previewOps, doneReason: 'other' };
             }
-            const event: Extract<
-              Parameters<ChatStreamWriter['write']>[0],
-              { kind: 'op-preview' }
-            > = {
-              kind: 'op-preview',
-              id: call.id,
-              toolName: call.name,
-              op: dispatched.preview.op,
-            };
+            const event: Extract<Parameters<ChatStreamWriter['write']>[0], { kind: 'op-preview' }> =
+              {
+                kind: 'op-preview',
+                id: call.id,
+                toolName: call.name,
+                op: dispatched.preview.op,
+              };
             if (previewSection) event.previewSection = previewSection;
             await writer.write(event);
             previewOps.push({ id: call.id, toolName: call.name, op: dispatched.preview.op });
@@ -898,36 +900,131 @@ function findMediaElementForGenerate(
   state: EditableSite,
   elementId: string,
 ): { box: { w: number; h: number } } | null {
-  function scan(section: { elements: ReadonlyArray<{ id: string; type: string; box?: unknown }> }):
-    | { box: { w: number; h: number } }
-    | null {
-    for (const el of section.elements) {
-      if (el.id !== elementId) continue;
-      if (el.type !== 'media') return null;
-      const box = el.box;
-      if (
-        !isRecord(box) ||
-        typeof box.w !== 'number' ||
-        typeof box.h !== 'number'
-      ) {
-        return null;
+  type MediaSearchResult = { box: { w: number; h: number } } | 'matched-non-media';
+  type FlowSlot = { w: number; h: number };
+
+  function boxFromElement(
+    element: CanvasElement,
+    flowSlot: FlowSlot | null,
+  ): { w: number; h: number } {
+    const box = element.box;
+    if (Number.isFinite(box.w) && Number.isFinite(box.h) && box.w > 0 && box.h > 0) {
+      return { w: box.w, h: box.h };
+    }
+    if (flowSlot !== null) return flowSlot;
+    return { w: box.w, h: box.h };
+  }
+
+  function flowContentSlot(element: Extract<CanvasElement, { type: 'flow-container' }>): FlowSlot {
+    return {
+      w: Math.max(0, element.box.w - element.layout.padding.left - element.layout.padding.right),
+      h: Math.max(0, element.box.h - element.layout.padding.top - element.layout.padding.bottom),
+    };
+  }
+
+  function flowItemSlot(
+    element: Extract<CanvasElement, { type: 'flow-container' }>,
+    itemIndex: number,
+  ): FlowSlot {
+    const content = flowContentSlot(element);
+    const itemCount = Math.max(1, element.items.length);
+    if (element.layout.mode === 'stack') {
+      return {
+        w: content.w,
+        h: Math.max(0, (content.h - element.layout.gap.row * (itemCount - 1)) / itemCount),
+      };
+    }
+    if (element.layout.mode === 'row') {
+      return {
+        w: Math.max(0, (content.w - element.layout.gap.column * (itemCount - 1)) / itemCount),
+        h: content.h,
+      };
+    }
+
+    const columns = Math.max(1, element.layout.columns ?? 1);
+    const spans = element.items.map((item) => Math.max(1, Math.min(columns, item.span ?? 1)));
+    let row = 0;
+    let column = 0;
+    let targetSpan = spans[itemIndex] ?? 1;
+    for (let i = 0; i < spans.length; i++) {
+      const span = spans[i]!;
+      if (column > 0 && column + span > columns) {
+        row += 1;
+        column = 0;
       }
-      return { box: { w: box.w, h: box.h } };
+      if (i === itemIndex) targetSpan = span;
+      column += span;
+      if (column >= columns) {
+        row += 1;
+        column = 0;
+      }
+    }
+    const rowCount = Math.max(1, column === 0 ? row : row + 1);
+    const columnWidth = Math.max(
+      0,
+      (content.w - element.layout.gap.column * (columns - 1)) / columns,
+    );
+    return {
+      w: Math.max(0, columnWidth * targetSpan + element.layout.gap.column * (targetSpan - 1)),
+      h: Math.max(0, (content.h - element.layout.gap.row * (rowCount - 1)) / rowCount),
+    };
+  }
+
+  function scanElements(
+    elements: ReadonlyArray<CanvasElement>,
+    flowSlot: FlowSlot | null,
+  ): MediaSearchResult | null {
+    for (const el of elements) {
+      if (el.id === elementId) {
+        if (el.type !== 'media') return 'matched-non-media';
+        return { box: boxFromElement(el, flowSlot) };
+      }
+      if (el.type === 'tabs') {
+        for (const tab of el.tabs) {
+          const hit = scanElements(tab.elements, flowSlot);
+          if (hit !== null) return hit;
+        }
+      } else if (el.type === 'collection') {
+        for (const entry of el.entries ?? []) {
+          const hit = scanElements(entry, flowSlot);
+          if (hit !== null) return hit;
+        }
+        if (el.customTemplate !== undefined) {
+          const hit = scanElements(el.customTemplate, flowSlot);
+          if (hit !== null) return hit;
+        }
+      } else if (el.type === 'flow-container') {
+        for (let itemIndex = 0; itemIndex < el.items.length; itemIndex++) {
+          const item = el.items[itemIndex]!;
+          const hit = scanElements([item.element], flowItemSlot(el, itemIndex));
+          if (hit !== null) return hit;
+        }
+      }
     }
     return null;
   }
+
+  function scan(section: { elements: ReadonlyArray<CanvasElement> }): MediaSearchResult | null {
+    return scanElements(section.elements, null);
+  }
+
+  function normalize(hit: MediaSearchResult | null): { box: { w: number; h: number } } | null {
+    if (hit === 'matched-non-media') return null;
+    return hit;
+  }
+
   if (state.header) {
     const hit = scan(state.header);
-    if (hit) return hit;
+    if (hit) return normalize(hit);
   }
   if (state.footer) {
     const hit = scan(state.footer);
-    if (hit) return hit;
+    if (hit) return normalize(hit);
   }
   for (const page of state.pages) {
     for (const section of page.sections) {
       const hit = scan(section);
-      if (hit) return hit;
+      if (hit) return normalize(hit);
     }
   }
   return null;
@@ -979,8 +1076,7 @@ async function dispatchGenerateImage(
   // limiter hook is a server wiring error; fail closed rather than letting a
   // future CHAT_AGENT_TOOLS caller bypass the cap.
   if (!ctx.imageRateLimit) {
-    const errMsg =
-      'generateImage: image rate limiter hook is missing on this deployment';
+    const errMsg = 'generateImage: image rate limiter hook is missing on this deployment';
     await writer.write({ kind: 'error', error: errMsg });
     history.push({
       role: 'tool',
@@ -1084,10 +1180,7 @@ async function dispatchGenerateImage(
  * so resolution must mirror applyCanvasAgentOp instead of silently omitting or
  * retargeting the preview section.
  */
-function resolvePreviewSection(
-  op: CanvasAgentOp,
-  state: EditableSite,
-): CanvasSection | undefined {
+function resolvePreviewSection(op: CanvasAgentOp, state: EditableSite): CanvasSection | undefined {
   if (op.kind === 'insertSection') {
     resolvePreviewInsertionPage(state, op.pageId ?? null, op.afterSectionId, 'insertSection');
     return createSectionFromRecipe(op.recipeId, op.input);
@@ -1151,20 +1244,20 @@ function resolvePreviewInsertionPage(
   return firstPage;
 }
 
-function cloneSectionForPreview(
-  state: EditableSite,
-  sectionId: string,
-): CanvasSection {
+function cloneSectionForPreview(state: EditableSite, sectionId: string): CanvasSection {
   for (const page of state.pages) {
     const found = page.sections.find((s) => s.id === sectionId);
     if (found) {
       const clone = structuredClone(found);
       clone.id = `sec-${clone.recipeId}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
       clone.name = `${found.name} copy`;
-      for (const el of clone.elements) {
-        const prefix = el.id.includes('-') ? el.id.split('-').slice(0, -1).join('-') : 'el';
-        el.id = `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
-      }
+      remapElementForestIdsInPlace(clone.elements, (previousId) => {
+        const prefix = previousId.includes('-')
+          ? previousId.split('-').slice(0, -1).join('-')
+          : 'el';
+        return `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+      });
+      delete (clone as { anchorId?: string }).anchorId;
       if (clone.role) delete clone.role;
       return clone;
     }
@@ -1239,29 +1332,34 @@ function findElementSummary(
   elementId: string,
 ): { type: string; sectionName: string; pageTitle: string } | null {
   if (state.header) {
-    for (const el of state.header.elements) {
-      if (el.id === elementId) {
-        return { type: el.type, sectionName: state.header.name ?? 'header', pageTitle: '(global)' };
-      }
+    const found = findElementInForest(state.header.elements, elementId);
+    if (found !== null) {
+      return {
+        type: found.element.type,
+        sectionName: state.header.name ?? 'header',
+        pageTitle: '(global)',
+      };
     }
   }
   if (state.footer) {
-    for (const el of state.footer.elements) {
-      if (el.id === elementId) {
-        return { type: el.type, sectionName: state.footer.name ?? 'footer', pageTitle: '(global)' };
-      }
+    const found = findElementInForest(state.footer.elements, elementId);
+    if (found !== null) {
+      return {
+        type: found.element.type,
+        sectionName: state.footer.name ?? 'footer',
+        pageTitle: '(global)',
+      };
     }
   }
   for (const page of state.pages) {
     for (const section of page.sections) {
-      for (const el of section.elements) {
-        if (el.id === elementId) {
-          return {
-            type: el.type,
-            sectionName: section.name ?? section.id,
-            pageTitle: page.title ?? page.id,
-          };
-        }
+      const found = findElementInForest(section.elements, elementId);
+      if (found !== null) {
+        return {
+          type: found.element.type,
+          sectionName: section.name ?? section.id,
+          pageTitle: page.title ?? page.id,
+        };
       }
     }
   }
@@ -1360,7 +1458,7 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
     "  setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable'), defaultLocale, or siteNoIndex.",
   );
   lines.push(
-    "  renameToken — site-wide literal find-and-replace on every owner- or visitor-visible string field: text element runs, action labels, media alt, embed titles, accordion item titles + bodies, carousel captions, nav siteTitle + link labels + primary action, form titles + submit + success + field labels + placeholders + option labels, table column headers + cell values, chart series + categories, tab labels (and recurses into tab panel elements), inline collection entries, section names, page titles + slugs + descriptions + authors + categories + tags. Walks header, footer, and every page section. USE THIS for any \"rename X to Y everywhere\", \"swap brand name\", or \"replace all instances of …\" intent. Emit ONE renameToken op — never enumerate per-element rewriteText calls for a bulk rename. Pure substring replace; pass caseSensitive:false to match regardless of casing.",
+    '  renameToken — site-wide literal find-and-replace on every owner- or visitor-visible string field: text element runs, action labels, media alt, embed titles, accordion item titles + bodies, carousel captions, nav siteTitle + link labels + primary action, form titles + submit + success + field labels + placeholders + option labels, table column headers + cell values, chart series + categories, tab labels (and recurses into tab panel elements), inline collection entries, section names, page titles + slugs + descriptions + authors + categories + tags. Walks header, footer, and every page section. USE THIS for any "rename X to Y everywhere", "swap brand name", or "replace all instances of …" intent. Emit ONE renameToken op — never enumerate per-element rewriteText calls for a bulk rename. Pure substring replace; pass caseSensitive:false to match regardless of casing.',
   );
   lines.push('');
   lines.push(`Current Style Kit: ${state.styleKit}.`);
@@ -1383,7 +1481,7 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
     '  - Style is layered: a site-wide Theme Choice picks one Style Kit (charcoal / orange-editorial / blue-saas / green-organic) which restyles every Design Primitive. A Pinned Style on a single element overrides the Style Kit for that element only and survives kit switches. Use setStyleKit to change the whole site; use updateElement for element-level Pinned Style.',
   );
   lines.push(
-    "  - Media Elements reference an Owner Asset by id. Owner Assets belong to the Owner (not the site) — the same asset can appear on many sites. NEVER fabricate asset ids; always call query_assets first.",
+    '  - Media Elements reference an Owner Asset by id. Owner Assets belong to the Owner (not the site) — the same asset can appear on many sites. NEVER fabricate asset ids; always call query_assets first.',
   );
   lines.push(
     '  - The Agent Edit preview/accept loop is structural, not cosmetic: every mutating tool call you emit is a PROPOSAL. The Owner sees a preview card and either accepts (which applies the op via the apply route) or rejects (which discards it). Until accept, the Editable Site is unchanged — that is why your past-tense rule above is absolute.',

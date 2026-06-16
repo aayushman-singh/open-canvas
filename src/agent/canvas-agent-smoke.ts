@@ -25,6 +25,7 @@ import {
 import {
   INLINE_MARK_TYPES,
   SECTION_RECIPE_IDS,
+  type CanvasElement,
   type EditableSite,
   type SectionRecipeId,
 } from '../canvas/schema.js';
@@ -133,6 +134,46 @@ if (!textElement) throw new Error('smoke base section must have a text element')
 const mediaElement = baseSection.elements.find((e) => e.type === 'media');
 if (!mediaElement) throw new Error('smoke base section must have a media element');
 
+function flowContainerWithHosted(element: CanvasElement): CanvasElement {
+  return {
+    id: 'el-flow-host',
+    type: 'flow-container',
+    box: { x: 40, y: 40, w: 640, h: 240, z: 1 },
+    layout: {
+      mode: 'grid',
+      columns: 1,
+      gap: { row: 12, column: 12 },
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      align: 'stretch',
+      justify: 'start',
+    },
+    items: [{ id: 'flow-item', element }],
+  };
+}
+
+function singleFlowSectionState(element: CanvasElement): EditableSite {
+  return {
+    styleKit: 'charcoal',
+    pages: [
+      {
+        id: 'page-flow-agent',
+        slug: 'flow-agent',
+        title: 'Flow Agent',
+        width: 1200,
+        sections: [
+          {
+            id: 'section-flow-agent',
+            recipeId: 'custom',
+            name: 'Flow Agent',
+            height: 560,
+            elements: [flowContainerWithHosted(element)],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 // 1. rewriteText: swap the heading content.
 const rewriteOp: CanvasAgentOp = {
   kind: 'rewriteText',
@@ -204,6 +245,39 @@ try {
 }
 assert(rewriteUnknownThrew, 'expected rewriteText against an unknown id to throw');
 
+// rewriteText can target Flow-hosted text children by element id.
+{
+  const hostedText: CanvasElement = {
+    id: 'el-flow-hosted-text',
+    type: 'text',
+    box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+    role: 'body',
+    align: 'left',
+    fontSize: 16,
+    fontWeight: 400,
+    content: [{ text: 'Hosted before' }],
+  };
+  const afterHostedRewrite = applyCanvasAgentOp(singleFlowSectionState(hostedText), {
+    kind: 'rewriteText',
+    elementId: hostedText.id,
+    content: [{ text: 'Hosted after' }],
+  });
+  const validation = validateEditableSite(afterHostedRewrite);
+  assert(
+    validation.valid,
+    validation.valid
+      ? ''
+      : `Flow-hosted rewriteText produced invalid state: ${validation.errors.join('; ')}`,
+  );
+  const flow = afterHostedRewrite.pages[0]?.sections[0]?.elements[0];
+  assert(
+    flow?.type === 'flow-container' &&
+      flow.items[0]?.element.type === 'text' &&
+      flow.items[0].element.content[0]?.text === 'Hosted after',
+    'rewriteText must update Flow-hosted text children',
+  );
+}
+
 // 2. replaceMedia: swap an existing media element's id.
 const replaceOp: CanvasAgentOp = {
   kind: 'replaceMedia',
@@ -247,6 +321,75 @@ assert(
   replaceWrongTypeThrew,
   'expected replaceMedia against a text element to throw with expected-media message',
 );
+
+// duplicateSection must remap nested Flow-hosted element ids.
+{
+  const source = singleFlowSectionState({
+    id: 'el-flow-duplicate-text',
+    type: 'text',
+    box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+    role: 'body',
+    align: 'left',
+    fontSize: 16,
+    fontWeight: 400,
+    content: [{ text: 'Clone me' }],
+  });
+  const duplicated = applyCanvasAgentOp(source, {
+    kind: 'duplicateSection',
+    sectionId: 'section-flow-agent',
+  });
+  const validation = validateEditableSite(duplicated);
+  assert(
+    validation.valid,
+    validation.valid
+      ? ''
+      : `duplicateSection must remap Flow-hosted ids: ${validation.errors.join('; ')}`,
+  );
+  const originalFlow = duplicated.pages[0]?.sections[0]?.elements[0];
+  const cloneFlow = duplicated.pages[0]?.sections[1]?.elements[0];
+  assert(
+    originalFlow?.type === 'flow-container' &&
+      cloneFlow?.type === 'flow-container' &&
+      originalFlow.items[0]?.element.id !== cloneFlow.items[0]?.element.id,
+    'duplicateSection clone must not preserve Flow-hosted element ids',
+  );
+}
+
+// deletePage rewrites action links hosted inside Flow Items before validation.
+{
+  const source = singleFlowSectionState({
+    id: 'el-flow-page-action',
+    type: 'action',
+    box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+    label: [{ text: 'Go target' }],
+    href: { type: 'page', pageId: 'page-target' },
+    variant: 'solid',
+  });
+  source.pages.push({
+    id: 'page-target',
+    slug: 'target',
+    title: 'Target',
+    width: 1200,
+    sections: [
+      { id: 'section-target', recipeId: 'custom', name: 'Target', height: 480, elements: [] },
+    ],
+  });
+  const afterDelete = applyCanvasAgentOp(source, { kind: 'deletePage', pageId: 'page-target' });
+  const validation = validateEditableSite(afterDelete);
+  assert(
+    validation.valid,
+    validation.valid
+      ? ''
+      : `deletePage must rewrite Flow-hosted page links: ${validation.errors.join('; ')}`,
+  );
+  const flow = afterDelete.pages[0]?.sections[0]?.elements[0];
+  const hostedAction = flow?.type === 'flow-container' ? flow.items[0]?.element : undefined;
+  const hostedHref = hostedAction?.type === 'action' ? hostedAction.href : undefined;
+  assert(
+    hostedHref?.type === 'external' && hostedHref.url === '#',
+    'deletePage must rewrite Flow-hosted action hrefs to #',
+  );
+}
 
 // 3. insertSection: append a feature-grid after the hero.
 const insertOp: CanvasAgentOp = {
@@ -1080,6 +1223,33 @@ if (deleteElementStyleParsed.ok) {
     'internal updateElement __deleteFields must delete optional element fields for chat revert',
   );
 }
+
+const restoreCustomTemplateParsed = parseApplyOp(
+  {
+    kind: 'restoreElement',
+    sectionId: baseSection.id,
+    parentKind: 'collection-custom-template',
+    collectionElementId: 'collection-for-restore',
+    index: 0,
+    element: {
+      id: 'restored-template-text',
+      type: 'text',
+      box: { x: 0, y: 0, w: 120, h: 40, z: 1 },
+      content: [{ text: 'Restored' }],
+      role: 'body',
+      fontSize: 16,
+      fontWeight: 400,
+      align: 'left',
+    },
+  },
+  'charcoal',
+);
+assert(
+  restoreCustomTemplateParsed.ok,
+  restoreCustomTemplateParsed.ok
+    ? ''
+    : `expected restoreElement(collection-custom-template) to parse for chat revert: ${restoreCustomTemplateParsed.error}`,
+);
 
 const addActionToolCall = translateToolCall({
   id: 'add-action-end-to-end',

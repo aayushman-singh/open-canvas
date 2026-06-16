@@ -40,6 +40,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import { loadAssetKindsWithSeedFallback } from '../../assets/seed-id-fallback';
+import { flattenElementForest } from '../../canvas/element-tree';
 import { type EditableSite, type StyleKit } from '../../canvas/schema';
 import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
@@ -215,7 +216,7 @@ function buildSystemPrompt(state: EditableSite): string {
     lines.push(
       `Header section ${state.header.id} (name=${JSON.stringify(state.header.name)}, height=${String(state.header.height)}):`,
     );
-    for (const element of state.header.elements) {
+    for (const element of flattenElementForest(state.header.elements)) {
       lines.push(`  - element ${element.id} type=${element.type}`);
     }
   }
@@ -229,7 +230,7 @@ function buildSystemPrompt(state: EditableSite): string {
       lines.push(
         `Section ${section.id} (recipe=${section.recipeId}, name=${JSON.stringify(section.name)}, height=${String(section.height)}):`,
       );
-      for (const element of section.elements) {
+      for (const element of flattenElementForest(section.elements)) {
         lines.push(`  - element ${element.id} type=${element.type}`);
       }
     }
@@ -240,7 +241,7 @@ function buildSystemPrompt(state: EditableSite): string {
     lines.push(
       `Footer section ${state.footer.id} (name=${JSON.stringify(state.footer.name)}, height=${String(state.footer.height)}):`,
     );
-    for (const element of state.footer.elements) {
+    for (const element of flattenElementForest(state.footer.elements)) {
       lines.push(`  - element ${element.id} type=${element.type}`);
     }
   }

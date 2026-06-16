@@ -908,10 +908,16 @@ function parseRestoreElement(value: Record<string, unknown>): ParseResult {
     return { ok: false, error: 'restoreElement.sectionId must be a non-empty string' };
   }
   const parentKind = value.parentKind;
-  if (parentKind !== 'section' && parentKind !== 'tab-panel' && parentKind !== 'collection-entry') {
+  if (
+    parentKind !== 'section' &&
+    parentKind !== 'tab-panel' &&
+    parentKind !== 'collection-entry' &&
+    parentKind !== 'collection-custom-template'
+  ) {
     return {
       ok: false,
-      error: "restoreElement.parentKind must be 'section' | 'tab-panel' | 'collection-entry'",
+      error:
+        "restoreElement.parentKind must be 'section' | 'tab-panel' | 'collection-entry' | 'collection-custom-template'",
     };
   }
   if (!isFiniteNumber(value.index) || value.index < 0) {
@@ -946,6 +952,14 @@ function parseRestoreElement(value: Record<string, unknown>): ParseResult {
     }
     op.collectionElementId = value.collectionElementId;
     op.entryIndex = value.entryIndex;
+  } else if (parentKind === 'collection-custom-template') {
+    if (!isNonEmptyString(value.collectionElementId)) {
+      return {
+        ok: false,
+        error: 'restoreElement(collection-custom-template): collectionElementId required',
+      };
+    }
+    op.collectionElementId = value.collectionElementId;
   }
   return { ok: true, op };
 }

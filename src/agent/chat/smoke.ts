@@ -28,7 +28,7 @@ import type {
   LlmChunk,
   LlmMessage,
 } from '../llm.js';
-import type { EditableSite, SectionRecipeId } from '../../canvas/schema.js';
+import type { CanvasElement, EditableSite, SectionRecipeId } from '../../canvas/schema.js';
 import { SECTION_RECIPE_IDS } from '../../canvas/schema.js';
 import { createSectionFromRecipe, type RecipeFactoryInput } from '../../canvas/recipes.js';
 import { STYLE_KIT_PRESETS } from '../../canvas/style-kits.js';
@@ -357,6 +357,45 @@ assert(
   `small site summary should fit budget (got ${String(smallTokens)} tokens)`,
 );
 assert(summarySmall.truncated === false, 'small site summary should not be truncated');
+
+const flowSummaryState = structuredClone(fixtureState);
+const flowSummarySection = flowSummaryState.pages[0]?.sections[0];
+if (!flowSummarySection) throw new Error('[chat:smoke] flow summary fixture missing section');
+const flowForSummary: CanvasElement = {
+  id: 'el-chat-flow',
+  type: 'flow-container',
+  box: { x: 0, y: 0, w: 640, h: 240, z: 99 },
+  layout: {
+    mode: 'grid',
+    columns: 1,
+    gap: { row: 12, column: 12 },
+    padding: { top: 0, right: 0, bottom: 0, left: 0 },
+    align: 'stretch',
+    justify: 'start',
+  },
+  items: [
+    {
+      id: 'chat-flow-item',
+      element: {
+        id: 'el-chat-flow-text',
+        type: 'text',
+        box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+        role: 'body',
+        align: 'left',
+        fontSize: 16,
+        fontWeight: 400,
+        content: [{ text: 'Hosted chat text' }],
+      },
+    },
+  ],
+};
+flowSummarySection.elements.push(flowForSummary);
+const flowSummary = buildQuerySiteSummary({ state: flowSummaryState, detail: 'full' });
+const flowElements = flowSummary.pages[0]?.sections[0]?.elements ?? [];
+assert(
+  flowElements.some((element) => element.id === 'el-chat-flow-text' && element.type === 'text'),
+  'query_site full summary must include Flow-hosted child element ids',
+);
 
 const largeState = buildLargeState();
 const summaryLarge = buildQuerySiteSummary({ state: largeState, detail: 'full' });
@@ -1003,8 +1042,7 @@ function makeReplicateStub(): {
     'op.target must carry mode=replace + the requested elementId',
   );
   assert(
-    typeof previewOp.dataUrl === 'string' &&
-      previewOp.dataUrl.startsWith('data:image/png;base64,'),
+    typeof previewOp.dataUrl === 'string' && previewOp.dataUrl.startsWith('data:image/png;base64,'),
     'op.dataUrl must be a base64 data URL with the Replicate mediaType',
   );
   assert(
@@ -1019,10 +1057,92 @@ function makeReplicateStub(): {
     result.doneReason === 'stop',
     `expected doneReason=stop after REPLACE happy path, got ${result.doneReason}`,
   );
-  console.log('[chat:smoke] 11/16 generateImage REPLACE mode — OK');
+  console.log('[chat:smoke] 11/17 generateImage REPLACE mode — OK');
 }
 
-// ---- Test 12 — ADD mode with default box ---------------------------------
+// ---- Test 12 — REPLACE mode on Flow-hosted media -------------------------
+
+{
+  const fix = buildGenerateFixture();
+  const hero = fix.state.pages[0]?.sections[0];
+  if (!hero) throw new Error('generate-flow-fixture: hero section missing');
+  const flowHostedMediaId = 'el-flow-generated-media';
+  hero.elements.push({
+    id: 'el-flow-generated-host',
+    type: 'flow-container',
+    box: { x: 80, y: 80, w: 640, h: 360, z: 99 },
+    layout: {
+      mode: 'grid',
+      columns: 1,
+      gap: { row: 0, column: 0 },
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      align: 'stretch',
+      justify: 'start',
+    },
+    items: [
+      {
+        id: 'flow-generated-media-item',
+        element: {
+          id: flowHostedMediaId,
+          type: 'media',
+          mediaKind: 'image',
+          assetId: 'asset-flow-generated-before',
+          alt: 'Flow-hosted image',
+          fit: 'cover',
+          box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+        },
+      },
+    ],
+  } satisfies CanvasElement);
+  const stub = makeReplicateStub();
+  const callId = 'gen-flow-replace-1';
+  const adapter = new MockLlmAdapter([
+    () =>
+      yieldChunks(
+        {
+          type: 'tool_call',
+          id: callId,
+          name: 'generateImage',
+          arguments: { elementId: flowHostedMediaId, prompt: 'a modular gallery wall' },
+        },
+        { type: 'done', reason: 'tool_use' },
+      ),
+    () => yieldChunks({ type: 'text', text: 'Done.' }, { type: 'done', reason: 'stop' }),
+  ]);
+  const writer = new BufferedStreamWriter();
+  const session = await new InMemorySessionStore().create('site-gen-flow-rep', 'customer-smoke');
+  await runChatTurn({
+    session,
+    userMessage: 'Generate into the flow image.',
+    writer,
+    ctx: {
+      adapter,
+      state: fix.state,
+      systemInstruction: '[smoke] sys',
+      replicateToken: 'test-token-FLOW',
+      replicateClient: stub.client,
+      imageRateLimit: () => Promise.resolve({ allowed: true, retryAfterMs: null }),
+    },
+  });
+
+  assert(stub.calls.length === 1, 'Flow-hosted REPLACE mode must call Replicate exactly once');
+  assert(
+    stub.calls[0]!.aspectRatio === '16:9',
+    `expected Flow container 640x360 slot to snap to 16:9, got ${stub.calls[0]!.aspectRatio}`,
+  );
+  const preview = writer
+    .events()
+    .find((e): e is Extract<ChatStreamEvent, { kind: 'op-preview' }> => e.kind === 'op-preview');
+  assert(preview !== undefined, 'Flow-hosted REPLACE mode must emit an op-preview');
+  const previewOp = preview!.op as { target?: { mode?: string; elementId?: string } };
+  assert(
+    previewOp.target?.mode === 'replace' && previewOp.target.elementId === flowHostedMediaId,
+    'Flow-hosted REPLACE preview must target the hosted media element id',
+  );
+  console.log('[chat:smoke] 12/17 generateImage Flow-hosted REPLACE mode — OK');
+}
+
+// ---- Test 13 — ADD mode with default box ---------------------------------
 
 {
   const fix = buildGenerateFixture();
@@ -1097,10 +1217,10 @@ function makeReplicateStub(): {
       box.y >= 40,
     `op.target.box must default to {x:40, w:480, h:270, y >= 40}, got ${JSON.stringify(box)}`,
   );
-  console.log('[chat:smoke] 12/16 generateImage ADD mode default box — OK');
+  console.log('[chat:smoke] 13/17 generateImage ADD mode default box — OK');
 }
 
-// ---- Test 13 — Missing REPLICATE_API_TOKEN -------------------------------
+// ---- Test 14 — Missing REPLICATE_API_TOKEN -------------------------------
 
 {
   const fix = buildGenerateFixture();
@@ -1134,10 +1254,7 @@ function makeReplicateStub(): {
     },
   });
 
-  assert(
-    stub.calls.length === 0,
-    'missing token must short-circuit before calling Replicate',
-  );
+  assert(stub.calls.length === 0, 'missing token must short-circuit before calling Replicate');
   const events = writer.events();
   const err = events.find(
     (e): e is Extract<ChatStreamEvent, { kind: 'error' }> => e.kind === 'error',
@@ -1150,10 +1267,10 @@ function makeReplicateStub(): {
     !events.some((e) => e.kind === 'op-preview'),
     'missing token must not emit any op-preview',
   );
-  console.log('[chat:smoke] 13/16 generateImage missing-token — OK');
+  console.log('[chat:smoke] 14/17 generateImage missing-token — OK');
 }
 
-// ---- Test 14 — both elementId and sectionId ------------------------------
+// ---- Test 15 — both elementId and sectionId ------------------------------
 
 {
   const fix = buildGenerateFixture();
@@ -1191,10 +1308,7 @@ function makeReplicateStub(): {
     },
   });
 
-  assert(
-    stub.calls.length === 0,
-    'parser rejection must short-circuit before calling Replicate',
-  );
+  assert(stub.calls.length === 0, 'parser rejection must short-circuit before calling Replicate');
   const events = writer.events();
   const err = events.find(
     (e): e is Extract<ChatStreamEvent, { kind: 'error' }> => e.kind === 'error',
@@ -1207,10 +1321,10 @@ function makeReplicateStub(): {
     !events.some((e) => e.kind === 'op-preview'),
     'parser rejection must not emit any op-preview',
   );
-  console.log('[chat:smoke] 14/16 generateImage parser rejection — OK');
+  console.log('[chat:smoke] 15/17 generateImage parser rejection — OK');
 }
 
-// ---- Test 15 — per-account image cap blocks generation -------------------
+// ---- Test 16 — per-account image cap blocks generation -------------------
 //
 // When ctx.imageRateLimit reports the account is over the 'ai-image' budget,
 // the generateImage tool must NOT call Replicate and must surface a loud
@@ -1260,10 +1374,10 @@ function makeReplicateStub(): {
     !events.some((e) => e.kind === 'op-preview'),
     'over-budget image cap must not emit an op-preview',
   );
-  console.log('[chat:smoke] 15/16 generateImage rate-limit cap — OK');
+  console.log('[chat:smoke] 16/17 generateImage rate-limit cap — OK');
 }
 
-// ---- Test 16 — image generation requires a cap hook ----------------------
+// ---- Test 17 — image generation requires a cap hook ----------------------
 //
 // Valid generateImage dispatch with a Replicate token but no imageRateLimit
 // hook is a server wiring error. The orchestrator must fail closed before the
@@ -1314,7 +1428,7 @@ function makeReplicateStub(): {
     !events.some((e) => e.kind === 'op-preview'),
     'missing imageRateLimit hook must not emit an op-preview',
   );
-  console.log('[chat:smoke] 16/16 generateImage limiter wiring — OK');
+  console.log('[chat:smoke] 17/17 generateImage limiter wiring — OK');
 }
 
 // ---------------------------------------------------------------------------

@@ -188,7 +188,7 @@ function responsiveItemEntries(
   override: FlowItemResponsiveOverride,
 ): Array<[string, string]> {
   const entries: Array<[string, string]> = [];
-  if (override.hidden === true) entries.push(['display', 'none']);
+  if (override.hidden !== undefined) entries.push(['display', override.hidden ? 'none' : 'block']);
   if (override.order !== undefined) entries.push(['order', String(override.order)]);
   if (override.align !== undefined) entries.push(['align-self', alignToCss(override.align)]);
   if (layout.mode === 'grid' && override.span !== undefined) {

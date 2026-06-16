@@ -309,6 +309,33 @@ function runReferenceWalkTests(): void {
                 ],
               ],
             },
+            {
+              id: 'flow-with-media',
+              type: 'flow-container',
+              box: { x: 620, y: 0, w: 420, h: 200, z: 3 },
+              layout: {
+                mode: 'grid',
+                columns: 1,
+                gap: { row: 12, column: 12 },
+                padding: { top: 0, right: 0, bottom: 0, left: 0 },
+                align: 'stretch',
+                justify: 'start',
+              },
+              items: [
+                {
+                  id: 'flow-media-item',
+                  element: {
+                    id: 'nested-flow-media',
+                    type: 'media',
+                    mediaKind: 'image',
+                    assetId: 'nested-flow-image-id',
+                    alt: '',
+                    fit: 'cover',
+                    box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+                  },
+                },
+              ],
+            },
           ],
         },
       ],
@@ -324,6 +351,7 @@ function runReferenceWalkTests(): void {
     nestedIds.has('nested-card-image-id'),
     'expected collection entry image asset to be reachable',
   );
+  assert(nestedIds.has('nested-flow-image-id'), 'expected Flow-hosted image asset to be reachable');
 
   const nestedUnfilledPages = structuredClone(nestedPages);
   const unfilledElements = nestedUnfilledPages[0]!.sections[0]!.elements;
@@ -343,6 +371,15 @@ function runReferenceWalkTests(): void {
     throw new Error('[assets:smoke] expected collection entry media');
   }
   unfilledEntry.assetId = '';
+  const unfilledFlow = unfilledElements[2]!;
+  if (unfilledFlow.type !== 'flow-container') {
+    throw new Error('[assets:smoke] expected flow third');
+  }
+  const unfilledFlowMedia = unfilledFlow.items[0]?.element;
+  if (unfilledFlowMedia?.type !== 'media') {
+    throw new Error('[assets:smoke] expected flow-hosted media');
+  }
+  unfilledFlowMedia.assetId = '';
   const nestedUnfilled = collectUnfilledAssetReferences(nestedUnfilledPages);
   assert(
     nestedUnfilled.some(
@@ -359,6 +396,14 @@ function runReferenceWalkTests(): void {
         ref.path.includes('.entries[0][1].assetId'),
     ),
     'expected collection entry unfilled media asset to be reported with nested path',
+  );
+  assert(
+    nestedUnfilled.some(
+      (ref) =>
+        ref.mediaElementId === 'nested-flow-media' &&
+        ref.path.includes('.items[0].element.assetId'),
+    ),
+    'expected Flow-hosted unfilled media asset to be reported with nested path',
   );
 
   // -------------------------------------------------------------------------
@@ -552,10 +597,7 @@ function runReferenceWalkTests(): void {
     !isAssetSubstitutionToken('seed-customer-x-blog-hero'),
     'isAssetSubstitutionToken must REJECT a real asset id',
   );
-  assert(
-    !isAssetSubstitutionToken(''),
-    'isAssetSubstitutionToken must REJECT the empty string',
-  );
+  assert(!isAssetSubstitutionToken(''), 'isAssetSubstitutionToken must REJECT the empty string');
   assert(
     !isAssetSubstitutionToken('{{ogImageAssetId'),
     'isAssetSubstitutionToken must REJECT truncated placeholder (open brace, no close)',
@@ -1612,6 +1654,145 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
     nestedBg?.elementStyle?.backgroundImageAssetId === undefined,
     `(7d) clearAssetReferences must DELETE elementStyle.backgroundImageAssetId ` +
       `nested inside customTemplate; got ${String(nestedBg?.elementStyle?.backgroundImageAssetId)}`,
+  );
+
+  // -------------------------------------------------------------------------
+  // 7e — Pinned header/footer parity. collectReferencedAssets walks
+  // EditableSite.header/footer; the delete cascade must do the same. A
+  // Flow-hosted asset in a pinned header must appear in the confirm report
+  // and be cleared from editableState on confirm, otherwise the next publish
+  // sees a stale header asset id that the cascade missed.
+  // -------------------------------------------------------------------------
+  const pinnedFlowAssetId = 'asset-pinned-flow-1';
+  const pinnedFlowSiteRow = {
+    id: 'site-pinned-flow',
+    name: 'Pinned Flow Site',
+    subdomain: 'pinned-flow-site',
+    publishedVersion: 0,
+    editableState: {
+      header: {
+        id: 'header-pinned-flow',
+        recipeId: 'custom',
+        name: 'Header',
+        height: 220,
+        elements: [
+          {
+            id: 'header-flow',
+            type: 'flow-container',
+            box: { x: 0, y: 0, w: 640, h: 180, z: 1 },
+            layout: {
+              mode: 'grid',
+              columns: 1,
+              gap: { row: 0, column: 0 },
+              padding: { top: 0, right: 0, bottom: 0, left: 0 },
+              align: 'stretch',
+              justify: 'start',
+            },
+            items: [
+              {
+                id: 'header-flow-media-item',
+                element: {
+                  id: 'header-flow-media',
+                  type: 'media',
+                  mediaKind: 'image',
+                  assetId: pinnedFlowAssetId,
+                  alt: '',
+                  fit: 'cover',
+                  box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+                },
+              },
+            ],
+          },
+        ],
+      },
+      pages: [{ slug: 'home', sections: [{ elements: [] }] }],
+    },
+    publishedSnapshot: null,
+  };
+
+  function makePinnedFlowShim(
+    returnSibling: boolean,
+    updateLog: Array<Record<string, unknown>> = [],
+  ): Db {
+    let selectCount = 0;
+    return {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCount += 1;
+            if (selectCount === 1) {
+              const result = Promise.resolve([
+                { id: pinnedFlowAssetId, contentHash: expectedHash, r2Key: 'assets/pinned.png' },
+              ]);
+              return Object.assign(result, { limit: () => result });
+            }
+            if (selectCount === 2) {
+              const result = Promise.resolve([pinnedFlowSiteRow]);
+              return Object.assign(result, { limit: () => result });
+            }
+            const result = Promise.resolve(returnSibling ? [{ id: 'asset-uuid-sibling' }] : []);
+            return Object.assign(result, { limit: () => result });
+          },
+        }),
+      }),
+      update: () => ({
+        set: (values: Record<string, unknown>) => ({
+          where: () => {
+            updateLog.push(values);
+            return Promise.resolve();
+          },
+        }),
+      }),
+      delete: () => ({ where: () => Promise.resolve() }),
+    } as unknown as Db;
+  }
+
+  const pinnedReportResult = await deleteOwnerAsset(
+    { db: makePinnedFlowShim(false), r2: reportClient },
+    { assetId: pinnedFlowAssetId, customerId: 'cust-1', confirm: false },
+  );
+  assert(
+    pinnedReportResult.status === 'confirm_required',
+    `(7e) expected confirm_required for pinned Flow asset, got ${pinnedReportResult.status}`,
+  );
+  if (pinnedReportResult.status === 'confirm_required') {
+    const pinnedRef = pinnedReportResult.references.find(
+      (ref) => ref.siteId === 'site-pinned-flow' && ref.elementId === 'header-flow-media',
+    );
+    assert(
+      pinnedRef !== undefined,
+      `(7e) delete walker must surface Flow-hosted assetId in site header; ` +
+        `got ${JSON.stringify(pinnedReportResult.references)}`,
+    );
+  }
+
+  const pinnedUpdateLog: Array<Record<string, unknown>> = [];
+  const pinnedConfirmResult = await deleteOwnerAsset(
+    { db: makePinnedFlowShim(false, pinnedUpdateLog), r2: reportClient },
+    { assetId: pinnedFlowAssetId, customerId: 'cust-1', confirm: true },
+  );
+  assert(
+    pinnedConfirmResult.status === 'deleted',
+    `(7e) expected deleted for pinned Flow asset, got ${pinnedConfirmResult.status}`,
+  );
+  assert(
+    pinnedUpdateLog.length === 1,
+    `(7e) expected one editable-state cleanup write for pinned Flow header, got ${String(pinnedUpdateLog.length)}`,
+  );
+  const pinnedCleared = pinnedUpdateLog[0]?.editableState as
+    | {
+        header?: {
+          elements?: Array<{
+            items?: Array<{ element?: { assetId?: string } }>;
+          }>;
+        };
+      }
+    | undefined;
+  const pinnedHeaderMedia = pinnedCleared?.header?.elements?.[0]?.items?.[0]?.element;
+  assert(
+    pinnedHeaderMedia?.assetId === '',
+    `(7e) clearAssetReferences must clear Flow-hosted header media assetId to ''; ` +
+      `got ${String(pinnedHeaderMedia?.assetId)}`,
   );
 }
 

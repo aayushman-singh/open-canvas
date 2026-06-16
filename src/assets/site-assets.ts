@@ -249,9 +249,15 @@ function collectElementReferences(
     // customTemplate path is the only place a fixed assetId survives the
     // editor's save round-trip.
     (element.customTemplate ?? []).forEach((child, childIdx) => {
+      collectElementReferences(child, `${elementPath}.customTemplate[${String(childIdx)}]`, out);
+    });
+    return;
+  }
+  if (element.type === 'flow-container') {
+    element.items.forEach((item, itemIdx) => {
       collectElementReferences(
-        child,
-        `${elementPath}.customTemplate[${String(childIdx)}]`,
+        item.element,
+        `${elementPath}.items[${String(itemIdx)}].element`,
         out,
       );
     });
@@ -381,6 +387,16 @@ function collectUnfilledElementReferences(
       collectUnfilledElementReferences(
         child,
         `${elementPath}.customTemplate[${String(childIdx)}]`,
+        out,
+      );
+    });
+    return;
+  }
+  if (element.type === 'flow-container') {
+    element.items.forEach((item, itemIdx) => {
+      collectUnfilledElementReferences(
+        item.element,
+        `${elementPath}.items[${String(itemIdx)}].element`,
         out,
       );
     });

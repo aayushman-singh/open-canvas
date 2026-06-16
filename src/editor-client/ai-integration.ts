@@ -90,8 +90,7 @@ export type AiNodeFinderContext = DomContext;
 // (viewport + camera) and forwards ctx into applyCameraTransform, whose
 // CameraTransformContext (root + camera + zoom readout + reflow hooks)
 // folds in here so the forwarded call typechecks without a cast.
-export type AiFocusCanvasContext = CameraTransformContext &
-  Pick<EditorContext, 'viewport'>;
+export type AiFocusCanvasContext = CameraTransformContext & Pick<EditorContext, 'viewport'>;
 
 // ADR 0064 — the AI accept-all banner reads pending suggestions + the
 // banner button ref, both members of the AiContext lazy-cluster. Named
@@ -221,6 +220,8 @@ interface SnapshotElement {
   type?: string | undefined;
   tabs?: Array<{ id?: string | undefined; elements?: SnapshotElement[] | undefined }> | undefined;
   entries?: SnapshotElement[][] | undefined;
+  customTemplate?: SnapshotElement[] | undefined;
+  items?: Array<{ id?: string | undefined; element?: SnapshotElement | undefined }> | undefined;
   href?: { type?: string | undefined; pageId?: string | undefined } | undefined;
   mediaKind?: string | undefined;
   assetId?: string | undefined;
@@ -249,7 +250,12 @@ interface Snapshot {
 
 function walkSnapshotElements(
   snap: Snapshot,
-  visit: (el: SnapshotElement, section: SnapshotSection, arr: SnapshotElement[], index: number) => void,
+  visit: (
+    el: SnapshotElement,
+    section: SnapshotSection,
+    arr: SnapshotElement[],
+    index: number,
+  ) => void,
 ): void {
   function walkArr(arr: SnapshotElement[] | undefined, section: SnapshotSection): void {
     if (!Array.isArray(arr)) return;
@@ -265,6 +271,14 @@ function walkSnapshotElements(
       } else if (el.type === 'collection' && Array.isArray(el.entries)) {
         for (let ei = 0; ei < el.entries.length; ei++) {
           walkArr(el.entries[ei], section);
+        }
+        if (Array.isArray(el.customTemplate)) walkArr(el.customTemplate, section);
+      } else if (el.type === 'collection' && Array.isArray(el.customTemplate)) {
+        walkArr(el.customTemplate, section);
+      } else if (el.type === 'flow-container' && Array.isArray(el.items)) {
+        for (let ii = 0; ii < el.items.length; ii++) {
+          const hosted = el.items[ii]?.element;
+          if (hosted) walkArr([hosted], section);
         }
       }
     }
@@ -296,11 +310,18 @@ function findElementInSnapshot(
 interface ElementLocation {
   element: SnapshotElement;
   section: SnapshotSection;
-  parentKind: 'section' | 'tab-panel' | 'collection-entry';
+  parentKind:
+    | 'section'
+    | 'tab-panel'
+    | 'collection-entry'
+    | 'collection-custom-template'
+    | 'flow-item';
   tabsElementId?: string | undefined;
   tabId?: string | undefined;
   collectionElementId?: string | undefined;
   entryIndex?: number | undefined;
+  flowContainerElementId?: string | undefined;
+  flowItemId?: string | undefined;
   index: number;
 }
 
@@ -313,11 +334,17 @@ function findElementLocationInSnapshot(snap: Snapshot, elementId: string): Eleme
   function searchArr(
     arr: SnapshotElement[] | undefined,
     section: SnapshotSection,
-    parentKind: 'section' | 'tab-panel' | 'collection-entry',
+    parentKind:
+      | 'section'
+      | 'tab-panel'
+      | 'collection-entry'
+      | 'collection-custom-template'
+      | 'flow-item',
     meta:
       | null
       | { tabsElementId?: string | undefined; tabId?: string | undefined }
-      | { collectionElementId?: string | undefined; entryIndex?: number | undefined },
+      | { collectionElementId?: string | undefined; entryIndex?: number | undefined }
+      | { flowContainerElementId?: string | undefined; flowItemId?: string | undefined },
   ): ElementLocation | null {
     if (!Array.isArray(arr)) return null;
     for (let i = 0; i < arr.length; i++) {
@@ -330,8 +357,12 @@ function findElementLocationInSnapshot(snap: Snapshot, elementId: string): Eleme
           parentKind: parentKind,
           tabsElementId: meta && 'tabsElementId' in meta ? meta.tabsElementId : undefined,
           tabId: meta && 'tabId' in meta ? meta.tabId : undefined,
-          collectionElementId: meta && 'collectionElementId' in meta ? meta.collectionElementId : undefined,
+          collectionElementId:
+            meta && 'collectionElementId' in meta ? meta.collectionElementId : undefined,
           entryIndex: meta && 'entryIndex' in meta ? meta.entryIndex : undefined,
+          flowContainerElementId:
+            meta && 'flowContainerElementId' in meta ? meta.flowContainerElementId : undefined,
+          flowItemId: meta && 'flowItemId' in meta ? meta.flowItemId : undefined,
           index: i,
         };
       }
@@ -356,6 +387,28 @@ function findElementLocationInSnapshot(snap: Snapshot, elementId: string): Eleme
             });
             if (hitC) return hitC;
           }
+        }
+        if (Array.isArray(el.customTemplate)) {
+          const hitT = searchArr(el.customTemplate, section, 'collection-custom-template', {
+            collectionElementId: el.id,
+          });
+          if (hitT) return hitT;
+        }
+      } else if (el.type === 'collection' && Array.isArray(el.customTemplate)) {
+        const hitT = searchArr(el.customTemplate, section, 'collection-custom-template', {
+          collectionElementId: el.id,
+        });
+        if (hitT) return hitT;
+      } else if (el.type === 'flow-container' && Array.isArray(el.items)) {
+        for (let fi = 0; fi < el.items.length; fi++) {
+          const item = el.items[fi];
+          const hosted = item?.element;
+          if (!hosted) continue;
+          const hitF = searchArr([hosted], section, 'flow-item', {
+            flowContainerElementId: el.id,
+            flowItemId: item.id,
+          });
+          if (hitF) return hitF;
         }
       }
     }
@@ -426,12 +479,12 @@ function collectActionRefsToPage(
   pageId: string,
 ): Array<{ sectionId: string; elementId: string }> {
   const refs: Array<{ sectionId: string; elementId: string }> = [];
-  function scanSection(section: SnapshotSection | undefined): void {
-    if (!section || !Array.isArray(section.elements)) return;
-    for (let i = 0; i < section.elements.length; i++) {
-      const el = section.elements[i];
+  function scanElements(elements: SnapshotElement[] | undefined, section: SnapshotSection): void {
+    if (!Array.isArray(elements)) return;
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i];
+      if (!el) continue;
       if (
-        el &&
         el.type === 'action' &&
         el.href &&
         typeof el.href === 'object' &&
@@ -440,7 +493,28 @@ function collectActionRefsToPage(
       ) {
         refs.push({ sectionId: section.id || '', elementId: el.id || '' });
       }
+      if (el.type === 'tabs' && Array.isArray(el.tabs)) {
+        for (let ti = 0; ti < el.tabs.length; ti++) {
+          scanElements(el.tabs[ti]?.elements, section);
+        }
+      } else if (el.type === 'collection') {
+        if (Array.isArray(el.entries)) {
+          for (let ei = 0; ei < el.entries.length; ei++) {
+            scanElements(el.entries[ei], section);
+          }
+        }
+        scanElements(el.customTemplate, section);
+      } else if (el.type === 'flow-container' && Array.isArray(el.items)) {
+        for (let ii = 0; ii < el.items.length; ii++) {
+          const hosted = el.items[ii]?.element;
+          if (hosted) scanElements([hosted], section);
+        }
+      }
     }
+  }
+  function scanSection(section: SnapshotSection | undefined): void {
+    if (!section || !Array.isArray(section.elements)) return;
+    scanElements(section.elements, section);
   }
   if (snap.header) scanSection(snap.header);
   if (snap.footer) scanSection(snap.footer);
@@ -618,7 +692,10 @@ function computeInverseFromPre(op: AgentOp | null, pre: Snapshot | null): Invers
   if (op.kind === 'setSiteConfig') {
     return {
       kind: 'ready',
-      op: { kind: 'setSiteConfig', patch: clonePatchPrev(pre as Record<string, unknown>, op.patch) },
+      op: {
+        kind: 'setSiteConfig',
+        patch: clonePatchPrev(pre as Record<string, unknown>, op.patch),
+      },
     };
   }
   if (op.kind === 'moveSection') {
@@ -626,7 +703,11 @@ function computeInverseFromPre(op: AgentOp | null, pre: Snapshot | null): Invers
     if (!ms) return { kind: 'destructive', reason: 'moveSection target missing' };
     return {
       kind: 'ready',
-      op: { kind: 'moveSection', sectionId: op.sectionId, afterSectionId: ms.prevSectionId || undefined },
+      op: {
+        kind: 'moveSection',
+        sectionId: op.sectionId,
+        afterSectionId: ms.prevSectionId || undefined,
+      },
     };
   }
   if (
@@ -644,6 +725,13 @@ function computeInverseFromPre(op: AgentOp | null, pre: Snapshot | null): Invers
   if (op.kind === 'deleteElement') {
     const loc = findElementLocationInSnapshot(pre, op.elementId || '');
     if (!loc) return { kind: 'destructive', reason: 'deleteElement target missing' };
+    if (loc.parentKind === 'flow-item') {
+      return {
+        kind: 'destructive',
+        reason:
+          'deleteElement target is hosted by a Flow Item and cannot be restored via array insertion',
+      };
+    }
     const restoreEl: Record<string, unknown> = {
       kind: 'restoreElement',
       sectionId: loc.section.id,
@@ -657,6 +745,8 @@ function computeInverseFromPre(op: AgentOp | null, pre: Snapshot | null): Invers
     } else if (loc.parentKind === 'collection-entry') {
       restoreEl.collectionElementId = loc.collectionElementId;
       restoreEl.entryIndex = loc.entryIndex;
+    } else if (loc.parentKind === 'collection-custom-template') {
+      restoreEl.collectionElementId = loc.collectionElementId;
     }
     return { kind: 'ready', op: restoreEl };
   }
@@ -698,7 +788,11 @@ function resolveDeferredInverse(
   originalOp: AgentOp | null,
   pre: Snapshot | null,
   post: Snapshot | null,
-  consumedIds: { elements: Record<string, boolean>; sections: Record<string, boolean>; pages: Record<string, boolean> } | null,
+  consumedIds: {
+    elements: Record<string, boolean>;
+    sections: Record<string, boolean>;
+    pages: Record<string, boolean>;
+  } | null,
 ): AgentOp | null {
   if (!originalOp || !pre || !post) return null;
   const consumed = consumedIds || { elements: {}, sections: {}, pages: {} };
@@ -732,7 +826,9 @@ export function describeOp(op: AgentOp): string {
     return 'Rewrite text ' + op.elementId + ': ' + JSON.stringify(shortened);
   }
   if (op.kind === 'replaceMedia') {
-    return 'Replace media ' + op.elementId + ' with asset ' + op.assetId + ' (' + op.mediaKind + ')';
+    return (
+      'Replace media ' + op.elementId + ' with asset ' + op.assetId + ' (' + op.mediaKind + ')'
+    );
   }
   if (op.kind === 'insertSection') {
     const after = op.afterSectionId ? ' after ' + op.afterSectionId : ' at end';
@@ -746,7 +842,10 @@ export function describeOp(op: AgentOp): string {
   }
   if (op.kind === 'designSection') {
     const after = op.afterSectionId ? ' after ' + op.afterSectionId : ' at end';
-    const name = op.input && typeof op.input.sectionName === 'string' ? op.input.sectionName : 'Custom section';
+    const name =
+      op.input && typeof op.input.sectionName === 'string'
+        ? op.input.sectionName
+        : 'Custom section';
     return 'Design section ' + JSON.stringify(name) + after;
   }
   if (op.kind === 'deleteElement') return 'Delete element ' + op.elementId;
@@ -782,20 +881,14 @@ export function describeOp(op: AgentOp): string {
   }
   if (op.kind === 'placeGeneratedImage') {
     const promptStr = typeof op.prompt === 'string' ? op.prompt : '';
-    const shortened =
-      promptStr.length > 80 ? promptStr.slice(0, 77) + '…' : promptStr;
+    const shortened = promptStr.length > 80 ? promptStr.slice(0, 77) + '…' : promptStr;
     const target = op.target;
     if (target && target.mode === 'replace' && target.elementId) {
-      return (
-        'Generate image for ' + target.elementId + ': ' + JSON.stringify(shortened)
-      );
+      return 'Generate image for ' + target.elementId + ': ' + JSON.stringify(shortened);
     }
     if (target && target.mode === 'add' && target.sectionId) {
       return (
-        'Generate + add image to section ' +
-        target.sectionId +
-        ': ' +
-        JSON.stringify(shortened)
+        'Generate + add image to section ' + target.sectionId + ': ' + JSON.stringify(shortened)
       );
     }
     return 'Generate image: ' + JSON.stringify(shortened);
@@ -803,7 +896,10 @@ export function describeOp(op: AgentOp): string {
   return 'Unknown op';
 }
 
-export function findCanvasNodeForOpImpl(ctx: AiNodeFinderContext, op: AgentOp | null): HTMLElement | null {
+export function findCanvasNodeForOpImpl(
+  ctx: AiNodeFinderContext,
+  op: AgentOp | null,
+): HTMLElement | null {
   if (!ctx.root || !op) return null;
   // placeGeneratedImage stashes the target under op.target; unpack it
   // before falling through to the regular elementId / sectionId lookup so
@@ -905,10 +1001,7 @@ async function materialiseGeneratedImageOps(
   return ops;
 }
 
-async function materialiseOneGeneratedImage(
-  ctx: AiApplyContext,
-  op: AgentOp,
-): Promise<unknown> {
+async function materialiseOneGeneratedImage(ctx: AiApplyContext, op: AgentOp): Promise<unknown> {
   if (!op.target) {
     ctx.setStatus('Apply failed: generated-image op has no target', 'error');
     return null;
@@ -935,10 +1028,7 @@ async function materialiseOneGeneratedImage(
     bytes = new Uint8Array(buf);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   } catch (err) {
-    ctx.setStatus(
-      'Apply failed: cannot decode generated bytes — ' + errorToString(err),
-      'error',
-    );
+    ctx.setStatus('Apply failed: cannot decode generated bytes — ' + errorToString(err), 'error');
     return null;
   }
 
@@ -1028,7 +1118,7 @@ function applyAgentOpsAfterMaterialise(
   ops: unknown[],
   suggestions: SuggestionEntry[] | null,
 ): Promise<boolean> {
-  const preSnapshot: Snapshot | null = ctx.state ? (structuredClone(ctx.state)) : null;
+  const preSnapshot: Snapshot | null = ctx.state ? structuredClone(ctx.state) : null;
   const precomputed: InverseResult[] = [];
   if (suggestions && preSnapshot) {
     for (let pi = 0; pi < suggestions.length; pi++) {
@@ -1047,7 +1137,10 @@ function applyAgentOpsAfterMaterialise(
         })
         .then(function (r) {
           return r.json().then(function (body) {
-            return { ok: r.ok, body: body as { editableState?: EditableSite; errors?: string[]; error?: string } };
+            return {
+              ok: r.ok,
+              body: body as { editableState?: EditableSite; errors?: string[]; error?: string },
+            };
           });
         })
         .then(function (res) {
@@ -1138,7 +1231,10 @@ function applyAgentOpsAfterMaterialise(
     });
 }
 
-export function revertAgentEntryImpl(ctx: AiApplyContext, entry: SuggestionEntry | null): Promise<boolean> {
+export function revertAgentEntryImpl(
+  ctx: AiApplyContext,
+  entry: SuggestionEntry | null,
+): Promise<boolean> {
   if (!entry || !entry.inverseOp) {
     ctx.setStatus('Cannot revert this change', 'error');
     return Promise.resolve(false);
@@ -1160,7 +1256,10 @@ export function revertAgentEntryImpl(ctx: AiApplyContext, entry: SuggestionEntry
         })
         .then(function (r) {
           return r.json().then(function (body) {
-            return { ok: r.ok, body: body as { editableState?: EditableSite; errors?: string[]; error?: string } };
+            return {
+              ok: r.ok,
+              body: body as { editableState?: EditableSite; errors?: string[]; error?: string },
+            };
           });
         })
         .then(function (res) {
@@ -1188,8 +1287,9 @@ export function revertAgentEntryImpl(ctx: AiApplyContext, entry: SuggestionEntry
           // Ghost-preview re-materialise BEFORE renderAll: the proposal is
           // back to "pending" so the in-place ghost reappears. The blueprint
           // was captured on Accept and survives the revert round-trip.
-          const ghostBlueprint = (entry as { ghostBlueprint?: EditorContext['ghostSections'][number] })
-            .ghostBlueprint;
+          const ghostBlueprint = (
+            entry as { ghostBlueprint?: EditorContext['ghostSections'][number] }
+          ).ghostBlueprint;
           if (ghostBlueprint) {
             const already = ctx.ghostSections.some((g) => g.id === ghostBlueprint.id);
             if (!already) ctx.ghostSections.push(ghostBlueprint);

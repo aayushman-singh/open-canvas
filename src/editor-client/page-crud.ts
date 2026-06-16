@@ -85,7 +85,8 @@ import type {
   StateContext,
   StatusEmitterContext,
 } from './editor-context.js';
-import type { CanvasPage } from '../canvas/schema.js';
+import { visitElementForest } from '../canvas/element-tree.js';
+import type { CanvasElement, CanvasPage } from '../canvas/schema.js';
 import { isCustom404Page } from '../canvas/page-routing.js';
 import {
   runCollectionScaffoldFlowImpl,
@@ -630,17 +631,9 @@ export function findActionPageLinkReferences(
   pageId: string,
 ): string[] {
   const refs: string[] = [];
-  function scanElements(elements: unknown[] | null | undefined, label: string): void {
+  function scanElements(elements: CanvasElement[] | null | undefined, label: string): void {
     if (!Array.isArray(elements)) return;
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i] as {
-        type?: string;
-        id?: string;
-        href?: { type?: string; pageId?: string } | null;
-        label?: Array<{ text?: string }>;
-        tabs?: Array<{ elements?: unknown[] }>;
-        entries?: unknown[][];
-      };
+    visitElementForest(elements, (el) => {
       if (el.type === 'action' && el.href && el.href.type === 'page' && el.href.pageId === pageId) {
         let actionLabelText = '';
         const runs = Array.isArray(el.label) ? el.label : [];
@@ -650,18 +643,12 @@ export function findActionPageLinkReferences(
         }
         refs.push(label + ' / ' + (actionLabelText || el.id || ''));
       }
-      if (el.type === 'tabs' && Array.isArray(el.tabs)) {
-        for (let ti = 0; ti < el.tabs.length; ti++) {
-          scanElements(el.tabs[ti]?.elements, label);
-        }
-      } else if (el.type === 'collection' && Array.isArray(el.entries)) {
-        for (let ei = 0; ei < el.entries.length; ei++) {
-          scanElements(el.entries[ei], label);
-        }
-      }
-    }
+    });
   }
-  function scanSection(section: { elements?: unknown[] } | null | undefined, label: string): void {
+  function scanSection(
+    section: { elements?: CanvasElement[] } | null | undefined,
+    label: string,
+  ): void {
     scanElements(section?.elements, label);
   }
   if (!ctx.state) return refs;

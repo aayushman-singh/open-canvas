@@ -111,6 +111,7 @@
 // against the inline twin.
 
 import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
+import { remapElementForestIdsInPlace } from '../canvas/element-tree.js';
 import type {
   DomContext,
   EditorContext,
@@ -464,9 +465,8 @@ export function handleSectionActionImpl(
     copy.id = newSectionId();
     copy.name = section.name + ' copy';
     delete copy.role;
-    for (const el of copy.elements) {
-      el.id = newElementId();
-    }
+    delete (copy as { anchorId?: string }).anchorId;
+    remapElementForestIdsInPlace(copy.elements, () => newElementId());
     page.sections.splice(idx + 1, 0, copy);
     ctx.renderAll();
     ctx.selectSection(copy.id);
