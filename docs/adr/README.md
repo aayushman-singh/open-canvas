@@ -86,6 +86,9 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0075 | Personalization uses Visitor Segments | Proposed | [`docs/adr/0075-personalization-uses-visitor-segments.md`](0075-personalization-uses-visitor-segments.md) |
 | 0076 | On-page Content Editing is review-gated | Proposed | [`docs/adr/0076-on-page-content-editing-is-review-gated.md`](0076-on-page-content-editing-is-review-gated.md) |
 | 0077 | On-page Design Editing edits the Editable Site | Proposed | [`docs/adr/0077-on-page-design-editing-edits-the-editable-site.md`](0077-on-page-design-editing-edits-the-editable-site.md) |
+| 0078 | Flow Container is a Compound Element inside Canvas Sections | Proposed | [`docs/adr/0078-flow-container-is-a-compound-element-inside-canvas-sections.md`](0078-flow-container-is-a-compound-element-inside-canvas-sections.md) |
+| 0079 | Flow Layout grammar v1 | Proposed | [`docs/adr/0079-flow-layout-grammar-v1.md`](0079-flow-layout-grammar-v1.md) |
+| 0080 | Flow Items own placement; Content Elements own behaviour | Proposed | [`docs/adr/0080-flow-items-own-placement-content-elements-own-behaviour.md`](0080-flow-items-own-placement-content-elements-own-behaviour.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

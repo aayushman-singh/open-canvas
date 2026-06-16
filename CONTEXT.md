@@ -156,6 +156,22 @@ _Avoid_: Screen, view
 A page made of ordered canvas sections rather than flow-based document content.
 _Avoid_: Prose document, webpage DOM, slide deck
 
+**Collection**:
+A named set of repeated content entries for one Editable Site.
+_Avoid_: CMS, database table, content type, page group
+
+**Collection Entry**:
+One authored content item inside a Collection.
+_Avoid_: Canvas Page, blog page, row, record
+
+**Collection Template Page**:
+A Canvas Page that defines how one Collection Entry appears when published.
+_Avoid_: Dynamic page, CMS template, detail page, generated page
+
+**Collection Element**:
+A Content Element that lists Collection Entries from a Collection on a Canvas Page.
+_Avoid_: CMS widget, listing block, feed
+
 **Section Role**:
 A designation on a page section that marks it as a body section, the only remaining role since ADR 0059 removed inline header/footer roles in favour of site-pinned Header Section and Footer Section.
 _Avoid_: Section type, section kind, section category
@@ -177,8 +193,24 @@ A section with its own bounded 2D editing space where content elements can be po
 _Avoid_: Full-page canvas, freeform page, absolute page layer
 
 **Content Element**:
-An editable item inside a section, such as text, media, an action, a shape, or a container.
+An editable visible item in a site authoring surface, such as text, media, an action, a shape, or a container.
 _Avoid_: Widget, layer
+
+**Compound Element**:
+A content element that owns a structured child set inside its own authoring model instead of relying only on sibling positioned elements in a canvas section.
+_Avoid_: Component, widget, group, section
+
+**Flow Container**:
+A Compound Element placed inside a canvas section that arranges its children by flow rules inside its own bounds.
+_Avoid_: Flow Section, auto-layout section, flexbox div, layout widget
+
+**Flow Layout**:
+A layout relation inside a Flow Container that arranges Flow Items by ordered rules, spacing, alignment, wrapping, and spans.
+_Avoid_: CSS layout, flexbox, grid system, auto layout
+
+**Flow Item**:
+A child of a Flow Container whose placement comes from order, span, and alignment within flow layout rather than freeform canvas position.
+_Avoid_: Positioned Element, layer, DOM node
 
 **Content Collaborator**:
 A person invited by an Owner to propose content changes without controlling layout, style, structure, behaviour, or publish.
@@ -214,7 +246,7 @@ _Avoid_: Media module, video widget, embed
 
 **Positioned Element**:
 A content element with a position and size inside a canvas section.
-_Avoid_: Flow item, DOM node, layer
+_Avoid_: Flow Item, DOM node, layer
 
 **Film Reel**:
 A right-side panel that shows all sections of a canvas page as miniature thumbnails, used for visual reordering and blank section insertion.
@@ -234,6 +266,15 @@ _Avoid_: Undo stack, version history, asset trail
 - Every visible **Section** in the POC is a **Canvas Section**
 - A **Section** contains one or more **Content Elements**
 - A **Canvas Section** contains one or more **Positioned Elements**
+- A **Compound Element** is a **Content Element**
+- A **Canvas Section** may contain **Flow Containers** as **Positioned Elements**
+- A **Flow Container** has exactly one **Flow Layout**
+- A **Flow Layout** arranges **Flow Items**
+- A **Flow Container** contains one or more **Flow Items**
+- A **Flow Item** contains one **Content Element**
+- A **Flow Item** places its **Content Element** through **Flow Layout**
+- A **Flow Item** is not a **Positioned Element**
+- A **Flow Container** does not replace **Canvas Section**
 - An **Owner** may invite a **Design Collaborator** to an **Editable Site**
 - A **Design Collaborator** uses **On-page Design Editing** to make **Design Changes**
 - **On-page Design Editing** changes the **Editable Site**, not the **Published Site**
@@ -244,6 +285,16 @@ _Avoid_: Undo stack, version history, asset trail
 - A **Content Change** changes content only; it does not change layout, style, structure, or behaviour
 - An accepted **Review Request** changes the **Editable Site**
 - A **Published Site** reflects accepted **Content Changes** only after the **Owner** publishes
+
+### Collections
+
+- An **Editable Site** may have one or more **Collections**
+- A **Collection** contains one or more **Collection Entries**
+- A **Collection Entry** belongs to exactly one **Collection**
+- A **Collection Template Page** belongs to one **Collection**
+- A **Collection Element** lists **Collection Entries** from one **Collection**
+- An **Editable Site** does not create one **Canvas Page** per **Collection Entry**
+- A **Published Site** renders one visitor-facing page per published **Collection Entry** through the **Collection Template Page**
 
 ### Section Library
 
