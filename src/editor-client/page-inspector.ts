@@ -50,6 +50,7 @@ import { selectInput } from './dom-builders.js';
 import { buildColorRow } from './inspector-leaf-builders.js';
 import { cssEscape } from './css-escape.js';
 import { openPageSeoAfterSave, type OpenPageSeoAfterSaveContext } from './page-crud.js';
+import { appendLoadRouteTransitionInspector } from './load-route-transition-inspector.js';
 
 // ADR 0064 — narrow context carves for the page-inspector cluster. Each
 // alias names the runtime surface the function actually touches so the
@@ -78,10 +79,7 @@ export type RevertActivePreviewContext = Pick<DomContext, 'root'>;
  *  and forwards into three pure `ctx`-bound helpers that own the actual
  *  attribute writes. */
 export type ApplyPageStylesContext = Pick<DomContext, 'root'> &
-  Pick<
-    EditorContext,
-    'applyPageMotionAttributes' | 'applyPageStyleProperties' | 'pageRenderWidth'
-  >;
+  Pick<EditorContext, 'applyPageMotionAttributes' | 'applyPageStyleProperties' | 'pageRenderWidth'>;
 
 /** Insert a `{{field}}` token into the focused contenteditable or fall
  *  back to clipboard. Reads `root` to confirm focus is inside the editor
@@ -666,6 +664,9 @@ export function renderPageInspector(ctx: RenderPageInspectorContext): void {
   });
   group4.appendChild(playBtn);
   ctx.inspector.appendChild(group4);
+
+  // -- Designer load + route choreography --------------------------------
+  appendLoadRouteTransitionInspector(ctx);
 
   // -- Divider ----------------------------------------------------------
   const divider2 = document.createElement('div');

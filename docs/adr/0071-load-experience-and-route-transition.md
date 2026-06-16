@@ -128,10 +128,13 @@ Route Transition.
   Sequences, swaps and hydrates the new root, updates title/history/scroll/focus,
   emits ready or failure events, and restores the previous DOM when hydration or
   dependent post-swap work fails.
+- **Editor authoring shipped in the designer-interactions branch.** The page
+  inspector can enable a Load Experience or Route Transition, bind existing
+  Motion Sequences, choose readiness/run/swap/scroll/focus controls, and remove
+  either contract without touching unrelated interaction state.
 
 ## Follow-ups
 
-- Add authoring UI for Load Experience and Route Transition.
 - Evaluate a Swup adapter behind the Runtime Hydrator if native lifecycle code
   starts duplicating cache/preload/history concerns.
 - Decide which View Transition API modes are allowed once browser support and
