@@ -4,9 +4,9 @@
 
 **Goal:** Make the accepted designer interaction ADRs persistable, validated, renderable, and hydratable on published pages.
 
-**Architecture:** Site-level interaction fields are the source of truth. The renderer emits deterministic data hooks and JSON payloads; the visitor Runtime Hydrator owns DOM attachment after initial load and live page swaps. Free third-party adapters remain behind the same contract, but this slice uses native browser primitives so the feature does not wait on package bundling, CSP, and asset-byte decisions.
+**Architecture:** Site-level interaction fields are the source of truth. The renderer emits deterministic data hooks and JSON payloads; the visitor Runtime Hydrator owns DOM attachment after initial load and live page swaps. Free third-party adapters remain behind the same contract, and missing adapters fail loudly instead of silently approximating the behaviour.
 
-**Tech Stack:** TypeScript, Bun smoke tests, existing public renderer, existing inline interactive runtime, native Web Animations, DOM event delegation.
+**Tech Stack:** TypeScript, Bun smoke tests, existing public renderer, existing inline interactive runtime, Anime.js WAAPI adapter, Floating UI DOM adapter, lottie-web light adapter, DOM event delegation.
 
 ---
 
@@ -16,7 +16,7 @@
 - No arbitrary Owner JavaScript.
 - No silent rich-motion blank state: unsupported runtime families emit explicit failure events.
 - Existing popup-section triggers remain supported; Overlay is additive in this slice.
-- Route-transition navigation adapters are not shipped in this slice; live publish hydration already exercises the Runtime Hydrator contract.
+- Route-transition navigation is shipped in this slice through the visitor Runtime Hydrator; Swup/View Transition adapters remain future adapter options, not the domain contract.
 
 ## Task 1: Load And Route Transition Contract
 
@@ -75,7 +75,7 @@
 
 - [ ] Extend `interactive:smoke` with a stub DOM case for load-triggered motion, click-triggered overlay open/close, body scroll lock, and rich-motion failure event dispatch.
 - [ ] Run `bun run interactive:smoke` and confirm the new assertions fail.
-- [ ] Hydrate motion sequences through native `element.animate` when available and apply final styles directly when not available.
+- [ ] Hydrate motion sequences through the Anime.js WAAPI adapter and fail loudly when the adapter or target is unavailable.
 - [ ] Hydrate scroll scenes by mapping scroll progress to whitelisted style properties.
 - [ ] Hydrate overlays with delegated triggers, Escape/backdrop/close dismissal, focus return when available, and body scroll lock.
 - [ ] Hydrate rich-motion markers by dispatching explicit unsupported-runtime failure events.

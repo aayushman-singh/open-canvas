@@ -110,6 +110,15 @@ function ocBuildAnimeMotionParams(step,targetCount){
   if(targetCount<2)params.delay=step.delayMs||0;
   return params;
 }
+function ocMotionStepMaxMs(step,targetCount){
+  var duration=Number(step.durationMs||0);
+  var delay=Number(step.delayMs||0);
+  var stagger=Number(step.staggerMs||0);
+  if(!Number.isFinite(duration)||duration<0)duration=0;
+  if(!Number.isFinite(delay)||delay<0)delay=0;
+  if(!Number.isFinite(stagger)||stagger<0)stagger=0;
+  return duration+delay+stagger*Math.max(0,targetCount-1);
+}
 function ocBuildMotionFrame(properties,index){
   var frame={};
   var transforms=[];
@@ -147,20 +156,22 @@ function ocResolveMotionTriggerElement(trigger){
   return null;
 }
 function ocPlayMotionSequence(sequence){
-  if(!sequence||!sequence.steps)return;
+  if(!sequence||!sequence.steps)return false;
   var adapter=ocAnimeAdapter();
+  var maxMs=0;
   for(var i=0;i<sequence.steps.length;i++){
     var step=sequence.steps[i];
     var targets=ocResolveMotionTargets(step.target);
     if(targets.length===0){
       ocMotionFailure(null,'missing-target',{sequenceId:sequence.id,stepId:step.id,target:step.target});
-      return;
+      return false;
     }
+    maxMs=Math.max(maxMs,ocMotionStepMaxMs(step,targets.length));
     if(!adapter){
       for(var a=0;a<targets.length;a++){
         ocMarkMotionFailed(targets[a],'adapter-unavailable',{sequenceId:sequence.id,stepId:step.id,adapter:'animejs-waapi'});
       }
-      return;
+      return false;
     }
     try{
       adapter.waapi.animate(targets,ocBuildAnimeMotionParams(step,targets.length));
@@ -173,9 +184,10 @@ function ocPlayMotionSequence(sequence){
         var el=targets[t];
         ocMarkMotionFailed(el,'adapter-error',{sequenceId:sequence.id,stepId:step.id,adapter:'animejs-waapi',error:String(err&&err.message?err.message:err)});
       }
-      return;
+      return false;
     }
   }
+  return maxMs;
 }
 function ocBindViewportMotionSequence(sequence){
   var anchor=ocResolveMotionTriggerElement(sequence.trigger);
@@ -262,7 +274,7 @@ function hydrateDesignerMotion(scope){
   var byId={};
   for(var i=0;i<sequences.length;i++)byId[sequences[i].id]=sequences[i];
   var view=document.defaultView||(typeof window!=='undefined'?window:null);
-  if(view)view.__opencanvasPlayMotionSequence=function(id){if(byId[id]){ocPlayMotionSequence(byId[id]);return true;}return false;};
+  if(view)view.__opencanvasPlayMotionSequence=function(id){if(byId[id])return ocPlayMotionSequence(byId[id]);return false;};
   for(var s=0;s<sequences.length;s++){
     var seq=sequences[s];
     if(seq.trigger&&seq.trigger.type==='load')ocPlayMotionSequence(seq);

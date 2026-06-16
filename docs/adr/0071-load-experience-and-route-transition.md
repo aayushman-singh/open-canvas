@@ -122,17 +122,19 @@ Route Transition.
   visitor Runtime Hydrator consumes the saved `loadExperience`, runs bounded
   readiness gates, plays configured Motion Sequences, and emits explicit ready
   or failure events.
-- **Route Transition is schema-validated and rendered into the designer
-  interaction payload, but the same-site navigation runtime is not shipped in
-  this branch.** Do not present Route Transition as a usable template feature
-  until the fetch, parse, public-root swap, hydrate, history, scroll, focus, and
-  restore-on-failure lifecycle has focused smoke coverage.
+- **Route Transition runtime shipped in the designer-interactions branch.** The
+  visitor Runtime Hydrator intercepts eligible same-site link clicks, fetches
+  the next document, parses the public root, plays outgoing and incoming Motion
+  Sequences, swaps and hydrates the new root, updates title/history/scroll/focus,
+  emits ready or failure events, and restores the previous DOM when hydration or
+  dependent post-swap work fails.
 
 ## Follow-ups
 
-- Define the Load Experience schema and supported readiness gates.
-- Define the Route Transition schema and supported transition modes.
-- Add a Swup adapter behind the Runtime Hydrator.
+- Add authoring UI for Load Experience and Route Transition.
+- Evaluate a Swup adapter behind the Runtime Hydrator if native lifecycle code
+  starts duplicating cache/preload/history concerns.
 - Decide which View Transition API modes are allowed once browser support and
   validation rules are explicit.
-- Replace the live-update `innerHTML` one-shot with a hydrate-after-swap path.
+- Replace the live-update `innerHTML` restore path with node-preserving
+  `replaceChildren` semantics like Route Transition uses.

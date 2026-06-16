@@ -56,6 +56,11 @@ function assert(condition: boolean, message: string): asserts condition {
 interface StubEvent {
   type: string;
   key?: string;
+  button?: number;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
   detail?: unknown;
   defaultPrevented: boolean;
   preventDefault(): void;
@@ -104,10 +109,29 @@ class StubElement {
   removeAttribute(name: string): void {
     this.attributes.delete(name);
   }
+
+  get childNodes(): StubElement[] {
+    return this.children;
+  }
+
+  private assignOwnerDocument(doc: StubDocument | null): void {
+    this.ownerDocument = doc;
+    for (const child of this.children) child.assignOwnerDocument(doc);
+  }
+
   appendChild(child: StubElement): void {
     child.parent = this;
-    child.ownerDocument = this.ownerDocument;
+    child.assignOwnerDocument(this.ownerDocument);
     this.children.push(child);
+  }
+
+  replaceChildren(...children: StubElement[]): void {
+    for (const child of this.children) {
+      child.parent = null;
+      child.assignOwnerDocument(null);
+    }
+    this.children = [];
+    for (const child of children) this.appendChild(child);
   }
 
   addEventListener(type: string, listener: Listener): void {
@@ -117,6 +141,15 @@ class StubElement {
       this.listeners.set(type, list);
     }
     list.push(listener);
+  }
+
+  removeEventListener(type: string, listener: Listener): void {
+    const listeners = this.listeners.get(type);
+    if (!listeners) return;
+    this.listeners.set(
+      type,
+      listeners.filter((fn) => fn !== listener),
+    );
   }
 
   dispatchEvent(event: StubEvent): void {
@@ -132,6 +165,7 @@ class StubElement {
       }
       node = node.parent;
     }
+    if (this.ownerDocument) this.ownerDocument.dispatchBubbledEvent(event);
   }
 
   animate(keyframes: unknown, options: unknown): { finished: Promise<void>; cancel(): void } {
@@ -201,6 +235,7 @@ class StubDocument {
   readyState: 'loading' | 'interactive' | 'complete' = 'complete';
   root: StubElement = new StubElement('html');
   body: StubElement = new StubElement('body');
+  title = '';
   defaultView: Record<string, unknown> = {
     CustomEvent: class StubCustomEvent implements StubEvent {
       defaultPrevented = false;
@@ -242,6 +277,16 @@ class StubDocument {
     }
     listeners.push(listener);
   }
+
+  removeEventListener(type: string, listener: Listener): void {
+    const listeners = this.listeners.get(type);
+    if (!listeners) return;
+    this.listeners.set(
+      type,
+      listeners.filter((fn) => fn !== listener),
+    );
+  }
+
   querySelectorAll(selector: string): StubElement[] {
     return this.root.querySelectorAll(selector);
   }
@@ -255,6 +300,10 @@ class StubDocument {
   }
   dispatchEvent(event: StubEvent): void {
     event.target = null;
+    this.dispatchBubbledEvent(event);
+  }
+
+  dispatchBubbledEvent(event: StubEvent): void {
     const listeners = this.listeners.get(event.type);
     if (!listeners) return;
     for (const listener of listeners) listener(event);
@@ -329,7 +378,17 @@ function parseHtml(html: string): StubElement {
   return root;
 }
 
-function makeEvent(type: string, init: { key?: string } = {}): StubEvent {
+function makeEvent(
+  type: string,
+  init: {
+    key?: string;
+    button?: number;
+    metaKey?: boolean;
+    ctrlKey?: boolean;
+    shiftKey?: boolean;
+    altKey?: boolean;
+  } = {},
+): StubEvent {
   const event: StubEvent = {
     type,
     defaultPrevented: false,
@@ -340,6 +399,11 @@ function makeEvent(type: string, init: { key?: string } = {}): StubEvent {
     currentTarget: null,
   };
   if (init.key !== undefined) event.key = init.key;
+  if (init.button !== undefined) event.button = init.button;
+  if (init.metaKey !== undefined) event.metaKey = init.metaKey;
+  if (init.ctrlKey !== undefined) event.ctrlKey = init.ctrlKey;
+  if (init.shiftKey !== undefined) event.shiftKey = init.shiftKey;
+  if (init.altKey !== undefined) event.altKey = init.altKey;
   return event;
 }
 
@@ -1847,6 +1911,306 @@ assert(loadIntroTarget.animations.length > 0, 'load experience should play intro
 assert(loadExitTarget.animations.length > 0, 'load experience should play exit sequence');
 assert(loadReadyEvents === 1, 'load experience should emit one ready event');
 assert(loadReadyDetail?.id === 'site-load', 'load experience ready event should include id');
+
+// ---------------------------------------------------------------------------
+// (9) Route Transition hydration: same-site navigation swaps, hydrates, and
+//     restores the current page when a dependent phase fails.
+// ---------------------------------------------------------------------------
+
+const routeTransitionSnapshot = {
+  version: 1,
+  publishedAt: '2026-06-16T00:00:00.000Z',
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'page-current',
+      slug: 'current',
+      title: 'Current',
+      width: 1200,
+      sections: [
+        {
+          id: 'section-current',
+          recipeId: 'custom',
+          name: 'Current section',
+          height: 360,
+          elements: [
+            {
+              id: 'route-current-title',
+              type: 'text',
+              box: { x: 80, y: 64, w: 520, h: 72, z: 1 },
+              content: [{ text: 'Current route' }],
+              role: 'heading',
+              fontSize: 40,
+              fontWeight: 700,
+              align: 'left',
+            },
+            {
+              id: 'route-link',
+              type: 'action',
+              box: { x: 80, y: 164, w: 180, h: 48, z: 2 },
+              label: [{ text: 'Next route' }],
+              href: { type: 'page', pageId: 'page-next' },
+              variant: 'solid',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'page-next',
+      slug: 'next',
+      title: 'Next',
+      width: 1200,
+      sections: [
+        {
+          id: 'section-next',
+          recipeId: 'custom',
+          name: 'Next section',
+          height: 360,
+          elements: [
+            {
+              id: 'route-next-title',
+              type: 'text',
+              box: { x: 80, y: 64, w: 520, h: 72, z: 1 },
+              content: [{ text: 'Next route' }],
+              role: 'heading',
+              fontSize: 40,
+              fontWeight: 700,
+              align: 'left',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  motionSequences: [
+    {
+      id: 'route-out',
+      trigger: { type: 'route-navigation', fromPageId: 'page-current', toPageId: 'page-next' },
+      steps: [
+        {
+          id: 'route-out-step',
+          target: { type: 'element', elementId: 'route-current-title' },
+          properties: { opacity: [1, 0] },
+          durationMs: 0,
+          easing: 'out-cubic',
+        },
+      ],
+    },
+    {
+      id: 'route-in',
+      trigger: { type: 'route-navigation', fromPageId: 'page-current', toPageId: 'page-next' },
+      steps: [
+        {
+          id: 'route-in-step',
+          target: { type: 'element', elementId: 'route-next-title' },
+          properties: { opacity: [0, 1], y: [16, 0] },
+          durationMs: 0,
+          easing: 'out-cubic',
+        },
+      ],
+    },
+  ],
+  routeTransition: {
+    id: 'route-swap',
+    trigger: { type: 'same-site-navigation' },
+    outgoingSequenceId: 'route-out',
+    incomingSequenceId: 'route-in',
+    swapAt: 'after-outgoing',
+    scrollRestoration: 'top',
+    focusTarget: { type: 'element', elementId: 'route-next-title' },
+    hydrate: true,
+    failureEvent: 'opencanvas:route-transition-failed',
+  },
+} as unknown as PublishedSnapshot;
+
+const routeCurrentPage = routeTransitionSnapshot.pages[0]!;
+const routeNextPage = routeTransitionSnapshot.pages[1]!;
+const routeCurrentHtml = injectInteractiveRuntime(
+  renderCanvasSnapshot(routeTransitionSnapshot, '/assets', 'route-site', {
+    renderPages: [routeCurrentPage],
+    turnstileSiteKey: 'turnstile-test-key',
+  }),
+  routeTransitionSnapshot,
+);
+const routeNextHtml = injectInteractiveRuntime(
+  renderCanvasSnapshot(routeTransitionSnapshot, '/assets', 'route-site', {
+    renderPages: [routeNextPage],
+    turnstileSiteKey: 'turnstile-test-key',
+  }),
+  routeTransitionSnapshot,
+);
+const routeNextDocumentHtml = `<html><head><title>Next Route</title></head><body><div data-opencanvas-public-root>${routeNextHtml}</div></body></html>`;
+
+function installRouteDocumentServices(
+  doc: StubDocument,
+  options: {
+    nextHtml: string;
+    hydrateThrows?: boolean;
+  },
+): { fetchUrls: string[]; pushedUrls: string[]; scrollCalls: Array<[number, number]> } {
+  const fetchUrls: string[] = [];
+  const pushedUrls: string[] = [];
+  const scrollCalls: Array<[number, number]> = [];
+  const location = {
+    href: 'https://route.example/current',
+    origin: 'https://route.example',
+    protocol: 'https:',
+    host: 'route.example',
+    pathname: '/current',
+    search: '',
+    hash: '',
+  };
+  const assignLocation = (href: string): void => {
+    const url = new URL(href, location.href);
+    location.href = url.href;
+    location.origin = url.origin;
+    location.protocol = url.protocol;
+    location.host = url.host;
+    location.pathname = url.pathname;
+    location.search = url.search;
+    location.hash = url.hash;
+  };
+  doc.defaultView.location = location;
+  doc.defaultView.history = {
+    pushState(_state: unknown, _title: string, href: string) {
+      pushedUrls.push(href);
+      assignLocation(href);
+    },
+  };
+  doc.defaultView.scrollTo = (x: number, y: number) => {
+    scrollCalls.push([x, y]);
+  };
+  doc.defaultView.fetch = (href: string) => {
+    fetchUrls.push(href);
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve(options.nextHtml),
+    });
+  };
+  doc.defaultView.DOMParser = class StubDOMParser {
+    parseFromString(html: string): {
+      title: string;
+      querySelector(selector: string): StubElement | null;
+    } {
+      const parsed = parseHtml(html);
+      const titleMatch = /<title>([^<]*)<\/title>/i.exec(html);
+      return {
+        title: titleMatch?.[1] ?? '',
+        querySelector(selector: string) {
+          return parsed.querySelector(selector);
+        },
+      };
+    }
+  };
+  if (options.hydrateThrows === true) {
+    doc.defaultView.__opencanvasHydrate = () => {
+      throw new Error('route hydrate failed');
+    };
+  }
+  return { fetchUrls, pushedUrls, scrollCalls };
+}
+
+const routeDoc = new StubDocument();
+routeDoc.title = 'Current Route';
+const routeParsed = parseHtml(
+  `<div data-opencanvas-public-root>${routeCurrentHtml}</div>`,
+);
+for (const child of routeParsed.children) routeDoc.root.appendChild(child);
+const routeServices = installRouteDocumentServices(routeDoc, { nextHtml: routeNextDocumentHtml });
+const routePublicRoot = routeDoc.querySelector('[data-opencanvas-public-root]') as StubElement;
+const routeLink = routeDoc.querySelector('[href="/next"]') as StubElement;
+const routeCurrentTitle = routeDoc.querySelector(
+  '[data-opencanvas-element="route-current-title"]',
+) as StubElement;
+let routeReadyEvents = 0;
+let routeReadyDetail: { id?: string; url?: string } | undefined;
+routeDoc.addEventListener('opencanvas:route-transition-ready', (event) => {
+  routeReadyEvents++;
+  routeReadyDetail = event.detail as typeof routeReadyDetail;
+});
+assert(routePublicRoot !== null, 'route public root must exist');
+assert(routeLink !== null, 'route same-site link must exist');
+assert(routeCurrentTitle !== null, 'route current motion target must exist');
+runRuntimeAgainstDocument(routeDoc);
+const routeClick = makeEvent('click', { button: 0 });
+routeLink.dispatchEvent(routeClick);
+await flushMicrotasks(10);
+const routeNextTitle = routeDoc.querySelector(
+  '[data-opencanvas-element="route-next-title"]',
+) as StubElement;
+assert(routeClick.defaultPrevented, 'route transition should intercept same-site link click');
+assert(routeServices.fetchUrls[0] === 'https://route.example/next', 'route transition should fetch the same-site target document');
+assert(routeCurrentTitle.animations.length > 0, 'route transition should play outgoing sequence');
+assert(routeNextTitle !== null, 'route transition should swap in the next public root HTML');
+assert(routeNextTitle.animations.length > 0, 'route transition should play incoming sequence after hydrate');
+assert(routeNextTitle.focused, 'route transition should focus the configured element target');
+assert(routeDoc.title === 'Next Route', 'route transition should update document title from fetched HTML');
+assert(
+  routeServices.pushedUrls[0] === 'https://route.example/next',
+  'route transition should push history after successful hydrate',
+);
+assert(
+  routeServices.scrollCalls.length === 1 &&
+    routeServices.scrollCalls[0]?.[0] === 0 &&
+    routeServices.scrollCalls[0]?.[1] === 0,
+  'route transition should scroll to top after successful hydrate',
+);
+assert(routeReadyEvents === 1, 'route transition should emit one ready event');
+assert(routeReadyDetail?.id === 'route-swap', 'route ready event should include transition id');
+assert(
+  routeReadyDetail?.url === 'https://route.example/next',
+  'route ready event should include resolved target URL',
+);
+
+const routeHydrateFailureDoc = new StubDocument();
+routeHydrateFailureDoc.title = 'Current Route';
+const routeHydrateFailureParsed = parseHtml(
+  `<div data-opencanvas-public-root>${routeCurrentHtml}</div>`,
+);
+for (const child of routeHydrateFailureParsed.children)
+  routeHydrateFailureDoc.root.appendChild(child);
+const routeHydrateFailureServices = installRouteDocumentServices(routeHydrateFailureDoc, {
+  nextHtml: routeNextDocumentHtml,
+  hydrateThrows: true,
+});
+const routeHydrateFailureLink = routeHydrateFailureDoc.querySelector('[href="/next"]') as StubElement;
+let routeFailureEvents = 0;
+let routeFailureDetail: { id?: string; phase?: string; url?: string; error?: string } | undefined;
+routeHydrateFailureDoc.addEventListener('opencanvas:route-transition-failure', (event) => {
+  routeFailureEvents++;
+  routeFailureDetail = event.detail as typeof routeFailureDetail;
+});
+runRuntimeAgainstDocument(routeHydrateFailureDoc);
+routeHydrateFailureDoc.defaultView.__opencanvasHydrate = () => {
+  throw new Error('route hydrate failed');
+};
+const routeHydrateFailureClick = makeEvent('click', { button: 0 });
+routeHydrateFailureLink.dispatchEvent(routeHydrateFailureClick);
+await flushMicrotasks(10);
+assert(
+  routeHydrateFailureClick.defaultPrevented,
+  'route transition should intercept same-site link before hydrate failure',
+);
+assert(
+  routeHydrateFailureDoc.querySelector('[data-opencanvas-element="route-current-title"]') !== null,
+  'route hydrate failure should restore the current page DOM',
+);
+assert(
+  routeHydrateFailureDoc.querySelector('[data-opencanvas-element="route-next-title"]') === null,
+  'route hydrate failure must not leave swapped next-page DOM active',
+);
+assert(
+  routeHydrateFailureServices.pushedUrls.length === 0,
+  'route hydrate failure must not push history',
+);
+assert(routeFailureEvents === 1, 'route hydrate failure should emit one failure event');
+assert(routeFailureDetail?.phase === 'hydrate', 'route failure detail should name hydrate phase');
+assert(
+  routeFailureDetail?.id === 'route-swap',
+  'route failure detail should include transition id',
+);
 
 // ---------------------------------------------------------------------------
 // All assertions passed.
