@@ -12,6 +12,7 @@ import { SIDEBAR_DISPATCH } from '../canvas/elements/index.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import type { SidebarCommandSpec } from '../canvas/elements/sidebar-spec.js';
 import type { Tab } from '../canvas/elements/tabs.js';
+import type { RichMotionAsset } from '../canvas/rich-motion-assets.js';
 import type { CanvasElement, CanvasPage, CanvasSection, EditableSite } from '../canvas/schema.js';
 import type { FindElementResult } from './editor-context-types.js';
 import type {
@@ -1094,11 +1095,11 @@ export async function applyAssetIdToElementImpl(
   if (typeof refreshFn === 'function') await refreshFn();
 }
 
-function walkMediaElements(state: EditableSite, visit: (element: MediaElement) => void): void {
+function walkCanvasElements(state: EditableSite, visit: (element: CanvasElement) => void): void {
   function walkArray(elements: CanvasElement[]): void {
     for (let i = 0; i < elements.length; i++) {
       const element = elements[i]!;
-      if (element.type === 'media') visit(element);
+      visit(element);
       if (element.type === 'tabs' && Array.isArray((element as { tabs?: unknown }).tabs)) {
         const tabs = (element as { tabs: Array<{ elements?: CanvasElement[] }> }).tabs;
         for (let ti = 0; ti < tabs.length; ti++) {
@@ -1107,12 +1108,18 @@ function walkMediaElements(state: EditableSite, visit: (element: MediaElement) =
         }
       } else if (
         element.type === 'collection' &&
-        Array.isArray((element as { entries?: unknown }).entries)
+        (Array.isArray((element as { entries?: unknown }).entries) ||
+          Array.isArray((element as { customTemplate?: unknown }).customTemplate))
       ) {
-        const entries = (element as { entries: unknown[] }).entries;
-        for (let ei = 0; ei < entries.length; ei++) {
-          const entry = entries[ei];
-          if (Array.isArray(entry)) walkArray(entry as CanvasElement[]);
+        const collection = element as { entries?: unknown[]; customTemplate?: unknown[] };
+        if (Array.isArray(collection.customTemplate)) {
+          walkArray(collection.customTemplate as CanvasElement[]);
+        }
+        if (Array.isArray(collection.entries)) {
+          for (let ei = 0; ei < collection.entries.length; ei++) {
+            const entry = collection.entries[ei];
+            if (Array.isArray(entry)) walkArray(entry as CanvasElement[]);
+          }
         }
       }
     }
@@ -1125,6 +1132,15 @@ function walkMediaElements(state: EditableSite, visit: (element: MediaElement) =
     const page = state.pages[pi]!;
     for (let si = 0; si < page.sections.length; si++) walkArray(page.sections[si]!.elements);
   }
+  for (let oi = 0; oi < (state.overlaySections ?? []).length; oi++) {
+    walkArray(state.overlaySections![oi]!.elements);
+  }
+}
+
+function walkMediaElements(state: EditableSite, visit: (element: MediaElement) => void): void {
+  walkCanvasElements(state, (element) => {
+    if (element.type === 'media') visit(element);
+  });
 }
 
 function clearDeletedAssetFromLocalState(
@@ -1133,6 +1149,32 @@ function clearDeletedAssetFromLocalState(
 ): number {
   if (!ctx.state || !Array.isArray(ctx.state.pages)) return 0;
   let cleared = 0;
+  const removedRichMotionAssetIds = new Set<string>();
+  if (Array.isArray(ctx.state.richMotionAssets)) {
+    const nextRichMotionAssets: RichMotionAsset[] = [];
+    let richMotionChanged = false;
+    for (const asset of ctx.state.richMotionAssets) {
+      if (richMotionAssetUsesDeletedOwnerAsset(asset, assetId)) {
+        removedRichMotionAssetIds.add(asset.id);
+        cleared += 1;
+        richMotionChanged = true;
+        continue;
+      }
+      if (asset.posterAssetId === assetId) {
+        const { posterAssetId: _removed, ...rest } = asset;
+        void _removed;
+        nextRichMotionAssets.push(rest);
+        cleared += 1;
+        richMotionChanged = true;
+        continue;
+      }
+      nextRichMotionAssets.push(asset);
+    }
+    if (richMotionChanged) {
+      if (nextRichMotionAssets.length === 0) delete ctx.state.richMotionAssets;
+      else ctx.state.richMotionAssets = nextRichMotionAssets;
+    }
+  }
   walkMediaElements(ctx.state, (mediaElement) => {
     if (mediaElement.assetId === assetId) {
       mediaElement.assetId = '';
@@ -1144,11 +1186,30 @@ function clearDeletedAssetFromLocalState(
       cleared += 1;
     }
   });
+  if (removedRichMotionAssetIds.size > 0) {
+    walkCanvasElements(ctx.state, (element) => {
+      if (
+        typeof element.richMotionAssetId === 'string' &&
+        removedRichMotionAssetIds.has(element.richMotionAssetId)
+      ) {
+        delete element.richMotionAssetId;
+        cleared += 1;
+      }
+    });
+  }
   if (cleared > 0) {
     ctx.renderAll();
     ctx.scheduleSave();
   }
   return cleared;
+}
+
+function richMotionAssetUsesDeletedOwnerAsset(asset: RichMotionAsset, assetId: string): boolean {
+  if (asset.ownerAssetId === assetId) return true;
+  if (asset.source.kind === 'image-sequence' && asset.source.frameAssetIds.includes(assetId)) {
+    return true;
+  }
+  return asset.source.kind === 'bounded-3d' && asset.source.sceneDescriptorAssetId === assetId;
 }
 
 export async function runDeleteAssetImpl(
