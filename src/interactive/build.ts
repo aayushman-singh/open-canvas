@@ -32,26 +32,32 @@ import { RICH_MOTION_RUNTIME_SRC } from './rich-motion.js';
 import { RUNTIME_ENTRY_SRC } from './runtime.js';
 import { ANIMEJS_WAAPI_RUNTIME_SRC } from './vendor/animejs-waapi.generated.js';
 import { FLOATING_UI_DOM_RUNTIME_SRC } from './vendor/floating-ui-dom.generated.js';
+import { LOTTIE_WEB_LIGHT_RUNTIME_SRC } from './vendor/lottie-web-light.generated.js';
 
 /**
  * The full interactive runtime as an IIFE string. Stable across builds — same
  * input fragments produce byte-identical output, which lets the smoke and any
  * future cache layer hash this once and reuse.
  */
-export const INTERACTIVE_RUNTIME_SRC: string = [
-  '(function(){',
-  ANIMEJS_WAAPI_RUNTIME_SRC,
-  ACCORDION_RUNTIME_SRC,
-  CAROUSEL_RUNTIME_SRC,
-  POINTER_FX_RUNTIME_SRC,
-  POPUP_RUNTIME_SRC,
-  DESIGNER_MOTION_RUNTIME_SRC,
-  FLOATING_UI_DOM_RUNTIME_SRC,
-  OVERLAY_RUNTIME_SRC,
-  RICH_MOTION_RUNTIME_SRC,
-  RUNTIME_ENTRY_SRC,
-  '})();',
-].join('\n');
+export function buildInteractiveRuntimeSource(options: { lottie?: boolean } = {}): string {
+  return [
+    '(function(){',
+    ANIMEJS_WAAPI_RUNTIME_SRC,
+    ACCORDION_RUNTIME_SRC,
+    CAROUSEL_RUNTIME_SRC,
+    POINTER_FX_RUNTIME_SRC,
+    POPUP_RUNTIME_SRC,
+    DESIGNER_MOTION_RUNTIME_SRC,
+    FLOATING_UI_DOM_RUNTIME_SRC,
+    OVERLAY_RUNTIME_SRC,
+    ...(options.lottie === true ? [LOTTIE_WEB_LIGHT_RUNTIME_SRC] : []),
+    RICH_MOTION_RUNTIME_SRC,
+    RUNTIME_ENTRY_SRC,
+    '})();',
+  ].join('\n');
+}
+
+export const INTERACTIVE_RUNTIME_SRC: string = buildInteractiveRuntimeSource();
 
 /** Size of the runtime IIFE in characters (the source-level proxy for byte size). */
 export const INTERACTIVE_RUNTIME_SRC_CHARS: number = INTERACTIVE_RUNTIME_SRC.length;

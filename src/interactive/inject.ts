@@ -25,7 +25,7 @@ import type {
   PublishedSnapshot,
 } from '../canvas/schema.js';
 import { formPointerFx } from '../canvas/elements/form.js';
-import { INTERACTIVE_RUNTIME_SRC } from './build.js';
+import { INTERACTIVE_RUNTIME_SRC, buildInteractiveRuntimeSource } from './build.js';
 
 /**
  * Element types that require the interactive runtime. Listed inline (rather
@@ -99,6 +99,51 @@ export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): bo
   return false;
 }
 
+export function snapshotNeedsLottieRuntime(snapshot: PublishedSnapshot): boolean {
+  const lottieAssetIds = new Set(
+    (snapshot.richMotionAssets ?? [])
+      .filter((asset) => asset.family === 'vector-animation' && asset.source.kind === 'lottie-json')
+      .map((asset) => asset.id),
+  );
+  if (lottieAssetIds.size === 0) return false;
+
+  const elementNeedsLottie = (element: CanvasElement): boolean => {
+    if (
+      typeof element.richMotionAssetId === 'string' &&
+      lottieAssetIds.has(element.richMotionAssetId)
+    ) {
+      return true;
+    }
+    if (element.type === 'tabs') {
+      return element.tabs.some((tab) => tab.elements.some(elementNeedsLottie));
+    }
+    if (element.type === 'collection') {
+      return (element.entries ?? []).some((entry) => entry.some(elementNeedsLottie));
+    }
+    return false;
+  };
+  const sectionNeedsLottie = (section: CanvasSection): boolean =>
+    section.elements.some(elementNeedsLottie);
+
+  if (snapshot.header && sectionNeedsLottie(snapshot.header)) return true;
+  if (snapshot.footer && sectionNeedsLottie(snapshot.footer)) return true;
+  for (const section of snapshot.overlaySections ?? []) {
+    if (sectionNeedsLottie(section)) return true;
+  }
+  for (const page of snapshot.pages) {
+    for (const section of page.sections) {
+      if (sectionNeedsLottie(section)) return true;
+    }
+  }
+  return false;
+}
+
+export function interactiveRuntimeSourceForSnapshot(snapshot: PublishedSnapshot): string {
+  return snapshotNeedsLottieRuntime(snapshot)
+    ? buildInteractiveRuntimeSource({ lottie: true })
+    : INTERACTIVE_RUNTIME_SRC;
+}
+
 /**
  * If the snapshot contains any interactive element, append an inline
  * `<script>` tag carrying the runtime IIFE to the rendered HTML. Otherwise
@@ -115,5 +160,5 @@ export function injectInteractiveRuntime(
   snapshot: PublishedSnapshot,
 ): string {
   if (!snapshotNeedsInteractiveRuntime(snapshot)) return snapshotHtml;
-  return `${snapshotHtml}<script data-opencanvas-interactive-runtime>${INTERACTIVE_RUNTIME_SRC}</script>`;
+  return `${snapshotHtml}<script data-opencanvas-interactive-runtime>${interactiveRuntimeSourceForSnapshot(snapshot)}</script>`;
 }

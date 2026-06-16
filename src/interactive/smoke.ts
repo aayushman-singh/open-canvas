@@ -27,9 +27,15 @@ import { renderCarousel } from '../canvas/elements/carousel.js';
 import { renderCanvasSnapshot } from '../canvas/render.js';
 import type { PublishedSnapshot } from '../canvas/schema.js';
 import { INTERACTIVE_RUNTIME_SRC, INTERACTIVE_RUNTIME_SRC_CHARS } from './build.js';
-import { injectInteractiveRuntime, snapshotNeedsInteractiveRuntime } from './inject.js';
+import {
+  injectInteractiveRuntime,
+  interactiveRuntimeSourceForSnapshot,
+  snapshotNeedsInteractiveRuntime,
+  snapshotNeedsLottieRuntime,
+} from './inject.js';
 import { ANIMEJS_WAAPI_RUNTIME_SRC } from './vendor/animejs-waapi.generated.js';
 import { FLOATING_UI_DOM_RUNTIME_SRC } from './vendor/floating-ui-dom.generated.js';
+import { LOTTIE_WEB_LIGHT_RUNTIME_SRC } from './vendor/lottie-web-light.generated.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[interactive:smoke] ${message}`);
@@ -236,6 +242,11 @@ class StubDocument {
   }
   querySelector(selector: string): StubElement | null {
     return this.root.querySelector(selector);
+  }
+  createElement(tagName: string): StubElement {
+    const element = new StubElement(tagName);
+    element.ownerDocument = this;
+    return element;
   }
   dispatchEvent(event: StubEvent): void {
     event.target = null;
@@ -1053,6 +1064,40 @@ assert(
   snapshotNeedsInteractiveRuntime(designerSnapshot) === true,
   'designer interaction fields should require interactive runtime injection',
 );
+assert(
+  snapshotNeedsLottieRuntime(designerSnapshot) === true,
+  'lottie-json rich-motion assets should require the conditional Lottie runtime',
+);
+assert(
+  INTERACTIVE_RUNTIME_SRC.includes(LOTTIE_WEB_LIGHT_RUNTIME_SRC) === false,
+  'base interactive runtime should not include the Lottie payload',
+);
+assert(
+  interactiveRuntimeSourceForSnapshot(designerSnapshot).includes(LOTTIE_WEB_LIGHT_RUNTIME_SRC),
+  'designer snapshot runtime should include the conditional Lottie payload',
+);
+const unusedLottieSnapshot = {
+  ...designerSnapshot,
+  pages: designerSnapshot.pages.map((page) => ({
+    ...page,
+    sections: page.sections.map((section) => ({
+      ...section,
+      elements: section.elements.map((element) =>
+        element.id === 'hero-lottie-owner' ? { ...element, richMotionAssetId: undefined } : element,
+      ),
+    })),
+  })),
+} as unknown as PublishedSnapshot;
+assert(
+  snapshotNeedsLottieRuntime(unusedLottieSnapshot) === false,
+  'unreferenced Lottie rich-motion assets should not require the Lottie payload',
+);
+assert(
+  interactiveRuntimeSourceForSnapshot(unusedLottieSnapshot).includes(
+    LOTTIE_WEB_LIGHT_RUNTIME_SRC,
+  ) === false,
+  'unreferenced Lottie rich-motion assets should not inject the Lottie payload',
+);
 
 const designerHtml = injectInteractiveRuntime(
   renderCanvasSnapshot(designerSnapshot, '/assets', 'smoke-site', {
@@ -1101,8 +1146,14 @@ assert(designerPopoverPanel !== null, 'designer popover panel must exist');
 assert(designerRich !== null, 'designer rich-motion owner must exist');
 
 let richMotionFailures = 0;
+let richMotionFailureDetail:
+  | { assetId?: string; elementId?: string; family?: string; source?: string; phase?: string }
+  | undefined;
 designerRich.addEventListener('opencanvas:rich-motion-failure', () => {
   richMotionFailures++;
+});
+designerRich.addEventListener('opencanvas:rich-motion-failure', (event) => {
+  richMotionFailureDetail = event.detail as typeof richMotionFailureDetail;
 });
 let floatingAutoUpdateCalls = 0;
 let floatingCleanupCalls = 0;
@@ -1150,8 +1201,176 @@ assert(
 );
 assert(richMotionFailures === 1, 'rich motion unsupported runtime should emit one failure event');
 assert(
-  designerRich.getAttribute('data-opencanvas-rich-motion-failed') === 'unsupported-runtime',
-  'rich motion unsupported runtime should mark the element as failed',
+  designerRich.getAttribute('data-opencanvas-rich-motion-failed') === 'adapter-unavailable',
+  'missing Lottie runtime should mark the element as adapter-unavailable',
+);
+assert(
+  richMotionFailureDetail?.assetId === 'hero-lottie' &&
+    richMotionFailureDetail.elementId === 'hero-lottie-owner' &&
+    richMotionFailureDetail.family === 'vector-animation' &&
+    richMotionFailureDetail.source === 'lottie-json' &&
+    richMotionFailureDetail.phase === 'adapter-unavailable',
+  'Lottie failure detail should include asset, element, family, source, and phase',
+);
+
+const lottieDoc = new StubDocument();
+const lottieParsed = parseHtml(designerHtml);
+for (const child of lottieParsed.children) lottieDoc.root.appendChild(child);
+const lottieRich = lottieDoc.querySelector(
+  '[data-opencanvas-rich-motion="hero-lottie"]',
+) as StubElement;
+assert(lottieRich !== null, 'lottie rich-motion owner must exist');
+let lottieReadyEvents = 0;
+let lottieFailureEvents = 0;
+const lottiePlayCalls = { value: 0 };
+const lottiePauseCalls = { value: 0 };
+let lottieSpeed: number | null = null;
+let lottieLoadOptions:
+  | {
+      path?: string;
+      loop?: boolean;
+      autoplay?: boolean;
+      renderer?: string;
+      container?: StubElement;
+    }
+  | undefined;
+let lottieObserverCallback: ((entries: Array<{ isIntersecting: boolean }>) => void) | undefined;
+lottieRich.addEventListener('opencanvas:rich-motion-ready', () => {
+  lottieReadyEvents++;
+});
+lottieRich.addEventListener('opencanvas:rich-motion-failure', () => {
+  lottieFailureEvents++;
+});
+lottieDoc.defaultView.__opencanvasLottie = {
+  loadAnimation(options: typeof lottieLoadOptions) {
+    lottieLoadOptions = options;
+    return {
+      setSpeed(speed: number) {
+        lottieSpeed = speed;
+      },
+      addEventListener(name: string, listener: () => void) {
+        if (name === 'DOMLoaded') listener();
+      },
+      play() {
+        lottiePlayCalls.value++;
+      },
+      pause() {
+        lottiePauseCalls.value++;
+      },
+      destroy() {
+        return undefined;
+      },
+    };
+  },
+};
+lottieDoc.defaultView.IntersectionObserver = class StubIntersectionObserver {
+  constructor(callback: (entries: Array<{ isIntersecting: boolean }>) => void) {
+    lottieObserverCallback = callback;
+  }
+
+  observe(): void {
+    return undefined;
+  }
+
+  disconnect(): void {
+    return undefined;
+  }
+};
+runRuntimeAgainstDocument(lottieDoc);
+assert(lottieFailureEvents === 0, 'available Lottie adapter should not emit a failure');
+assert(lottieReadyEvents === 1, 'available Lottie adapter should emit one ready event');
+assert(
+  lottieLoadOptions?.path === '/assets/asset-lottie',
+  'Lottie adapter should receive asset URL',
+);
+assert(lottieLoadOptions?.renderer === 'svg', 'Lottie adapter should use the SVG renderer');
+assert(lottieLoadOptions?.loop === false, 'Lottie adapter should receive playback loop setting');
+assert(
+  lottieLoadOptions?.autoplay === false,
+  'viewport-enter Lottie playback should not autoplay before intersection',
+);
+assert(lottieSpeed === 1, 'Lottie adapter should receive playback speed');
+assert(
+  lottieRich.getAttribute('data-opencanvas-rich-motion-ready') === 'lottie-web',
+  'Lottie success should mark the rich-motion node as ready',
+);
+assert(
+  lottieRich.querySelector('[data-opencanvas-lottie-container]') !== null,
+  'Lottie success should create a playback container',
+);
+assert(lottieObserverCallback !== undefined, 'viewport-enter Lottie should install observer');
+const lottiePlayCallsBeforeIntersection: number = lottiePlayCalls.value;
+assert(
+  lottiePlayCallsBeforeIntersection === 0,
+  'viewport-enter Lottie should wait for intersection before play',
+);
+lottieObserverCallback([{ isIntersecting: true }]);
+const lottiePlayCallsAfterIntersection: number = lottiePlayCalls.value;
+assert(
+  lottiePlayCallsAfterIntersection === 1,
+  'viewport-enter Lottie should play on first intersection',
+);
+assert(lottiePauseCalls.value === 0, 'non-reduced-motion Lottie should not pause playback');
+
+const reducedMotionDoc = new StubDocument();
+const reducedMotionParsed = parseHtml(designerHtml);
+for (const child of reducedMotionParsed.children) reducedMotionDoc.root.appendChild(child);
+const reducedMotionRich = reducedMotionDoc.querySelector(
+  '[data-opencanvas-rich-motion="hero-lottie"]',
+) as StubElement;
+reducedMotionRich.setAttribute('data-opencanvas-rich-motion-poster-url', '/assets/poster-lottie');
+let reducedLottieLoadCalls = 0;
+reducedMotionDoc.defaultView.matchMedia = () => ({ matches: true });
+reducedMotionDoc.defaultView.__opencanvasLottie = {
+  loadAnimation() {
+    reducedLottieLoadCalls++;
+    return {};
+  },
+};
+runRuntimeAgainstDocument(reducedMotionDoc);
+assert(reducedLottieLoadCalls === 0, 'reduced-motion poster mode should not load Lottie');
+assert(
+  reducedMotionRich.querySelector('[data-opencanvas-rich-motion-poster]') !== null,
+  'reduced-motion poster mode should render the poster asset',
+);
+assert(
+  reducedMotionRich.getAttribute('data-opencanvas-rich-motion-ready') === 'lottie-web',
+  'reduced-motion poster mode should mark the node ready',
+);
+
+const unsupportedTriggerDoc = new StubDocument();
+const unsupportedTriggerParsed = parseHtml(designerHtml);
+for (const child of unsupportedTriggerParsed.children)
+  unsupportedTriggerDoc.root.appendChild(child);
+const unsupportedTriggerRich = unsupportedTriggerDoc.querySelector(
+  '[data-opencanvas-rich-motion="hero-lottie"]',
+) as StubElement;
+unsupportedTriggerRich.setAttribute('data-opencanvas-rich-motion-trigger', 'click');
+let unsupportedTriggerFailures = 0;
+unsupportedTriggerRich.addEventListener('opencanvas:rich-motion-failure', (event) => {
+  unsupportedTriggerFailures++;
+  const detail = event.detail as { phase?: string; elementId?: string; trigger?: string };
+  assert(detail.phase === 'unsupported-trigger', 'click Lottie trigger should fail explicitly');
+  assert(
+    detail.elementId === 'hero-lottie-owner',
+    'unsupported trigger failure should include element id',
+  );
+  assert(detail.trigger === 'click', 'unsupported trigger failure should include trigger type');
+});
+unsupportedTriggerDoc.defaultView.__opencanvasLottie = {
+  loadAnimation() {
+    throw new Error('should not load unsupported trigger');
+  },
+};
+runRuntimeAgainstDocument(unsupportedTriggerDoc);
+assert(
+  unsupportedTriggerFailures === 1,
+  'unsupported Lottie trigger should emit one failure event',
+);
+assert(
+  unsupportedTriggerRich.getAttribute('data-opencanvas-rich-motion-failed') ===
+    'unsupported-trigger',
+  'unsupported Lottie trigger should mark the rich-motion node as failed',
 );
 
 designerTrigger.dispatchEvent(makeEvent('click'));

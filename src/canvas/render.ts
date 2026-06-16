@@ -272,9 +272,19 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
     typeof element.richMotionAssetId === 'string' && element.richMotionAssetId.length > 0
       ? ctx.richMotionAssets?.get(element.richMotionAssetId)
       : undefined;
+  const richMotionTriggerAttrs =
+    richMotion?.playback.trigger.type === 'viewport-enter' ||
+    richMotion?.playback.trigger.type === 'scroll-progress'
+      ? `${richMotion.playback.trigger.sectionId !== undefined ? ` data-opencanvas-rich-motion-trigger-section="${escapeAttr(richMotion.playback.trigger.sectionId)}"` : ''}${richMotion.playback.trigger.elementId !== undefined ? ` data-opencanvas-rich-motion-trigger-element="${escapeAttr(richMotion.playback.trigger.elementId)}"` : ''}`
+      : richMotion?.playback.trigger.type === 'click' ||
+          richMotion?.playback.trigger.type === 'hover'
+        ? ` data-opencanvas-rich-motion-trigger-element="${escapeAttr(richMotion.playback.trigger.elementId)}"`
+        : richMotion?.playback.trigger.type === 'media-ready'
+          ? ` data-opencanvas-rich-motion-trigger-asset="${escapeAttr(richMotion.playback.trigger.assetId)}"`
+          : '';
   const richMotionAttrs =
     richMotion !== undefined
-      ? ` data-opencanvas-rich-motion="${escapeAttr(richMotion.id)}" data-opencanvas-rich-motion-family="${escapeAttr(richMotion.family)}" data-opencanvas-rich-motion-source="${escapeAttr(richMotion.source.kind)}"`
+      ? ` data-opencanvas-rich-motion="${escapeAttr(richMotion.id)}" data-opencanvas-rich-motion-family="${escapeAttr(richMotion.family)}" data-opencanvas-rich-motion-source="${escapeAttr(richMotion.source.kind)}" data-opencanvas-rich-motion-asset-url="${escapeAttr(`${ctx.assetBasePath}/${richMotion.ownerAssetId}`)}" data-opencanvas-rich-motion-trigger="${escapeAttr(richMotion.playback.trigger.type)}"${richMotionTriggerAttrs} data-opencanvas-rich-motion-loop="${escapeAttr(String(richMotion.playback.loop))}" data-opencanvas-rich-motion-speed="${escapeAttr(String(richMotion.playback.speed))}" data-opencanvas-rich-motion-reduced="${escapeAttr(richMotion.playback.reducedMotion)}"${richMotion.posterAssetId !== undefined ? ` data-opencanvas-rich-motion-poster-url="${escapeAttr(`${ctx.assetBasePath}/${richMotion.posterAssetId}`)}"` : ''}`
       : element.richMotionAssetId !== undefined
         ? ` data-opencanvas-rich-motion="${escapeAttr(element.richMotionAssetId)}"`
         : '';

@@ -149,6 +149,12 @@ const floatingUtilsPackage = await readMitPackage({
   expectedVersion: '0.2.11',
   licenseFile: 'LICENSE',
 });
+const lottiePackage = await readMitPackage({
+  packagePath: ['lottie-web'],
+  expectedName: 'lottie-web',
+  expectedVersion: '5.13.0',
+  licenseFile: 'LICENSE.md',
+});
 
 await writeVendorBundle({
   bundleFile: 'animejs-waapi.js',
@@ -170,4 +176,15 @@ await writeVendorBundle({
   globalName: 'OpenCanvasFloating',
   packages: [floatingDomPackage, floatingCorePackage, floatingUtilsPackage],
   tempPrefix: 'opencanvas-floating-ui-',
+});
+
+await writeVendorBundle({
+  bundleFile: 'lottie-web-light.js',
+  entrypoint: join(repoRoot, 'src', 'interactive', 'vendor', 'lottie-web-light-entry.ts'),
+  exposedSymbol: '__opencanvasLottie',
+  exportName: 'LOTTIE_WEB_LIGHT_RUNTIME_SRC',
+  generatedFile: join(repoRoot, 'src', 'interactive', 'vendor', 'lottie-web-light.generated.ts'),
+  globalName: 'OpenCanvasLottie',
+  packages: [lottiePackage],
+  tempPrefix: 'opencanvas-lottie-web-',
 });

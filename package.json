@@ -201,6 +201,7 @@
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.21",
     "katex": "^0.17.0",
+    "lottie-web": "^5.13.0",
     "markdown-it": "^14.2.0",
     "postgres": "^3.4.9",
     "satori": "0.26.0",
