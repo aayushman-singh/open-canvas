@@ -52,12 +52,56 @@ _Avoid_: Custom animation code, interaction script, pointer-reactive effect
 A curated visual behaviour on an element that responds continuously to the visitor's cursor position (e.g. a glow that follows the pointer, a tilt toward it). Distinct from a Motion Preset, which is time- or scroll-triggered and ignores the cursor.
 _Avoid_: Motion preset, animation, hover state, interaction script
 
+**Interaction Trigger**:
+A schema-owned visitor or owner-preview event that starts or updates an authored behaviour, such as load, viewport entry, scroll progress, hover, pointer movement, click, route navigation, or media readiness.
+_Avoid_: Event listener, hook, script callback
+
+**Interaction Target**:
+A named page, section, element, component part, text fragment, or overlay surface that an authored behaviour can affect.
+_Avoid_: CSS selector, DOM node, query target
+
+**Motion Sequence**:
+An ordered animation relation from one Interaction Trigger to one or more Interaction Targets. It carries explicit steps, timings, easing, target parts, and animated properties.
+_Avoid_: Keyframe blob, custom animation code, motion preset
+
+**Scroll Scene**:
+A scroll-position relation that binds progress through a page or section range to a Motion Sequence.
+_Avoid_: Scroll trigger, parallax preset, scroll script
+
+**Runtime Hydrator**:
+The shared behaviour runner that reads schema-owned interactions and attaches the visitor/editor state needed to execute them.
+_Avoid_: Per-component script, custom code, visitor-only runtime
+
+**Overlay**:
+A temporary visitor-facing surface opened above the current page from an explicit Interaction Trigger and closed by an explicit dismissal rule.
+_Avoid_: Popup, modal widget, iframe drill-in
+
+**Load Experience**:
+An authored first-load choreography that can wait on explicit readiness gates before handing control to the page.
+_Avoid_: Spinner, preloader script, loading state
+
+**Route Transition**:
+An authored navigation choreography between two page states that can define outgoing, incoming, and shared-target movement.
+_Avoid_: Router hook, page animation, navigation script
+
+**Layout Transition**:
+An authored state-change relation between two named Interaction Targets whose geometry changes while the visitor should perceive continuity.
+_Avoid_: FLIP script, shared-element hack, layout animation code
+
+**Rich Motion Asset**:
+A non-static media asset whose playback is schema-owned and rendered by a dedicated runtime, such as vector animation, interactive animation, or a 3D scene.
+_Avoid_: Animation blob, embed, custom canvas script
+
 **Variant**:
 A named, designed look for a single element that the owner selects with one choice, applying a complete coherent presentation at once. Sits above the granular per-element style: a Variant sets the base, the owner's explicit style choices override it. Each element kind that offers Variants exposes a fixed, curated set.
 _Avoid_: Theme, skin, preset, template, style kit
 
+**Component Style**:
+A named group of owner-chosen visual values for the meaningful parts of one Content Element.
+_Avoid_: Variant, theme, preset, raw CSS, pinned style
+
 **Pinned Style**:
-An explicit element-level visual choice that is not changed by a theme choice.
+An explicit element-level visual choice for a Positioned Element when no named Component Style owns that choice.
 _Avoid_: Override, custom CSS, inline style
 
 **Presence Indicator**:
@@ -136,6 +180,34 @@ _Avoid_: Full-page canvas, freeform page, absolute page layer
 An editable item inside a section, such as text, media, an action, a shape, or a container.
 _Avoid_: Widget, layer
 
+**Content Collaborator**:
+A person invited by an Owner to propose content changes without controlling layout, style, structure, behaviour, or publish.
+_Avoid_: Editor, teammate, member, viewer
+
+**Design Collaborator**:
+A person invited by an Owner to change content, layout, style, structure, or behaviour on an Editable Site without owning publish or administrative controls.
+_Avoid_: Content Collaborator, viewer, visitor, teammate
+
+**On-page Content Editing**:
+A constrained workflow where a Content Collaborator proposes content changes from the Published Site context.
+_Avoid_: On-site editor, canvas editor, page builder, inline layout editing
+
+**On-page Design Editing**:
+A full editing workflow where an Owner or Design Collaborator changes the Editable Site from the Published Site context.
+_Avoid_: On-page Content Editing, live production editing, DOM patching, visitor edit
+
+**Content Change**:
+A proposed change to words, media choice, media description, link destination, form copy, or collection content that does not change layout, style, structure, or behaviour.
+_Avoid_: Layout edit, style edit, schema change, publish
+
+**Design Change**:
+A change to content, layout, style, structure, or behaviour made by an Owner or Design Collaborator on an Editable Site.
+_Avoid_: Content Change, Review Request, live patch, published edit
+
+**Review Request**:
+A bundle of Content Changes awaiting an Owner decision before it can affect an Editable Site.
+_Avoid_: Draft, branch, pull request, autosave
+
 **Media Element**:
 A content element that displays an image or video asset.
 _Avoid_: Media module, video widget, embed
@@ -162,6 +234,16 @@ _Avoid_: Undo stack, version history, asset trail
 - Every visible **Section** in the POC is a **Canvas Section**
 - A **Section** contains one or more **Content Elements**
 - A **Canvas Section** contains one or more **Positioned Elements**
+- An **Owner** may invite a **Design Collaborator** to an **Editable Site**
+- A **Design Collaborator** uses **On-page Design Editing** to make **Design Changes**
+- **On-page Design Editing** changes the **Editable Site**, not the **Published Site**
+- A **Published Site** reflects **Design Changes** only after the **Owner** publishes
+- An **Owner** may invite a **Content Collaborator** to an **Editable Site**
+- A **Content Collaborator** uses **On-page Content Editing** to create **Review Requests**
+- A **Review Request** contains one or more **Content Changes**
+- A **Content Change** changes content only; it does not change layout, style, structure, or behaviour
+- An accepted **Review Request** changes the **Editable Site**
+- A **Published Site** reflects accepted **Content Changes** only after the **Owner** publishes
 
 ### Section Library
 
@@ -182,7 +264,16 @@ _Avoid_: Undo stack, version history, asset trail
 - A **Published Snapshot** reflects the owner's live editable state at the moment publish is requested
 - A **Theme Choice** applies to the whole **Editable Site** and is included in the **Published Snapshot**
 - A **Style Kit** controls the default look of **Design Primitives**
-- A **Pinned Style** belongs to one **Positioned Element** and survives **Theme Choice** changes
+- A **Variant** gives one **Content Element** a complete base look
+- A **Component Style** belongs to one **Content Element** and overrides that element's **Variant**
+- A **Pinned Style** belongs to one **Positioned Element**, does not duplicate its **Component Style**, and survives **Theme Choice** changes
+- A **Motion Sequence** starts from one **Interaction Trigger** and affects one or more **Interaction Targets**
+- A **Scroll Scene** drives one **Motion Sequence** from scroll progress rather than elapsed time
+- An **Overlay** opens from one **Interaction Trigger** and closes by one explicit dismissal rule
+- A **Load Experience** belongs to an **Editable Site** or **Page** and hands off to the initial page state
+- A **Route Transition** belongs to page navigation and may include one or more **Layout Transitions**
+- A **Runtime Hydrator** runs schema-owned interactions for both the **Editable Site** preview and the **Published Site**
+- A **Rich Motion Asset** belongs to one **Owner** and may be referenced by media elements in any of that owner's editable sites
 - A **Media Element** references an **Owner Asset**
 - An **Owner Asset** belongs to one **Owner** and may be referenced by media elements in any of that owner's editable sites
 - An **Owner Asset** survives deletion of any single editable site that references it
@@ -239,6 +330,47 @@ _Avoid_: Primary color, theme color, dominant color
 - A **Scraper Service** performs the **Import Mapping** for every visible element on the source page
 - A **Site Import** downloads external assets and stores them as **Owner Assets**
 - A **Site Import** replaces source animations with the nearest **Motion Preset**
+
+**Growth Signal**:
+An owner-chosen visitor occurrence that Open Canvas measures on a Published Site, such as a page view, action click, form submission, or site search query.
+_Avoid_: Event, telemetry, tracking event, behavioural stream
+
+**Conversion Goal**:
+An owner-chosen desired visitor outcome on a Published Site, evaluated from one or more Growth Signals.
+_Avoid_: KPI, analytics goal, funnel metric
+
+**Experiment**:
+An owner-run comparison on a Published Site that assigns visitors between Alternatives and evaluates them against one Conversion Goal.
+_Avoid_: A/B test, split test, variant test, personalization
+
+**Alternative**:
+One published page, section, or content state being compared inside an Experiment.
+_Avoid_: Variant, style variant, branch, treatment
+
+**Visitor Segment**:
+An owner-authored rule that matches a Visitor request for a Published Site using explicit request or site context.
+_Avoid_: Audience, cohort, visitor profile, inferred profile
+
+**Personalization Rule**:
+An owner-authored relation from one Visitor Segment to one published page, section, or content state.
+_Avoid_: Experiment, targeting script, recommendation, automation
+
+## Relationships (Growth)
+
+- An **Owner** chooses which **Growth Signals** a **Published Site** measures
+- A **Published Site** records only the **Growth Signals** the **Owner** has chosen
+- A **Growth Signal** is produced by a **Visitor** interacting with a **Published Site**
+- A **Conversion Goal** belongs to one **Editable Site**
+- A **Conversion Goal** is evaluated from the **Growth Signals** recorded for the corresponding **Published Site**
+- An **Experiment** compares two or more **Alternatives**
+- An **Experiment** evaluates exactly one **Conversion Goal**
+- An **Alternative** belongs to exactly one **Experiment**
+- A **Visitor** sees one **Alternative** for a given **Experiment**
+- An **Owner** defines **Visitor Segments** for one **Editable Site**
+- A **Visitor Segment** matches a **Visitor** request to the corresponding **Published Site**
+- A **Personalization Rule** uses one **Visitor Segment**
+- A **Personalization Rule** changes what matching **Visitors** see on the **Published Site**
+- A **Published Site** applies **Personalization Rules** only after publish
 
 **Addon**:
 A purchasable capability that can be enabled per-site after an Owner acquires it. Each addon has its own integration logic that determines how it affects the Published Site.

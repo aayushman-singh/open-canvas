@@ -75,6 +75,17 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0064 | EditorContext decomposes into narrow named-Pick contexts per consumer | Accepted | [`docs/adr/0064-editor-context-decomposition.md`](0064-editor-context-decomposition.md) |
 | 0065 | Custom Collection card template lives on the element, edited in-place via global editor state | Accepted | [`docs/adr/0065-custom-collection-card-template.md`](0065-custom-collection-card-template.md) |
 | 0066 | Interactive components gain the variant-preset layer; pointer-reactive variants run on one fragment in the existing interactive runtime | Proposed | [`docs/adr/0066-interactive-component-variant-layer-and-declarative-motion-runtime.md`](0066-interactive-component-variant-layer-and-declarative-motion-runtime.md) |
+| 0067 | Component Style objects for interactive components and Collections | Proposed | [`docs/adr/0067-component-style-objects-for-interactive-components-and-collections.md`](0067-component-style-objects-for-interactive-components-and-collections.md) |
+| 0068 | License-safe third-party interaction runtimes | Accepted | [`docs/adr/0068-license-safe-third-party-interaction-runtimes.md`](0068-license-safe-third-party-interaction-runtimes.md) |
+| 0069 | Motion Sequence and Scroll Scene | Accepted | [`docs/adr/0069-motion-sequence-and-scroll-scene.md`](0069-motion-sequence-and-scroll-scene.md) |
+| 0070 | Overlay as first-class behaviour | Accepted | [`docs/adr/0070-overlay-as-first-class-behaviour.md`](0070-overlay-as-first-class-behaviour.md) |
+| 0071 | Load Experience and Route Transition | Accepted | [`docs/adr/0071-load-experience-and-route-transition.md`](0071-load-experience-and-route-transition.md) |
+| 0072 | Rich Motion Asset runtimes | Accepted | [`docs/adr/0072-rich-motion-asset-runtimes.md`](0072-rich-motion-asset-runtimes.md) |
+| 0073 | Owner-chosen Growth Signals | Proposed | [`docs/adr/0073-owner-chosen-growth-signals.md`](0073-owner-chosen-growth-signals.md) |
+| 0074 | Experiments use Alternatives | Proposed | [`docs/adr/0074-experiments-use-alternatives.md`](0074-experiments-use-alternatives.md) |
+| 0075 | Personalization uses Visitor Segments | Proposed | [`docs/adr/0075-personalization-uses-visitor-segments.md`](0075-personalization-uses-visitor-segments.md) |
+| 0076 | On-page Content Editing is review-gated | Proposed | [`docs/adr/0076-on-page-content-editing-is-review-gated.md`](0076-on-page-content-editing-is-review-gated.md) |
+| 0077 | On-page Design Editing edits the Editable Site | Proposed | [`docs/adr/0077-on-page-design-editing-edits-the-editable-site.md`](0077-on-page-design-editing-edits-the-editable-site.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 
