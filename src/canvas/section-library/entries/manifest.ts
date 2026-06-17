@@ -88,11 +88,18 @@ import e79 from './studio-template-features.json' with { type: 'json' };
 import e80 from './studio-template-footer.json' with { type: 'json' };
 import e81 from './studio-template-header.json' with { type: 'json' };
 import e82 from './studio-template-hero.json' with { type: 'json' };
-import e83 from './violet-template-cta.json' with { type: 'json' };
-import e84 from './violet-template-features.json' with { type: 'json' };
-import e85 from './violet-template-footer.json' with { type: 'json' };
-import e86 from './violet-template-header.json' with { type: 'json' };
-import e87 from './violet-template-hero.json' with { type: 'json' };
+import e83 from './velocity-template-artifacts.json' with { type: 'json' };
+import e84 from './velocity-template-footer.json' with { type: 'json' };
+import e85 from './velocity-template-header.json' with { type: 'json' };
+import e86 from './velocity-template-hero.json' with { type: 'json' };
+import e87 from './velocity-template-impact.json' with { type: 'json' };
+import e88 from './velocity-template-store.json' with { type: 'json' };
+import e89 from './velocity-template-story.json' with { type: 'json' };
+import e90 from './violet-template-cta.json' with { type: 'json' };
+import e91 from './violet-template-features.json' with { type: 'json' };
+import e92 from './violet-template-footer.json' with { type: 'json' };
+import e93 from './violet-template-header.json' with { type: 'json' };
+import e94 from './violet-template-hero.json' with { type: 'json' };
 
 export const EXTRACTED_ENTRIES: ReadonlyArray<SectionLibraryEntry> = [
   e0 as SectionLibraryEntry,
@@ -183,4 +190,11 @@ export const EXTRACTED_ENTRIES: ReadonlyArray<SectionLibraryEntry> = [
   e85 as SectionLibraryEntry,
   e86 as SectionLibraryEntry,
   e87 as SectionLibraryEntry,
+  e88 as SectionLibraryEntry,
+  e89 as SectionLibraryEntry,
+  e90 as SectionLibraryEntry,
+  e91 as SectionLibraryEntry,
+  e92 as SectionLibraryEntry,
+  e93 as SectionLibraryEntry,
+  e94 as SectionLibraryEntry,
 ];

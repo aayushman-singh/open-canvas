@@ -1,0 +1,244 @@
+{
+  "baseSlug": "velocity-template-hero",
+  "category": "hero",
+  "name": "Hero",
+  "description": "Velocity Athlete hero — fullscreen dark field, contour lines, central rich motion, event card, and display name.",
+  "recipeId": "custom",
+  "headingPreview": "Ari Vale",
+  "sectionData": {
+    "id": "velocity-hero",
+    "recipeId": "custom",
+    "name": "Hero",
+    "height": 920,
+    "backgroundEffect": "grain",
+    "elements": [
+      {
+        "id": "velocity-hero-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 920,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#111112"
+        }
+      },
+      {
+        "id": "velocity-hero-contour-1",
+        "type": "shape",
+        "box": {
+          "x": 0,
+          "y": 140,
+          "w": 1440,
+          "h": 2,
+          "z": 1,
+          "rotation": -4
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(93, 98, 84, 0.45)"
+        }
+      },
+      {
+        "id": "velocity-hero-contour-2",
+        "type": "shape",
+        "box": {
+          "x": 0,
+          "y": 320,
+          "w": 1440,
+          "h": 2,
+          "z": 1,
+          "rotation": 2
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(93, 98, 84, 0.32)"
+        }
+      },
+      {
+        "id": "velocity-hero-contour-3",
+        "type": "shape",
+        "box": {
+          "x": 0,
+          "y": 520,
+          "w": 1440,
+          "h": 2,
+          "z": 1,
+          "rotation": -1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(93, 98, 84, 0.28)"
+        }
+      },
+      {
+        "id": "velocity-hero-contour-arc",
+        "type": "shape",
+        "box": {
+          "x": 920,
+          "y": 80,
+          "w": 480,
+          "h": 480,
+          "z": 1
+        },
+        "variant": "circle",
+        "pinnedStyle": {
+          "background": "transparent",
+          "border": "1px solid rgba(93, 98, 84, 0.22)"
+        }
+      },
+      {
+        "id": "velocity-hero-motion",
+        "type": "rich-motion",
+        "box": {
+          "x": 470,
+          "y": 180,
+          "w": 500,
+          "h": 500,
+          "z": 5
+        },
+        "assetRefId": "velocity-helmet-sequence",
+        "fit": "contain",
+        "label": "Abstract signal helmet rotating through a kinetic frame sequence"
+      },
+      {
+        "id": "velocity-hero-name",
+        "type": "text",
+        "box": {
+          "x": 64,
+          "y": 620,
+          "w": 1312,
+          "h": 200,
+          "z": 4
+        },
+        "content": [
+          {
+            "text": "ARI VALE"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 168,
+        "fontWeight": 700,
+        "align": "center",
+        "letterSpacing": "-0.04em",
+        "pinnedStyle": {
+          "color": "#F4F4ED"
+        }
+      },
+      {
+        "id": "velocity-hero-event-card",
+        "type": "container",
+        "box": {
+          "x": 64,
+          "y": 120,
+          "w": 320,
+          "h": 168,
+          "z": 4
+        },
+        "variant": "outlined",
+        "pinnedStyle": {
+          "background": "rgba(40, 44, 32, 0.72)",
+          "border": "1px solid rgba(200, 255, 26, 0.35)",
+          "borderRadius": "4px"
+        }
+      },
+      {
+        "id": "velocity-hero-event-label",
+        "type": "text",
+        "box": {
+          "x": 88,
+          "y": 144,
+          "w": 272,
+          "h": 20,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "NEXT GATE // 2026 WORLD TOUR"
+          }
+        ],
+        "role": "label",
+        "fontSize": 11,
+        "fontWeight": 600,
+        "align": "left",
+        "letterSpacing": "0.12em",
+        "pinnedStyle": {
+          "color": "#C8FF1A"
+        }
+      },
+      {
+        "id": "velocity-hero-event-title",
+        "type": "text",
+        "box": {
+          "x": 88,
+          "y": 176,
+          "w": 272,
+          "h": 56,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "Signal Circuit"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#F4F4ED"
+        }
+      },
+      {
+        "id": "velocity-hero-event-meta",
+        "type": "text",
+        "box": {
+          "x": 88,
+          "y": 240,
+          "w": 272,
+          "h": 32,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "Austin · June 28 · Field Session 04"
+          }
+        ],
+        "role": "body",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#5D6254"
+        }
+      },
+      {
+        "id": "velocity-hero-cta",
+        "type": "action",
+        "box": {
+          "x": 1080,
+          "y": 120,
+          "w": 296,
+          "h": 52,
+          "z": 4
+        },
+        "label": [
+          {
+            "text": "Enter the archive"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#artifacts"
+        },
+        "variant": "solid"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "velocity-athlete"
+}

@@ -1,0 +1,96 @@
+{
+  "baseSlug": "velocity-template-header",
+  "category": "header",
+  "name": "Header",
+  "description": "Velocity Athlete header — compact nav with signal mark and tour/store links.",
+  "recipeId": "custom",
+  "headingPreview": "Ari Vale",
+  "sectionData": {
+    "id": "velocity-header",
+    "recipeId": "custom",
+    "name": "Header",
+    "height": 72,
+    "elements": [
+      {
+        "id": "velocity-header-nav",
+        "type": "nav",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 72,
+          "z": 3
+        },
+        "siteTitle": "Ari Vale",
+        "links": [
+          {
+            "label": "Tour",
+            "href": "#story",
+            "kind": "anchor"
+          },
+          {
+            "label": "Archive",
+            "href": "#artifacts",
+            "kind": "anchor"
+          },
+          {
+            "label": "Store",
+            "href": "#store",
+            "kind": "anchor"
+          },
+          {
+            "label": "Field Notes",
+            "href": "https://example.com/field-notes",
+            "kind": "external"
+          }
+        ],
+        "primaryAction": {
+          "label": "Signal",
+          "href": "https://example.com/social",
+          "kind": "external"
+        },
+        "layout": "left-right",
+        "sticky": true,
+        "pinnedStyle": {
+          "color": "#F4F4ED",
+          "background": "rgba(17, 17, 18, 0.88)",
+          "backdrop-filter": "blur(14px) saturate(120%)",
+          "padding": "0 64px"
+        }
+      },
+      {
+        "id": "velocity-header-mark",
+        "type": "shape",
+        "box": {
+          "x": 64,
+          "y": 20,
+          "w": 32,
+          "h": 32,
+          "z": 4
+        },
+        "variant": "circle",
+        "pinnedStyle": {
+          "background": "#C8FF1A",
+          "border": "1px solid rgba(200, 255, 26, 0.4)"
+        }
+      },
+      {
+        "id": "velocity-header-divider",
+        "type": "shape",
+        "box": {
+          "x": 0,
+          "y": 71,
+          "w": 1440,
+          "h": 1,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(93, 98, 84, 0.35)"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "velocity-athlete"
+}

@@ -1,0 +1,255 @@
+{
+  "baseSlug": "velocity-template-story",
+  "category": "other",
+  "name": "Story",
+  "description": "Velocity Athlete story track — tall scroll section with horizontally translated media panels.",
+  "recipeId": "custom",
+  "headingPreview": "Course notes",
+  "sectionData": {
+    "id": "velocity-story",
+    "recipeId": "custom",
+    "name": "Story",
+    "height": 1400,
+    "anchorId": "story",
+    "elements": [
+      {
+        "id": "velocity-story-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 1400,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#111112"
+        }
+      },
+      {
+        "id": "velocity-story-label",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 400,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "COURSE NOTES"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 600,
+        "align": "left",
+        "letterSpacing": "0.14em",
+        "pinnedStyle": {
+          "color": "#C8FF1A"
+        }
+      },
+      {
+        "id": "velocity-story-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 120,
+          "w": 800,
+          "h": 80,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "A horizontal read through the season"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 48,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#F4F4ED"
+        }
+      },
+      {
+        "id": "velocity-story-track",
+        "type": "flow-container",
+        "box": {
+          "x": 80,
+          "y": 260,
+          "w": 1280,
+          "h": 520,
+          "z": 3
+        },
+        "layout": {
+          "mode": "row",
+          "gap": {
+            "row": 0,
+            "column": 32
+          },
+          "padding": {
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "align": "stretch",
+          "justify": "start",
+          "wrap": false
+        },
+        "items": [
+          {
+            "id": "story-panel-track",
+            "element": {
+              "id": "velocity-story-panel-track",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "mediaKind": "image",
+              "assetId": "seed-velocity-track-study",
+              "alt": "Abstract track contour study with speed lines",
+              "fit": "cover",
+              "pinnedStyle": {
+                "width": "420px",
+                "height": "520px",
+                "borderRadius": "6px"
+              }
+            }
+          },
+          {
+            "id": "story-panel-garage",
+            "element": {
+              "id": "velocity-story-panel-garage",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "mediaKind": "image",
+              "assetId": "seed-velocity-garage-study",
+              "alt": "Garage form study with layered mechanical shapes",
+              "fit": "cover",
+              "pinnedStyle": {
+                "width": "420px",
+                "height": "520px",
+                "borderRadius": "6px"
+              }
+            }
+          },
+          {
+            "id": "story-panel-suit",
+            "element": {
+              "id": "velocity-story-panel-suit",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "mediaKind": "image",
+              "assetId": "seed-velocity-suit-study",
+              "alt": "Race suit textile study with citron seam accents",
+              "fit": "cover",
+              "pinnedStyle": {
+                "width": "420px",
+                "height": "520px",
+                "borderRadius": "6px"
+              }
+            }
+          },
+          {
+            "id": "story-panel-product",
+            "element": {
+              "id": "velocity-story-panel-product",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "mediaKind": "image",
+              "assetId": "seed-velocity-product-study",
+              "alt": "Product macro study with heat orange highlights",
+              "fit": "cover",
+              "pinnedStyle": {
+                "width": "420px",
+                "height": "520px",
+                "borderRadius": "6px"
+              }
+            }
+          },
+          {
+            "id": "story-panel-caption",
+            "element": {
+              "id": "velocity-story-panel-caption",
+              "type": "text",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "content": [
+                {
+                  "text": "Scroll to move through the field. Each panel is a captured moment from the training archive."
+                }
+              ],
+              "role": "body",
+              "fontSize": 18,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "width": "360px",
+                "padding": "48px 32px",
+                "color": "#F4F4ED",
+                "background": "#282C20",
+                "borderRadius": "6px"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "velocity-story-meta",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 820,
+          "w": 600,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Session 04 · Austin paddock · captured at dusk"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#5D6254"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "velocity-athlete"
+}
