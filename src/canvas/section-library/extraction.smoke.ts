@@ -17,8 +17,14 @@
 //   3. `baseSlug` uniqueness — two entries with the same baseSlug
 //      would collide on the `(base_slug, version)` unique index from
 //      Phase A's migration.
+//   4. Every `entries/*.json` file on disk appears in
+//      `SECTION_LIBRARY` — a dropped manifest import would hide a
+//      committed entry from the runtime registry.
 //
 // Run with `bun run section-library-extraction:smoke`.
+
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import { allTemplateSeeds } from '../../templates/registry.js';
 import { entryRowId } from './boot-upsert.js';
@@ -92,6 +98,28 @@ for (let i = 0; i < SECTION_LIBRARY.length; i += 1) {
 assert(
   duplicateSlugs.length === 0,
   `${String(duplicateSlugs.length)} duplicate baseSlugs in SECTION_LIBRARY — would collide on (base_slug, version) unique index:\n  ${duplicateSlugs.join('\n  ')}`,
+);
+
+// -- Invariant 4: every JSON entry on disk appears in SECTION_LIBRARY ---
+
+const entriesDir = join(resolve(import.meta.dirname), 'entries');
+const missingFromRegistry: string[] = [];
+for (const name of readdirSync(entriesDir)) {
+  if (!name.endsWith('.json')) continue;
+  const parsed = JSON.parse(readFileSync(join(entriesDir, name), 'utf8')) as { baseSlug?: string };
+  const baseSlug = parsed.baseSlug;
+  if (typeof baseSlug !== 'string' || baseSlug.length === 0) {
+    missingFromRegistry.push(`${name} (missing baseSlug)`);
+    continue;
+  }
+  if (!slugIndex.has(baseSlug)) {
+    missingFromRegistry.push(`${name} → ${baseSlug}`);
+  }
+}
+
+assert(
+  missingFromRegistry.length === 0,
+  `${String(missingFromRegistry.length)} entries/*.json files are not in SECTION_LIBRARY — run bun run section-library:sync:\n  ${missingFromRegistry.join('\n  ')}`,
 );
 
 console.log(

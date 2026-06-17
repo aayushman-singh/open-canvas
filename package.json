@@ -175,6 +175,7 @@
     "element-dispatch:smoke": "bun run src/editor/element-dispatch.smoke.ts",
     "section-library-schema:smoke": "bun run src/db/section-library-schema.smoke.ts",
     "section-library-boot-upsert:smoke": "bun run src/canvas/section-library/boot-upsert.smoke.ts",
+    "section-library:sync": "bun run scripts/sync-section-library-manifest.ts",
     "section-library-extraction:smoke": "bun run src/canvas/section-library/extraction.smoke.ts",
     "section-library-testimonial-fixtures:smoke": "bun run src/canvas/section-library/testimonial-fixtures.smoke.ts",
     "section-library-composition:smoke": "bun run src/canvas/section-library/composition.smoke.ts",
