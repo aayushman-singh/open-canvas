@@ -401,14 +401,15 @@ Competitor signal:
 Current Open Canvas state:
 
 - Collections exist with entries, field binding, folders, and per-entry OG.
-- `designer-template-fidelity-gaps.md` and ADR 0067 note that published
-  Collection rendering and premium card templates still need work.
+- Published Collection rendering exists for `card`, `image-only`, and `custom`
+  displays, with ADR 0067 Component Style variables on built-in card/image
+  chrome and custom display preserving the Owner's template-owned chrome.
 
 Potential addition:
 
-- Collection renderer for card/image/custom modes; collection detail/list/index
-  page workflow; editorial states; drafts; scheduling; preview; field schemas;
-  search/filter/sort UI; import/export; API/webhook surface.
+- Collection detail/list/index page workflow; editorial states; drafts;
+  scheduling; preview; field schemas; search/filter/sort UI; import/export;
+  API/webhook surface; richer second-wave card style catalog.
 
 Why it matters:
 
@@ -417,8 +418,8 @@ Why it matters:
 
 Pushback:
 
-- Do not style collection cards before there is a real render target and
-  editor/public parity. ADR 0067 is right to tie style work to rendering.
+- Do not broaden card styling by exposing raw CSS variables. Extend the typed
+  Component Style catalog by named owner-visible parts.
 
 ### P0: Responsive Flow Layout and Components With Props
 

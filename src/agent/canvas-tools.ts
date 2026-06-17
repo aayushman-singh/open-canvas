@@ -37,16 +37,15 @@ import {
 } from '../canvas/layout/tree.js';
 import type { JsonSchema, LlmTool } from './llm.js';
 
-const ADD_ELEMENT_TYPES = ELEMENT_TYPES.filter((type) => type !== 'flow-container');
-
 // ---------------------------------------------------------------------------
 // Per-element schema fragment merger (ADR 0011 Step 2 cutover)
 // ---------------------------------------------------------------------------
 //
 // `updateElement` advertises every element type's editable fields. `addElement`
-// reuses this field union for creatable element types, but excludes compound
-// types whose required nested graph has no agent creation contract yet. The
-// shape used to live inline (one giant
+// reuses this field union for creatable element types. Compound types with
+// nested graphs must expose their own explicit creation fields through
+// `AGENT_TOOL_DISPATCH`; Flow Container does this with `layout` + `items`.
+// The shape used to live inline (one giant
 // "X elements only"-annotated bag per tool). It now comes from
 // `AGENT_TOOL_DISPATCH` — each per-element module contributes its own
 // `patchProperties`; this merger unions them.
@@ -54,9 +53,17 @@ const ADD_ELEMENT_TYPES = ELEMENT_TYPES.filter((type) => type !== 'flow-containe
 // When two specs claim the same field name AND both schemas have `enum`s
 // (e.g. `variant` across shape/container/action), the merger unions the
 // enums and concatenates the descriptions so the LLM sees every per-type
-// meaning. Non-enum collisions keep the first declarer's shape — the
-// `agent-tool-dispatch:smoke` check on no-shape-leakage catches surprising
-// new collisions at build time.
+// meaning. Non-enum collisions are deliberately loosened to the common
+// top-level type with a combined description; keeping the first shape would
+// make shared names such as `items` advertise Accordion-only payloads while
+// Flow Container legitimately accepts Flow Items.
+function mergeSchemaDescriptions(existing: JsonSchema, incoming: JsonSchema): string {
+  const descriptions = [existing.description, incoming.description].filter(
+    (value): value is string => typeof value === 'string' && value.length > 0,
+  );
+  return Array.from(new Set(descriptions)).join(' ');
+}
+
 function mergeAgentPatchProperties(): Record<string, JsonSchema> {
   const merged: Record<string, JsonSchema> = {};
   for (const spec of Object.values(AGENT_TOOL_DISPATCH)) {
@@ -68,14 +75,17 @@ function mergeAgentPatchProperties(): Record<string, JsonSchema> {
       }
       if (existing.enum !== undefined && schema.enum !== undefined) {
         const unionEnum = Array.from(new Set([...existing.enum, ...schema.enum]));
-        const existingDesc = existing.description ?? '';
-        const newDesc = schema.description ?? '';
         merged[name] = {
           ...existing,
           enum: unionEnum,
-          description: existingDesc.includes(newDesc)
-            ? existingDesc
-            : `${existingDesc} ${newDesc}`.trim(),
+          description: mergeSchemaDescriptions(existing, schema),
+        };
+        continue;
+      }
+      if (existing.type !== undefined && existing.type === schema.type) {
+        merged[name] = {
+          type: existing.type,
+          description: mergeSchemaDescriptions(existing, schema),
         };
       }
     }
@@ -437,7 +447,7 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
         sectionId: { type: 'string', description: 'The section to add the element to.' },
         elementType: {
           type: 'string',
-          enum: [...ADD_ELEMENT_TYPES],
+          enum: [...ELEMENT_TYPES],
           description: 'The type of element to create.',
         },
         box: {

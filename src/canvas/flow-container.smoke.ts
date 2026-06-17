@@ -181,6 +181,93 @@ function renderHtml(state: EditableSite): string {
   );
 }
 
+// Renderer: stack mode emits vertical flex flow without row wrapping.
+{
+  const html = renderHtml(
+    siteWith([
+      flowElement({
+        id: 'flow-stack',
+        layout: {
+          mode: 'stack',
+          gap: { row: 10, column: 0 },
+          padding: { top: 8, right: 8, bottom: 8, left: 8 },
+          align: 'start',
+          justify: 'center',
+        },
+        items: [
+          { id: 'stack-copy', element: textElement({ id: 'stack-copy' }) },
+          { id: 'stack-action', element: copyAction() },
+        ],
+      }),
+    ]),
+  );
+  assert(html.includes('data-flow-layout-mode="stack"'), `missing stack layout mode: ${html}`);
+  assert(
+    html.includes('display:flex') &&
+      html.includes('flex-direction:column') &&
+      html.includes('gap:10px 0px') &&
+      html.includes('justify-content:center') &&
+      !html.includes('flex-wrap'),
+    `stack style did not render expected vertical grammar: ${html}`,
+  );
+}
+
+// Renderer: row mode keeps wrapping explicit for both wrap and no-wrap cases.
+{
+  const wrappingHtml = renderHtml(
+    siteWith([
+      flowElement({
+        id: 'flow-row-wrap',
+        layout: {
+          mode: 'row',
+          wrap: true,
+          gap: { row: 8, column: 12 },
+          padding: { top: 0, right: 0, bottom: 0, left: 0 },
+          align: 'center',
+          justify: 'space-between',
+        },
+        items: [
+          { id: 'row-a', element: textElement({ id: 'row-a' }) },
+          { id: 'row-b', element: textElement({ id: 'row-b' }) },
+        ],
+      }),
+    ]),
+  );
+  assert(
+    wrappingHtml.includes('data-flow-layout-mode="row"') &&
+      wrappingHtml.includes('flex-direction:row') &&
+      wrappingHtml.includes('flex-wrap:wrap') &&
+      wrappingHtml.includes('justify-content:space-between'),
+    `row wrap style did not render expected grammar: ${wrappingHtml}`,
+  );
+
+  const noWrapHtml = renderHtml(
+    siteWith([
+      flowElement({
+        id: 'flow-row-nowrap',
+        layout: {
+          mode: 'row',
+          wrap: false,
+          gap: { row: 8, column: 12 },
+          padding: { top: 0, right: 0, bottom: 0, left: 0 },
+          align: 'center',
+          justify: 'start',
+        },
+        items: [
+          { id: 'row-c', element: textElement({ id: 'row-c' }) },
+          { id: 'row-d', element: textElement({ id: 'row-d' }) },
+        ],
+      }),
+    ]),
+  );
+  assert(
+    noWrapHtml.includes('data-flow-layout-mode="row"') &&
+      noWrapHtml.includes('flex-direction:row') &&
+      noWrapHtml.includes('flex-wrap:nowrap'),
+    `row no-wrap style did not render expected grammar: ${noWrapHtml}`,
+  );
+}
+
 // Renderer: narrower breakpoint overrides can unhide an item hidden at tablet.
 {
   const html = renderHtml(

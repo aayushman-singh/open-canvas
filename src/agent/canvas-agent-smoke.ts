@@ -537,6 +537,21 @@ assert(
   'expected replaceMedia description to flag that the tool does not generate media',
 );
 
+const addElementTool = CANVAS_AGENT_TOOLS.find((t) => t.name === 'addElement');
+const updateElementTool = CANVAS_AGENT_TOOLS.find((t) => t.name === 'updateElement');
+assert(
+  addElementTool !== undefined &&
+    addElementTool.parameters.properties?.elementType?.enum?.includes('flow-container') === true,
+  'addElement.elementType enum must include flow-container now that Flow Items have an agent creation contract',
+);
+assert(
+  addElementTool !== undefined &&
+    updateElementTool !== undefined &&
+    addElementTool.parameters.properties?.items?.description?.includes('Flow Item') === true &&
+    updateElementTool.parameters.properties?.items?.description?.includes('Flow Item') === true,
+  'merged agent items schema must mention Flow Item semantics, not only Accordion items',
+);
+
 // designSection tool schema
 const designTool = CANVAS_AGENT_TOOLS.find((t) => t.name === 'designSection');
 assert(designTool !== undefined, 'designSection tool must exist');
@@ -1296,11 +1311,12 @@ if (acceptedAddAction?.ok) {
 }
 
 const addFlowToolCall = translateToolCall({
-  id: 'add-flow-rejected',
+  id: 'add-flow-container',
   name: 'addElement',
   arguments: {
     sectionId: baseSection.id,
     elementType: 'flow-container',
+    box: { x: 80, y: 120, w: 640, h: 260 },
     layout: {
       mode: 'grid',
       columns: 2,
@@ -1309,15 +1325,89 @@ const addFlowToolCall = translateToolCall({
       align: 'stretch',
       justify: 'start',
     },
-    items: [],
+    items: [
+      {
+        id: 'agent-card',
+        span: 2,
+        element: {
+          id: 'agent-flow-copy',
+          type: 'text',
+          box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+          content: [{ text: 'Agent-created Flow Item' }],
+          role: 'body',
+          fontSize: 16,
+          fontWeight: 400,
+          align: 'left',
+        },
+      },
+    ],
   },
 });
 assert(
-  !addFlowToolCall.ok && addFlowToolCall.error.includes('flow-container'),
-  addFlowToolCall.ok
-    ? 'addElement must reject flow-container until hosted items have an agent creation contract'
-    : `addElement flow-container rejection must name the unsupported type: ${addFlowToolCall.error}`,
+  addFlowToolCall.ok,
+  addFlowToolCall.ok ? '' : `expected addElement flow-container to parse: ${addFlowToolCall.error}`,
 );
+if (addFlowToolCall.ok) {
+  const withFlow = applyCanvasAgentOp(baseState, addFlowToolCall.op);
+  const flowValidation = validateEditableSite(withFlow);
+  assert(
+    flowValidation.valid,
+    flowValidation.valid
+      ? ''
+      : `addElement flow-container produced invalid state: ${flowValidation.errors.join('; ')}`,
+  );
+  const addedFlowCandidate = withFlow.pages[0]?.sections[0]?.elements.at(-1);
+  if (addedFlowCandidate?.type !== 'flow-container') {
+    throw new Error('expected addElement flow-container to append a Flow Container element');
+  }
+  const addedFlow = addedFlowCandidate;
+  assert(
+    addedFlow.layout.mode === 'grid' &&
+      addedFlow.items[0]?.element.type === 'text' &&
+      addedFlow.items[0].element.box.w === 0 &&
+      addedFlow.items[0].element.content[0]?.text === 'Agent-created Flow Item',
+    'expected addElement flow-container to preserve layout and hosted Content Element',
+  );
+
+  const patchFlowItems = translateToolCall({
+    id: 'patch-flow-items',
+    name: 'updateElement',
+    arguments: {
+      elementId: addedFlow.id,
+      elementType: 'flow-container',
+      items: [
+        {
+          id: 'agent-card',
+          responsive: { phone: { hidden: true, order: 1 } },
+          element: addedFlow.items[0]?.element,
+        },
+      ],
+    },
+  });
+  assert(
+    patchFlowItems.ok,
+    patchFlowItems.ok
+      ? ''
+      : `expected updateElement flow-container items patch to parse: ${patchFlowItems.error}`,
+  );
+  if (patchFlowItems.ok) {
+    const withPatchedItems = applyCanvasAgentOp(withFlow, patchFlowItems.op);
+    const patchedValidation = validateEditableSite(withPatchedItems);
+    assert(
+      patchedValidation.valid,
+      patchedValidation.valid
+        ? ''
+        : `updateElement flow-container items patch produced invalid state: ${patchedValidation.errors.join('; ')}`,
+    );
+    const patchedFlow = withPatchedItems.pages[0]?.sections[0]?.elements.at(-1);
+    assert(
+      patchedFlow?.type === 'flow-container' &&
+        patchedFlow.items[0]?.responsive?.phone?.hidden === true &&
+        patchedFlow.items[0].responsive.phone.order === 1,
+      'expected updateElement flow-container items patch to preserve Flow Item responsive placement',
+    );
+  }
+}
 
 const missingTextProps = parseDesignSectionToolArgs({
   sectionName: 'Bad text',

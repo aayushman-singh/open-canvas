@@ -1,6 +1,6 @@
 # ADR 0067 - Component Style objects for interactive components and Collections
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-15
 **Author:** Aayushman Singh
 

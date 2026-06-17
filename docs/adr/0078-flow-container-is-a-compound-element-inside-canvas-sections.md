@@ -1,6 +1,6 @@
 # ADR 0078 - Flow Container is a Compound Element inside Canvas Sections
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-16
 **Author:** Aayushman Singh
 
@@ -123,19 +123,19 @@ overloading existing surface primitives.
 - Arbitrary CSS flexbox/grid syntax or owner-authored CSS.
 - Exact editor UI for entering/exiting Flow Container child editing.
 - Custom component platform or third-party extension model.
-- Implementation changes to schema, renderer, validator, Yjs projection,
-  inspector, agent tools, or public styles.
+- Detailed implementation plan sequencing for schema, renderer, validator, Yjs
+  projection, inspector, agent tools, and public styles.
 
 ## Consequences
 
 - Open Canvas keeps one section model while gaining structured responsive
   regions inside the canvas.
 - The domain gains a new abstraction: Compound Element.
-- `ContainerElement` stays a Surface primitive; future implementation should
-  not overload it into a layout parent.
-- Flow Container will require a new element registry branch, validator path,
-  renderer path, Yjs projection path, inspector surface, selection semantics,
-  and agent patch surface.
+- `ContainerElement` stays a Surface primitive and must not be overloaded into
+  a layout parent.
+- Flow Container has its own element registry branch, validator path, renderer
+  path, Yjs projection path, inspector surface, selection semantics, and agent
+  patch surface.
 - Flow Item introduces a new child relation distinct from Positioned Element.
   Implementation may need to separate "content payload" from "section-positioned
   element" more cleanly than the current `BaseElement` shape does.
@@ -147,11 +147,20 @@ overloading existing surface primitives.
 
 ## Follow-ups
 
-- ADR 0079 defines the Flow Layout grammar and required v1 fields.
-- ADR 0080 defines how Flow Items host Content Elements.
-- Define the editor selection and editing mode for Flow Container children.
-- ADR 0079 defines inner responsive layout overrides for Flow Container and
-  Flow Items.
-- Decide whether Tabs panels and Collection custom templates can contain Flow
-  Containers without special authoring modes.
-- Define agent tools for creating, reordering, and patching Flow Items.
+- **DONE 2026-06-16:** ADR 0079 defines the Flow Layout grammar and required
+  v1 fields.
+- **DONE 2026-06-16:** ADR 0080 defines how Flow Items host Content Elements.
+- **DONE 2026-06-16:** v1 editor selection resolves Flow-hosted children and
+  rebuilds them through the hosted-child wrapper. `flow-container-editor:smoke`
+  and `editor-client-regression:smoke` pin this contract.
+- **DONE 2026-06-16:** ADR 0079 defines inner responsive layout overrides for
+  Flow Container and Flow Items; `flow-container:smoke` pins scoped responsive
+  CSS emission.
+- **DONE 2026-06-16:** Flow Containers are ordinary `CanvasElement` nodes, so
+  Tabs panels and Collection custom templates may host them through the same
+  nested element recursion. No special authoring mode is needed for the data
+  model.
+- **DONE 2026-06-17:** Agent creation and patching use the existing
+  `addElement` / `updateElement` tools. `addElement` accepts Flow Container
+  `layout` + `items`; `updateElement` can replace the full Flow Item list for
+  reordering, hiding, and placement patching.

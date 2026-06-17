@@ -276,16 +276,14 @@ html, body {
 .opencanvas-collection-entry {
   position: relative;
 }
-.opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="container"]:first-child > .opencanvas-surface,
-.opencanvas-collection[data-collection-display="custom"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="container"]:first-child > .opencanvas-surface {
+.opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="container"]:first-child > .opencanvas-surface {
   background: var(--opencanvas-collection-card-bg, inherit);
   border: var(--opencanvas-collection-card-border-width, 0) solid var(--opencanvas-collection-card-border-color, transparent);
   border-radius: var(--opencanvas-collection-card-radius, inherit);
   box-shadow: var(--opencanvas-collection-card-shadow, inherit);
   padding: var(--opencanvas-collection-card-padding, 0);
 }
-.opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="media"] .opencanvas-media,
-.opencanvas-collection[data-collection-display="custom"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="media"] .opencanvas-media {
+.opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="media"] .opencanvas-media {
   border-radius: var(--opencanvas-collection-card-image-radius, 0);
 }
 .opencanvas-collection[data-collection-display="image-only"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="media"] .opencanvas-media {

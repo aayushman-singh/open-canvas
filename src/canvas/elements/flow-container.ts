@@ -257,6 +257,11 @@ export const flowContainerAgentToolSpec: AgentToolSpec = {
       description:
         'Flow Container layout object. Must satisfy the Flow Layout grammar: mode stack|row|grid, gap, padding, align, justify, and mode-specific wrap/columns.',
     },
+    items: {
+      type: 'array',
+      description:
+        'Full Flow Item list. Each item has id, optional span/align/responsive placement, and one hosted CanvasElement in item.element with box x/y/w/h/z all set to 0.',
+    },
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
@@ -265,6 +270,12 @@ export const flowContainerAgentToolSpec: AgentToolSpec = {
         throw new Error('layout must be an object');
       }
       patch.layout = args.layout;
+    }
+    if (args.items !== undefined) {
+      if (!Array.isArray(args.items)) {
+        throw new Error('items must be an array');
+      }
+      patch.items = args.items;
     }
     return patch;
   },

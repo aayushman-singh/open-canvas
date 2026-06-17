@@ -244,46 +244,52 @@ Needed primitive:
 
 Current state:
 
-- Forms have `FormStyle`.
-- Accordions, tabs, carousels, and collections do not yet have full typed
-  style objects.
-- ADR 0067 proposes `accordionStyle`, `carouselStyle`, `tabsStyle`, and
-  `collectionStyle`, plus stronger editor/public DOM parity.
-- ADR 0066 explicitly deferred static Variant CSS preview parity in the editor.
+- Forms, accordions, tabs, carousels, and collections have typed sparse
+  Component Style objects (`formStyle`, `accordionStyle`, `tabsStyle`,
+  `carouselStyle`, and `collectionStyle`).
+- ADR 0067 is accepted and shipped with validator, render, Yjs, agent, and
+  inspector smoke coverage.
+- Editor/public DOM parity is in place for the styled component parts covered
+  by ADR 0067.
 
 User-visible miss:
 
-- A template author can pick a Variant but cannot precisely tune component
-  anatomy such as active tab fill, tab indicator color, accordion body padding,
-  carousel arrow size, dot colors, or collection card radius without raw
+- A template author can now tune the first ADR 0067 field catalog without raw
   `pinnedStyle`.
-- The editor can diverge from published output for static variant arms.
+- Template fidelity still stops at the first catalog: there are no reusable
+  saved Component Style recipes, arbitrary unit controls, collection title /
+  excerpt / CTA typography controls, or Component Style objects for unrelated
+  elements such as action, shape, container, table, nav, chart, code, text,
+  media, and embed.
 
 Needed primitive:
 
-- Implement ADR 0067 or a stricter successor, with typed Component Style fields
-  and one component DOM/CSS contract shared by editor preview and public render.
+- A second Component Style wave should add named owner-visible parts by ADR,
+  not expose raw CSS variables. Reusable style recipes and arbitrary units
+  remain separate decisions.
 
 ### 8. Collection Rendering Is Not Ready For Premium Card Templates
 
 Current state:
 
 - `CollectionElement.entries` exists as materialized per-entry output.
-- `renderCollection` emits an empty collection frame with data attributes.
-- ADR 0067 correctly states that collection card/image styling must ship only
-  once there is a real published render target.
+- `renderCollection` emits materialized entries inside the collection frame for
+  `card`, `image-only`, and `custom` displays.
+- Built-in `card` and `image-only` displays consume `collectionStyle` host
+  variables for entry chrome; `custom` display keeps the Owner's custom
+  template-owned chrome.
 
 User-visible miss:
 
-- Cannot reproduce premium blog/case-study grids, animated card reveals,
-  hover card transitions, image-only rails, or custom card templates as a
-  first-class published component.
+- Basic published collection cards and custom templates are real, but premium
+  CMS experiences still lack animated card reveals, hover transitions, filters,
+  search, editorial states, drafts, scheduling, and full detail/list workflow.
 
 Needed primitive:
 
-- Published Collection rendering for `card`, `image-only`, and `custom` display
-  modes, with Component Style variables on the collection host and support for
-  nested interactive/runtime scans.
+- CMS workflow primitives around the shipped renderer: filters, search/sort UI,
+  editorial states, scheduling, previews, and a richer second-wave card style
+  catalog.
 
 ### 9. No Layout Or Shared-Element Animation
 

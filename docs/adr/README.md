@@ -74,8 +74,8 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0063 | Collection element binds at element level, ships visible defaults, and groups entries by folder | Accepted | [`docs/adr/0063-collection-element-binds-at-element-level-and-ships-defaults.md`](0063-collection-element-binds-at-element-level-and-ships-defaults.md) |
 | 0064 | EditorContext decomposes into narrow named-Pick contexts per consumer | Accepted | [`docs/adr/0064-editor-context-decomposition.md`](0064-editor-context-decomposition.md) |
 | 0065 | Custom Collection card template lives on the element, edited in-place via global editor state | Accepted | [`docs/adr/0065-custom-collection-card-template.md`](0065-custom-collection-card-template.md) |
-| 0066 | Interactive components gain the variant-preset layer; pointer-reactive variants run on one fragment in the existing interactive runtime | Proposed | [`docs/adr/0066-interactive-component-variant-layer-and-declarative-motion-runtime.md`](0066-interactive-component-variant-layer-and-declarative-motion-runtime.md) |
-| 0067 | Component Style objects for interactive components and Collections | Proposed | [`docs/adr/0067-component-style-objects-for-interactive-components-and-collections.md`](0067-component-style-objects-for-interactive-components-and-collections.md) |
+| 0066 | Interactive components gain the variant-preset layer; pointer-reactive variants run on one fragment in the existing interactive runtime | Accepted | [`docs/adr/0066-interactive-component-variant-layer-and-declarative-motion-runtime.md`](0066-interactive-component-variant-layer-and-declarative-motion-runtime.md) |
+| 0067 | Component Style objects for interactive components and Collections | Accepted | [`docs/adr/0067-component-style-objects-for-interactive-components-and-collections.md`](0067-component-style-objects-for-interactive-components-and-collections.md) |
 | 0068 | License-safe third-party interaction runtimes | Accepted | [`docs/adr/0068-license-safe-third-party-interaction-runtimes.md`](0068-license-safe-third-party-interaction-runtimes.md) |
 | 0069 | Motion Sequence and Scroll Scene | Accepted | [`docs/adr/0069-motion-sequence-and-scroll-scene.md`](0069-motion-sequence-and-scroll-scene.md) |
 | 0070 | Overlay as first-class behaviour | Accepted | [`docs/adr/0070-overlay-as-first-class-behaviour.md`](0070-overlay-as-first-class-behaviour.md) |
@@ -86,9 +86,9 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0075 | Personalization uses Visitor Segments | Proposed | [`docs/adr/0075-personalization-uses-visitor-segments.md`](0075-personalization-uses-visitor-segments.md) |
 | 0076 | On-page Content Editing is review-gated | Proposed | [`docs/adr/0076-on-page-content-editing-is-review-gated.md`](0076-on-page-content-editing-is-review-gated.md) |
 | 0077 | On-page Design Editing edits the Editable Site | Proposed | [`docs/adr/0077-on-page-design-editing-edits-the-editable-site.md`](0077-on-page-design-editing-edits-the-editable-site.md) |
-| 0078 | Flow Container is a Compound Element inside Canvas Sections | Proposed | [`docs/adr/0078-flow-container-is-a-compound-element-inside-canvas-sections.md`](0078-flow-container-is-a-compound-element-inside-canvas-sections.md) |
-| 0079 | Flow Layout grammar v1 | Proposed | [`docs/adr/0079-flow-layout-grammar-v1.md`](0079-flow-layout-grammar-v1.md) |
-| 0080 | Flow Items own placement; Content Elements own behaviour | Proposed | [`docs/adr/0080-flow-items-own-placement-content-elements-own-behaviour.md`](0080-flow-items-own-placement-content-elements-own-behaviour.md) |
+| 0078 | Flow Container is a Compound Element inside Canvas Sections | Accepted | [`docs/adr/0078-flow-container-is-a-compound-element-inside-canvas-sections.md`](0078-flow-container-is-a-compound-element-inside-canvas-sections.md) |
+| 0079 | Flow Layout grammar v1 | Accepted | [`docs/adr/0079-flow-layout-grammar-v1.md`](0079-flow-layout-grammar-v1.md) |
+| 0080 | Flow Items own placement; Content Elements own behaviour | Accepted | [`docs/adr/0080-flow-items-own-placement-content-elements-own-behaviour.md`](0080-flow-items-own-placement-content-elements-own-behaviour.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

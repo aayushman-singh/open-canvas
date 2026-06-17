@@ -1,6 +1,6 @@
 # ADR 0080 - Flow Items own placement; Content Elements own behaviour
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-16
 **Author:** Aayushman Singh
 
@@ -113,8 +113,8 @@ controls.
 
 ## Out of scope
 
-- Exact TypeScript schema for storing hosted Content Elements.
-- Exact renderer function names or wrapper class names.
+- Additional TypeScript schema beyond the v1 hosted Content Element shape.
+- Additional renderer wrapper variants beyond the v1 hosted-child wrapper.
 - Exact editor UI for selecting Flow Item versus hosted Content Element.
 - Exact flow-scoped sizing fields.
 - Arbitrary CSS inside Flow Items.
@@ -141,9 +141,20 @@ controls.
 
 ## Follow-ups
 
-- Define the generic child-slot lookup model for editor selection, insertion,
-  delete/restore, and agent operations.
-- Define flow-scoped sizing fields for hosted Content Elements.
-- Define how inspector selection moves between Flow Container, Flow Item, and
-  hosted Content Element.
-- Define validation rules for nested Flow Containers and duplicate identities.
+- **DONE 2026-06-16:** Shared traversal and id-remap helpers live in
+  `src/canvas/element-tree.ts`; editor/runtime/agent paths recurse through
+  Flow Items instead of stopping at the Flow Container.
+- **DONE 2026-06-16:** Validation rejects malformed Flow Items, duplicate Flow
+  Item ids, duplicate hosted element identities, unsupported placement fields
+  on hosted Content Elements, invalid spans, and malformed nested content.
+- **DONE 2026-06-17:** Agent operations can create Flow Containers and patch
+  Flow Items through the existing `addElement` and `updateElement` tools.
+
+## Successor Work
+
+- Define direct Flow Item inspector navigation: how selection moves between the
+  Flow Container, one Flow Item, and the hosted Content Element.
+- Define flow-scoped sizing fields for hosted Content Elements. v1 keeps hosted
+  `box` dimensions at zero and relies on intrinsic/component sizing.
+- Extend the shared child-slot model from traversal/id-remap into mutation:
+  insertion, direct Flow Item deletion, restore, and undo metadata.

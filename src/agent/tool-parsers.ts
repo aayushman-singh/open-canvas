@@ -39,9 +39,6 @@ import { AGENT_TOOL_DISPATCH } from '../canvas/elements/index.js';
 
 export type ParseResult = { ok: true; op: CanvasAgentOp } | { ok: false; error: string };
 
-const FLOW_CONTAINER_ADD_ELEMENT_ERROR =
-  'addElement.elementType flow-container is not supported until Flow Items have an agent creation contract';
-
 // ---------------------------------------------------------------------------
 // Type-guard helpers
 // ---------------------------------------------------------------------------
@@ -398,9 +395,6 @@ export function parseAddElement(args: unknown): ParseResult {
       ok: false,
       error: `addElement.elementType must be one of [${ELEMENT_TYPES.join(', ')}] (got ${JSON.stringify(args.elementType)})`,
     };
-  }
-  if (args.elementType === 'flow-container') {
-    return { ok: false, error: FLOW_CONTAINER_ADD_ELEMENT_ERROR };
   }
   const boxResult = parseAddElementBox(args.box);
   if (!boxResult.ok) return { ok: false, error: `addElement.${boxResult.error}` };
@@ -760,9 +754,6 @@ function parseCanonicalAddElementOp(value: Record<string, unknown>): ParseResult
       ok: false,
       error: `addElement.elementType must be one of [${ELEMENT_TYPES.join(', ')}] (got ${JSON.stringify(value.elementType)})`,
     };
-  }
-  if (value.elementType === 'flow-container') {
-    return { ok: false, error: FLOW_CONTAINER_ADD_ELEMENT_ERROR };
   }
   const boxResult = parseAddElementBox(value.box);
   if (!boxResult.ok) return { ok: false, error: `addElement.${boxResult.error}` };

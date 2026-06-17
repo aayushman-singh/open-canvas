@@ -1,6 +1,6 @@
 # ADR 0079 - Flow Layout grammar v1
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-16
 **Author:** Aayushman Singh
 
@@ -173,9 +173,10 @@ Existing constraints:
 ## Out of scope
 
 - ADR 0080 defines how Flow Items host Content Elements.
-- Exact schema names for the eventual TypeScript implementation.
-- Editor UI for editing Flow Layouts and Flow Items.
-- Agent tool names and patch command shape.
+- Additional schema expansion beyond the v1 TypeScript shape.
+- Full editor UI for editing Flow Layouts and direct Flow Item selection.
+- Dedicated Flow Item tool names beyond the existing `addElement` /
+  `updateElement` creation and patch surface.
 - Masonry, subgrid, absolute child placement, overlapping flow items, manual
   row/column placement, custom CSS, container queries, and arbitrary media
   queries.
@@ -197,8 +198,11 @@ Existing constraints:
 
 ## Follow-ups
 
-- ADR 0080 defines how Flow Items host Content Elements.
-- Define Flow Container editor selection and child-editing mode.
-- Define agent tools for creating, reordering, hiding, and patching Flow Items.
-- Define smoke fixtures for stack, row wrap/no-wrap, grid columns, spans, and
-  breakpoint overrides.
+- **DONE 2026-06-16:** ADR 0080 defines how Flow Items host Content Elements.
+- **DONE 2026-06-16:** v1 editor selection resolves Flow-hosted children and
+  uses hosted-child rebuild/autogrow rules. Dedicated Flow Item inspector
+  navigation remains successor work under ADR 0080.
+- **DONE 2026-06-17:** Agent tools create Flow Containers through `addElement`
+  and patch/reorder/hide Flow Items through `updateElement.items`.
+- **DONE 2026-06-17:** `flow-container:smoke` covers stack, row wrap/no-wrap,
+  grid columns, spans, and breakpoint overrides.

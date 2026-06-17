@@ -17,6 +17,7 @@ import type {
   FormElement,
 } from './elements/index.js';
 import { renderCanvasSnapshot } from './render.js';
+import { canvasPublishedStyles } from './public-styles.js';
 import { validateEditableSite } from './validate.js';
 import { decodeYDoc, encodeYDoc } from './yjs-projection.js';
 import { accordionAgentToolSpec } from './elements/accordion.js';
@@ -236,6 +237,43 @@ function expectRoundTrip(state: EditableSite, label: string): void {
   assert(
     html.includes('data-opencanvas-collection-entry="0"'),
     'Collection render must wrap each materialized entry with an entry marker',
+  );
+}
+
+{
+  const customStyled = siteWith([
+    withStyle(
+      collection({
+        id: 'el-custom-collection',
+        display: 'custom',
+        entries: [[baseText({ id: 'custom-entry-title', content: [{ text: 'Custom card' }] })]],
+      }),
+      'collectionStyle',
+      {
+        cardBackgroundColor: '#ffeeee',
+        cardImageRadius: 12,
+      },
+    ),
+  ]);
+
+  expectValid(customStyled, 'custom collection with sparse collection style');
+
+  const html = renderHtml(customStyled);
+  assert(
+    html.includes('data-collection-display="custom"'),
+    'custom Collection render must preserve the custom display marker',
+  );
+  assert(
+    html.includes('--opencanvas-collection-card-bg:#ffeeee'),
+    'custom Collection style object must still emit sparse host variables',
+  );
+  assert(
+    canvasPublishedStyles.includes('[data-collection-display="card"]'),
+    'public stylesheet must still target built-in card Collection chrome',
+  );
+  assert(
+    !canvasPublishedStyles.includes('[data-collection-display="custom"]'),
+    'custom Collection templates must not consume built-in card surface or media chrome',
   );
 }
 
