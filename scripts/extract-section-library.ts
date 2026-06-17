@@ -1,16 +1,15 @@
 // scripts/extract-section-library.ts
 //
-// ADR 0061 Phase C — one-shot extraction of every section from every
-// TemplateSeed into individual `src/canvas/section-library/entries/*.json`
-// files, plus a manifest barrel + an origin map.
+// LEGACY — ADR 0061 Phase C one-shot extraction from TemplateSeed
+// `.state` blobs into `entries/*.json`, `entries/manifest.ts`, and
+// `origin-mapping.ts`. Do not use this for composition-era templates.
 //
-// Idempotent — re-running overwrites the output files. The script is the
-// generator; `entries/*.json`, `entries/manifest.ts`, and
-// `src/canvas/section-library/origin-mapping.ts` are the committed
-// artefacts that the runtime + Phase D's TemplateSeed rewrite consume.
+// To add or refresh Section Library entries in the composition era,
+// author `entries/*.json` directly and run `bun run section-library:sync`.
 //
-// Run with `bun run scripts/extract-section-library.ts` after editing
-// TemplateSeed content; regenerated output is what the registry serves.
+// Re-running this script overwrites auto-extracted JSON files and
+// regenerates manifest + origin map from TemplateSeed state. It is kept
+// for historical re-extraction only.
 
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';

@@ -8,10 +8,9 @@
 // `global` rows are intentionally ephemeral and overwritten on next deploy.
 //
 // Phase C populated the registry from the 9 TemplateSeeds via
-// `scripts/extract-section-library.ts`. Re-run that script after editing
-// any TemplateSeed content or adding new entries/*.json files. Phase F
-// adds standalone testimonial fixtures as JSON files under `entries/`
-// and the manifest picks them up automatically on re-run.
+// `scripts/extract-section-library.ts` (legacy extraction). For
+// composition-era templates, add or edit `entries/*.json` files and
+// run `bun run section-library:sync` to regenerate `entries/manifest.ts`.
 
 import { EXTRACTED_ENTRIES } from './entries/manifest.js';
 import type { SectionLibraryEntry } from './types.js';
