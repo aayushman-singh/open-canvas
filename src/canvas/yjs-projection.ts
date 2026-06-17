@@ -27,6 +27,9 @@
 //   'visitorTheme'?    -> 'light' | 'dark' | 'toggleable' (ADR 0035)
 //   'faviconAssetId'?  -> string
 //   'scrollBehavior'?  -> Y.Map<unknown>
+//   'overlays'?        -> Y.Array<Y.Map<unknown>>    (Overlay[])
+//   'loadExperience'?  -> Y.Map<unknown>             (LoadExperience)
+//   'routeTransition'? -> Y.Map<unknown>             (RouteTransition)
 //   'pages'            -> Y.Array<Y.Map<unknown>>    (CanvasPage[])
 //
 // Each CanvasPage Y.Map:
@@ -1018,6 +1021,13 @@ export function encodeYDoc(state: EditableSite): Y.Doc {
       setIfDefined(scroll, 'paddingTop', state.scrollBehavior.paddingTop);
       root.set('scrollBehavior', scroll);
     }
+    if (state.overlays !== undefined) root.set('overlays', encodeJsonValue(state.overlays));
+    if (state.loadExperience !== undefined) {
+      root.set('loadExperience', encodeJsonValue(state.loadExperience));
+    }
+    if (state.routeTransition !== undefined) {
+      root.set('routeTransition', encodeJsonValue(state.routeTransition));
+    }
 
     const pages = new Y.Array<Y.Map<unknown>>();
     for (const page of state.pages) pages.push([encodePage(page)]);
@@ -1839,6 +1849,19 @@ export function decodeYDoc(doc: Y.Doc): EditableSite {
     if (scroll.has('smooth')) scrollBehavior.smooth = scroll.get('smooth') as boolean;
     if (scroll.has('paddingTop')) scrollBehavior.paddingTop = scroll.get('paddingTop') as number;
     state.scrollBehavior = scrollBehavior;
+  }
+  if (root.has('overlays')) {
+    state.overlays = decodeJsonValue(root.get('overlays')) as NonNullable<EditableSite['overlays']>;
+  }
+  if (root.has('loadExperience')) {
+    state.loadExperience = decodeJsonValue(
+      root.get('loadExperience'),
+    ) as NonNullable<EditableSite['loadExperience']>;
+  }
+  if (root.has('routeTransition')) {
+    state.routeTransition = decodeJsonValue(
+      root.get('routeTransition'),
+    ) as NonNullable<EditableSite['routeTransition']>;
   }
   if (root.has('header')) {
     state.header = decodeSection(root.get('header') as Y.Map<unknown>);

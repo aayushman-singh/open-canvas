@@ -51,9 +51,16 @@ import {
   INLINE_FONT_SIZE_PX_MIN,
   INLINE_MARK_TYPES,
   INLINE_MATH_TEX_MAX_LEN,
+  LOAD_EXPERIENCE_GATES,
+  LOAD_EXPERIENCE_PRESETS,
+  LOAD_EXPERIENCE_RUN_POLICIES,
   MEDIA_KINDS,
+  MOTION_SEQUENCE_LITE_EFFECTS,
+  MOTION_SEQUENCE_LITE_TARGET_TYPES,
   MOTION_PRESETS,
+  OVERLAY_TRIGGER_TYPES,
   OVERFLOW_VALUES,
+  ROUTE_TRANSITION_MODES,
   SCROLL_TRIGGER_MODES,
   SECTION_RECIPE_IDS,
   SECTION_ROLES,
@@ -68,9 +75,16 @@ import {
   type EditableSite,
   type ElementType,
   type InlineMarkType,
+  type LoadExperienceGate,
+  type LoadExperiencePreset,
+  type LoadExperienceRunPolicy,
   type MediaKind,
+  type MotionSequenceLiteEffect,
+  type MotionSequenceLiteTargetType,
   type MotionPreset,
+  type OverlayTriggerType,
   type OverflowValue,
+  type RouteTransitionMode,
   type ScrollTriggerMode,
   type SectionRecipeId,
   type SectionRole,
@@ -1888,6 +1902,214 @@ function validateSectionTrigger(trigger: unknown, basePath: string, errors: stri
   }
 }
 
+function validateMotionSequenceLite(seq: unknown, basePath: string, errors: string[]): void {
+  if (seq === undefined) return;
+  if (!isRecord(seq)) {
+    errors.push(`${basePath} must be an object when present`);
+    return;
+  }
+  assertNonEmptyString(seq.id, `${basePath}.id`, errors);
+  if (!Array.isArray(seq.steps)) {
+    errors.push(`${basePath}.steps must be an array`);
+    return;
+  }
+  seq.steps.forEach((step, index) => {
+    const stepPath = `${basePath}.steps[${String(index)}]`;
+    if (!isRecord(step)) {
+      errors.push(`${stepPath} must be an object`);
+      return;
+    }
+    assertNonEmptyString(step.id, `${stepPath}.id`, errors);
+    assertOneOf<MotionSequenceLiteEffect>(
+      step.effect,
+      MOTION_SEQUENCE_LITE_EFFECTS,
+      `${stepPath}.effect`,
+      errors,
+    );
+    assertFiniteNumber(step.delayMs, `${stepPath}.delayMs`, errors);
+    assertFiniteNumber(step.durationMs, `${stepPath}.durationMs`, errors);
+    if (typeof step.durationMs === 'number' && step.durationMs <= 0) {
+      errors.push(`${stepPath}.durationMs must be > 0`);
+    }
+    assertNonEmptyString(step.easing, `${stepPath}.easing`, errors);
+    if (!isRecord(step.target)) {
+      errors.push(`${stepPath}.target must be an object`);
+      return;
+    }
+    assertOneOf<MotionSequenceLiteTargetType>(
+      step.target.type,
+      MOTION_SEQUENCE_LITE_TARGET_TYPES,
+      `${stepPath}.target.type`,
+      errors,
+    );
+    if (step.target.type === 'load-screen-part') {
+      assertOneOf(
+        step.target.part,
+        ['shell', 'brand', 'progress'] as const,
+        `${stepPath}.target.part`,
+        errors,
+      );
+    }
+  });
+}
+
+function validateInteractionTrigger(trigger: unknown, basePath: string, errors: string[]): void {
+  if (!isRecord(trigger)) {
+    errors.push(`${basePath} must be an object`);
+    return;
+  }
+  if (!assertOneOf<OverlayTriggerType>(trigger.type, OVERLAY_TRIGGER_TYPES, `${basePath}.type`, errors)) {
+    return;
+  }
+  if (trigger.type === 'delay') {
+    assertFiniteNumber(trigger.value, `${basePath}.value`, errors);
+    if (typeof trigger.value === 'number' && trigger.value < 0) {
+      errors.push(`${basePath}.value must be >= 0`);
+    }
+  } else if (trigger.type === 'scroll') {
+    assertFiniteNumber(trigger.value, `${basePath}.value`, errors);
+    if (typeof trigger.value === 'number' && (trigger.value < 0 || trigger.value > 100)) {
+      errors.push(`${basePath}.value must be in [0, 100]`);
+    }
+  } else if (trigger.type === 'element-click') {
+    assertNonEmptyString(trigger.targetElementId, `${basePath}.targetElementId`, errors);
+    if ('value' in trigger) {
+      errors.push(`${basePath}.value must be absent for ${String(trigger.type)} triggers`);
+    }
+  } else if ('value' in trigger) {
+    errors.push(`${basePath}.value must be absent for ${String(trigger.type)} triggers`);
+  }
+}
+
+function validateOverlays(site: Record<string, unknown>, errors: string[]): void {
+  if (site.overlays === undefined) return;
+  if (!Array.isArray(site.overlays)) {
+    errors.push('overlays must be an array when present');
+    return;
+  }
+  const pageIds = new Set<string>();
+  if (Array.isArray(site.pages)) {
+    site.pages.forEach((page) => {
+      if (isRecord(page) && typeof page.id === 'string') pageIds.add(page.id);
+    });
+  }
+  site.overlays.forEach((overlay, index) => {
+    const basePath = `overlays[${String(index)}]`;
+    if (!isRecord(overlay)) {
+      errors.push(`${basePath} must be an object`);
+      return;
+    }
+    assertNonEmptyString(overlay.id, `${basePath}.id`, errors);
+    assertNonEmptyString(overlay.name, `${basePath}.name`, errors);
+    validateInteractionTrigger(overlay.trigger, `${basePath}.trigger`, errors);
+    if (!isRecord(overlay.scope)) {
+      errors.push(`${basePath}.scope must be an object`);
+    } else if (overlay.scope.type === 'site') {
+      if ('pageIds' in overlay.scope) {
+        errors.push(`${basePath}.scope.pageIds must be absent for site scope`);
+      }
+    } else if (overlay.scope.type === 'pages') {
+      if (!Array.isArray(overlay.scope.pageIds) || overlay.scope.pageIds.length === 0) {
+        errors.push(`${basePath}.scope.pageIds must be a non-empty array for pages scope`);
+      } else {
+        overlay.scope.pageIds.forEach((pageId, pageIndex) => {
+          if (typeof pageId !== 'string' || !pageIds.has(pageId)) {
+            errors.push(`${basePath}.scope.pageIds[${String(pageIndex)}] must reference an existing page id`);
+          }
+        });
+      }
+    } else {
+      errors.push(`${basePath}.scope.type must be one of [site, pages]`);
+    }
+    validateSection(
+      overlay.content,
+      PAGE_WIDTH_MAX,
+      `${basePath}.content`,
+      errors,
+      new Set<string>(),
+      pageIds,
+    );
+    const dismissal = overlay.dismissal;
+    if (!isRecord(dismissal)) {
+      errors.push(`${basePath}.dismissal must be an object`);
+    } else {
+      ['closeButton', 'escape', 'backdropClick', 'bodyScrollLock', 'focusTrap', 'returnFocus'].forEach((key) => {
+        if (typeof dismissal[key] !== 'boolean') {
+          errors.push(`${basePath}.dismissal.${key} must be boolean`);
+        }
+      });
+    }
+    validateMotionSequenceLite(overlay.openSequence, `${basePath}.openSequence`, errors);
+    validateMotionSequenceLite(overlay.closeSequence, `${basePath}.closeSequence`, errors);
+  });
+}
+
+function validateLoadExperience(value: unknown, errors: string[]): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`loadExperience must be an object when present (got ${describe(value)})`);
+    return;
+  }
+  assertNonEmptyString(value.id, 'loadExperience.id', errors);
+  if (typeof value.enabled !== 'boolean') {
+    errors.push(`loadExperience.enabled must be boolean`);
+  }
+  assertOneOf<LoadExperiencePreset>(
+    value.preset,
+    LOAD_EXPERIENCE_PRESETS,
+    'loadExperience.preset',
+    errors,
+  );
+  assertOneOf<LoadExperienceRunPolicy>(
+    value.runPolicy,
+    LOAD_EXPERIENCE_RUN_POLICIES,
+    'loadExperience.runPolicy',
+    errors,
+  );
+  if (!Array.isArray(value.gates)) {
+    errors.push('loadExperience.gates must be an array');
+  } else {
+    value.gates.forEach((gate, index) => {
+      assertOneOf<LoadExperienceGate>(
+        gate,
+        LOAD_EXPERIENCE_GATES,
+        `loadExperience.gates[${String(index)}]`,
+        errors,
+      );
+    });
+  }
+  assertFiniteNumber(value.timeoutMs, 'loadExperience.timeoutMs', errors);
+  if (typeof value.timeoutMs === 'number' && value.timeoutMs < 0) {
+    errors.push('loadExperience.timeoutMs must be >= 0');
+  }
+  validateMotionSequenceLite(value.handoffSequence, 'loadExperience.handoffSequence', errors);
+}
+
+function validateRouteTransition(value: unknown, errors: string[]): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`routeTransition must be an object when present (got ${describe(value)})`);
+    return;
+  }
+  assertNonEmptyString(value.id, 'routeTransition.id', errors);
+  if (typeof value.enabled !== 'boolean') {
+    errors.push('routeTransition.enabled must be boolean');
+  }
+  assertOneOf<RouteTransitionMode>(
+    value.mode,
+    ROUTE_TRANSITION_MODES,
+    'routeTransition.mode',
+    errors,
+  );
+  assertFiniteNumber(value.durationMs, 'routeTransition.durationMs', errors);
+  if (typeof value.durationMs === 'number' && value.durationMs <= 0) {
+    errors.push('routeTransition.durationMs must be > 0');
+  }
+  assertNonEmptyString(value.easing, 'routeTransition.easing', errors);
+  validateMotionSequenceLite(value.outgoingSequence, 'routeTransition.outgoingSequence', errors);
+  validateMotionSequenceLite(value.incomingSequence, 'routeTransition.incomingSequence', errors);
+}
+
 function validateBackgroundVideo(value: unknown, basePath: string, errors: string[]): void {
   if (value === undefined) return;
   if (!isNonEmptyString(value)) {
@@ -2194,6 +2416,15 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
         `state.footer must be a section object when present (got ${describe(state.footer)})`,
       );
     }
+  },
+  overlays: ({ state, errors }) => {
+    validateOverlays(state, errors);
+  },
+  loadExperience: ({ state, errors }) => {
+    validateLoadExperience(state.loadExperience, errors);
+  },
+  routeTransition: ({ state, errors }) => {
+    validateRouteTransition(state.routeTransition, errors);
   },
   defaultLocale: ({ state, errors }) => {
     // Locale uses the same "non-empty string when present" shape as the

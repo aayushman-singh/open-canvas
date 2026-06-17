@@ -103,6 +103,32 @@ export type MotionPreset = (typeof MOTION_PRESETS)[number];
 export const SCROLL_TRIGGER_MODES = ['on-load', 'on-scroll'] as const;
 export type ScrollTriggerMode = (typeof SCROLL_TRIGGER_MODES)[number];
 
+export const OVERLAY_TRIGGER_TYPES = ['load', 'delay', 'scroll', 'exit-intent', 'element-click'] as const;
+export type OverlayTriggerType = (typeof OVERLAY_TRIGGER_TYPES)[number];
+
+export const LOAD_EXPERIENCE_PRESETS = ['fade', 'wipe', 'logo-card', 'progress-bar'] as const;
+export type LoadExperiencePreset = (typeof LOAD_EXPERIENCE_PRESETS)[number];
+
+export const LOAD_EXPERIENCE_RUN_POLICIES = ['every-visit', 'once-per-session'] as const;
+export type LoadExperienceRunPolicy = (typeof LOAD_EXPERIENCE_RUN_POLICIES)[number];
+
+export const LOAD_EXPERIENCE_GATES = ['document-ready', 'fonts-ready', 'hero-media-ready'] as const;
+export type LoadExperienceGate = (typeof LOAD_EXPERIENCE_GATES)[number];
+
+export const ROUTE_TRANSITION_MODES = ['fade', 'slide', 'wipe'] as const;
+export type RouteTransitionMode = (typeof ROUTE_TRANSITION_MODES)[number];
+
+export const MOTION_SEQUENCE_LITE_EFFECTS = ['fade', 'slide', 'scale', 'wipe', 'blur'] as const;
+export type MotionSequenceLiteEffect = (typeof MOTION_SEQUENCE_LITE_EFFECTS)[number];
+
+export const MOTION_SEQUENCE_LITE_TARGET_TYPES = [
+  'page-container',
+  'overlay-surface',
+  'overlay-backdrop',
+  'load-screen-part',
+] as const;
+export type MotionSequenceLiteTargetType = (typeof MOTION_SEQUENCE_LITE_TARGET_TYPES)[number];
+
 // ADR 0060 / ADR 0063 — CMS collection page kinds.
 //
 // ADR 0063 dec 2 + F5 — `'collection-index'` is retired. The element-
@@ -578,6 +604,75 @@ export interface CanvasPage {
   suppressFooter?: boolean;
 }
 
+export type InteractionTrigger =
+  | { type: 'load' }
+  | { type: 'exit-intent' }
+  | { type: 'delay'; value: number }
+  | { type: 'scroll'; value: number }
+  | { type: 'element-click'; targetElementId: string };
+
+export type OverlayScope = { type: 'site' } | { type: 'pages'; pageIds: string[] };
+
+export type MotionSequenceLiteTarget =
+  | { type: 'page-container' }
+  | { type: 'overlay-surface' }
+  | { type: 'overlay-backdrop' }
+  | { type: 'load-screen-part'; part: 'shell' | 'brand' | 'progress' };
+
+export interface MotionSequenceLiteStep {
+  id: string;
+  target: MotionSequenceLiteTarget;
+  effect: MotionSequenceLiteEffect;
+  delayMs: number;
+  durationMs: number;
+  easing: string;
+}
+
+export interface MotionSequenceLite {
+  id: string;
+  steps: MotionSequenceLiteStep[];
+}
+
+export interface OverlayDismissal {
+  closeButton: boolean;
+  escape: boolean;
+  backdropClick: boolean;
+  bodyScrollLock: boolean;
+  focusTrap: boolean;
+  returnFocus: boolean;
+}
+
+export interface Overlay {
+  id: string;
+  name: string;
+  scope: OverlayScope;
+  trigger: InteractionTrigger;
+  content: CanvasSection;
+  dismissal: OverlayDismissal;
+  openSequence?: MotionSequenceLite;
+  closeSequence?: MotionSequenceLite;
+}
+
+export interface LoadExperience {
+  id: string;
+  enabled: boolean;
+  preset: LoadExperiencePreset;
+  runPolicy: LoadExperienceRunPolicy;
+  gates: LoadExperienceGate[];
+  timeoutMs: number;
+  handoffSequence?: MotionSequenceLite;
+}
+
+export interface RouteTransition {
+  id: string;
+  enabled: boolean;
+  mode: RouteTransitionMode;
+  durationMs: number;
+  easing: string;
+  outgoingSequence?: MotionSequenceLite;
+  incomingSequence?: MotionSequenceLite;
+}
+
 /**
  * ADR 0016 — `styleKit` and `customStyleKit` form a real discriminated union:
  * `customStyleKit` is required exactly when `styleKit === 'custom'` and absent
@@ -594,6 +689,9 @@ export interface EditableSiteBase {
   header?: CanvasSection;
   /** Site-wide footer section shared across all pages. */
   footer?: CanvasSection;
+  overlays?: Overlay[];
+  loadExperience?: LoadExperience;
+  routeTransition?: RouteTransition;
   /**
    * Default locale for pages with no explicit `locale`. Optional everywhere;
    * `'en'` when absent.
