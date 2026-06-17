@@ -1,0 +1,116 @@
+{
+  "baseSlug": "velocity-template-impact",
+  "category": "features",
+  "name": "Impact",
+  "description": "Velocity Athlete impact statement — large split-text manifesto.",
+  "recipeId": "custom",
+  "headingPreview": "Speed is signal",
+  "sectionData": {
+    "id": "velocity-impact",
+    "recipeId": "custom",
+    "name": "Impact",
+    "height": 640,
+    "anchorId": "impact",
+    "elements": [
+      {
+        "id": "velocity-impact-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 640,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#282C20"
+        }
+      },
+      {
+        "id": "velocity-impact-eyebrow",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 80,
+          "w": 400,
+          "h": 24,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "FIELD MANIFESTO"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 600,
+        "align": "left",
+        "letterSpacing": "0.14em",
+        "pinnedStyle": {
+          "color": "#C8FF1A"
+        }
+      },
+      {
+        "id": "velocity-impact-heading",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 140,
+          "w": 1200,
+          "h": 360,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Speed is not noise. It is "
+          },
+          {
+            "text": "signal",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": ". Every lap leaves a contour. Every contour becomes a story you can feel before you read it."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 72,
+        "fontWeight": 700,
+        "align": "left",
+        "lineHeight": 1.05,
+        "pinnedStyle": {
+          "color": "#F4F4ED"
+        }
+      },
+      {
+        "id": "velocity-impact-caption",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 520,
+          "w": 720,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Training archive · kinetic identity · 2026 world tour"
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#5D6254"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "velocity-athlete"
+}

@@ -1,0 +1,209 @@
+{
+  "baseSlug": "velocity-template-store",
+  "category": "cta",
+  "name": "Store",
+  "description": "Velocity Athlete store CTA — product drop with citron and heat orange accents.",
+  "recipeId": "custom",
+  "headingPreview": "Signal drop 01",
+  "sectionData": {
+    "id": "velocity-store",
+    "recipeId": "custom",
+    "name": "Store",
+    "height": 560,
+    "anchorId": "store",
+    "elements": [
+      {
+        "id": "velocity-store-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 560,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#282C20"
+        }
+      },
+      {
+        "id": "velocity-store-accent",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 8,
+          "h": 120,
+          "z": 2
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "#FF6B2A"
+        }
+      },
+      {
+        "id": "velocity-store-eyebrow",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 80,
+          "w": 320,
+          "h": 24,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "SIGNAL DROP 01"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 600,
+        "align": "left",
+        "letterSpacing": "0.14em",
+        "pinnedStyle": {
+          "color": "#C8FF1A"
+        }
+      },
+      {
+        "id": "velocity-store-heading",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 120,
+          "w": 640,
+          "h": 120,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Field kit — limited run"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 56,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#F4F4ED"
+        }
+      },
+      {
+        "id": "velocity-store-body",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 260,
+          "w": 560,
+          "h": 80,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Citron-trim race layer, graphite base, and a heat-orange pull tab. Built for athletes who treat every entrance like a start line."
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#5D6254"
+        }
+      },
+      {
+        "id": "velocity-store-price",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 360,
+          "w": 200,
+          "h": 40,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "$148"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 32,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#FF6B2A"
+        }
+      },
+      {
+        "id": "velocity-store-cta",
+        "type": "action",
+        "box": {
+          "x": 112,
+          "y": 420,
+          "w": 240,
+          "h": 56,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Shop the drop"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://example.com/store"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "velocity-store-media",
+        "type": "media",
+        "box": {
+          "x": 820,
+          "y": 80,
+          "w": 540,
+          "h": 400,
+          "z": 2
+        },
+        "mediaKind": "image",
+        "assetId": "seed-velocity-product-study",
+        "alt": "Signal drop product macro with heat orange accents",
+        "fit": "cover",
+        "pinnedStyle": {
+          "borderRadius": "8px",
+          "border": "1px solid rgba(200, 255, 26, 0.25)"
+        }
+      },
+      {
+        "id": "velocity-store-badge",
+        "type": "text",
+        "box": {
+          "x": 1080,
+          "y": 100,
+          "w": 120,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "NEW"
+          }
+        ],
+        "role": "label",
+        "fontSize": 11,
+        "fontWeight": 700,
+        "align": "center",
+        "letterSpacing": "0.1em",
+        "pinnedStyle": {
+          "color": "#111112",
+          "background": "#C8FF1A",
+          "padding": "6px 12px",
+          "borderRadius": "999px"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "velocity-athlete"
+}

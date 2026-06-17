@@ -30,7 +30,7 @@ import type {
   EditableSiteStyleKit,
   StyleKit,
   StyleKitPreset,
-} from '../canvas/schema';
+} from '../canvas/schema.js';
 import {
   SECTION_LIBRARY,
   entryRowId,
@@ -111,6 +111,302 @@ const APOGEE_KIT = (apogeeShowcaseSeed as unknown as { customStyleKit: StyleKitP
   .customStyleKit;
 const PORTFOLIO_KIT = (portfolioShowcaseSeed as unknown as { customStyleKit: StyleKitPreset })
   .customStyleKit;
+
+const VELOCITY_KIT: StyleKitPreset = {
+  bg: '#111112',
+  panel: '#282C20',
+  text: '#F4F4ED',
+  muted: '#5D6254',
+  accent: '#C8FF1A',
+  accentText: '#111112',
+  fontFamilyDisplay:
+    "'Instrument Serif', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+  fontFamilyBody: "'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif",
+  fontFamilyMono: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
+  headingScale: 1.12,
+  bodyScale: 1,
+  labelScale: 0.82,
+  lineHeight: 1.45,
+  radius: '4px',
+  borderWidth: '1px',
+  shadow: '0 12px 40px rgba(0, 0, 0, 0.45)',
+  surfaceVariants: {
+    flat: {
+      background: '#111112',
+      shadow: 'none',
+    },
+    raised: {
+      background: '#282C20',
+      border: '1px solid rgba(93, 98, 84, 0.35)',
+      shadow: '0 12px 40px rgba(0, 0, 0, 0.45)',
+      radius: '6px',
+    },
+    glass: {
+      background: 'rgba(40, 44, 32, 0.72)',
+      border: '1px solid rgba(200, 255, 26, 0.18)',
+      shadow: '0 8px 28px rgba(0, 0, 0, 0.40)',
+      radius: '6px',
+    },
+    outlined: {
+      background: 'transparent',
+      border: '1px solid rgba(93, 98, 84, 0.45)',
+      radius: '4px',
+    },
+    sticker: {
+      background: '#282C20',
+      border: '1px solid rgba(200, 255, 26, 0.35)',
+      shadow: '4px 4px 0 #C8FF1A, 0 0 0 1px rgba(200, 255, 26, 0.15)',
+      radius: '4px',
+    },
+    'editorial-frame': {
+      background: 'transparent',
+      border: '2px solid #C8FF1A',
+      radius: '0px',
+    },
+    'soft-panel': {
+      background: '#1a1b1c',
+      shadow: '0 1px 0 rgba(244, 244, 237, 0.04) inset',
+    },
+  },
+  shapeFill: '#C8FF1A',
+  shapeStroke: '#5D6254',
+  shapeStrokeWidth: '1px',
+  actionRadius: '999px',
+  actionPadding: '14px 24px',
+  actionVariants: {
+    solid: {
+      background: '#C8FF1A',
+      color: '#111112',
+      weight: 700,
+      borderRadius: '999px',
+      boxShadow: '0 4px 16px rgba(200, 255, 26, 0.25)',
+    },
+    outline: {
+      background: 'transparent',
+      color: '#F4F4ED',
+      border: '1px solid rgba(244, 244, 237, 0.35)',
+      weight: 600,
+      borderRadius: '999px',
+    },
+    ghost: {
+      background: 'transparent',
+      color: '#F4F4ED',
+      weight: 500,
+      borderRadius: '4px',
+      padding: '8px 12px',
+    },
+    pill: {
+      background: '#282C20',
+      color: '#F4F4ED',
+      weight: 600,
+      border: '1px solid rgba(93, 98, 84, 0.45)',
+      borderRadius: '999px',
+      padding: '6px 14px',
+      letterSpacing: '0.06em',
+    },
+    glass: {
+      background: 'rgba(40, 44, 32, 0.72)',
+      color: '#F4F4ED',
+      border: '1px solid rgba(200, 255, 26, 0.20)',
+      backdropFilter: 'blur(12px)',
+      borderRadius: '999px',
+    },
+    brutalist: {
+      background: '#FF6B2A',
+      color: '#111112',
+      border: '2px solid #FF6B2A',
+      weight: 800,
+      borderRadius: '0px',
+      boxShadow: '4px 4px 0 #111112',
+    },
+    underline: {
+      background: 'transparent',
+      color: '#C8FF1A',
+      textDecoration: 'underline',
+      borderRadius: '0px',
+      padding: '0',
+    },
+  },
+  motionDurationMs: 420,
+  motionEasing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  motionPresets: {
+    none: {},
+    'fade-up': {
+      transform: 'translateY(16px)',
+      opacity: 0,
+    },
+    'fade-down': {
+      transform: 'translateY(-16px)',
+      opacity: 0,
+    },
+    'fade-in': {
+      opacity: 0,
+    },
+    'fade-right': {
+      transform: 'translateX(-16px)',
+      opacity: 0,
+    },
+    'slide-left': {
+      transform: 'translateX(24px)',
+      opacity: 0,
+    },
+    'slide-up': {
+      transform: 'translateY(24px)',
+    },
+    'slide-right': {
+      transform: 'translateX(-24px)',
+    },
+    'scale-in': {
+      transform: 'scale(0.94)',
+      opacity: 0,
+    },
+    'zoom-out': {
+      transform: 'scale(1.06)',
+      opacity: 0,
+    },
+    'blur-in': {
+      opacity: 0,
+    },
+    'rotate-in': {
+      transform: 'rotate(-3deg) scale(0.96)',
+      opacity: 0,
+    },
+    'flip-in': {
+      transform: 'perspective(600px) rotateY(90deg)',
+      opacity: 0,
+    },
+    'bounce-in': {
+      transform: 'scale(0.72)',
+      opacity: 0,
+    },
+    'stagger-children': {
+      transform: 'translateY(10px)',
+      opacity: 0,
+      delayMs: 50,
+    },
+    'slow-drift': {
+      transform: 'translateY(0px)',
+    },
+    'parallax-soft': {
+      transform: 'translateY(8px)',
+    },
+  },
+};
+
+export const velocityAthleteTemplate: TemplateSeed = {
+  id: 'velocity-athlete',
+  name: 'Velocity Athlete',
+  tagline: 'A kinetic personal-brand template for athletes, creators, and high-energy product drops.',
+  styleKit: 'custom',
+  customStyleKit: VELOCITY_KIT,
+  headerRef: { sectionId: 'velocity-template-header-v1', instanceId: 'velocityheader' },
+  footerRef: { sectionId: 'velocity-template-footer-v1', instanceId: 'velocityfooter' },
+  loadExperience: {
+    id: 'velocity-load',
+    label: 'Ari Vale',
+    enterLabel: 'Load Vale',
+    background: '#111112',
+    foreground: '#C8FF1A',
+    sequenceId: 'velocity-load-sequence',
+  },
+  richMotionAssets: [
+    {
+      id: 'velocity-helmet-sequence',
+      kind: 'image-sequence',
+      posterAssetId: 'seed-velocity-helmet-frame-00',
+      alt: 'Abstract signal helmet rotating through a kinetic frame sequence',
+      frameAssetIds: [
+        'seed-velocity-helmet-frame-00',
+        'seed-velocity-helmet-frame-01',
+        'seed-velocity-helmet-frame-02',
+        'seed-velocity-helmet-frame-03',
+        'seed-velocity-helmet-frame-04',
+        'seed-velocity-helmet-frame-05',
+        'seed-velocity-helmet-frame-06',
+        'seed-velocity-helmet-frame-07',
+        'seed-velocity-helmet-frame-08',
+        'seed-velocity-helmet-frame-09',
+        'seed-velocity-helmet-frame-10',
+        'seed-velocity-helmet-frame-11',
+      ],
+      playback: { driver: 'load', fps: 18, loop: true },
+    },
+  ],
+  motionSequences: [
+    {
+      id: 'velocity-load-sequence',
+      trigger: { type: 'load-enter' },
+      reducedMotion: 'final-state',
+      steps: [
+        { id: 'load-out', target: { type: 'site' }, to: { opacity: 1 }, durationMs: 260 },
+        {
+          id: 'hero-motion-in',
+          target: { type: 'element', elementId: 'velocity-hero-motion' },
+          from: { scale: 0.88, opacity: 0 },
+          to: { scale: 1, opacity: 1 },
+          durationMs: 620,
+          delayMs: 80,
+        },
+      ],
+    },
+    {
+      id: 'velocity-impact-split',
+      trigger: { type: 'section-enter', sectionId: 'velocity-impact' },
+      reducedMotion: 'final-state',
+      steps: [
+        {
+          id: 'impact-words',
+          target: { type: 'text-split', elementId: 'velocity-impact-heading', unit: 'word' },
+          from: { translateY: 32, opacity: 0 },
+          to: { translateY: 0, opacity: 1 },
+          durationMs: 420,
+          staggerMs: 28,
+        },
+      ],
+    },
+    {
+      id: 'velocity-story-scrub',
+      trigger: { type: 'scroll-scene', scrollSceneId: 'velocity-story-scene' },
+      reducedMotion: 'final-state',
+      steps: [
+        {
+          id: 'story-track-x',
+          target: { type: 'element', elementId: 'velocity-story-track' },
+          from: { translateX: 0 },
+          to: { translateX: -940 },
+          durationMs: 1,
+        },
+      ],
+    },
+  ],
+  scrollScenes: [
+    {
+      id: 'velocity-story-scene',
+      sectionId: 'velocity-story',
+      sequenceId: 'velocity-story-scrub',
+      pinTarget: { type: 'section', sectionId: 'velocity-story' },
+      startOffsetPx: 0,
+      endOffsetPx: 1800,
+    },
+  ],
+  pages: [
+    {
+      id: 'page-velocity-home',
+      slug: 'home',
+      title: 'Ari Vale - Velocity Athlete',
+      width: 1440,
+      pageBackground: '#111112',
+      sectionGap: 0,
+      bodyRefs: [
+        { sectionId: 'velocity-template-hero-v1', instanceId: 'velocityhero' },
+        { sectionId: 'velocity-template-impact-v1', instanceId: 'velocityimpact' },
+        { sectionId: 'velocity-template-story-v1', instanceId: 'velocitystory' },
+        { sectionId: 'velocity-template-artifacts-v1', instanceId: 'velocityartifacts' },
+        { sectionId: 'velocity-template-store-v1', instanceId: 'velocitystore' },
+      ],
+    },
+  ],
+};
 
 export const starterTemplate: TemplateSeed = {
   id: 'starter-canvas',
@@ -465,6 +761,7 @@ export const allTemplateSeeds: ReadonlyArray<TemplateSeed> = [
   violetLaunchTemplate,
   apogeeShowcaseTemplate,
   portfolioShowcaseTemplate,
+  velocityAthleteTemplate,
 ];
 
 const templatesById = new Map(allTemplateSeeds.map((template) => [template.id, template]));

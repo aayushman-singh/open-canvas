@@ -1,0 +1,186 @@
+{
+  "baseSlug": "velocity-template-footer",
+  "category": "footer",
+  "name": "Footer",
+  "description": "Velocity Athlete footer — dense statement with repeated marquee text.",
+  "recipeId": "custom",
+  "headingPreview": "Ari Vale",
+  "sectionData": {
+    "id": "velocity-footer",
+    "recipeId": "custom",
+    "name": "Footer",
+    "height": 240,
+    "elements": [
+      {
+        "id": "velocity-footer-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 240,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#111112"
+        }
+      },
+      {
+        "id": "velocity-footer-marquee-1",
+        "type": "text",
+        "box": {
+          "x": 0,
+          "y": 32,
+          "w": 1440,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "ARI VALE · SIGNAL CIRCUIT · FIELD NOTES · ARI VALE · SIGNAL CIRCUIT · FIELD NOTES · "
+          }
+        ],
+        "role": "heading",
+        "fontSize": 36,
+        "fontWeight": 700,
+        "align": "left",
+        "letterSpacing": "-0.02em",
+        "pinnedStyle": {
+          "color": "rgba(244, 244, 237, 0.12)",
+          "whiteSpace": "nowrap"
+        }
+      },
+      {
+        "id": "velocity-footer-marquee-2",
+        "type": "text",
+        "box": {
+          "x": 0,
+          "y": 88,
+          "w": 1440,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "VELOCITY ATHLETE · 2026 WORLD TOUR · VELOCITY ATHLETE · 2026 WORLD TOUR · "
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left",
+        "letterSpacing": "-0.01em",
+        "pinnedStyle": {
+          "color": "rgba(200, 255, 26, 0.18)",
+          "whiteSpace": "nowrap"
+        }
+      },
+      {
+        "id": "velocity-footer-brand",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 160,
+          "w": 240,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Ari Vale"
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#F4F4ED"
+        }
+      },
+      {
+        "id": "velocity-footer-copy",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 196,
+          "w": 480,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "© 2026 Ari Vale. Original athlete identity template."
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#5D6254"
+        }
+      },
+      {
+        "id": "velocity-footer-link-1",
+        "type": "action",
+        "box": {
+          "x": 1040,
+          "y": 164,
+          "w": 120,
+          "h": 32,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Privacy"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/privacy"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "velocity-footer-link-2",
+        "type": "action",
+        "box": {
+          "x": 1180,
+          "y": 164,
+          "w": 120,
+          "h": 32,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Contact"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/contact"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "velocity-footer-mark",
+        "type": "shape",
+        "box": {
+          "x": 1320,
+          "y": 160,
+          "w": 40,
+          "h": 40,
+          "z": 3
+        },
+        "variant": "circle",
+        "pinnedStyle": {
+          "background": "#C8FF1A"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "velocity-athlete"
+}

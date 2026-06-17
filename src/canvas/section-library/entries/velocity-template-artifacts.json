@@ -1,0 +1,508 @@
+{
+  "baseSlug": "velocity-template-artifacts",
+  "category": "gallery",
+  "name": "Artifacts",
+  "description": "Velocity Athlete artifact gallery — collection grid of original media studies.",
+  "recipeId": "custom",
+  "headingPreview": "Training archive",
+  "sectionData": {
+    "id": "velocity-artifacts",
+    "recipeId": "custom",
+    "name": "Artifacts",
+    "height": 880,
+    "anchorId": "artifacts",
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "velocity-artifacts-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 880,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#111112"
+        }
+      },
+      {
+        "id": "velocity-artifacts-eyebrow",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 64,
+          "w": 320,
+          "h": 24,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "TRAINING ARCHIVE"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 600,
+        "align": "left",
+        "letterSpacing": "0.14em",
+        "pinnedStyle": {
+          "color": "#C8FF1A"
+        }
+      },
+      {
+        "id": "velocity-artifacts-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 104,
+          "w": 720,
+          "h": 64,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Artifacts from the field"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#F4F4ED"
+        }
+      },
+      {
+        "id": "velocity-artifacts-grid",
+        "type": "collection",
+        "box": {
+          "x": 80,
+          "y": 200,
+          "w": 1280,
+          "h": 600,
+          "z": 1
+        },
+        "display": "card",
+        "entries": [
+          [
+            {
+              "id": "artifact-track-bg",
+              "type": "container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 560,
+                "z": 1
+              },
+              "variant": "raised",
+              "preset": "card",
+              "pinnedStyle": {
+                "background": "#282C20",
+                "border": "1px solid rgba(93, 98, 84, 0.35)"
+              }
+            },
+            {
+              "id": "artifact-track-img",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 320,
+                "z": 2
+              },
+              "mediaKind": "image",
+              "assetId": "seed-velocity-track-study",
+              "alt": "Track contour artifact",
+              "fit": "cover"
+            },
+            {
+              "id": "artifact-track-tag",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 340,
+                "w": 120,
+                "h": 20,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "TRACK"
+                }
+              ],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#C8FF1A"
+              }
+            },
+            {
+              "id": "artifact-track-title",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 372,
+                "w": 252,
+                "h": 56,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "Contour study 01"
+                }
+              ],
+              "role": "heading",
+              "fontSize": 22,
+              "fontWeight": 600,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#F4F4ED"
+              }
+            },
+            {
+              "id": "artifact-track-meta",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 440,
+                "w": 252,
+                "h": 40,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "Speed lines mapped across a fictional circuit."
+                }
+              ],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#5D6254"
+              }
+            }
+          ],
+          [
+            {
+              "id": "artifact-garage-bg",
+              "type": "container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 560,
+                "z": 1
+              },
+              "variant": "raised",
+              "preset": "card",
+              "pinnedStyle": {
+                "background": "#282C20",
+                "border": "1px solid rgba(93, 98, 84, 0.35)"
+              }
+            },
+            {
+              "id": "artifact-garage-img",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 320,
+                "z": 2
+              },
+              "mediaKind": "image",
+              "assetId": "seed-velocity-garage-study",
+              "alt": "Garage form artifact",
+              "fit": "cover"
+            },
+            {
+              "id": "artifact-garage-tag",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 340,
+                "w": 120,
+                "h": 20,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "GARAGE"
+                }
+              ],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#C8FF1A"
+              }
+            },
+            {
+              "id": "artifact-garage-title",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 372,
+                "w": 252,
+                "h": 56,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "Paddock forms"
+                }
+              ],
+              "role": "heading",
+              "fontSize": 22,
+              "fontWeight": 600,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#F4F4ED"
+              }
+            },
+            {
+              "id": "artifact-garage-meta",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 440,
+                "w": 252,
+                "h": 40,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "Layered mechanical silhouettes from prep week."
+                }
+              ],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#5D6254"
+              }
+            }
+          ],
+          [
+            {
+              "id": "artifact-suit-bg",
+              "type": "container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 560,
+                "z": 1
+              },
+              "variant": "raised",
+              "preset": "card",
+              "pinnedStyle": {
+                "background": "#282C20",
+                "border": "1px solid rgba(93, 98, 84, 0.35)"
+              }
+            },
+            {
+              "id": "artifact-suit-img",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 320,
+                "z": 2
+              },
+              "mediaKind": "image",
+              "assetId": "seed-velocity-suit-study",
+              "alt": "Suit textile artifact",
+              "fit": "cover"
+            },
+            {
+              "id": "artifact-suit-tag",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 340,
+                "w": 120,
+                "h": 20,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "SUIT"
+                }
+              ],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#C8FF1A"
+              }
+            },
+            {
+              "id": "artifact-suit-title",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 372,
+                "w": 252,
+                "h": 56,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "Textile signal"
+                }
+              ],
+              "role": "heading",
+              "fontSize": 22,
+              "fontWeight": 600,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#F4F4ED"
+              }
+            },
+            {
+              "id": "artifact-suit-meta",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 440,
+                "w": 252,
+                "h": 40,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "Citron seam geometry on race-day fabric."
+                }
+              ],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#5D6254"
+              }
+            }
+          ],
+          [
+            {
+              "id": "artifact-product-bg",
+              "type": "container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 560,
+                "z": 1
+              },
+              "variant": "raised",
+              "preset": "card",
+              "pinnedStyle": {
+                "background": "#282C20",
+                "border": "1px solid rgba(93, 98, 84, 0.35)"
+              }
+            },
+            {
+              "id": "artifact-product-img",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 320,
+                "z": 2
+              },
+              "mediaKind": "image",
+              "assetId": "seed-velocity-product-study",
+              "alt": "Product macro artifact",
+              "fit": "cover"
+            },
+            {
+              "id": "artifact-product-tag",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 340,
+                "w": 120,
+                "h": 20,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "DROP"
+                }
+              ],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#FF6B2A"
+              }
+            },
+            {
+              "id": "artifact-product-title",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 372,
+                "w": 252,
+                "h": 56,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "Signal kit macro"
+                }
+              ],
+              "role": "heading",
+              "fontSize": 22,
+              "fontWeight": 600,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#F4F4ED"
+              }
+            },
+            {
+              "id": "artifact-product-meta",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 440,
+                "w": 252,
+                "h": 40,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "Heat-orange highlights on limited gear."
+                }
+              ],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#5D6254"
+              }
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "velocity-athlete"
+}
