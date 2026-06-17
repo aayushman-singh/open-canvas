@@ -25,6 +25,7 @@ export type SidebarFactoryName =
   | 'text'
   | 'image'
   | 'video'
+  | 'rich-motion'
   | 'action'
   | 'shape'
   | 'container'
@@ -72,6 +73,16 @@ export const SIDEBAR_FACTORIES: Record<SidebarFactoryName, () => SidebarFactoryR
       alt: 'Video',
       fit: 'cover',
       playback: { autoplay: false, muted: true, loop: false, controls: true },
+    },
+  }),
+
+  'rich-motion': () => ({
+    defaultSize: { w: 520, h: 520 },
+    payload: {
+      type: 'rich-motion',
+      assetRefId: '__placeholder__',
+      fit: 'contain',
+      label: 'Rich motion asset',
     },
   }),
 

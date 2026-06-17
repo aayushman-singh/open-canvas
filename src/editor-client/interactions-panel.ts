@@ -7,7 +7,7 @@
 
 import type {
   InteractionTrigger,
-  LoadExperience,
+  PremiumLoadExperience,
   LoadExperienceGate,
   LoadExperiencePreset,
   LoadExperienceRunPolicy,
@@ -22,7 +22,9 @@ import type {
   OverlayTriggerType,
   RouteTransition,
   RouteTransitionMode,
+  EditableSite,
 } from '../canvas/schema.js';
+import { isPremiumLoadExperience } from '../canvas/schema.js';
 import {
   LOAD_EXPERIENCE_GATES,
   LOAD_EXPERIENCE_PRESETS,
@@ -83,7 +85,7 @@ export function defaultOverlay(id: string, name: string, pageId: string): Overla
   };
 }
 
-export function defaultLoadExperience(): LoadExperience {
+export function defaultLoadExperience(): PremiumLoadExperience {
   return {
     id: 'load-main',
     enabled: false,
@@ -215,15 +217,20 @@ function activePageId(ctx: InteractionsPanelContext): string | null {
   return ctx.activePageId || ctx.state.pages[0]!.id;
 }
 
+function currentPremiumLoadExperience(state: EditableSite): PremiumLoadExperience {
+  const load = state.loadExperience;
+  return isPremiumLoadExperience(load) ? load : defaultLoadExperience();
+}
+
 function renderLoadControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
   if (!ctx.state) return;
   const wrap = section('Load Experience');
-  const load = ctx.state.loadExperience;
+  const load = isPremiumLoadExperience(ctx.state.loadExperience) ? ctx.state.loadExperience : undefined;
 
   wrap.appendChild(
     checkbox(!!load?.enabled, 'Enable load screen', (checked) => {
       mutate(ctx, () => {
-        const current = ctx.state!.loadExperience ?? defaultLoadExperience();
+        const current = currentPremiumLoadExperience(ctx.state!);
         ctx.state!.loadExperience = { ...current, enabled: checked };
       });
       ctx.setStatus(checked ? 'Load experience enabled' : 'Load experience disabled', 'ok');
@@ -234,7 +241,7 @@ function renderLoadControls(ctx: InteractionsPanelContext, host: HTMLElement): v
   const preset = selectInput(LOAD_EXPERIENCE_PRESETS, model.preset);
   preset.addEventListener('change', () => {
     mutate(ctx, () => {
-      const current = ctx.state!.loadExperience ?? defaultLoadExperience();
+      const current = currentPremiumLoadExperience(ctx.state!);
       ctx.state!.loadExperience = {
         ...current,
         preset: preset.value as LoadExperiencePreset,
@@ -246,7 +253,7 @@ function renderLoadControls(ctx: InteractionsPanelContext, host: HTMLElement): v
   const runPolicy = selectInput(LOAD_EXPERIENCE_RUN_POLICIES, model.runPolicy);
   runPolicy.addEventListener('change', () => {
     mutate(ctx, () => {
-      const current = ctx.state!.loadExperience ?? defaultLoadExperience();
+      const current = currentPremiumLoadExperience(ctx.state!);
       ctx.state!.loadExperience = {
         ...current,
         runPolicy: runPolicy.value as LoadExperienceRunPolicy,
@@ -261,7 +268,7 @@ function renderLoadControls(ctx: InteractionsPanelContext, host: HTMLElement): v
     gatesHost.appendChild(
       checkbox(model.gates.includes(gate), gate, (checked) => {
         mutate(ctx, () => {
-          const current = ctx.state!.loadExperience ?? defaultLoadExperience();
+          const current = currentPremiumLoadExperience(ctx.state!);
           const gateSet = new Set<LoadExperienceGate>(current.gates);
           if (checked) {
             gateSet.add(gate);
@@ -283,11 +290,11 @@ function renderLoadControls(ctx: InteractionsPanelContext, host: HTMLElement): v
     const next = validNumber(timeout, 0, 30000);
     if (next === null) {
       ctx.setStatus('Load timeout must be 0-30000ms', 'error');
-      timeout.value = String((ctx.state?.loadExperience ?? defaultLoadExperience()).timeoutMs);
+      timeout.value = String(currentPremiumLoadExperience(ctx.state!).timeoutMs);
       return;
     }
     mutate(ctx, () => {
-      const current = ctx.state!.loadExperience ?? defaultLoadExperience();
+      const current = currentPremiumLoadExperience(ctx.state!);
       ctx.state!.loadExperience = { ...current, timeoutMs: next };
     });
   });
@@ -298,7 +305,7 @@ function renderLoadControls(ctx: InteractionsPanelContext, host: HTMLElement): v
   wrap.appendChild(preview);
 
   renderSequenceLiteEditor(ctx, wrap, 'Handoff sequence', 'load-handoff', () => {
-    return (ctx.state?.loadExperience ?? defaultLoadExperience()).handoffSequence;
+    return currentPremiumLoadExperience(ctx.state!).handoffSequence;
   });
 
   host.appendChild(wrap);
@@ -789,7 +796,10 @@ function sequenceForSlot(
   overlayId?: string,
 ): MotionSequenceLite | undefined {
   if (!ctx.state) return undefined;
-  if (slot === 'load-handoff') return ctx.state.loadExperience?.handoffSequence;
+  if (slot === 'load-handoff') {
+    const load = ctx.state.loadExperience;
+    return isPremiumLoadExperience(load) ? load.handoffSequence : undefined;
+  }
   if (slot === 'route-outgoing') return ctx.state.routeTransition?.outgoingSequence;
   if (slot === 'route-incoming') return ctx.state.routeTransition?.incomingSequence;
   const overlay = (ctx.state.overlays ?? []).find((item) => item.id === overlayId);
@@ -804,8 +814,8 @@ function setSequenceForSlot(
 ): void {
   if (!ctx.state) return;
   if (slot === 'load-handoff') {
-    const current = ctx.state.loadExperience ?? defaultLoadExperience();
-    const next: LoadExperience = { ...current };
+    const current = currentPremiumLoadExperience(ctx.state);
+    const next: PremiumLoadExperience = { ...current };
     if (sequence === undefined) {
       delete next.handoffSequence;
     } else {

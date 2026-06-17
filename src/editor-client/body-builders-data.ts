@@ -1,9 +1,9 @@
 // src/editor-client/body-builders-data.ts
 //
-// ADR 0058 Phase 2q.d — body builders for the ten data-heavy element
+// ADR 0058 Phase 2q.d — body builders for the eleven data-heavy element
 // types: chart, form, embed, code, accordion, carousel, table, nav,
-// collection, tabs. Plus the buildElementBody dispatch that routes every
-// CanvasElement to its per-type builder.
+// collection, tabs, rich-motion. Plus the buildElementBody dispatch that
+// routes every CanvasElement to its per-type builder.
 //
 // Extracted from canvas-client.ts:3095-3648. The inline IIFE twin remains
 // the production source-of-truth until ADR 0015 Phase 3 atomic cutover.
@@ -38,6 +38,7 @@ import type {
 import type { FormElement } from '../canvas/elements/form.js';
 import { formPointerFx } from '../canvas/elements/form.js';
 import type { NavElement } from '../canvas/elements/nav.js';
+import type { RichMotionElement } from '../canvas/elements/rich-motion.js';
 import type { TableElement } from '../canvas/elements/table.js';
 
 import type { DomContext, EditorContext, PersistContext, RenderContext } from './editor-context.js';
@@ -118,6 +119,8 @@ export type BuildTabsBodyContext = RenderContext &
 
 export type BuildFlowContainerBodyContext = Pick<EditorContext, 'buildHostedElementNode'>;
 
+export type BuildRichMotionBodyContext = Pick<EditorContext, never>;
+
 // ADR 0064 — buildElementBody is the per-type dispatcher; its parameter
 // surface is the union of every per-builder narrow context plus the five
 // primitive contexts re-exported from body-builders-basic.ts. The wiring
@@ -140,7 +143,8 @@ export type BuildElementBodyContext = BuildTextBodyContext &
   BuildNavBodyContext &
   BuildCollectionBodyContext &
   BuildTabsBodyContext &
-  BuildFlowContainerBodyContext;
+  BuildFlowContainerBodyContext &
+  BuildRichMotionBodyContext;
 
 // -- Chart editor preview ----------------------------------------------
 //
@@ -976,6 +980,29 @@ export function buildFlowContainerBodyImpl(
   return node;
 }
 
+export function buildRichMotionBodyImpl(
+  _ctx: BuildRichMotionBodyContext,
+  element: RichMotionElement,
+): HTMLElement {
+  const node = document.createElement('div');
+  node.className = 'opencanvas-rich-motion';
+  node.setAttribute('data-opencanvas-rich-motion-editor', element.id);
+  node.setAttribute('data-rich-motion-asset-ref', element.assetRefId);
+  node.setAttribute('aria-label', element.label);
+  node.style.width = '100%';
+  node.style.height = '100%';
+  node.style.display = 'block';
+
+  const canvas = document.createElement('canvas');
+  canvas.setAttribute('data-opencanvas-rich-motion-canvas', element.id);
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.display = 'block';
+  node.appendChild(canvas);
+
+  return node;
+}
+
 export function buildElementBodyImpl(
   ctx: BuildElementBodyContext,
   element: CanvasElement,
@@ -985,6 +1012,8 @@ export function buildElementBodyImpl(
       return buildTextBodyImpl(ctx, element);
     case 'media':
       return buildMediaBodyImpl(ctx, element);
+    case 'rich-motion':
+      return buildRichMotionBodyImpl(ctx, element);
     case 'action':
       return buildActionBodyImpl(ctx, element);
     case 'shape':

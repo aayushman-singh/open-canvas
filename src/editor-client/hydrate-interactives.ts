@@ -28,12 +28,19 @@
 //     circuits via the `data-opencanvas-hydrated="true"` flag, matching the
 //     visitor runtime's contract.
 
+import type { EditableSite } from '../canvas/schema.js';
+import { hydrateBehaviourPreview } from './hydrate-behaviour.js';
+
 export interface HydrateOptions {
   /** When true, popup sections (`[data-opencanvas-popup="true"]`) are
    *  skipped. The editor passes `true` so an Owner editing a popup-
    *  triggered section doesn't get the popup chrome (overlay + close
    *  button) hijacking the canvas. Defaults to false (full visitor parity). */
   skipPopups?: boolean;
+  /** Editable site state for behaviour primitive preview hydration. */
+  behaviourState?: EditableSite;
+  /** Asset base path used to resolve image-sequence frame URLs in preview. */
+  behaviourAssetBasePath?: string;
 }
 
 /**
@@ -80,6 +87,9 @@ export function hydrateInteractives(
   // dispatch arm), mirroring hydratePointerFx in `./pointer-fx.ts` so the
   // editor preview reacts to the cursor exactly as the published site does.
   hydratePointerFx(root);
+  if (options.behaviourState && options.behaviourAssetBasePath) {
+    hydrateBehaviourPreview(root, options.behaviourState, options.behaviourAssetBasePath);
+  }
 }
 
 // ---------------------------------------------------------------------------

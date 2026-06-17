@@ -56,17 +56,22 @@ interface StubEvent {
 
 type Listener = (event: StubEvent) => void;
 
+class StubStyle {
+  private values = new Map<string, string>();
+
+  setProperty(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+}
+
 class StubElement {
   tagName: string;
+  className = '';
   attributes = new Map<string, string>();
   children: StubElement[] = [];
   parent: StubElement | null = null;
   listeners = new Map<string, Listener[]>();
-  style = {
-    setProperty(_name: string, _value: string): void {
-      // Stub only: runtime smokes assert behaviour through attributes/events.
-    },
-  };
+  style = new StubStyle();
   textContent = '';
 
   constructor(tagName: string) {
@@ -116,6 +121,23 @@ class StubElement {
   // error and we throw loudly so the smoke surfaces the drift immediately.
   matchesSelector(selector: string): boolean {
     const trimmed = selector.trim();
+    if (trimmed.startsWith('.')) {
+      const className = trimmed.slice(1);
+      return this.className.split(/\s+/).includes(className);
+    }
+    const tagAttrMatch = /^([a-zA-Z0-9-]+)\[([a-zA-Z0-9-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'))?\]$/.exec(
+      trimmed,
+    );
+    if (tagAttrMatch) {
+      const tagName = tagAttrMatch[1];
+      const attrName = tagAttrMatch[2];
+      if (tagName === undefined || attrName === undefined) return false;
+      if (this.tagName !== tagName.toLowerCase()) return false;
+      if (!this.attributes.has(attrName)) return false;
+      const expected = tagAttrMatch[3] ?? tagAttrMatch[4] ?? null;
+      if (expected === null) return true;
+      return this.attributes.get(attrName) === expected;
+    }
     const match = /^\[([a-zA-Z0-9-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'))?\]$/.exec(trimmed);
     if (!match) {
       throw new Error(`[stub] unsupported selector "${selector}"`);
@@ -162,8 +184,13 @@ class StubElement {
 //   - document.querySelectorAll (the per-root hydration scan)
 class StubDocument {
   readyState: 'loading' | 'interactive' | 'complete' = 'complete';
-  root: StubElement = new StubElement('html');
+  documentElement = new StubElement('html');
+  root: StubElement;
   domContentLoadedListeners: Listener[] = [];
+
+  constructor() {
+    this.root = this.documentElement;
+  }
 
   addEventListener(type: string, listener: Listener): void {
     if (type === 'DOMContentLoaded') {
@@ -174,6 +201,9 @@ class StubDocument {
   }
   querySelectorAll(selector: string): StubElement[] {
     return this.root.querySelectorAll(selector);
+  }
+  querySelector(selector: string): StubElement | null {
+    return this.root.querySelector(selector);
   }
 }
 

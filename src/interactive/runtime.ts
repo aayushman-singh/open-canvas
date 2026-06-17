@@ -43,6 +43,7 @@ function hydrateAll(scope, options) {
   // idempotent, so running it every hydrateAll (incl. live-publish re-hydrate)
   // is safe.
   hydratePremiumInteractions(rootScope, options || {});
+  hydrateBehaviour(rootScope);
 }
 if (typeof window !== 'undefined') window.__opencanvasHydrate = hydrateAll;
 if (document.readyState === 'loading') {

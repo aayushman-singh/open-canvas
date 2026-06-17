@@ -393,6 +393,7 @@ export type RenderAllContext = ComputePagePositionsContext &
     | 'renderReel'
     | 'pendingImport'
     | 'renderPlacementSlots'
+    | 'siteBase'
   >;
 
 export function renderAllImpl(ctx: RenderAllContext): void {
@@ -496,7 +497,11 @@ export function renderAllImpl(ctx: RenderAllContext): void {
   // no-op. `skipPopups: true` keeps popup chrome from hijacking the canvas
   // while editing; popups are visitor-only behaviour.
   if (ctx.root) {
-    hydrateInteractives(ctx.root, { skipPopups: true });
+    hydrateInteractives(ctx.root, {
+      skipPopups: true,
+      behaviourState: ctx.state,
+      behaviourAssetBasePath: `${ctx.siteBase}/assets`,
+    });
   }
 
   if (ctx.pendingImport) {

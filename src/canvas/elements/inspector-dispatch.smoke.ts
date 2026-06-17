@@ -93,6 +93,14 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     alt: 'fixture image',
     fit: 'cover',
   },
+  'rich-motion': {
+    id: 'fx-rich-motion',
+    type: 'rich-motion',
+    box: { x: 0, y: 0, w: 240, h: 240, z: 0 },
+    assetRefId: 'fx-rich-motion-asset',
+    fit: 'contain',
+    label: 'Fixture motion asset',
+  },
   accordion: {
     id: 'fx-accordion',
     type: 'accordion',

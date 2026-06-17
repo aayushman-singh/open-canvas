@@ -34,6 +34,13 @@ import {
   TABS_STYLE_SPEC,
   type ComponentStyleSpec,
 } from './elements/component-style.js';
+import {
+  BEHAVIOUR_TARGET_TYPES,
+  MOTION_SEQUENCE_PROPERTIES,
+  MOTION_SEQUENCE_TRIGGER_TYPES,
+  RICH_MOTION_KINDS,
+  TEXT_SPLIT_UNITS,
+} from './behaviour-primitives.js';
 
 // Re-export the canonical href allowlist so existing consumers (agent
 // parsers, etc.) that import from './canvas/validate.js' keep working. The
@@ -102,6 +109,7 @@ const PINNED_SECTION_HEIGHT_MIN = 48;
 const SECTION_HEIGHT_MAX = 1400;
 
 const POPUP_TRIGGER_TYPES = ['exit-intent', 'delay', 'scroll'] as const;
+const RICH_MOTION_PLACEHOLDER_ASSET_REF_ID = '__placeholder__';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -1303,6 +1311,16 @@ function validateElement(
       }
       break;
     }
+    case 'rich-motion': {
+      if (typeof element.assetRefId !== 'string') {
+        errors.push(`${basePath}.assetRefId must be a string`);
+      }
+      assertOneOf<BackgroundSize>(element.fit, BACKGROUND_SIZES, `${basePath}.fit`, errors);
+      if (typeof element.label !== 'string') {
+        errors.push(`${basePath}.label must be a string`);
+      }
+      break;
+    }
     case 'carousel': {
       validateComponentStyleObject(
         element.carouselStyle,
@@ -2375,6 +2393,477 @@ interface SiteFieldValidatorCtx {
 
 type SiteFieldValidator = (ctx: SiteFieldValidatorCtx) => void;
 
+interface BehaviourTargetIndex {
+  pageIds: Set<string>;
+  sectionIds: Map<string, number>;
+  elementIds: Map<string, number>;
+  textElementIds: Map<string, number>;
+}
+
+function bumpIdCount(map: Map<string, number>, id: unknown): void {
+  if (typeof id !== 'string' || id.length === 0) return;
+  map.set(id, (map.get(id) ?? 0) + 1);
+}
+
+function collectBehaviourTargetIndex(state: Record<string, unknown>): BehaviourTargetIndex {
+  const index: BehaviourTargetIndex = {
+    pageIds: new Set<string>(),
+    sectionIds: new Map<string, number>(),
+    elementIds: new Map<string, number>(),
+    textElementIds: new Map<string, number>(),
+  };
+
+  const visitElementTree = (element: unknown): void => {
+    if (!isRecord(element)) return;
+    bumpIdCount(index.elementIds, element.id);
+    if (element.type === 'text') {
+      bumpIdCount(index.textElementIds, element.id);
+    }
+    if (element.type === 'tabs' && Array.isArray(element.tabs)) {
+      element.tabs.forEach((tab) => {
+        if (!isRecord(tab) || !Array.isArray(tab.elements)) return;
+        tab.elements.forEach(visitElementTree);
+      });
+    }
+    if (element.type === 'collection') {
+      if (Array.isArray(element.customTemplate)) {
+        element.customTemplate.forEach(visitElementTree);
+      }
+      if (Array.isArray(element.entries)) {
+        element.entries.forEach((entry) => {
+          if (!Array.isArray(entry)) return;
+          entry.forEach(visitElementTree);
+        });
+      }
+    }
+    if (element.type === 'flow-container' && Array.isArray(element.items)) {
+      element.items.forEach((item) => {
+        if (!isRecord(item)) return;
+        visitElementTree(item.element);
+      });
+    }
+  };
+
+  const visitSection = (section: unknown): void => {
+    if (!isRecord(section)) return;
+    bumpIdCount(index.sectionIds, section.id);
+    if (!Array.isArray(section.elements)) return;
+    section.elements.forEach(visitElementTree);
+  };
+
+  if (Array.isArray(state.pages)) {
+    state.pages.forEach((page) => {
+      if (!isRecord(page)) return;
+      if (typeof page.id === 'string' && page.id.length > 0) {
+        index.pageIds.add(page.id);
+      }
+      if (Array.isArray(page.sections)) {
+        page.sections.forEach(visitSection);
+      }
+    });
+  }
+  visitSection(state.header);
+  visitSection(state.footer);
+  return index;
+}
+
+function resolveIndexedId(
+  map: Map<string, number>,
+  id: unknown,
+  path: string,
+  kind: string,
+  errors: string[],
+): void {
+  if (!assertNonEmptyString(id, path, errors)) return;
+  const count = map.get(id);
+  if (count === undefined) {
+    errors.push(`${path} "${id}" must reference an existing ${kind}`);
+    return;
+  }
+  if (count > 1) {
+    errors.push(
+      `${path} "${id}" resolves to multiple ${kind}s; ids must be unique for behaviour targets`,
+    );
+  }
+}
+
+function validateMotionProperties(
+  value: unknown,
+  path: string,
+  errors: string[],
+  required: boolean,
+): void {
+  if (value === undefined) {
+    if (required) errors.push(`${path} must be an object`);
+    return;
+  }
+  if (!isRecord(value)) {
+    errors.push(`${path} must be an object`);
+    return;
+  }
+  validateAllowedKeys(value, MOTION_SEQUENCE_PROPERTIES, path, errors);
+  for (const [key, propertyValue] of Object.entries(value)) {
+    if (!(MOTION_SEQUENCE_PROPERTIES as readonly string[]).includes(key)) continue;
+    if (typeof propertyValue !== 'string' && typeof propertyValue !== 'number') {
+      errors.push(`${path}.${key} must be a string or number (got ${describe(propertyValue)})`);
+    }
+  }
+}
+
+function validateNonNegativeFiniteNumber(
+  value: unknown,
+  path: string,
+  errors: string[],
+  required: boolean,
+): void {
+  if (value === undefined) {
+    if (required) errors.push(`${path} must be a finite number >= 0 (got undefined)`);
+    return;
+  }
+  if (!isFiniteNumber(value) || value < 0) {
+    errors.push(`${path} must be a finite number >= 0 (got ${describe(value)})`);
+  }
+}
+
+function validateBehaviourTarget(
+  value: unknown,
+  path: string,
+  errors: string[],
+  index: BehaviourTargetIndex,
+): void {
+  if (!isRecord(value)) {
+    errors.push(`${path} must be an object`);
+    return;
+  }
+  if (!assertOneOf(value.type, BEHAVIOUR_TARGET_TYPES, `${path}.type`, errors)) return;
+  switch (value.type) {
+    case 'site':
+      break;
+    case 'page':
+      if (!assertNonEmptyString(value.pageId, `${path}.pageId`, errors)) return;
+      if (!index.pageIds.has(value.pageId)) {
+        errors.push(`${path}.pageId "${value.pageId}" must reference an existing page`);
+      }
+      break;
+    case 'section':
+      resolveIndexedId(index.sectionIds, value.sectionId, `${path}.sectionId`, 'section', errors);
+      break;
+    case 'element':
+      resolveIndexedId(index.elementIds, value.elementId, `${path}.elementId`, 'element', errors);
+      break;
+    case 'text-split':
+      resolveIndexedId(
+        index.textElementIds,
+        value.elementId,
+        `${path}.elementId`,
+        'text element',
+        errors,
+      );
+      assertOneOf(value.unit, TEXT_SPLIT_UNITS, `${path}.unit`, errors);
+      break;
+    default:
+      break;
+  }
+}
+
+function validateBehaviourPrimitives(state: Record<string, unknown>, errors: string[]): void {
+  const targetIndex = collectBehaviourTargetIndex(state);
+  const knownSequenceIds = new Set<string>();
+  const knownScrollSceneIds = new Set<string>();
+  const knownRichMotionAssetIds = new Set<string>();
+  const knownStepIds = new Set<string>();
+
+  if (state.loadExperience !== undefined) {
+    if (!isRecord(state.loadExperience)) {
+      errors.push(
+        `loadExperience must be an object when present (got ${describe(state.loadExperience)})`,
+      );
+    } else if ('label' in state.loadExperience) {
+      assertNonEmptyString(state.loadExperience.id, 'loadExperience.id', errors);
+      assertNonEmptyString(state.loadExperience.label, 'loadExperience.label', errors);
+      assertNonEmptyString(state.loadExperience.enterLabel, 'loadExperience.enterLabel', errors);
+      assertNonEmptyString(state.loadExperience.background, 'loadExperience.background', errors);
+      assertNonEmptyString(state.loadExperience.foreground, 'loadExperience.foreground', errors);
+      assertNonEmptyString(state.loadExperience.sequenceId, 'loadExperience.sequenceId', errors);
+    } else if (!('enabled' in state.loadExperience)) {
+      errors.push(
+        'loadExperience must be a premium load experience (enabled/preset) or behaviour load chrome (label/sequenceId)',
+      );
+    }
+  }
+
+  if (state.motionSequences !== undefined) {
+    if (!Array.isArray(state.motionSequences)) {
+      errors.push(
+        `motionSequences must be an array when present (got ${describe(state.motionSequences)})`,
+      );
+    } else {
+      state.motionSequences.forEach((sequence, sequenceIdx) => {
+        const sequencePath = `motionSequences[${String(sequenceIdx)}]`;
+        if (!isRecord(sequence)) {
+          errors.push(`${sequencePath} must be an object`);
+          return;
+        }
+        if (assertNonEmptyString(sequence.id, `${sequencePath}.id`, errors)) {
+          assertUnique(
+            sequence.id,
+            knownSequenceIds,
+            `${sequencePath}.id`,
+            'across motionSequences',
+            errors,
+          );
+        }
+        if (!isRecord(sequence.trigger)) {
+          errors.push(`${sequencePath}.trigger must be an object`);
+        } else if (
+          assertOneOf(
+            sequence.trigger.type,
+            MOTION_SEQUENCE_TRIGGER_TYPES,
+            `${sequencePath}.trigger.type`,
+            errors,
+          )
+        ) {
+          if (sequence.trigger.type === 'section-enter') {
+            resolveIndexedId(
+              targetIndex.sectionIds,
+              sequence.trigger.sectionId,
+              `${sequencePath}.trigger.sectionId`,
+              'section',
+              errors,
+            );
+          }
+          if (sequence.trigger.type === 'scroll-scene') {
+            assertNonEmptyString(
+              sequence.trigger.scrollSceneId,
+              `${sequencePath}.trigger.scrollSceneId`,
+              errors,
+            );
+          }
+        }
+        if (sequence.reducedMotion !== undefined) {
+          if (sequence.reducedMotion !== 'skip' && sequence.reducedMotion !== 'final-state') {
+            errors.push(
+              `${sequencePath}.reducedMotion must be "skip" or "final-state" when present (got ${describe(sequence.reducedMotion)})`,
+            );
+          }
+        }
+        if (!Array.isArray(sequence.steps)) {
+          errors.push(`${sequencePath}.steps must be an array`);
+          return;
+        }
+        sequence.steps.forEach((step, stepIdx) => {
+          const stepPath = `${sequencePath}.steps[${String(stepIdx)}]`;
+          if (!isRecord(step)) {
+            errors.push(`${stepPath} must be an object`);
+            return;
+          }
+          if (assertNonEmptyString(step.id, `${stepPath}.id`, errors)) {
+            assertUnique(
+              step.id,
+              knownStepIds,
+              `${stepPath}.id`,
+              'across motion sequence steps',
+              errors,
+            );
+          }
+          validateBehaviourTarget(step.target, `${stepPath}.target`, errors, targetIndex);
+          validateMotionProperties(step.from, `${stepPath}.from`, errors, false);
+          validateMotionProperties(step.to, `${stepPath}.to`, errors, true);
+          validateNonNegativeFiniteNumber(step.durationMs, `${stepPath}.durationMs`, errors, true);
+          validateNonNegativeFiniteNumber(step.delayMs, `${stepPath}.delayMs`, errors, false);
+          validateNonNegativeFiniteNumber(step.staggerMs, `${stepPath}.staggerMs`, errors, false);
+          assertOptionalNonEmptyString(step.easing, `${stepPath}.easing`, errors);
+        });
+      });
+    }
+  }
+
+  if (state.scrollScenes !== undefined) {
+    if (!Array.isArray(state.scrollScenes)) {
+      errors.push(
+        `scrollScenes must be an array when present (got ${describe(state.scrollScenes)})`,
+      );
+    } else {
+      state.scrollScenes.forEach((scene, sceneIdx) => {
+        const scenePath = `scrollScenes[${String(sceneIdx)}]`;
+        if (!isRecord(scene)) {
+          errors.push(`${scenePath} must be an object`);
+          return;
+        }
+        if (assertNonEmptyString(scene.id, `${scenePath}.id`, errors)) {
+          assertUnique(
+            scene.id,
+            knownScrollSceneIds,
+            `${scenePath}.id`,
+            'across scrollScenes',
+            errors,
+          );
+        }
+        resolveIndexedId(
+          targetIndex.sectionIds,
+          scene.sectionId,
+          `${scenePath}.sectionId`,
+          'section',
+          errors,
+        );
+        assertNonEmptyString(scene.sequenceId, `${scenePath}.sequenceId`, errors);
+        if (!isRecord(scene.pinTarget)) {
+          errors.push(`${scenePath}.pinTarget must be an object`);
+        } else if (scene.pinTarget.type === 'section') {
+          resolveIndexedId(
+            targetIndex.sectionIds,
+            scene.pinTarget.sectionId,
+            `${scenePath}.pinTarget.sectionId`,
+            'section',
+            errors,
+          );
+        } else if (scene.pinTarget.type === 'element') {
+          resolveIndexedId(
+            targetIndex.elementIds,
+            scene.pinTarget.elementId,
+            `${scenePath}.pinTarget.elementId`,
+            'element',
+            errors,
+          );
+        } else {
+          errors.push(
+            `${scenePath}.pinTarget.type must be "section" or "element" (got ${describe(scene.pinTarget.type)})`,
+          );
+        }
+        validateNonNegativeFiniteNumber(
+          scene.startOffsetPx,
+          `${scenePath}.startOffsetPx`,
+          errors,
+          true,
+        );
+        validateNonNegativeFiniteNumber(
+          scene.endOffsetPx,
+          `${scenePath}.endOffsetPx`,
+          errors,
+          true,
+        );
+      });
+    }
+  }
+
+  if (state.richMotionAssets !== undefined) {
+    if (!Array.isArray(state.richMotionAssets)) {
+      errors.push(
+        `richMotionAssets must be an array when present (got ${describe(state.richMotionAssets)})`,
+      );
+    } else {
+      state.richMotionAssets.forEach((asset, assetIdx) => {
+        const assetPath = `richMotionAssets[${String(assetIdx)}]`;
+        if (!isRecord(asset)) {
+          errors.push(`${assetPath} must be an object`);
+          return;
+        }
+        if (assertNonEmptyString(asset.id, `${assetPath}.id`, errors)) {
+          assertUnique(
+            asset.id,
+            knownRichMotionAssetIds,
+            `${assetPath}.id`,
+            'across richMotionAssets',
+            errors,
+          );
+        }
+        if (!assertOneOf(asset.kind, RICH_MOTION_KINDS, `${assetPath}.kind`, errors)) return;
+        if (!Array.isArray(asset.frameAssetIds) || asset.frameAssetIds.length < 2) {
+          errors.push(`${assetPath}.frameAssetIds must be an array with length >= 2`);
+        } else {
+          asset.frameAssetIds.forEach((frameAssetId, frameIdx) => {
+            if (!isAssetIdLike(frameAssetId)) {
+              errors.push(
+                `${assetPath}.frameAssetIds[${String(frameIdx)}] must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(frameAssetId)})`,
+              );
+            }
+          });
+        }
+        assertNonEmptyString(asset.posterAssetId, `${assetPath}.posterAssetId`, errors);
+        assertNonEmptyString(asset.alt, `${assetPath}.alt`, errors);
+        if (!isRecord(asset.playback)) {
+          errors.push(`${assetPath}.playback must be an object`);
+        } else {
+          if (asset.playback.driver !== 'load' && asset.playback.driver !== 'scroll-scene') {
+            errors.push(
+              `${assetPath}.playback.driver must be "load" or "scroll-scene" (got ${describe(asset.playback.driver)})`,
+            );
+          }
+          if (asset.playback.fps !== undefined) {
+            if (!isFiniteNumber(asset.playback.fps) || asset.playback.fps <= 0) {
+              errors.push(
+                `${assetPath}.playback.fps must be a finite number > 0 when present (got ${describe(asset.playback.fps)})`,
+              );
+            }
+          }
+          if (asset.playback.loop !== undefined && typeof asset.playback.loop !== 'boolean') {
+            errors.push(
+              `${assetPath}.playback.loop must be a boolean when present (got ${describe(asset.playback.loop)})`,
+            );
+          }
+          if (asset.playback.driver === 'scroll-scene') {
+            assertNonEmptyString(
+              asset.playback.scrollSceneId,
+              `${assetPath}.playback.scrollSceneId`,
+              errors,
+            );
+          }
+        }
+      });
+    }
+  }
+
+  if (isRecord(state.loadExperience) && typeof state.loadExperience.sequenceId === 'string') {
+    if (!knownSequenceIds.has(state.loadExperience.sequenceId)) {
+      errors.push(
+        `loadExperience.sequenceId "${state.loadExperience.sequenceId}" must reference an existing motion sequence`,
+      );
+    }
+  }
+
+  if (Array.isArray(state.scrollScenes)) {
+    state.scrollScenes.forEach((scene, sceneIdx) => {
+      if (!isRecord(scene) || typeof scene.sequenceId !== 'string') return;
+      if (!knownSequenceIds.has(scene.sequenceId)) {
+        errors.push(
+          `scrollScenes[${String(sceneIdx)}].sequenceId "${scene.sequenceId}" must reference an existing motion sequence`,
+        );
+      }
+    });
+  }
+
+  if (Array.isArray(state.motionSequences)) {
+    state.motionSequences.forEach((sequence, sequenceIdx) => {
+      if (!isRecord(sequence) || !isRecord(sequence.trigger)) return;
+      if (sequence.trigger.type === 'scroll-scene') {
+        if (
+          typeof sequence.trigger.scrollSceneId === 'string' &&
+          !knownScrollSceneIds.has(sequence.trigger.scrollSceneId)
+        ) {
+          errors.push(
+            `motionSequences[${String(sequenceIdx)}].trigger.scrollSceneId "${sequence.trigger.scrollSceneId}" must reference an existing scroll scene`,
+          );
+        }
+      }
+    });
+  }
+
+  if (Array.isArray(state.richMotionAssets)) {
+    state.richMotionAssets.forEach((asset, assetIdx) => {
+      if (!isRecord(asset) || !isRecord(asset.playback)) return;
+      if (
+        asset.playback.driver === 'scroll-scene' &&
+        typeof asset.playback.scrollSceneId === 'string' &&
+        !knownScrollSceneIds.has(asset.playback.scrollSceneId)
+      ) {
+        errors.push(
+          `richMotionAssets[${String(assetIdx)}].playback.scrollSceneId "${asset.playback.scrollSceneId}" must reference an existing scroll scene`,
+        );
+      }
+    });
+  }
+}
+
 const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } = {
   // ADR 0016 — `styleKit` and `customStyleKit` are a discriminated union at
   // the type layer. The validator owns the cross-field contract: when the
@@ -2421,11 +2910,22 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
     validateOverlays(state, errors);
   },
   loadExperience: ({ state, errors }) => {
-    validateLoadExperience(state.loadExperience, errors);
+    if (
+      state.loadExperience !== undefined &&
+      isRecord(state.loadExperience) &&
+      'enabled' in state.loadExperience
+    ) {
+      validateLoadExperience(state.loadExperience, errors);
+    }
   },
   routeTransition: ({ state, errors }) => {
     validateRouteTransition(state.routeTransition, errors);
   },
+  // Site-level behaviour primitives validate after the page/section/element
+  // graph exists, because their cross-references resolve against that graph.
+  motionSequences: () => {},
+  scrollScenes: () => {},
+  richMotionAssets: () => {},
   defaultLocale: ({ state, errors }) => {
     // Locale uses the same "non-empty string when present" shape as the
     // helper but carries an extra "BCP-47" hint in the error prose;
@@ -2544,6 +3044,7 @@ function validateSiteShape(state: unknown, errors: string[]): void {
       true,
     );
   }
+  validateBehaviourPrimitives(state, errors);
   // ADR 0050 dec 2 — per-page anchor uniqueness across (header + sections + footer).
   if (Array.isArray(state.pages)) {
     state.pages.forEach((page, idx) => {
@@ -2682,7 +3183,156 @@ export const PUBLISH_ONLY_REQUIRED_FIELDS = [
   'version',
   'publishedAt',
   'media.assetId-non-empty',
+  'richMotion.assetRefId-resolves',
 ] as const;
+
+function validatePublishedRichMotionReferencesInSection(
+  section: unknown,
+  basePath: string,
+  richMotionAssetsById: Map<string, { kind: unknown; path: string }>,
+  errors: string[],
+): void {
+  if (!isRecord(section) || !Array.isArray(section.elements)) return;
+  section.elements.forEach((element, elementIdx) => {
+    const elementPath = `${basePath}.elements[${String(elementIdx)}]`;
+    validatePublishedRichMotionReferencesInElement(
+      element,
+      elementPath,
+      richMotionAssetsById,
+      errors,
+    );
+  });
+}
+
+function validatePublishedRichMotionReferencesInElement(
+  element: unknown,
+  elementPath: string,
+  richMotionAssetsById: Map<string, { kind: unknown; path: string }>,
+  errors: string[],
+): void {
+  if (!isRecord(element)) return;
+  if (element.type === 'rich-motion') {
+    if (element.assetRefId === RICH_MOTION_PLACEHOLDER_ASSET_REF_ID) {
+      errors.push(
+        `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: "${RICH_MOTION_PLACEHOLDER_ASSET_REF_ID}" is the editor placeholder sentinel`,
+      );
+      return;
+    }
+    if (!isNonEmptyString(element.assetRefId)) {
+      errors.push(
+        `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: assetRefId must be a non-empty string in published snapshots`,
+      );
+      return;
+    }
+    const asset = richMotionAssetsById.get(element.assetRefId);
+    if (asset === undefined) {
+      errors.push(
+        `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: "${element.assetRefId}" must reference an existing richMotionAssets[].id`,
+      );
+      return;
+    }
+    if (asset.kind !== 'image-sequence') {
+      errors.push(
+        `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: ${asset.path}.kind ${JSON.stringify(asset.kind)} is not supported for published rich-motion elements`,
+      );
+    }
+    return;
+  }
+  if (element.type === 'tabs' && Array.isArray(element.tabs)) {
+    element.tabs.forEach((tab, tabIdx) => {
+      if (!isRecord(tab) || !Array.isArray(tab.elements)) return;
+      tab.elements.forEach((child, childIdx) => {
+        validatePublishedRichMotionReferencesInElement(
+          child,
+          pathJoin(pathJoin(pathJoin(pathJoin(elementPath, 'tabs'), tabIdx), 'elements'), childIdx),
+          richMotionAssetsById,
+          errors,
+        );
+      });
+    });
+    return;
+  }
+  if (element.type === 'collection') {
+    if (Array.isArray(element.customTemplate)) {
+      element.customTemplate.forEach((child, childIdx) => {
+        validatePublishedRichMotionReferencesInElement(
+          child,
+          pathJoin(pathJoin(elementPath, 'customTemplate'), childIdx),
+          richMotionAssetsById,
+          errors,
+        );
+      });
+    }
+    if (Array.isArray(element.entries)) {
+      element.entries.forEach((entry, entryIdx) => {
+        if (!Array.isArray(entry)) return;
+        entry.forEach((child, childIdx) => {
+          validatePublishedRichMotionReferencesInElement(
+            child,
+            pathJoin(pathJoin(pathJoin(elementPath, 'entries'), entryIdx), childIdx),
+            richMotionAssetsById,
+            errors,
+          );
+        });
+      });
+    }
+    return;
+  }
+  if (element.type === 'flow-container' && Array.isArray(element.items)) {
+    element.items.forEach((item, itemIdx) => {
+      if (!isRecord(item)) return;
+      validatePublishedRichMotionReferencesInElement(
+        item.element,
+        pathJoin(pathJoin(pathJoin(elementPath, 'items'), itemIdx), 'element'),
+        richMotionAssetsById,
+        errors,
+      );
+    });
+  }
+}
+
+function validatePublishedRichMotionReferences(snapshot: unknown, errors: string[]): void {
+  if (!isRecord(snapshot)) return;
+  const richMotionAssetsById = new Map<string, { kind: unknown; path: string }>();
+  if (Array.isArray(snapshot.richMotionAssets)) {
+    snapshot.richMotionAssets.forEach((asset, assetIdx) => {
+      if (!isRecord(asset) || typeof asset.id !== 'string') return;
+      richMotionAssetsById.set(asset.id, {
+        kind: asset.kind,
+        path: `richMotionAssets[${String(assetIdx)}]`,
+      });
+    });
+  }
+  if (Array.isArray(snapshot.pages)) {
+    snapshot.pages.forEach((page, pageIdx) => {
+      if (!isRecord(page) || !Array.isArray(page.sections)) return;
+      page.sections.forEach((section, sectionIdx) => {
+        validatePublishedRichMotionReferencesInSection(
+          section,
+          `pages[${String(pageIdx)}].sections[${String(sectionIdx)}]`,
+          richMotionAssetsById,
+          errors,
+        );
+      });
+    });
+  }
+  if (snapshot.header !== undefined) {
+    validatePublishedRichMotionReferencesInSection(
+      snapshot.header,
+      'header',
+      richMotionAssetsById,
+      errors,
+    );
+  }
+  if (snapshot.footer !== undefined) {
+    validatePublishedRichMotionReferencesInSection(
+      snapshot.footer,
+      'footer',
+      richMotionAssetsById,
+      errors,
+    );
+  }
+}
 
 export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
   const errors: string[] = [];
@@ -2705,6 +3355,7 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
   // snapshot via the spread at publish.ts:373-386.
   validateSiteShape(snapshot, errors);
   validatePublishedMediaReferences(snapshot, errors);
+  validatePublishedRichMotionReferences(snapshot, errors);
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
 }

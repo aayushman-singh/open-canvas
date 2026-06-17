@@ -13,17 +13,13 @@
 // renderer never has to know how Owner Assets are addressed.
 
 import { renderElementBody, type ElementRenderCtx } from './elements/index.js';
-import { componentStyleEntriesForElement } from './elements/component-style.js';
 import {
-  escapeAttr,
-  escapeCssValue,
-  sanitiseCssKey,
-  styleFromEntries,
-} from './elements/render-utils.js';
-import { renderResponsiveCss } from './responsive/index.js';
-import { resolveActionHref } from './action-href.js';
-import { getStyleKitPreset, resolveStyleKitWithCustom } from './style-kits.js';
+  buildBehaviourPayload,
+  serializeBehaviourPayload,
+  snapshotHasBehaviourPrimitives,
+} from './behaviour-payload.js';
 import type {
+  BehaviourLoadExperience,
   CanvasElement,
   CanvasPage,
   CanvasSection,
@@ -33,6 +29,18 @@ import type {
   PublishedSnapshot,
   StyleKitPreset,
 } from './schema.js';
+import { isPremiumLoadExperience } from './schema.js';
+import { componentStyleEntriesForElement } from './elements/component-style.js';
+import {
+  escapeAttr,
+  escapeCssValue,
+  escapeHtml,
+  sanitiseCssKey,
+  styleFromEntries,
+} from './elements/render-utils.js';
+import { renderResponsiveCss } from './responsive/index.js';
+import { resolveActionHref } from './action-href.js';
+import { getStyleKitPreset, resolveStyleKitWithCustom } from './style-kits.js';
 
 function applyElementStyle(
   entries: Array<[string, string]>,
@@ -188,6 +196,7 @@ function buildAriaWrapperAttrs(element: CanvasElement): string {
       return element.linkHref === undefined ? ' aria-hidden="true" role="presentation"' : '';
     case 'media':
       return element.alt === '' ? ' aria-hidden="true"' : '';
+    case 'rich-motion':
     case 'text':
     case 'action':
     case 'form':
@@ -237,6 +246,7 @@ function variantAttr(element: CanvasElement): string {
       return ` data-variant="${escapeAttr(element.variant ?? 'classic')}"`;
     case 'tabs':
       return ` data-variant="${escapeAttr(element.variant ?? 'classic')}"`;
+    case 'rich-motion':
     case 'media':
     case 'embed':
     case 'table':
@@ -531,7 +541,7 @@ function renderOverlays(
 
 function renderLoadExperience(snapshot: PublishedSnapshot): string {
   const load = snapshot.loadExperience;
-  if (!load || load.enabled !== true) return '';
+  if (!isPremiumLoadExperience(load) || load.enabled !== true) return '';
   const sequenceAttr = load.handoffSequence
     ? ` data-opencanvas-load-handoff-sequence="${escapeAttr(load.handoffSequence.id)}"`
     : '';
@@ -611,12 +621,20 @@ export function renderCanvasSnapshot(
   const scrollStyle = renderScrollBehaviourCss(snapshot.scrollBehavior);
   const copyScript = renderCopyHandlerScript(snapshot);
   const tabsScript = renderTabsHandlerScript(snapshot);
+  const behaviourLoadExperience =
+    snapshot.loadExperience && 'sequenceId' in snapshot.loadExperience
+      ? snapshot.loadExperience
+      : undefined;
+  const loadExperienceHtml = behaviourLoadExperience
+    ? renderLoadExperienceChrome(behaviourLoadExperience)
+    : '';
+  const behaviourPayloadScript = renderBehaviourPayloadScript(snapshot, assetBasePath);
   const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
   const routeAttrs =
     snapshot.routeTransition?.enabled === true
       ? ` data-opencanvas-route-transition="${escapeAttr(snapshot.routeTransition.id)}" data-opencanvas-route-mode="${escapeAttr(snapshot.routeTransition.mode)}" data-opencanvas-route-duration-ms="${escapeAttr(String(snapshot.routeTransition.durationMs))}" data-opencanvas-route-easing="${escapeAttr(snapshot.routeTransition.easing)}"${snapshot.routeTransition.outgoingSequence ? ` data-opencanvas-route-outgoing-sequence="${escapeAttr(snapshot.routeTransition.outgoingSequence.id)}"` : ''}${snapshot.routeTransition.incomingSequence ? ` data-opencanvas-route-incoming-sequence="${escapeAttr(snapshot.routeTransition.incomingSequence.id)}"` : ''}`
       : '';
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${copyScript}${tabsScript}</main>`;
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${loadExperienceHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
 }
 
 /**
@@ -718,4 +736,31 @@ function renderScrollBehaviourCss(scrollBehavior: PublishedSnapshot['scrollBehav
   }
   if (rules.length === 0) return '';
   return `<style data-opencanvas-scroll-behavior>html{${rules.join(';')}}</style>`;
+}
+
+function renderLoadExperienceChrome(load: BehaviourLoadExperience): string {
+  const background = escapeCssValue(load.background) || load.background;
+  const foreground = escapeCssValue(load.foreground) || load.foreground;
+  const style = styleFromEntries([
+    ['position', 'fixed'],
+    ['inset', '0'],
+    ['z-index', '100001'],
+    ['display', 'grid'],
+    ['place-items', 'center'],
+    ['align-content', 'center'],
+    ['gap', '24px'],
+    ['background', background],
+    ['color', foreground],
+  ]);
+  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}" style="${style}"><div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div><button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
+}
+
+function renderBehaviourPayloadScript(
+  snapshot: PublishedSnapshot,
+  assetBasePath: string,
+): string {
+  if (!snapshotHasBehaviourPrimitives(snapshot)) return '';
+  const payload = buildBehaviourPayload(snapshot, assetBasePath);
+  if (!payload) return '';
+  return `<script type="application/json" data-opencanvas-behaviour-payload>${serializeBehaviourPayload(payload)}</script>`;
 }

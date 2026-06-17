@@ -98,7 +98,12 @@ assert.equal(valid.valid, true, valid.valid ? undefined : valid.errors.join('\n'
 
 const roundTrip = decodeYDoc(encodeYDoc(premiumSite));
 assert.equal(roundTrip.overlays?.[0]?.trigger.type, 'load');
-assert.equal(roundTrip.loadExperience?.preset, 'progress-bar');
+assert.equal(
+  roundTrip.loadExperience && 'preset' in roundTrip.loadExperience
+    ? roundTrip.loadExperience.preset
+    : undefined,
+  'progress-bar',
+);
 assert.equal(roundTrip.routeTransition?.mode, 'fade');
 
 const legacy: EditableSite = {

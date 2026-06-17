@@ -31,11 +31,12 @@ import type {
   InlineMark,
   InlineRun,
   InlineMarkType,
-  LoadExperience,
+  PremiumLoadExperience,
   Overlay,
   PositionedBox,
   RouteTransition,
 } from '../canvas/schema.js';
+import { isPremiumLoadExperience } from '../canvas/schema.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import { INSPECTOR_DISPATCH } from '../canvas/elements/index.js';
 import { ICON_NAMES, renderIconSvg } from '../canvas/icons.js';
@@ -365,7 +366,7 @@ function ensureEditorOverlayPreviewShell(ctx: EditorContext, overlay: Overlay): 
   return true;
 }
 
-function ensureEditorLoadExperienceShell(load: LoadExperience, title: string): void {
+function ensureEditorLoadExperienceShell(load: PremiumLoadExperience, title: string): void {
   const layer = ensureEditorPreviewLayer();
   const oldShell = layer.querySelector('[data-opencanvas-load-experience]');
   if (oldShell) oldShell.remove();
@@ -766,7 +767,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
       ctx.setStatus('Overlay preview opened', 'ok');
     },
     previewLoadExperience: () => {
-      if (!ctx.state?.loadExperience) {
+      if (!ctx.state || !isPremiumLoadExperience(ctx.state.loadExperience)) {
         ctx.setStatus('Enable or configure a load experience before previewing', 'error');
         console.error('[previewLoadExperience] loadExperience is missing');
         return;

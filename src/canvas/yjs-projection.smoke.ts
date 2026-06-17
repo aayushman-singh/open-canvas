@@ -115,6 +115,14 @@ const syntheticElements: CanvasElement[] = [
     playback: { autoplay: true, muted: true, loop: false, controls: true },
   },
   {
+    id: 'el-rich-motion',
+    type: 'rich-motion',
+    box: { x: 220, y: 50, w: 240, h: 240, z: 2 },
+    assetRefId: 'motion-seq-synthetic',
+    fit: 'contain',
+    label: 'Synthetic motion sequence',
+  },
+  {
     id: 'el-action',
     type: 'action',
     box: { x: 0, y: 220, w: 120, h: 40, z: 1 },

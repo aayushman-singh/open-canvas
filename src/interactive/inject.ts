@@ -18,6 +18,7 @@
 //     const finalHtml = injectInteractiveRuntime(snapshotHtml, snapshot);
 //     // ... pass finalHtml into the document envelope ...
 
+import { snapshotHasBehaviourPrimitives } from '../canvas/behaviour-payload.js';
 import type {
   CanvasElement,
   CanvasSection,
@@ -56,8 +57,15 @@ function elementHasPointerFx(element: CanvasElement): boolean {
  */
 export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): boolean {
   if (snapshot.overlays && snapshot.overlays.length > 0) return true;
-  if (snapshot.loadExperience?.enabled === true) return true;
+  if (
+    snapshot.loadExperience &&
+    'enabled' in snapshot.loadExperience &&
+    snapshot.loadExperience.enabled === true
+  ) {
+    return true;
+  }
   if (snapshot.routeTransition?.enabled === true) return true;
+  if (snapshotHasBehaviourPrimitives(snapshot)) return true;
   const sectionNeedsRuntime = (section: CanvasSection): boolean => {
     if (section.trigger) return true;
     return section.elements.some(elementNeedsRuntime);
@@ -73,6 +81,9 @@ export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): bo
       // walked so nested interactive elements (e.g. tabs inside a card)
       // still trigger runtime injection.
       return (element.entries ?? []).some((entry) => entry.some(elementNeedsRuntime));
+    }
+    if (element.type === 'flow-container') {
+      return element.items.some((item) => elementNeedsRuntime(item.element));
     }
     return false;
   };

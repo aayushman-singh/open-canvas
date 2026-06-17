@@ -7,6 +7,15 @@
 // A Published Snapshot wraps the same Canvas Pages with publish metadata for
 // the visitor-facing site.
 
+import type {
+  LoadExperience as BehaviourLoadExperience,
+  MotionSequence,
+  RichMotionAsset,
+  ScrollScene,
+} from './behaviour-primitives.js';
+
+export type { BehaviourLoadExperience };
+
 /**
  * The four deterministic built-in kits. Iterating over presets — emitting
  * per-kit CSS, smoke-test loops, editor preview — uses this list.
@@ -34,6 +43,7 @@ export type StyleKit = (typeof STYLE_KITS)[number];
 export const ELEMENT_TYPES = [
   'text',
   'media',
+  'rich-motion',
   'action',
   'shape',
   'container',
@@ -403,7 +413,7 @@ export type TextRole = (typeof TEXT_ROLES)[number];
 
 // -- CanvasElement discriminated union -------------------------------------
 //
-// All 14 element interfaces live in `src/canvas/elements/*.ts`. Each file
+// All 17 element interfaces live in `src/canvas/elements/*.ts`. Each file
 // owns its interface and renderer together; schema.ts is the root of the
 // dependency tree (provides BaseElement and the variant enums) but does not
 // define any element interface itself. The `CanvasElement` union pulls each
@@ -413,6 +423,7 @@ export type TextRole = (typeof TEXT_ROLES)[number];
 // '../canvas/schema'` consumers continue to resolve without change.
 import type { TextElement } from './elements/text.js';
 import type { MediaElement, ImageMediaElement, VideoMediaElement } from './elements/media.js';
+import type { RichMotionElement } from './elements/rich-motion.js';
 import type { ActionElement, ActionHref, ActionBehavior } from './elements/action.js';
 import type { ShapeElement } from './elements/shape.js';
 import type { ContainerElement } from './elements/container.js';
@@ -436,6 +447,7 @@ export type {
   MediaElement,
   ImageMediaElement,
   VideoMediaElement,
+  RichMotionElement,
   ActionElement,
   ActionHref,
   ActionBehavior,
@@ -448,6 +460,7 @@ export type {
 export type CanvasElement =
   | TextElement
   | MediaElement
+  | RichMotionElement
   | ActionElement
   | ShapeElement
   | ContainerElement
@@ -653,7 +666,7 @@ export interface Overlay {
   closeSequence?: MotionSequenceLite;
 }
 
-export interface LoadExperience {
+export interface PremiumLoadExperience {
   id: string;
   enabled: boolean;
   preset: LoadExperiencePreset;
@@ -661,6 +674,18 @@ export interface LoadExperience {
   gates: LoadExperienceGate[];
   timeoutMs: number;
   handoffSequence?: MotionSequenceLite;
+}
+
+export function isPremiumLoadExperience(
+  load: PremiumLoadExperience | BehaviourLoadExperience | undefined,
+): load is PremiumLoadExperience {
+  return load !== undefined && 'enabled' in load;
+}
+
+export function isBehaviourLoadExperience(
+  load: PremiumLoadExperience | BehaviourLoadExperience | undefined,
+): load is BehaviourLoadExperience {
+  return load !== undefined && 'label' in load;
 }
 
 export interface RouteTransition {
@@ -690,8 +715,15 @@ export interface EditableSiteBase {
   /** Site-wide footer section shared across all pages. */
   footer?: CanvasSection;
   overlays?: Overlay[];
-  loadExperience?: LoadExperience;
+  /** Premium load experience (editor panel) or behaviour-primitive load chrome. */
+  loadExperience?: PremiumLoadExperience | BehaviourLoadExperience;
   routeTransition?: RouteTransition;
+  /** Declarative motion graph owned by schema/validator/runtime, not templates-as-script. */
+  motionSequences?: MotionSequence[];
+  /** Scroll-driver declarations referenced by motion sequences and rich motion playback. */
+  scrollScenes?: ScrollScene[];
+  /** Rich-motion asset declarations referenced by later render/runtime tasks. */
+  richMotionAssets?: RichMotionAsset[];
   /**
    * Default locale for pages with no explicit `locale`. Optional everywhere;
    * `'en'` when absent.

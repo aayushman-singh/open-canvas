@@ -2,6 +2,14 @@
 
 Open Canvas is a live site builder where an owner starts from a template seed, edits a site directly, and publishes it to a public address visitors can open.
 
+## Agent Operating Preferences
+
+- Treat Codex tokens as a constrained resource. Default to delegating substantive execution work to Cursor CLI workers using `agent --model auto`.
+- Use Codex primarily for orchestration, task decomposition, code review, verification, and merge-risk control.
+- Parallelize by default when tasks are independent by file ownership or behavioural boundary. Use separate worktrees for concurrent edit tasks.
+- Do not parallelize tasks that touch the same files or the same behavioural contract; serialize those to avoid drift and merge noise.
+- When a task can be completed either directly in Codex or by a Cursor worker, prefer the Cursor worker unless there is a concrete reason not to.
+
 ## Language
 
 **Owner**:

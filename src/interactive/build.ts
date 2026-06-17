@@ -23,6 +23,7 @@
 // preflight on the script origin.
 
 import { ACCORDION_RUNTIME_SRC } from './accordion.js';
+import { BEHAVIOUR_RUNTIME_SRC } from './behaviour.js';
 import { CAROUSEL_RUNTIME_SRC } from './carousel.js';
 import { LOAD_EXPERIENCE_RUNTIME_SRC } from './load-experience.js';
 import { MOTION_SEQUENCE_LITE_RUNTIME_SRC } from './motion-sequence-lite.js';
@@ -47,6 +48,7 @@ export const INTERACTIVE_RUNTIME_SRC: string = [
   OVERLAY_RUNTIME_SRC,
   LOAD_EXPERIENCE_RUNTIME_SRC,
   ROUTE_TRANSITION_RUNTIME_SRC,
+  BEHAVIOUR_RUNTIME_SRC,
   RUNTIME_ENTRY_SRC,
   '})();',
 ].join('\n');
