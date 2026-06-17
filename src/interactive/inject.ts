@@ -55,6 +55,9 @@ function elementHasPointerFx(element: CanvasElement): boolean {
  * in their first interactive section.
  */
 export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): boolean {
+  if (snapshot.overlays && snapshot.overlays.length > 0) return true;
+  if (snapshot.loadExperience?.enabled === true) return true;
+  if (snapshot.routeTransition?.enabled === true) return true;
   const sectionNeedsRuntime = (section: CanvasSection): boolean => {
     if (section.trigger) return true;
     return section.elements.some(elementNeedsRuntime);

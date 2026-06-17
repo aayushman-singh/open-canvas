@@ -62,6 +62,11 @@ class StubElement {
   children: StubElement[] = [];
   parent: StubElement | null = null;
   listeners = new Map<string, Listener[]>();
+  style = {
+    setProperty(_name: string, _value: string): void {
+      // Stub only: runtime smokes assert behaviour through attributes/events.
+    },
+  };
   textContent = '';
 
   constructor(tagName: string) {

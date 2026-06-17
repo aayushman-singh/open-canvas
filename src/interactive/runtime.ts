@@ -15,8 +15,16 @@
 // `src/routes/public.ts`) re-hydrate cleanly.
 
 export const RUNTIME_ENTRY_SRC = String.raw`
-function hydrateAll() {
-  var roots = document.querySelectorAll('[data-opencanvas-interactive]');
+function hydratePremiumInteractions(scope, options) {
+  var root = scope || document;
+  hydratePointerFx(root);
+  if (typeof hydrateOverlays === 'function') hydrateOverlays(root, options || {});
+  if (typeof hydrateLoadExperience === 'function') hydrateLoadExperience(root, options || {});
+  if (typeof hydrateRouteTransition === 'function') hydrateRouteTransition(root, options || {});
+}
+function hydrateAll(scope, options) {
+  var rootScope = scope || document;
+  var roots = rootScope.querySelectorAll('[data-opencanvas-interactive]');
   for (var i = 0; i < roots.length; i++) {
     var root = roots[i];
     if (root.getAttribute('data-opencanvas-hydrated') === 'true') continue;
@@ -33,11 +41,12 @@ function hydrateAll() {
   // arm (a pointer-fx element need not be an interactive element type). It is
   // idempotent, so running it every hydrateAll (incl. live-publish re-hydrate)
   // is safe.
-  hydratePointerFx(document);
+  hydratePremiumInteractions(rootScope, options || {});
 }
+if (typeof window !== 'undefined') window.__opencanvasHydrate = hydrateAll;
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', hydrateAll);
+  document.addEventListener('DOMContentLoaded', function(){ hydrateAll(document, { reason: 'initial-load' }); });
 } else {
-  hydrateAll();
+  hydrateAll(document, { reason: 'initial-load' });
 }
 `;

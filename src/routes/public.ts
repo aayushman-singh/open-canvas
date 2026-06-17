@@ -275,6 +275,14 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
             // endpoint validates the snapshot before broadcast; there is no
             // visitor-controlled path into this assignment.
             root.innerHTML = selectedHtml;
+            var hydrate = window.__opencanvasHydrate;
+            if (typeof hydrate === 'function') {
+              hydrate(root, { reason: 'live-publish' });
+            } else {
+              console.error('[opencanvas-live] Runtime Hydrator missing after live publish swap', {
+                version: payload.version,
+              });
+            }
           }
           currentVersion = payload.version;
           return;

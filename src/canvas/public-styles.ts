@@ -981,6 +981,97 @@ const variantCss = String.raw`
   transition: transform 120ms ease;
   transform-style: preserve-3d;
 }
+
+[data-opencanvas-route-container] {
+  view-transition-name: opencanvas-site;
+}
+[data-opencanvas-route-state="outgoing"] {
+  pointer-events: none;
+}
+[data-opencanvas-route-mode="fade"][data-opencanvas-route-state="outgoing"] {
+  opacity: 0;
+}
+[data-opencanvas-route-mode="slide"][data-opencanvas-route-state="outgoing"] {
+  transform: translateX(-24px);
+  opacity: 0;
+}
+[data-opencanvas-route-mode="wipe"][data-opencanvas-route-state="outgoing"] {
+  clip-path: inset(0 100% 0 0);
+}
+
+[data-opencanvas-overlays-root] {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100000;
+}
+.opencanvas-overlay[hidden] {
+  display: none;
+}
+.opencanvas-overlay[data-opencanvas-overlay-open] {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+}
+.opencanvas-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.56);
+}
+.opencanvas-overlay-surface {
+  position: relative;
+  z-index: 1;
+  max-width: min(92vw, 960px);
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--opencanvas-kit-bg, #0c0c0d);
+  color: var(--opencanvas-kit-text, #f6f6f6);
+}
+.opencanvas-overlay-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+}
+
+.opencanvas-load-experience {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: grid;
+  place-items: center;
+  gap: 18px;
+  background: var(--opencanvas-kit-bg, #0c0c0d);
+  color: var(--opencanvas-kit-text, #f6f6f6);
+}
+.opencanvas-load-experience[data-opencanvas-load-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+.opencanvas-load-progress {
+  width: min(260px, 60vw);
+  height: 3px;
+  background: rgba(127, 127, 127, 0.25);
+  overflow: hidden;
+}
+.opencanvas-load-progress > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: translateX(-100%);
+  background: var(--opencanvas-kit-accent, currentColor);
+  animation: opencanvas-load-progress 1200ms ease-in-out infinite;
+}
+@keyframes opencanvas-load-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+.opencanvas-load-error[hidden] {
+  display: none;
+}
 `;
 
 export const canvasPublishedStyles = `${baseCss}\n${carouselActiveCss}\n${variantCss}\n${kitCss}`;

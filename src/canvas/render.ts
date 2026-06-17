@@ -477,6 +477,46 @@ function renderPage(
   return `<article class="opencanvas-page" data-opencanvas-page="${escapeAttr(page.id)}"${motionAttr}${entranceAttr}${triggerAttr} style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
 }
 
+function renderOverlays(
+  snapshot: PublishedSnapshot,
+  ctx: Omit<ElementRenderCtx, 'pageSlug'>,
+  renderedPages: CanvasPage[],
+): string {
+  if (!snapshot.overlays || snapshot.overlays.length === 0) return '';
+  const pageIds = new Set(renderedPages.map((page) => page.id));
+  const renderPage = renderedPages[0] ?? snapshot.pages[0];
+  if (!renderPage) return '';
+  const renderWidth = Math.min(renderPage.maxWidth ?? Infinity, renderPage.width);
+  const overlays = snapshot.overlays
+    .filter((overlay) => {
+      if (overlay.scope.type === 'site') return true;
+      return overlay.scope.pageIds.some((pageId) => pageIds.has(pageId));
+    })
+    .map((overlay) => {
+      const contentHtml = renderSection(overlay.content, renderWidth, {
+        ...ctx,
+        pageSlug: renderPage.slug,
+      });
+      const trigger = overlay.trigger;
+      const triggerAttrs =
+        trigger.type === 'delay' || trigger.type === 'scroll'
+          ? ` data-opencanvas-overlay-trigger-value="${escapeAttr(String(trigger.value))}"`
+          : trigger.type === 'element-click'
+            ? ` data-opencanvas-overlay-trigger-target="${escapeAttr(trigger.targetElementId)}"`
+            : '';
+      return `<div class="opencanvas-overlay" data-opencanvas-overlay="${escapeAttr(overlay.id)}" data-opencanvas-overlay-trigger-type="${escapeAttr(trigger.type)}"${triggerAttrs} data-opencanvas-overlay-close-button="${String(overlay.dismissal.closeButton)}" data-opencanvas-overlay-escape="${String(overlay.dismissal.escape)}" data-opencanvas-overlay-backdrop-click="${String(overlay.dismissal.backdropClick)}" data-opencanvas-overlay-body-scroll-lock="${String(overlay.dismissal.bodyScrollLock)}" data-opencanvas-overlay-focus-trap="${String(overlay.dismissal.focusTrap)}" data-opencanvas-overlay-return-focus="${String(overlay.dismissal.returnFocus)}" hidden><div class="opencanvas-overlay-backdrop" data-opencanvas-overlay-backdrop></div><div class="opencanvas-overlay-surface" data-opencanvas-overlay-surface role="dialog" aria-modal="true" aria-label="${escapeAttr(overlay.name)}">${contentHtml}</div></div>`;
+    })
+    .join('');
+  if (!overlays) return '';
+  return `<div data-opencanvas-overlays-root>${overlays}</div>`;
+}
+
+function renderLoadExperience(snapshot: PublishedSnapshot): string {
+  const load = snapshot.loadExperience;
+  if (!load || load.enabled !== true) return '';
+  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-preset="${escapeAttr(load.preset)}" data-opencanvas-load-run-policy="${escapeAttr(load.runPolicy)}" data-opencanvas-load-gates="${escapeAttr(load.gates.join(' '))}" data-opencanvas-load-timeout-ms="${escapeAttr(String(load.timeoutMs))}"><div class="opencanvas-load-brand" data-opencanvas-load-part="brand">${escapeAttr(snapshot.pages[0]?.title ?? 'Loading')}</div><div class="opencanvas-load-progress" data-opencanvas-load-part="progress"><span></span></div><div class="opencanvas-load-error" data-opencanvas-load-part="error" hidden>Loading failed</div></div>`;
+}
+
 /**
  * Renderer options collected into one object so callers don't bloat the
  * positional signature each time a new optional hook lands. New optional
@@ -551,7 +591,11 @@ export function renderCanvasSnapshot(
   const copyScript = renderCopyHandlerScript(snapshot);
   const tabsScript = renderTabsHandlerScript(snapshot);
   const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${pagesHtml}${copyScript}${tabsScript}</main>`;
+  const routeAttrs =
+    snapshot.routeTransition?.enabled === true
+      ? ` data-opencanvas-route-transition="${escapeAttr(snapshot.routeTransition.id)}" data-opencanvas-route-mode="${escapeAttr(snapshot.routeTransition.mode)}" data-opencanvas-route-duration-ms="${escapeAttr(String(snapshot.routeTransition.durationMs))}" data-opencanvas-route-easing="${escapeAttr(snapshot.routeTransition.easing)}"`
+      : '';
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${pagesHtml}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${copyScript}${tabsScript}</main>`;
 }
 
 /**
