@@ -37,6 +37,7 @@
     "adr-0016-du-narrowing:smoke": "bun run src/canvas/adr-0016-du-narrowing.smoke.ts",
     "adr-0020-csp-nonce:smoke": "bun run src/security/adr-0020-csp-nonce.smoke.ts",
     "validate-parity:smoke": "bun run src/canvas/validate-parity.smoke.ts",
+    "behaviour-primitives:smoke": "bun run src/canvas/behaviour-primitives.smoke.ts",
     "inspector-dispatch:smoke": "bun run src/canvas/elements/inspector-dispatch.smoke.ts",
     "agent-tool-dispatch:smoke": "bun run src/canvas/elements/agent-tool-dispatch.smoke.ts",
     "sidebar-dispatch:smoke": "bun run src/canvas/elements/sidebar-dispatch.smoke.ts",

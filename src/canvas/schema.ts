@@ -7,6 +7,13 @@
 // A Published Snapshot wraps the same Canvas Pages with publish metadata for
 // the visitor-facing site.
 
+import type {
+  LoadExperience,
+  MotionSequence,
+  RichMotionAsset,
+  ScrollScene,
+} from './behaviour-primitives.js';
+
 /**
  * The four deterministic built-in kits. Iterating over presets — emitting
  * per-kit CSS, smoke-test loops, editor preview — uses this list.
@@ -594,6 +601,14 @@ export interface EditableSiteBase {
   header?: CanvasSection;
   /** Site-wide footer section shared across all pages. */
   footer?: CanvasSection;
+  /** Optional site-level load transition consumed by the later runtime slice. */
+  loadExperience?: LoadExperience;
+  /** Declarative motion graph owned by schema/validator/runtime, not templates-as-script. */
+  motionSequences?: MotionSequence[];
+  /** Scroll-driver declarations referenced by motion sequences and rich motion playback. */
+  scrollScenes?: ScrollScene[];
+  /** Rich-motion asset declarations referenced by later render/runtime tasks. */
+  richMotionAssets?: RichMotionAsset[];
   /**
    * Default locale for pages with no explicit `locale`. Optional everywhere;
    * `'en'` when absent.

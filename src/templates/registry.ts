@@ -18,6 +18,12 @@ import enterpriseScaleSeed from '../canvas/fixtures/enterprise-scale.json';
 import apogeeShowcaseSeed from '../canvas/fixtures/apogee-showcase.json';
 import portfolioShowcaseSeed from '../canvas/fixtures/portfolio-showcase.json';
 import type {
+  LoadExperience,
+  MotionSequence,
+  RichMotionAsset,
+  ScrollScene,
+} from '../canvas/behaviour-primitives.js';
+import type {
   CanvasPage,
   CanvasSection,
   EditableSite,
@@ -50,6 +56,10 @@ export interface TemplateSeed {
   customStyleKit?: StyleKitPreset;
   headerRef?: SectionInstanceRef;
   footerRef?: SectionInstanceRef;
+  loadExperience?: LoadExperience;
+  motionSequences?: MotionSequence[];
+  scrollScenes?: ScrollScene[];
+  richMotionAssets?: RichMotionAsset[];
   pages: TemplatePage[];
 }
 
@@ -70,7 +80,9 @@ function resolveRef(ref: SectionInstanceRef): CanvasSection {
   if (!entry) {
     throw new Error(
       `instantiateTemplate: unresolved section ref '${ref.sectionId}' — pool entry missing. ` +
-        `Did you remove a `+`SECTION_LIBRARY`+` entry without updating the composition?`,
+        `Did you remove a ` +
+        `SECTION_LIBRARY` +
+        ` entry without updating the composition?`,
     );
   }
   // Deep clone so each instantiation gets a fresh tree; overrides + scope
@@ -93,9 +105,12 @@ function resolveRef(ref: SectionInstanceRef): CanvasSection {
 // rewrite. Hand-editable from here on; re-run the generator only as a
 // reference if the underlying pool slugs ever get bulk-renamed.
 
-const ENTERPRISE_KIT = (enterpriseScaleSeed as unknown as { customStyleKit: StyleKitPreset }).customStyleKit;
-const APOGEE_KIT = (apogeeShowcaseSeed as unknown as { customStyleKit: StyleKitPreset }).customStyleKit;
-const PORTFOLIO_KIT = (portfolioShowcaseSeed as unknown as { customStyleKit: StyleKitPreset }).customStyleKit;
+const ENTERPRISE_KIT = (enterpriseScaleSeed as unknown as { customStyleKit: StyleKitPreset })
+  .customStyleKit;
+const APOGEE_KIT = (apogeeShowcaseSeed as unknown as { customStyleKit: StyleKitPreset })
+  .customStyleKit;
+const PORTFOLIO_KIT = (portfolioShowcaseSeed as unknown as { customStyleKit: StyleKitPreset })
+  .customStyleKit;
 
 export const starterTemplate: TemplateSeed = {
   id: 'starter-canvas',
@@ -346,7 +361,8 @@ export const apogeeShowcaseTemplate: TemplateSeed = {
       slug: 'customers',
       title: 'Customers - Stories from 300,000+ teams',
       width: 1440,
-      description: 'See how enterprises, agencies, and businesses large and small build with Apogee.',
+      description:
+        'See how enterprises, agencies, and businesses large and small build with Apogee.',
       entranceAnimation: 'fade-up',
       bodyRefs: [
         { sectionId: 'apogee-template-cust-hero-v1', instanceId: 'wfcusthero' },
@@ -453,6 +469,10 @@ export const allTemplateSeeds: ReadonlyArray<TemplateSeed> = [
 
 const templatesById = new Map(allTemplateSeeds.map((template) => [template.id, template]));
 
+function cloneTemplateField<T>(value: T | undefined): T | undefined {
+  return value === undefined ? undefined : structuredClone(value);
+}
+
 export function getTemplateSeed(id: string): TemplateSeed | null {
   return templatesById.get(id) ?? null;
 }
@@ -519,5 +539,13 @@ export function instantiateTemplate(templateId: string): EditableSite {
   };
   if (seed.headerRef) state.header = resolveRef(seed.headerRef);
   if (seed.footerRef) state.footer = resolveRef(seed.footerRef);
+  const loadExperience = cloneTemplateField(seed.loadExperience);
+  const motionSequences = cloneTemplateField(seed.motionSequences);
+  const scrollScenes = cloneTemplateField(seed.scrollScenes);
+  const richMotionAssets = cloneTemplateField(seed.richMotionAssets);
+  if (loadExperience !== undefined) state.loadExperience = loadExperience;
+  if (motionSequences !== undefined) state.motionSequences = motionSequences;
+  if (scrollScenes !== undefined) state.scrollScenes = scrollScenes;
+  if (richMotionAssets !== undefined) state.richMotionAssets = richMotionAssets;
   return state;
 }
