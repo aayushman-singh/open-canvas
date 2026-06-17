@@ -177,6 +177,7 @@
     "section-library-testimonial-fixtures:smoke": "bun run src/canvas/section-library/testimonial-fixtures.smoke.ts",
     "section-library-composition:smoke": "bun run src/canvas/section-library/composition.smoke.ts",
     "sections-picker:smoke": "bun run src/editor-client/sections-picker.smoke.ts",
+    "velocity-athlete:smoke": "bun run src/templates/velocity-athlete-fidelity.smoke.ts",
     "reel-drag:smoke": "bun run src/editor-client/reel-drag.smoke.ts",
     "carousel-hydration:smoke": "bun run src/editor-client/carousel-hydration.smoke.ts",
     "text-inspector-font-family-v3:smoke": "bun run src/editor-client/text-inspector-font-family-v3.smoke.ts",
