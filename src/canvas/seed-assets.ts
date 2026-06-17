@@ -105,6 +105,185 @@ const PROJECT_THUMB_NEUTRAL_SVG = {
   sourcePath: 'project-thumb-neutral.svg.b64',
 };
 
+// Velocity Athlete template seeds (fidelity pilot). Twelve abstract helmet
+// sequence frames plus four editorial media studies. SVG bytes are stable —
+// re-rendering the same XML byte-for-byte yields the same contentHash.
+const VELOCITY_HELMET_FRAME_00 = {
+  contentHash: '675923a27b456d9d34d6cb47396c32b1ff14dde9b9038b66bc183f1f64510b3e',
+  r2Key: 'assets/675923a27b456d9d34d6cb47396c32b1.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1734,
+  sourcePath: 'velocity-helmet-frame-00.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_01 = {
+  contentHash: 'cfbec8a9d8e18eea9ad13c51aee644540d2406139a7ef747b08797fd8913b85d',
+  r2Key: 'assets/cfbec8a9d8e18eea9ad13c51aee64454.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1765,
+  sourcePath: 'velocity-helmet-frame-01.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_02 = {
+  contentHash: '2cd746eb0983ca09a5fb3d829ffb33c3ae060af151d2779f992b3160a5effdac',
+  r2Key: 'assets/2cd746eb0983ca09a5fb3d829ffb33c3.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1749,
+  sourcePath: 'velocity-helmet-frame-02.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_03 = {
+  contentHash: '40e3bd9ebbbf44b2d34d5d9eb04b4d16ecc91526550b90de7aa4b0e40a88c853',
+  r2Key: 'assets/40e3bd9ebbbf44b2d34d5d9eb04b4d16.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1735,
+  sourcePath: 'velocity-helmet-frame-03.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_04 = {
+  contentHash: '486c57d95441f6746e1427f54b69c2fb84cad7b1d4639b979c894f06c2c64e81',
+  r2Key: 'assets/486c57d95441f6746e1427f54b69c2fb.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1750,
+  sourcePath: 'velocity-helmet-frame-04.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_05 = {
+  contentHash: 'eb4512615b9ff40ae3fd2103e80da9b7d1b9ff009b30beeee89d56096d16b77d',
+  r2Key: 'assets/eb4512615b9ff40ae3fd2103e80da9b7.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1766,
+  sourcePath: 'velocity-helmet-frame-05.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_06 = {
+  contentHash: '0a2ccf3bcf46266ca5aba71ed4bdf19c8c58be38247e919f66eaa00a4ad82830',
+  r2Key: 'assets/0a2ccf3bcf46266ca5aba71ed4bdf19c.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1736,
+  sourcePath: 'velocity-helmet-frame-06.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_07 = {
+  contentHash: '289101a6a8060ddab557b0a278f5fd27a05bd51fb98da55bde645eabc9d2ef8c',
+  r2Key: 'assets/289101a6a8060ddab557b0a278f5fd27.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1766,
+  sourcePath: 'velocity-helmet-frame-07.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_08 = {
+  contentHash: 'bb89d4ee13af78f1a427537e71ddedd3a79bcf894459d87637c1e5cc188e0eb0',
+  r2Key: 'assets/bb89d4ee13af78f1a427537e71ddedd3.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1750,
+  sourcePath: 'velocity-helmet-frame-08.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_09 = {
+  contentHash: '175552d6ad06a4ec891f2c94e3f7bf8b2a6ede102a1cc7e7aa6b018102734d82',
+  r2Key: 'assets/175552d6ad06a4ec891f2c94e3f7bf8b.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1736,
+  sourcePath: 'velocity-helmet-frame-09.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_10 = {
+  contentHash: 'a1394c646cf423f2b10c6e6cd32e87128d18fc25cb496ed365de6a41049d030e',
+  r2Key: 'assets/a1394c646cf423f2b10c6e6cd32e8712.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1750,
+  sourcePath: 'velocity-helmet-frame-10.svg.b64',
+};
+
+const VELOCITY_HELMET_FRAME_11 = {
+  contentHash: '5d7a349625d5aacf7955158d2350723993ff81fb3b4b076a3848cc92c0a79af6',
+  r2Key: 'assets/5d7a349625d5aacf7955158d23507239.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 520,
+  height: 520,
+  byteSize: 1766,
+  sourcePath: 'velocity-helmet-frame-11.svg.b64',
+};
+
+const VELOCITY_TRACK_STUDY = {
+  contentHash: 'd235ad957777752735327b8e1eff2d57b59f62ba36ac61247772c4e542e006e6',
+  r2Key: 'assets/d235ad957777752735327b8e1eff2d57.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 960,
+  height: 640,
+  byteSize: 1060,
+  sourcePath: 'velocity-track-study.svg.b64',
+};
+
+const VELOCITY_GARAGE_STUDY = {
+  contentHash: 'a56a9e64dfd7df8ef059329d8402144619cfe998472f57e2ed54866a702f969f',
+  r2Key: 'assets/a56a9e64dfd7df8ef059329d84021446.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 960,
+  height: 640,
+  byteSize: 976,
+  sourcePath: 'velocity-garage-study.svg.b64',
+};
+
+const VELOCITY_SUIT_STUDY = {
+  contentHash: '5afefe168f7731c1a287bc7dfec0fb360da5844959f9bc9858fbd220bf5eb2b0',
+  r2Key: 'assets/5afefe168f7731c1a287bc7dfec0fb36.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 720,
+  height: 960,
+  byteSize: 1182,
+  sourcePath: 'velocity-suit-study.svg.b64',
+};
+
+const VELOCITY_PRODUCT_STUDY = {
+  contentHash: 'a14c994f83d78da5389dc7587666c91667574bca2d0eefb090df90716b74f27a',
+  r2Key: 'assets/a14c994f83d78da5389dc7587666c916.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 800,
+  height: 800,
+  byteSize: 927,
+  sourcePath: 'velocity-product-study.svg.b64',
+};
+
 export const SEED_ASSET_REGISTRY: Record<string, SeedAsset> = {
   'seed-hero-poster-1': {
     ...TRANSPARENT_PNG,
@@ -121,6 +300,70 @@ export const SEED_ASSET_REGISTRY: Record<string, SeedAsset> = {
   'seed-project-thumb-neutral': {
     ...PROJECT_THUMB_NEUTRAL_SVG,
     alt: 'Neutral project thumbnail',
+  },
+  'seed-velocity-helmet-frame-00': {
+    ...VELOCITY_HELMET_FRAME_00,
+    alt: 'Abstract signal helmet frame 1 of 12',
+  },
+  'seed-velocity-helmet-frame-01': {
+    ...VELOCITY_HELMET_FRAME_01,
+    alt: 'Abstract signal helmet frame 2 of 12',
+  },
+  'seed-velocity-helmet-frame-02': {
+    ...VELOCITY_HELMET_FRAME_02,
+    alt: 'Abstract signal helmet frame 3 of 12',
+  },
+  'seed-velocity-helmet-frame-03': {
+    ...VELOCITY_HELMET_FRAME_03,
+    alt: 'Abstract signal helmet frame 4 of 12',
+  },
+  'seed-velocity-helmet-frame-04': {
+    ...VELOCITY_HELMET_FRAME_04,
+    alt: 'Abstract signal helmet frame 5 of 12',
+  },
+  'seed-velocity-helmet-frame-05': {
+    ...VELOCITY_HELMET_FRAME_05,
+    alt: 'Abstract signal helmet frame 6 of 12',
+  },
+  'seed-velocity-helmet-frame-06': {
+    ...VELOCITY_HELMET_FRAME_06,
+    alt: 'Abstract signal helmet frame 7 of 12',
+  },
+  'seed-velocity-helmet-frame-07': {
+    ...VELOCITY_HELMET_FRAME_07,
+    alt: 'Abstract signal helmet frame 8 of 12',
+  },
+  'seed-velocity-helmet-frame-08': {
+    ...VELOCITY_HELMET_FRAME_08,
+    alt: 'Abstract signal helmet frame 9 of 12',
+  },
+  'seed-velocity-helmet-frame-09': {
+    ...VELOCITY_HELMET_FRAME_09,
+    alt: 'Abstract signal helmet frame 10 of 12',
+  },
+  'seed-velocity-helmet-frame-10': {
+    ...VELOCITY_HELMET_FRAME_10,
+    alt: 'Abstract signal helmet frame 11 of 12',
+  },
+  'seed-velocity-helmet-frame-11': {
+    ...VELOCITY_HELMET_FRAME_11,
+    alt: 'Abstract signal helmet frame 12 of 12',
+  },
+  'seed-velocity-track-study': {
+    ...VELOCITY_TRACK_STUDY,
+    alt: 'Editorial track contour study with speed lines',
+  },
+  'seed-velocity-garage-study': {
+    ...VELOCITY_GARAGE_STUDY,
+    alt: 'Editorial garage workspace study with geometric forms',
+  },
+  'seed-velocity-suit-study': {
+    ...VELOCITY_SUIT_STUDY,
+    alt: 'Editorial race suit textile weave study',
+  },
+  'seed-velocity-product-study': {
+    ...VELOCITY_PRODUCT_STUDY,
+    alt: 'Editorial product macro study with signal accents',
   },
 };
 
