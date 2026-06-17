@@ -768,7 +768,7 @@ declare global {
   }
 }
 
-export function attachCoEditImpl(ctx: AttachCoEditContext): void {
+export function attachCoEditImpl(ctx: AttachCoEditContext): boolean {
   if (
     typeof window.__opencanvasCoEdit === 'undefined' ||
     !window.__opencanvasCoEdit ||
@@ -781,7 +781,7 @@ export function attachCoEditImpl(ctx: AttachCoEditContext): void {
     console.error(
       '[co-edit] window.__opencanvasCoEdit not registered — CO_EDIT_BUNDLE failed to load or was blocked. Concurrent editing is disabled until reload.',
     );
-    return;
+    return false;
   }
 
   // Bind the repaint hook before the first remote presence event fires so
@@ -997,4 +997,5 @@ export function attachCoEditImpl(ctx: AttachCoEditContext): void {
     ctx.coEditSocketOpen = false;
     conn.destroy();
   });
+  return true;
 }

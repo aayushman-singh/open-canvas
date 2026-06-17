@@ -541,7 +541,7 @@ assert(
 
 const lastStatus = statusWrites[statusWrites.length - 1] ?? '';
 assert(
-  lastStatus === 'Ready',
+  lastStatus === 'Co-edit unavailable — please reload the page',
   `createEditor boot final status was unexpected: ${JSON.stringify(lastStatus)} ` +
     `(full sequence: ${JSON.stringify(statusWrites)})`,
 );
@@ -619,7 +619,7 @@ assert(
 );
 
 console.log(
-  '[create-editor-runtime:smoke] OK — happy:',
+  '[create-editor-runtime:smoke] OK — missing co-edit:',
   JSON.stringify(statusWrites),
   '/ failure:',
   JSON.stringify(statusWritesFailure),

@@ -1101,8 +1101,8 @@ export function createEditor(boot: EditorBoot): void {
       ctx.attachSaveButton();
       ctx.attachPublishButton();
       ctx.localPresence = loadPresenceIdentity(ctx.presenceDisplayName);
-      ctx.attachCoEdit();
-      wireCoEditPresenceListeners(ctx);
+      const coEditAttached = ctx.attachCoEdit();
+      if (coEditAttached) wireCoEditPresenceListeners(ctx);
 
       // Text-inspector font-family picker — pull the site's custom font
       // catalog so the picker can offer uploaded faces and the editor
@@ -1114,7 +1114,7 @@ export function createEditor(boot: EditorBoot): void {
         ctx.setStatus('Could not load custom fonts — try reloading', 'error');
       });
 
-      ctx.setStatus('Ready', 'ok');
+      if (coEditAttached) ctx.setStatus('Ready', 'ok');
 
       // Session keepalive — Owner sessions get an hourly HEAD; published-
       // site editors get a token refresh ~15 min before expiry.

@@ -1232,12 +1232,13 @@ export interface EditorContext {
    *  assigns the connection to ctx.coEditConnection. Also binds
    *  ctx.repaintRemoteCursors at the moment the connection attaches so
    *  the camera module's typeof-check picks up the live function from
-   *  the first camera transform onwards. No-op when the co-edit bundle
-   *  global is missing (smoke / kill-switch). Bound impl lives in
+   *  the first camera transform onwards. Returns false after surfacing an
+   *  error when the co-edit bundle global is missing (smoke / kill-switch).
+   *  Bound impl lives in
    *  co-edit.ts (attachCoEditImpl); exposed on ctx because the boot
    *  sequence in canvas-client.ts (and, post-cutover, in createEditor)
    *  needs a ctx-method reference, not a re-import. */
-  attachCoEdit(): void;
+  attachCoEdit(): boolean;
 
   // -- Phase 2p.b: forward declarations ----------------------------------
   /** WebSocket token issued by the editor route for published-site
