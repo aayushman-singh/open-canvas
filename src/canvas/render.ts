@@ -13,10 +13,17 @@
 // renderer never has to know how Owner Assets are addressed.
 
 import { renderElementBody, type ElementRenderCtx } from './elements/index.js';
+import {
+  buildBehaviourPayload,
+  serializeBehaviourPayload,
+  snapshotHasBehaviourPrimitives,
+} from './behaviour-payload.js';
+import type { LoadExperience } from './behaviour-primitives.js';
 import { componentStyleEntriesForElement } from './elements/component-style.js';
 import {
   escapeAttr,
   escapeCssValue,
+  escapeHtml,
   sanitiseCssKey,
   styleFromEntries,
 } from './elements/render-utils.js';
@@ -552,8 +559,12 @@ export function renderCanvasSnapshot(
   const scrollStyle = renderScrollBehaviourCss(snapshot.scrollBehavior);
   const copyScript = renderCopyHandlerScript(snapshot);
   const tabsScript = renderTabsHandlerScript(snapshot);
+  const loadExperienceHtml = snapshot.loadExperience
+    ? renderLoadExperienceChrome(snapshot.loadExperience)
+    : '';
+  const behaviourPayloadScript = renderBehaviourPayloadScript(snapshot, assetBasePath);
   const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${pagesHtml}${copyScript}${tabsScript}</main>`;
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${loadExperienceHtml}${pagesHtml}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
 }
 
 /**
@@ -655,4 +666,31 @@ function renderScrollBehaviourCss(scrollBehavior: PublishedSnapshot['scrollBehav
   }
   if (rules.length === 0) return '';
   return `<style data-opencanvas-scroll-behavior>html{${rules.join(';')}}</style>`;
+}
+
+function renderLoadExperienceChrome(load: LoadExperience): string {
+  const background = escapeCssValue(load.background) || load.background;
+  const foreground = escapeCssValue(load.foreground) || load.foreground;
+  const style = styleFromEntries([
+    ['position', 'fixed'],
+    ['inset', '0'],
+    ['z-index', '100001'],
+    ['display', 'grid'],
+    ['place-items', 'center'],
+    ['align-content', 'center'],
+    ['gap', '24px'],
+    ['background', background],
+    ['color', foreground],
+  ]);
+  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}" style="${style}"><div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div><button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
+}
+
+function renderBehaviourPayloadScript(
+  snapshot: PublishedSnapshot,
+  assetBasePath: string,
+): string {
+  if (!snapshotHasBehaviourPrimitives(snapshot)) return '';
+  const payload = buildBehaviourPayload(snapshot, assetBasePath);
+  if (!payload) return '';
+  return `<script type="application/json" data-opencanvas-behaviour-payload>${serializeBehaviourPayload(payload)}</script>`;
 }

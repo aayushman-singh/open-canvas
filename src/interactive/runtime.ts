@@ -34,6 +34,7 @@ function hydrateAll() {
   // idempotent, so running it every hydrateAll (incl. live-publish re-hydrate)
   // is safe.
   hydratePointerFx(document);
+  hydrateBehaviour(document);
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', hydrateAll);
