@@ -31,7 +31,10 @@ import type {
   InlineMark,
   InlineRun,
   InlineMarkType,
+  LoadExperience,
+  Overlay,
   PositionedBox,
+  RouteTransition,
 } from '../canvas/schema.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import { INSPECTOR_DISPATCH } from '../canvas/elements/index.js';
@@ -151,6 +154,12 @@ import {
   buildKitSummary,
   syncSidebarStyleKitButtonsImpl,
 } from './sidebar.js';
+import { renderInteractionsPanel } from './interactions-panel.js';
+import {
+  previewLoadExperienceInEditor,
+  previewOverlayInEditor,
+  previewRouteTransitionInEditor,
+} from './hydrate-interactives.js';
 import { attachPublishButtonImpl, publishSiteImpl, updateVersionBadgeImpl } from './publish.js';
 import {
   attachVersionBadgeImpl,
@@ -301,6 +310,97 @@ function errorToString(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === 'string') return err;
   return 'unknown';
+}
+
+function ensureEditorPreviewLayer(): HTMLElement {
+  const existing = document.querySelector('[data-opencanvas-editor-preview-layer]');
+  if (existing instanceof HTMLElement) return existing;
+  const layer = document.createElement('div');
+  layer.setAttribute('data-opencanvas-editor-preview-layer', 'true');
+  document.body.appendChild(layer);
+  return layer;
+}
+
+function ensureEditorOverlayPreviewShell(ctx: EditorContext, overlay: Overlay): boolean {
+  const existingOverlays = document.querySelectorAll('[data-opencanvas-overlay]');
+  for (let i = 0; i < existingOverlays.length; i++) {
+    const existing = existingOverlays[i];
+    if (
+      existing instanceof HTMLElement &&
+      existing.getAttribute('data-opencanvas-overlay') === overlay.id
+    ) {
+      return true;
+    }
+  }
+  if (!ctx.state) return false;
+  const page = ctx.currentPage() || ctx.state.pages[0] || null;
+  if (!page) return false;
+  const layer = ensureEditorPreviewLayer();
+  const overlaysRoot =
+    layer.querySelector('[data-opencanvas-overlays-root]') ?? document.createElement('div');
+  if (!(overlaysRoot instanceof HTMLElement)) return false;
+  overlaysRoot.setAttribute('data-opencanvas-overlays-root', '');
+  if (!overlaysRoot.parentNode) layer.appendChild(overlaysRoot);
+  const oldShells = overlaysRoot.querySelectorAll('[data-opencanvas-editor-preview-temp="true"]');
+  for (let i = 0; i < oldShells.length; i++) oldShells[i]!.remove();
+  const shell = document.createElement('div');
+  shell.className = 'opencanvas-overlay';
+  shell.setAttribute('data-opencanvas-overlay', overlay.id);
+  shell.setAttribute('data-opencanvas-overlay-trigger-type', overlay.trigger.type);
+  shell.setAttribute('data-opencanvas-editor-preview-temp', 'true');
+  shell.setAttribute('hidden', '');
+  const backdrop = document.createElement('div');
+  backdrop.className = 'opencanvas-overlay-backdrop';
+  backdrop.setAttribute('data-opencanvas-overlay-backdrop', '');
+  const surface = document.createElement('div');
+  surface.className = 'opencanvas-overlay-surface';
+  surface.setAttribute('data-opencanvas-overlay-surface', '');
+  surface.setAttribute('role', 'dialog');
+  surface.setAttribute('aria-modal', 'true');
+  surface.setAttribute('aria-label', overlay.name);
+  surface.appendChild(ctx.buildSectionNode(overlay.content, ctx.pageRenderWidth(page)));
+  shell.appendChild(backdrop);
+  shell.appendChild(surface);
+  overlaysRoot.appendChild(shell);
+  return true;
+}
+
+function ensureEditorLoadExperienceShell(load: LoadExperience, title: string): void {
+  const layer = ensureEditorPreviewLayer();
+  const oldShell = layer.querySelector('[data-opencanvas-load-experience]');
+  if (oldShell) oldShell.remove();
+  const shell = document.createElement('div');
+  shell.className = 'opencanvas-load-experience';
+  shell.setAttribute('data-opencanvas-load-experience', load.id);
+  shell.setAttribute('data-opencanvas-load-preset', load.preset);
+  shell.setAttribute('data-opencanvas-load-run-policy', load.runPolicy);
+  shell.setAttribute('data-opencanvas-load-gates', load.gates.join(' '));
+  shell.setAttribute('data-opencanvas-load-timeout-ms', String(load.timeoutMs));
+  shell.setAttribute('data-opencanvas-editor-preview-temp', 'true');
+  const brand = document.createElement('div');
+  brand.className = 'opencanvas-load-brand';
+  brand.setAttribute('data-opencanvas-load-part', 'brand');
+  brand.textContent = title || 'Loading';
+  const progress = document.createElement('div');
+  progress.className = 'opencanvas-load-progress';
+  progress.setAttribute('data-opencanvas-load-part', 'progress');
+  progress.appendChild(document.createElement('span'));
+  shell.appendChild(brand);
+  shell.appendChild(progress);
+  layer.appendChild(shell);
+}
+
+function applyEditorRoutePreviewAttrs(root: HTMLElement, route: RouteTransition): void {
+  root.setAttribute('data-opencanvas-route-container', '');
+  root.setAttribute('data-opencanvas-route-transition', route.id);
+  root.setAttribute('data-opencanvas-route-mode', route.mode);
+  root.setAttribute('data-opencanvas-route-duration-ms', String(route.durationMs));
+  root.setAttribute('data-opencanvas-route-easing', route.easing);
+}
+
+function rerenderAfterInteractionMutation(context: EditorContext): void {
+  context.renderAll();
+  context.renderInteractionsPanel();
 }
 
 /**
@@ -644,6 +744,76 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     attachSidebarActions: () => attachSidebarActions(ctx),
     applySidebarStyleKit: (kit, buttons) => applySidebarStyleKit(ctx, kit, buttons),
     buildKitSummary: () => buildKitSummary(ctx),
+    renderInteractionsPanel: () => renderInteractionsPanel(ctx),
+    previewOverlay: (overlayId) => {
+      if (!ctx.state) {
+        ctx.setStatus('Load the site before previewing overlays', 'error');
+        console.error('[previewOverlay] state is not loaded');
+        return;
+      }
+      const overlay = (ctx.state.overlays ?? []).find((item) => item.id === overlayId);
+      if (!overlay) {
+        ctx.setStatus('Overlay preview failed: overlay not found', 'error');
+        console.error('[previewOverlay] missing overlay id=' + overlayId);
+        return;
+      }
+      if (!ensureEditorOverlayPreviewShell(ctx, overlay)) {
+        ctx.setStatus('Overlay preview failed: preview shell could not be created', 'error');
+        console.error('[previewOverlay] failed to create shell for overlay id=' + overlayId);
+        return;
+      }
+      previewOverlayInEditor(document, overlayId);
+      ctx.setStatus('Overlay preview opened', 'ok');
+    },
+    previewLoadExperience: () => {
+      if (!ctx.state?.loadExperience) {
+        ctx.setStatus('Enable or configure a load experience before previewing', 'error');
+        console.error('[previewLoadExperience] loadExperience is missing');
+        return;
+      }
+      const page = ctx.currentPage() || ctx.state.pages[0] || null;
+      ensureEditorLoadExperienceShell(ctx.state.loadExperience, page?.title || 'Loading');
+      previewLoadExperienceInEditor(document);
+      ctx.setStatus('Load experience preview started', 'ok');
+    },
+    previewRouteTransition: () => {
+      if (!ctx.state?.routeTransition) {
+        ctx.setStatus('Enable or configure a route transition before previewing', 'error');
+        console.error('[previewRouteTransition] routeTransition is missing');
+        return;
+      }
+      if (!ctx.root) {
+        ctx.setStatus('Route preview failed: canvas root missing', 'error');
+        console.error('[previewRouteTransition] ctx.root is missing');
+        return;
+      }
+      applyEditorRoutePreviewAttrs(ctx.root, ctx.state.routeTransition);
+      previewRouteTransitionInEditor(ctx.root);
+      ctx.setStatus('Route transition preview started', 'ok');
+    },
+    useSelectedElementAsOverlayTrigger: (overlayId) => {
+      if (!ctx.state) {
+        ctx.setStatus('Load the site before connecting overlay triggers', 'error');
+        console.error('[useSelectedElementAsOverlayTrigger] state is not loaded');
+        return;
+      }
+      if (!ctx.selectedElementId || !ctx.findElement(ctx.selectedElementId)) {
+        ctx.setStatus('Select an element before connecting an overlay trigger', 'error');
+        console.error('[useSelectedElementAsOverlayTrigger] selected element is missing');
+        return;
+      }
+      const overlay = (ctx.state.overlays ?? []).find((item) => item.id === overlayId);
+      if (!overlay) {
+        ctx.setStatus('Overlay trigger failed: overlay not found', 'error');
+        console.error('[useSelectedElementAsOverlayTrigger] missing overlay id=' + overlayId);
+        return;
+      }
+      ctx.captureForUndo();
+      overlay.trigger = { type: 'element-click', targetElementId: ctx.selectedElementId };
+      rerenderAfterInteractionMutation(ctx);
+      ctx.scheduleSave();
+      ctx.setStatus('Overlay trigger connected', 'ok');
+    },
     ensureSectionsPanelLoaded: () => ensureSectionsPanelLoaded(ctx),
 
     // ---- Phase 2q.j: publish + version pill + save + versions panel --

@@ -32,8 +32,8 @@
 //     failure the local state rolls back to prevKit so the UI stops
 //     lying about what's saved.
 //
-//   - attachSidebarTabs(ctx) — wire click handlers on the 3 static tabs
-//     rendered in route.tsx (Add / Sections / Pages). The Versions tab
+//   - attachSidebarTabs(ctx) — wire click handlers on the static tabs
+//     rendered in route.tsx (Add / Sections / Pages / Interactions). The Versions tab
 //     is mounted dynamically later by ensureVersionsTabMounted and
 //     brings its own click handler. All four delegate to
 //     ctx.activateSidebarTab so the active class is toggled on every
@@ -88,7 +88,10 @@ export type ApplySidebarStyleKitContext = StateContext &
 // ADR 0064 — tab wiring only forwards every click into the single
 // activateSidebarTab verb. No canonical cluster fits, so the surface is
 // an inline one-field Pick.
-export type AttachSidebarTabsContext = Pick<EditorContext, 'activateSidebarTab'>;
+export type AttachSidebarTabsContext = Pick<
+  EditorContext,
+  'activateSidebarTab' | 'renderInteractionsPanel'
+>;
 
 // ADR 0064 — sidebar-actions wiring reads two DomContext refs (sidebar +
 // inspector) and forwards into applySidebarStyleKit (so it must satisfy
@@ -218,8 +221,8 @@ export async function applySidebarStyleKit(
 }
 
 export function attachSidebarTabs(ctx: AttachSidebarTabsContext): void {
-  // Listeners attach to the 3 static tabs rendered in route.tsx (Add /
-  // Sections / Pages). The Versions tab is mounted dynamically later by
+  // Listeners attach to the static tabs rendered in route.tsx (Add /
+  // Sections / Pages / Interactions). The Versions tab is mounted dynamically later by
   // ensureVersionsTabMounted and brings its own click handler. All four
   // delegate to the single activateSidebarTab() function so the active
   // class is toggled on every live tab — querying [data-sidebar-tab]
@@ -232,7 +235,10 @@ export function attachSidebarTabs(ctx: AttachSidebarTabsContext): void {
   tabButtons.forEach((button) => {
     button.addEventListener('click', () => {
       const tabName = button.getAttribute('data-sidebar-tab');
-      if (tabName) ctx.activateSidebarTab(tabName);
+      if (tabName) {
+        ctx.activateSidebarTab(tabName);
+        if (tabName === 'interactions') ctx.renderInteractionsPanel();
+      }
     });
   });
 }

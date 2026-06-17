@@ -1791,6 +1791,76 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   text-transform: uppercase;
 }
 
+.opencanvas-interactions-panel {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.opencanvas-interactions-section {
+  min-width: 0;
+}
+.opencanvas-interactions-card,
+.opencanvas-interactions-step,
+.opencanvas-interactions-sequence {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--opencanvas-hairline);
+  border-radius: 8px;
+  background: var(--opencanvas-bg-panel);
+}
+.opencanvas-interactions-card-header,
+.opencanvas-interactions-sequence-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+.opencanvas-interactions-card-header strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--opencanvas-fg);
+  font-size: 13px;
+}
+.opencanvas-interactions-action {
+  width: auto;
+  margin: 6px 0;
+}
+.opencanvas-interactions-check,
+.opencanvas-interactions-check-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.opencanvas-interactions-check {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  color: var(--opencanvas-fg);
+  font-size: 12px;
+}
+.opencanvas-interactions-sequence > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--opencanvas-fg);
+}
+.opencanvas-interactions-card .field,
+.opencanvas-interactions-step .field,
+.opencanvas-interactions-section .field {
+  min-width: 0;
+}
+.opencanvas-interactions-card input,
+.opencanvas-interactions-card select,
+.opencanvas-interactions-step input,
+.opencanvas-interactions-step select,
+.opencanvas-interactions-section input,
+.opencanvas-interactions-section select {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .opencanvas-sidebar-command-grid,
 .opencanvas-sidebar-kit-grid {
   display: grid;
@@ -4233,6 +4303,94 @@ body[data-placement-active="true"] .opencanvas-section-slot {
 
 .media-picker .picker-current-actions input[type="file"] {
   display: none;
+}
+
+[data-opencanvas-route-container] {
+  view-transition-name: opencanvas-editor-site;
+}
+[data-opencanvas-route-state="outgoing"] {
+  pointer-events: none;
+}
+[data-opencanvas-route-mode="fade"][data-opencanvas-route-state="outgoing"] {
+  opacity: 0;
+}
+[data-opencanvas-route-mode="slide"][data-opencanvas-route-state="outgoing"] {
+  transform: translateX(-24px);
+  opacity: 0;
+}
+[data-opencanvas-route-mode="wipe"][data-opencanvas-route-state="outgoing"] {
+  clip-path: inset(0 100% 0 0);
+}
+[data-opencanvas-editor-preview-layer],
+[data-opencanvas-overlays-root] {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100000;
+}
+.opencanvas-overlay[hidden] {
+  display: none;
+}
+.opencanvas-overlay[data-opencanvas-overlay-open] {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+}
+.opencanvas-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.56);
+}
+.opencanvas-overlay-surface {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 960px);
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--opencanvas-bg-panel);
+  color: var(--opencanvas-fg);
+  box-shadow: var(--shadow-lg);
+}
+.opencanvas-overlay-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+}
+.opencanvas-load-experience {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: grid;
+  place-items: center;
+  gap: 18px;
+  background: var(--opencanvas-bg);
+  color: var(--opencanvas-fg);
+}
+.opencanvas-load-experience[data-opencanvas-load-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+.opencanvas-load-progress {
+  width: min(260px, 60vw);
+  height: 3px;
+  background: rgba(127, 127, 127, 0.25);
+  overflow: hidden;
+}
+.opencanvas-load-progress > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: translateX(-100%);
+  background: var(--opencanvas-accent);
+  animation: opencanvas-load-progress 1200ms ease-in-out infinite;
+}
+@keyframes opencanvas-load-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
 }
 
 /* Brand-matching scrollbars across the editor surfaces. Webkit-only

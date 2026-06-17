@@ -383,3 +383,108 @@ function hydratePopups(root: ParentNode): void {
     })(sec);
   }
 }
+
+function queryByAttributeValue(root: ParentNode, attr: string, value: string): HTMLElement | null {
+  const nodes = root.querySelectorAll('[' + attr + ']');
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    if (node instanceof HTMLElement && node.getAttribute(attr) === value) return node;
+  }
+  return null;
+}
+
+function rootDocument(root: ParentNode): Document {
+  if ('ownerDocument' in root && root.ownerDocument) return root.ownerDocument;
+  return document;
+}
+
+function ensurePreviewLayer(root: ParentNode): HTMLElement {
+  const doc = rootDocument(root);
+  const existing = doc.querySelector('[data-opencanvas-editor-preview-layer]');
+  if (existing instanceof HTMLElement) return existing;
+  const layer = doc.createElement('div');
+  layer.setAttribute('data-opencanvas-editor-preview-layer', 'true');
+  doc.body.appendChild(layer);
+  return layer;
+}
+
+function closeEditorPreviewShell(shell: HTMLElement): void {
+  shell.removeAttribute('data-opencanvas-overlay-open');
+  shell.setAttribute('hidden', '');
+  if (shell.getAttribute('data-opencanvas-editor-preview-temp') === 'true') shell.remove();
+}
+
+export function previewOverlayInEditor(root: ParentNode, overlayId: string): void {
+  const overlay = queryByAttributeValue(root, 'data-opencanvas-overlay', overlayId);
+  if (!overlay) {
+    console.error('[previewOverlayInEditor] missing overlay shell for id=' + overlayId);
+    return;
+  }
+  overlay.removeAttribute('hidden');
+  overlay.setAttribute('data-opencanvas-overlay-open', 'true');
+  const doc = rootDocument(root);
+  const close = overlay.querySelector('[data-opencanvas-overlay-editor-close]');
+  if (!close) {
+    const button = doc.createElement('button');
+    button.type = 'button';
+    button.className = 'opencanvas-overlay-close';
+    button.setAttribute('data-opencanvas-overlay-editor-close', 'true');
+    button.setAttribute('aria-label', 'Close overlay preview');
+    button.textContent = 'x';
+    button.addEventListener('click', () => closeEditorPreviewShell(overlay));
+    overlay.appendChild(button);
+  }
+}
+
+export function previewLoadExperienceInEditor(root: ParentNode): void {
+  const doc = rootDocument(root);
+  let shell = root.querySelector('[data-opencanvas-load-experience]');
+  if (!(shell instanceof HTMLElement)) {
+    const layer = ensurePreviewLayer(root);
+    shell = doc.createElement('div');
+    shell.className = 'opencanvas-load-experience';
+    shell.setAttribute('data-opencanvas-load-experience', 'editor-load-preview');
+    shell.setAttribute('data-opencanvas-load-preset', 'fade');
+    shell.setAttribute('data-opencanvas-load-run-policy', 'every-visit');
+    shell.setAttribute('data-opencanvas-load-gates', 'document-ready');
+    shell.setAttribute('data-opencanvas-load-timeout-ms', '4000');
+    shell.setAttribute('data-opencanvas-editor-preview-temp', 'true');
+    const brand = doc.createElement('div');
+    brand.className = 'opencanvas-load-brand';
+    brand.setAttribute('data-opencanvas-load-part', 'brand');
+    brand.textContent = 'Loading';
+    const progress = doc.createElement('div');
+    progress.className = 'opencanvas-load-progress';
+    progress.setAttribute('data-opencanvas-load-part', 'progress');
+    progress.appendChild(doc.createElement('span'));
+    shell.appendChild(brand);
+    shell.appendChild(progress);
+    layer.appendChild(shell);
+  }
+  shell.removeAttribute('hidden');
+  shell.removeAttribute('data-opencanvas-load-hidden');
+  window.setTimeout(() => {
+    if (!(shell instanceof HTMLElement)) return;
+    shell.setAttribute('data-opencanvas-load-hidden', 'true');
+    if (shell.getAttribute('data-opencanvas-editor-preview-temp') === 'true') {
+      window.setTimeout(() => shell.remove(), 220);
+    }
+  }, 1200);
+}
+
+export function previewRouteTransitionInEditor(root: ParentNode): void {
+  let container: Element | null = root.querySelector('[data-opencanvas-route-container]');
+  if (!container && root instanceof HTMLElement) container = root;
+  if (!(container instanceof HTMLElement)) {
+    console.error('[previewRouteTransitionInEditor] missing route transition container');
+    return;
+  }
+  if (!container.hasAttribute('data-opencanvas-route-mode')) {
+    container.setAttribute('data-opencanvas-route-mode', 'fade');
+  }
+  container.setAttribute('data-opencanvas-route-container', '');
+  container.setAttribute('data-opencanvas-route-state', 'outgoing');
+  window.setTimeout(() => {
+    container.removeAttribute('data-opencanvas-route-state');
+  }, 420);
+}

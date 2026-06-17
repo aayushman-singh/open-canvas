@@ -572,6 +572,31 @@ export function renderInspector(ctx: EditorContext): void {
     replayAnimations(ctx, element.id);
   });
   ctx.inspector.appendChild(elPlayBtn);
+
+  if (ctx.state?.overlays && ctx.state.overlays.length > 0) {
+    const triggerHeading = document.createElement('h3');
+    triggerHeading.textContent = 'Overlay trigger';
+    triggerHeading.className = 'inspector-section-heading';
+    ctx.inspector.appendChild(triggerHeading);
+
+    const overlaySelect = document.createElement('select');
+    for (const overlay of ctx.state.overlays) {
+      const option = document.createElement('option');
+      option.value = overlay.id;
+      option.textContent = overlay.name || overlay.id;
+      overlaySelect.appendChild(option);
+    }
+    ctx.inspector.appendChild(field('Overlay', overlaySelect));
+
+    const useAsTriggerBtn = document.createElement('button');
+    useAsTriggerBtn.type = 'button';
+    useAsTriggerBtn.className = 'opencanvas-replay-btn';
+    useAsTriggerBtn.textContent = 'Use as overlay trigger';
+    useAsTriggerBtn.addEventListener('click', function () {
+      ctx.useSelectedElementAsOverlayTrigger(overlaySelect.value);
+    });
+    ctx.inspector.appendChild(useAsTriggerBtn);
+  }
 }
 
 // ---------------------------------------------------------------------------

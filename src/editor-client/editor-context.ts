@@ -1656,6 +1656,21 @@ export interface EditorContext {
    *  it stays in sync with whatever style-kits.ts emits at runtime.
    *  Bound impl lives in sidebar.ts (buildKitSummary). */
   buildKitSummary(): HTMLElement;
+  /** Render the Interactions sidebar panel for site-level overlays, load
+   *  experience, route transitions, and Motion Sequence Lite steps. Bound
+   *  impl lives in interactions-panel.ts. */
+  renderInteractionsPanel(): void;
+  /** Open a configured Overlay in the editor preview without changing the
+   *  saved trigger. Missing overlay shells fail loudly via status + console. */
+  previewOverlay(overlayId: string): void;
+  /** Show the configured Load Experience shell in the editor preview. */
+  previewLoadExperience(): void;
+  /** Run the configured Route Transition state against the editor page
+   *  container. */
+  previewRouteTransition(): void;
+  /** Convert the selected element into the named Overlay's element-click
+   *  trigger. Fails loudly when no element is selected or the id is unknown. */
+  useSelectedElementAsOverlayTrigger(overlayId: string): void;
 
   // -- Phase 2q.j: publish + version pill + save wiring + versions panel
   /** The "v3 / Draft" pill in the editor header that doubles as a popover

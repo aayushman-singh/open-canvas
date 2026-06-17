@@ -445,6 +445,15 @@ export function editorPageJsx(opts: EditorPageOptions) {
               >
                 Pages
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-sidebar-tab="interactions"
+                title="Configure overlays, load experience, and route transitions"
+              >
+                Interactions
+              </button>
             </div>
             <div
               class="opencanvas-sidebar-panel"
@@ -544,6 +553,15 @@ export function editorPageJsx(opts: EditorPageOptions) {
               >
                 + New Page
               </button>
+            </div>
+            <div
+              class="opencanvas-sidebar-panel"
+              role="tabpanel"
+              aria-label="Interactions"
+              data-sidebar-panel="interactions"
+              hidden
+            >
+              <div id="opencanvas-interactions-panel"></div>
             </div>
           </aside>
           <div id="canvas-root" data-site-id={siteId} />
