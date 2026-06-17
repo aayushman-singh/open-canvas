@@ -499,6 +499,10 @@ assert(
     templatesPageSource.includes('canvasPublishedStyles'),
   'expected template previews to use the real canvas renderer and published styles',
 );
+assert(
+  templatesPageSource.includes('injectInteractiveRuntime'),
+  'expected built-in template previews to inject the interactive runtime',
+);
 
 const sitesApiSource = await readSource('./routes/api/sites.ts');
 assert(
@@ -511,6 +515,10 @@ assert(
   'expected site creation API to return JSON for JSON request bodies even without an Accept header',
 );
 const customTemplatesSource = await readSource('./routes/api/custom-templates.ts');
+assert(
+  customTemplatesSource.includes('injectInteractiveRuntime'),
+  'expected custom template previews to inject the interactive runtime',
+);
 assert(
   !customTemplatesSource.includes('opencanvas-preview-stage'),
   'expected custom template previews to rely on the outer thumbnail iframe scaling',

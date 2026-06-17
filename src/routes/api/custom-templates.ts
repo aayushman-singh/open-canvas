@@ -25,8 +25,8 @@ import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
 import { canvasPublishedStyles } from '../../canvas/public-styles.js';
 import { renderCanvasSnapshot } from '../../canvas/render.js';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form.js';
-import { pickStyleKitField } from '../../canvas/schema.js';
 import type { EditableSite, PublishedSnapshot } from '../../canvas/schema.js';
+import { injectInteractiveRuntime } from '../../interactive/inject.js';
 import { validateEditableSite } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
 import {
@@ -318,23 +318,23 @@ customTemplatesOwner.get('/:id/preview', async (c) => {
   }
 
   const snapshot: PublishedSnapshot = {
+    ...tmpl.siteState,
     version: 1,
     publishedAt: new Date().toISOString(),
-    ...pickStyleKitField(tmpl.siteState),
-    pages: tmpl.siteState.pages,
-    ...(tmpl.siteState.header ? { header: tmpl.siteState.header } : {}),
-    ...(tmpl.siteState.footer ? { footer: tmpl.siteState.footer } : {}),
   };
   // Template previews have no backing site yet — forms inside a preview
   // cannot submit to a real /__opencanvas/forms/<siteId>/<formId> endpoint. Pass
   // an explicit synthetic id so the renderer's siteId check still passes and
   // any accidental form POST hits a 404 against the forms router instead of
   // a silent double-slash URL.
-  const html = renderCanvasSnapshot(
+  const html = injectInteractiveRuntime(
+    renderCanvasSnapshot(
+      snapshot,
+      `/api/custom-templates/${c.req.param('id')}/assets`,
+      '__template-preview__',
+      { turnstileSiteKey: requireTurnstileSiteKey(c.env) },
+    ),
     snapshot,
-    `/api/custom-templates/${c.req.param('id')}/assets`,
-    '__template-preview__',
-    { turnstileSiteKey: requireTurnstileSiteKey(c.env) },
   );
 
   return c.html(

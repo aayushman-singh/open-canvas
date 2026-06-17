@@ -8,8 +8,8 @@ import { canvasPublishedStyles } from '../../canvas/public-styles';
 import { renderCanvasSnapshot } from '../../canvas/render';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { getSeedAsset } from '../../canvas/seed-assets';
-import { pickStyleKitField } from '../../canvas/schema';
 import type { PublishedSnapshot } from '../../canvas/schema';
+import { injectInteractiveRuntime } from '../../interactive/inject';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
 import { customTemplate, site } from '../../db/schema';
@@ -330,6 +330,38 @@ const previewStyles = `
   html, body { margin: 0; overflow: hidden; background: var(--paper); }
 `;
 
+const builtInTemplatePreviewPublishedAt = '2026-05-22T00:00:00.000Z';
+
+/** Body HTML for built-in template picker iframes — full snapshot + interactive runtime. */
+export function renderBuiltInTemplatePreviewBodyHtml(
+  templateId: string,
+  options: { turnstileSiteKey: string },
+): string {
+  // ADR 0061 Phase D — instantiate the composition to get an EditableSite
+  // shape the snapshot renderer accepts. Each preview re-materialises, so
+  // pool edits between deploys surface on the next preview render.
+  const state = instantiateTemplate(templateId);
+  const snapshot: PublishedSnapshot = {
+    ...state,
+    version: 1,
+    publishedAt: builtInTemplatePreviewPublishedAt,
+  };
+  // Template previews have no backing site yet — forms inside a preview
+  // cannot submit to a real /__opencanvas/forms/<siteId>/<formId> endpoint. Pass
+  // an explicit synthetic id so the renderer's siteId check still passes and
+  // any accidental form POST hits a 404 against the forms router instead of
+  // a silent double-slash URL.
+  return injectInteractiveRuntime(
+    renderCanvasSnapshot(
+      snapshot,
+      `/dashboard/templates/${templateId}/assets`,
+      '__template-preview__',
+      { turnstileSiteKey: options.turnstileSiteKey },
+    ),
+    snapshot,
+  );
+}
+
 function PreviewPage({
   template,
   turnstileSiteKey,
@@ -337,29 +369,7 @@ function PreviewPage({
   template: TemplateSeed;
   turnstileSiteKey: string;
 }) {
-  // ADR 0061 Phase D — instantiate the composition to get an EditableSite
-  // shape the snapshot renderer accepts. Each preview re-materialises, so
-  // pool edits between deploys surface on the next preview render.
-  const state = instantiateTemplate(template.id);
-  const snapshot: PublishedSnapshot = {
-    version: 1,
-    publishedAt: '2026-05-22T00:00:00.000Z',
-    ...pickStyleKitField(state),
-    pages: state.pages,
-    ...(state.header ? { header: state.header } : {}),
-    ...(state.footer ? { footer: state.footer } : {}),
-  };
-  // Template previews have no backing site yet — forms inside a preview
-  // cannot submit to a real /__opencanvas/forms/<siteId>/<formId> endpoint. Pass
-  // an explicit synthetic id so the renderer's siteId check still passes and
-  // any accidental form POST hits a 404 against the forms router instead of
-  // a silent double-slash URL.
-  const html = renderCanvasSnapshot(
-    snapshot,
-    `/dashboard/templates/${template.id}/assets`,
-    '__template-preview__',
-    { turnstileSiteKey },
-  );
+  const html = renderBuiltInTemplatePreviewBodyHtml(template.id, { turnstileSiteKey });
 
   return (
     <html lang="en">
