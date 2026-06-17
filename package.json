@@ -114,6 +114,7 @@
     "search:smoke": "bun run src/search/smoke.ts",
     "a11y:smoke": "bun run src/a11y/smoke.ts",
     "a11y-remediation:smoke": "bun run src/a11y/remediation.smoke.ts",
+    "behaviour-runtime:smoke": "bun run src/interactive/behaviour.smoke.ts",
     "interactive:smoke": "bun run src/interactive/smoke.ts",
     "popup:smoke": "bun run src/interactive/popup.smoke.ts",
     "code:smoke": "bun run src/code/smoke.ts",

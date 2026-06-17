@@ -23,6 +23,7 @@
 // preflight on the script origin.
 
 import { ACCORDION_RUNTIME_SRC } from './accordion.js';
+import { BEHAVIOUR_RUNTIME_SRC } from './behaviour.js';
 import { CAROUSEL_RUNTIME_SRC } from './carousel.js';
 import { POINTER_FX_RUNTIME_SRC } from './pointer-fx.js';
 import { POPUP_RUNTIME_SRC } from './popup.js';
@@ -39,6 +40,7 @@ export const INTERACTIVE_RUNTIME_SRC: string = [
   CAROUSEL_RUNTIME_SRC,
   POINTER_FX_RUNTIME_SRC,
   POPUP_RUNTIME_SRC,
+  BEHAVIOUR_RUNTIME_SRC,
   RUNTIME_ENTRY_SRC,
   '})();',
 ].join('\n');
