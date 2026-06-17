@@ -31,6 +31,7 @@ const FALLBACK_SECTION_HEIGHT = 320;
 const ELEMENT_TYPE_FILL: Record<ElementType, string> = {
   text: '#cbd5e1',
   media: '#60a5fa',
+  'rich-motion': '#22c55e',
   action: '#ef4444',
   shape: '#fcd34d',
   container: 'transparent',

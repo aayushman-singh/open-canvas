@@ -34,6 +34,7 @@ const REGISTERED_FACTORIES = [
   'text',
   'image',
   'video',
+  'rich-motion',
   'action',
   'shape',
   'container',

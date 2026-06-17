@@ -41,6 +41,7 @@ export type StyleKit = (typeof STYLE_KITS)[number];
 export const ELEMENT_TYPES = [
   'text',
   'media',
+  'rich-motion',
   'action',
   'shape',
   'container',
@@ -384,7 +385,7 @@ export type TextRole = (typeof TEXT_ROLES)[number];
 
 // -- CanvasElement discriminated union -------------------------------------
 //
-// All 14 element interfaces live in `src/canvas/elements/*.ts`. Each file
+// All 17 element interfaces live in `src/canvas/elements/*.ts`. Each file
 // owns its interface and renderer together; schema.ts is the root of the
 // dependency tree (provides BaseElement and the variant enums) but does not
 // define any element interface itself. The `CanvasElement` union pulls each
@@ -394,6 +395,7 @@ export type TextRole = (typeof TEXT_ROLES)[number];
 // '../canvas/schema'` consumers continue to resolve without change.
 import type { TextElement } from './elements/text.js';
 import type { MediaElement, ImageMediaElement, VideoMediaElement } from './elements/media.js';
+import type { RichMotionElement } from './elements/rich-motion.js';
 import type { ActionElement, ActionHref, ActionBehavior } from './elements/action.js';
 import type { ShapeElement } from './elements/shape.js';
 import type { ContainerElement } from './elements/container.js';
@@ -417,6 +419,7 @@ export type {
   MediaElement,
   ImageMediaElement,
   VideoMediaElement,
+  RichMotionElement,
   ActionElement,
   ActionHref,
   ActionBehavior,
@@ -429,6 +432,7 @@ export type {
 export type CanvasElement =
   | TextElement
   | MediaElement
+  | RichMotionElement
   | ActionElement
   | ShapeElement
   | ContainerElement

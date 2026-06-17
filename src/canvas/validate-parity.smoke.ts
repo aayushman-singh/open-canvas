@@ -86,10 +86,48 @@ function withPlaceholderMediaAsset(s: object): object {
   throw new Error('home.json fixture has no media element for the parity test');
 }
 
+function withUnresolvedRichMotionAssetRef(s: object): object {
+  const cloned = JSON.parse(JSON.stringify(s)) as {
+    pages?: {
+      sections?: {
+        elements?: Array<Record<string, unknown>>;
+      }[];
+    }[];
+    richMotionAssets?: Array<Record<string, unknown>>;
+  };
+  if (!Array.isArray(cloned.pages) || cloned.pages.length === 0) {
+    throw new Error('snapshot has no pages for the rich-motion parity test');
+  }
+  const firstSection = cloned.pages[0]?.sections?.[0];
+  if (!firstSection || !Array.isArray(firstSection.elements)) {
+    throw new Error('snapshot has no section elements for the rich-motion parity test');
+  }
+  cloned.richMotionAssets = [
+    {
+      id: 'rich-motion-seq',
+      kind: 'image-sequence',
+      frameAssetIds: ['frame-001', 'frame-002'],
+      posterAssetId: 'poster-001',
+      alt: 'Parity smoke motion asset',
+      playback: { driver: 'load', fps: 24 },
+    },
+  ];
+  firstSection.elements.push({
+    id: 'rich-motion-parity',
+    type: 'rich-motion',
+    box: { x: 24, y: 24, w: 520, h: 520, z: 99 },
+    assetRefId: '__placeholder__',
+    fit: 'contain',
+    label: 'Parity smoke motion asset',
+  });
+  return cloned;
+}
+
 const removalCases: { field: (typeof PUBLISH_ONLY_REQUIRED_FIELDS)[number]; transform: (s: object) => object }[] = [
   { field: 'version', transform: withoutVersion },
   { field: 'publishedAt', transform: withoutPublishedAt },
   { field: 'media.assetId-non-empty', transform: withPlaceholderMediaAsset },
+  { field: 'richMotion.assetRefId-resolves', transform: withUnresolvedRichMotionAssetRef },
 ];
 
 assert(

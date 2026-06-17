@@ -186,6 +186,7 @@ function buildAriaWrapperAttrs(element: CanvasElement): string {
       return element.linkHref === undefined ? ' aria-hidden="true" role="presentation"' : '';
     case 'media':
       return element.alt === '' ? ' aria-hidden="true"' : '';
+    case 'rich-motion':
     case 'text':
     case 'action':
     case 'form':
@@ -235,6 +236,7 @@ function variantAttr(element: CanvasElement): string {
       return ` data-variant="${escapeAttr(element.variant ?? 'classic')}"`;
     case 'tabs':
       return ` data-variant="${escapeAttr(element.variant ?? 'classic')}"`;
+    case 'rich-motion':
     case 'media':
     case 'embed':
     case 'table':

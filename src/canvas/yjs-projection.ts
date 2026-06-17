@@ -138,6 +138,7 @@ import type {
   FlowSpacing,
   NavElement,
   NavLink,
+  RichMotionElement,
   TableColumn,
   TableElement,
   TableRow,
@@ -380,6 +381,15 @@ function encodeMediaElement(el: MediaElement): Y.Map<unknown> {
       out.set('playback', playback);
     }
   }
+  return out;
+}
+
+function encodeRichMotionElement(el: RichMotionElement): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  encodeBaseElementFields(out, el);
+  out.set('assetRefId', el.assetRefId);
+  out.set('fit', el.fit);
+  out.set('label', el.label);
   return out;
 }
 
@@ -835,6 +845,7 @@ type YEncodeDispatch = {
 export const Y_ENCODE_DISPATCH: YEncodeDispatch = {
   text: encodeTextElement,
   media: encodeMediaElement,
+  'rich-motion': encodeRichMotionElement,
   action: encodeActionElement,
   shape: encodeShapeElement,
   container: encodeContainerElement,
@@ -1186,6 +1197,16 @@ function decodeMediaElement(map: Y.Map<unknown>, base: BaseElement): MediaElemen
     el.playback = playbackOut;
   }
   return el;
+}
+
+function decodeRichMotionElement(map: Y.Map<unknown>, base: BaseElement): RichMotionElement {
+  return {
+    ...base,
+    type: 'rich-motion',
+    assetRefId: map.get('assetRefId') as string,
+    fit: map.get('fit') as RichMotionElement['fit'],
+    label: map.get('label') as string,
+  };
 }
 
 function decodeActionElement(map: Y.Map<unknown>, base: BaseElement): ActionElement {
@@ -1563,6 +1584,7 @@ type YDecodeDispatch = {
 export const Y_DECODE_DISPATCH: YDecodeDispatch = {
   text: decodeTextElement,
   media: decodeMediaElement,
+  'rich-motion': decodeRichMotionElement,
   action: decodeActionElement,
   shape: decodeShapeElement,
   container: decodeContainerElement,

@@ -95,6 +95,7 @@ const PINNED_SECTION_HEIGHT_MIN = 48;
 const SECTION_HEIGHT_MAX = 1400;
 
 const POPUP_TRIGGER_TYPES = ['exit-intent', 'delay', 'scroll'] as const;
+const RICH_MOTION_PLACEHOLDER_ASSET_REF_ID = '__placeholder__';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -1293,6 +1294,16 @@ function validateElement(
             `${basePath}.playback: video with autoplay=true must also set muted=true (visitor autoplay policy)`,
           );
         }
+      }
+      break;
+    }
+    case 'rich-motion': {
+      if (typeof element.assetRefId !== 'string') {
+        errors.push(`${basePath}.assetRefId must be a string`);
+      }
+      assertOneOf<BackgroundSize>(element.fit, BACKGROUND_SIZES, `${basePath}.fit`, errors);
+      if (typeof element.label !== 'string') {
+        errors.push(`${basePath}.label must be a string`);
       }
       break;
     }
@@ -2932,7 +2943,156 @@ export const PUBLISH_ONLY_REQUIRED_FIELDS = [
   'version',
   'publishedAt',
   'media.assetId-non-empty',
+  'richMotion.assetRefId-resolves',
 ] as const;
+
+function validatePublishedRichMotionReferencesInSection(
+  section: unknown,
+  basePath: string,
+  richMotionAssetsById: Map<string, { kind: unknown; path: string }>,
+  errors: string[],
+): void {
+  if (!isRecord(section) || !Array.isArray(section.elements)) return;
+  section.elements.forEach((element, elementIdx) => {
+    const elementPath = `${basePath}.elements[${String(elementIdx)}]`;
+    validatePublishedRichMotionReferencesInElement(
+      element,
+      elementPath,
+      richMotionAssetsById,
+      errors,
+    );
+  });
+}
+
+function validatePublishedRichMotionReferencesInElement(
+  element: unknown,
+  elementPath: string,
+  richMotionAssetsById: Map<string, { kind: unknown; path: string }>,
+  errors: string[],
+): void {
+  if (!isRecord(element)) return;
+  if (element.type === 'rich-motion') {
+    if (element.assetRefId === RICH_MOTION_PLACEHOLDER_ASSET_REF_ID) {
+      errors.push(
+        `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: "${RICH_MOTION_PLACEHOLDER_ASSET_REF_ID}" is the editor placeholder sentinel`,
+      );
+      return;
+    }
+    if (!isNonEmptyString(element.assetRefId)) {
+      errors.push(
+        `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: assetRefId must be a non-empty string in published snapshots`,
+      );
+      return;
+    }
+    const asset = richMotionAssetsById.get(element.assetRefId);
+    if (asset === undefined) {
+      errors.push(
+        `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: "${element.assetRefId}" must reference an existing richMotionAssets[].id`,
+      );
+      return;
+    }
+    if (asset.kind !== 'image-sequence') {
+      errors.push(
+        `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: ${asset.path}.kind ${JSON.stringify(asset.kind)} is not supported for published rich-motion elements`,
+      );
+    }
+    return;
+  }
+  if (element.type === 'tabs' && Array.isArray(element.tabs)) {
+    element.tabs.forEach((tab, tabIdx) => {
+      if (!isRecord(tab) || !Array.isArray(tab.elements)) return;
+      tab.elements.forEach((child, childIdx) => {
+        validatePublishedRichMotionReferencesInElement(
+          child,
+          pathJoin(pathJoin(pathJoin(pathJoin(elementPath, 'tabs'), tabIdx), 'elements'), childIdx),
+          richMotionAssetsById,
+          errors,
+        );
+      });
+    });
+    return;
+  }
+  if (element.type === 'collection') {
+    if (Array.isArray(element.customTemplate)) {
+      element.customTemplate.forEach((child, childIdx) => {
+        validatePublishedRichMotionReferencesInElement(
+          child,
+          pathJoin(pathJoin(elementPath, 'customTemplate'), childIdx),
+          richMotionAssetsById,
+          errors,
+        );
+      });
+    }
+    if (Array.isArray(element.entries)) {
+      element.entries.forEach((entry, entryIdx) => {
+        if (!Array.isArray(entry)) return;
+        entry.forEach((child, childIdx) => {
+          validatePublishedRichMotionReferencesInElement(
+            child,
+            pathJoin(pathJoin(pathJoin(elementPath, 'entries'), entryIdx), childIdx),
+            richMotionAssetsById,
+            errors,
+          );
+        });
+      });
+    }
+    return;
+  }
+  if (element.type === 'flow-container' && Array.isArray(element.items)) {
+    element.items.forEach((item, itemIdx) => {
+      if (!isRecord(item)) return;
+      validatePublishedRichMotionReferencesInElement(
+        item.element,
+        pathJoin(pathJoin(pathJoin(elementPath, 'items'), itemIdx), 'element'),
+        richMotionAssetsById,
+        errors,
+      );
+    });
+  }
+}
+
+function validatePublishedRichMotionReferences(snapshot: unknown, errors: string[]): void {
+  if (!isRecord(snapshot)) return;
+  const richMotionAssetsById = new Map<string, { kind: unknown; path: string }>();
+  if (Array.isArray(snapshot.richMotionAssets)) {
+    snapshot.richMotionAssets.forEach((asset, assetIdx) => {
+      if (!isRecord(asset) || typeof asset.id !== 'string') return;
+      richMotionAssetsById.set(asset.id, {
+        kind: asset.kind,
+        path: `richMotionAssets[${String(assetIdx)}]`,
+      });
+    });
+  }
+  if (Array.isArray(snapshot.pages)) {
+    snapshot.pages.forEach((page, pageIdx) => {
+      if (!isRecord(page) || !Array.isArray(page.sections)) return;
+      page.sections.forEach((section, sectionIdx) => {
+        validatePublishedRichMotionReferencesInSection(
+          section,
+          `pages[${String(pageIdx)}].sections[${String(sectionIdx)}]`,
+          richMotionAssetsById,
+          errors,
+        );
+      });
+    });
+  }
+  if (snapshot.header !== undefined) {
+    validatePublishedRichMotionReferencesInSection(
+      snapshot.header,
+      'header',
+      richMotionAssetsById,
+      errors,
+    );
+  }
+  if (snapshot.footer !== undefined) {
+    validatePublishedRichMotionReferencesInSection(
+      snapshot.footer,
+      'footer',
+      richMotionAssetsById,
+      errors,
+    );
+  }
+}
 
 export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
   const errors: string[] = [];
@@ -2955,6 +3115,7 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
   // snapshot via the spread at publish.ts:373-386.
   validateSiteShape(snapshot, errors);
   validatePublishedMediaReferences(snapshot, errors);
+  validatePublishedRichMotionReferences(snapshot, errors);
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
 }

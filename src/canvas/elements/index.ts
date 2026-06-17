@@ -47,6 +47,12 @@ import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
 import { mediaAgentToolSpec, mediaInspectorSpec, mediaSidebarSpec, renderMedia } from './media.js';
 import { navAgentToolSpec, navInspectorSpec, navSidebarSpec, renderNav } from './nav.js';
+import {
+  renderRichMotion,
+  richMotionAgentToolSpec,
+  richMotionInspectorSpec,
+  richMotionSidebarSpec,
+} from './rich-motion.js';
 import { renderShape, shapeAgentToolSpec, shapeInspectorSpec, shapeSidebarSpec } from './shape.js';
 import { renderTable, tableAgentToolSpec, tableInspectorSpec, tableSidebarSpec } from './table.js';
 import { renderTabs, tabsAgentToolSpec, tabsInspectorSpec, tabsSidebarSpec } from './tabs.js';
@@ -54,11 +60,12 @@ import { renderText, textAgentToolSpec, textInspectorSpec, textSidebarSpec } fro
 
 // Re-export every element interface so downstream code has a single import
 // point. The five originals come from `schema.ts` (legacy location); the
-// nine new ones come from per-element files in this directory.
+// twelve newer ones come from per-element files in this directory.
 export type {
   ActionElement,
   ContainerElement,
   MediaElement,
+  RichMotionElement,
   ShapeElement,
   TextElement,
 } from '../schema.js';
@@ -209,6 +216,7 @@ export function renderElementBody(
 export const RENDER_DISPATCH: RenderDispatch = {
   text: (el) => renderText(el),
   media: (el, ctx) => renderMedia(el, { assetBasePath: ctx.assetBasePath }),
+  'rich-motion': (el) => renderRichMotion(el),
   action: (el, ctx) => renderAction(el, { pages: ctx.pages }),
   shape: (el) => renderShape(el),
   container: (el) => renderContainer(el),
@@ -290,6 +298,7 @@ export const INSPECTOR_DISPATCH: InspectorDispatch = {
   text: textInspectorSpec,
   action: actionInspectorSpec,
   media: mediaInspectorSpec,
+  'rich-motion': richMotionInspectorSpec,
   accordion: accordionInspectorSpec,
   carousel: carouselInspectorSpec,
   table: tableInspectorSpec,
@@ -340,6 +349,7 @@ export type SidebarDispatch = Record<CanvasElement['type'], SidebarSpec>;
 export const SIDEBAR_DISPATCH: SidebarDispatch = {
   text: textSidebarSpec,
   media: mediaSidebarSpec,
+  'rich-motion': richMotionSidebarSpec,
   action: actionSidebarSpec,
   shape: shapeSidebarSpec,
   container: containerSidebarSpec,
@@ -365,6 +375,7 @@ export const AGENT_TOOL_DISPATCH: AgentToolDispatch = {
   text: textAgentToolSpec,
   action: actionAgentToolSpec,
   media: mediaAgentToolSpec,
+  'rich-motion': richMotionAgentToolSpec,
   accordion: accordionAgentToolSpec,
   carousel: carouselAgentToolSpec,
   table: tableAgentToolSpec,
