@@ -24,5 +24,6 @@ assert.ok(html.includes('data-opencanvas-route-mode="wipe"'));
 assert.equal(snapshotNeedsInteractiveRuntime(snapshot), true);
 assert.ok(injectInteractiveRuntime(html, snapshot).includes('hydrateRouteTransition'));
 assert.ok(injectInteractiveRuntime(html, snapshot).includes('opencanvas:route-transition-failed'));
+assert.ok(injectInteractiveRuntime(html, snapshot).includes("swapTo(new URL(window.location.href), 'replace')"));
 
 console.log('[route-transition:smoke] OK');

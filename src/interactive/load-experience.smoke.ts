@@ -20,6 +20,7 @@ const snapshot: PublishedSnapshot = {
 
 const html = renderCanvasSnapshot(snapshot, '/assets', 'site-1', { turnstileSiteKey: 'test-key' });
 assert.ok(html.includes('data-opencanvas-load-experience'));
+assert.ok(html.includes('data-opencanvas-load-part="shell"'));
 assert.ok(html.includes('data-opencanvas-load-preset="progress-bar"'));
 assert.ok(html.includes('data-opencanvas-load-gates="document-ready fonts-ready"'));
 assert.equal(snapshotNeedsInteractiveRuntime(snapshot), true);

@@ -35,7 +35,7 @@ function hydrateRouteTransition(scope, options) {
   function wait(ms) {
     return new Promise(function(resolve){ window.setTimeout(resolve, ms); });
   }
-  function swapTo(url) {
+  function swapTo(url, historyMode) {
     if (busy) return;
     busy = true;
     var outgoingSequence = container.getAttribute('data-opencanvas-route-outgoing-sequence');
@@ -58,7 +58,8 @@ function hydrateRouteTransition(scope, options) {
         if (value === null) container.removeAttribute(attrs[i]);
         else container.setAttribute(attrs[i], value);
       }
-      history.pushState({}, '', url.href);
+      if (historyMode === 'replace') history.replaceState({}, '', url.href);
+      else history.pushState({}, '', url.href);
       container.removeAttribute('data-opencanvas-route-state');
       container.setAttribute('tabindex', '-1');
       if (typeof container.focus === 'function') container.focus({ preventScroll: true });
@@ -83,11 +84,11 @@ function hydrateRouteTransition(scope, options) {
     var url = sameSiteAnchor(target);
     if (!url) return;
     ev.preventDefault();
-    swapTo(url);
+    swapTo(url, 'push');
   });
   window.addEventListener('popstate', function() {
     if (container.isConnected === false) return;
-    swapTo(new URL(window.location.href));
+    swapTo(new URL(window.location.href), 'replace');
   });
 }
 `;

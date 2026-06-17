@@ -13,7 +13,9 @@ function motionTarget(root, target) {
     return root.querySelector('[data-opencanvas-overlay-backdrop]');
   }
   if (target.indexOf('load-screen-part:') === 0) {
-    return root.querySelector('[data-opencanvas-load-part="' + target.split(':')[1] + '"]');
+    var part = target.split(':')[1];
+    if (root.matches && root.matches('[data-opencanvas-load-part="' + part + '"]')) return root;
+    return root.querySelector('[data-opencanvas-load-part="' + part + '"]');
   }
   return null;
 }

@@ -535,7 +535,7 @@ function renderLoadExperience(snapshot: PublishedSnapshot): string {
   const sequenceAttr = load.handoffSequence
     ? ` data-opencanvas-load-handoff-sequence="${escapeAttr(load.handoffSequence.id)}"`
     : '';
-  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-preset="${escapeAttr(load.preset)}" data-opencanvas-load-run-policy="${escapeAttr(load.runPolicy)}" data-opencanvas-load-gates="${escapeAttr(load.gates.join(' '))}" data-opencanvas-load-timeout-ms="${escapeAttr(String(load.timeoutMs))}"${sequenceAttr}><div class="opencanvas-load-brand" data-opencanvas-load-part="brand">${escapeAttr(snapshot.pages[0]?.title ?? 'Loading')}</div><div class="opencanvas-load-progress" data-opencanvas-load-part="progress"><span></span></div><div class="opencanvas-load-error" data-opencanvas-load-part="error" hidden>Loading failed</div>${renderMotionSequenceLite(load.handoffSequence)}</div>`;
+  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-part="shell" data-opencanvas-load-preset="${escapeAttr(load.preset)}" data-opencanvas-load-run-policy="${escapeAttr(load.runPolicy)}" data-opencanvas-load-gates="${escapeAttr(load.gates.join(' '))}" data-opencanvas-load-timeout-ms="${escapeAttr(String(load.timeoutMs))}"${sequenceAttr}><div class="opencanvas-load-brand" data-opencanvas-load-part="brand">${escapeAttr(snapshot.pages[0]?.title ?? 'Loading')}</div><div class="opencanvas-load-progress" data-opencanvas-load-part="progress"><span></span></div><div class="opencanvas-load-error" data-opencanvas-load-part="error" hidden>Loading failed</div>${renderMotionSequenceLite(load.handoffSequence)}</div>`;
 }
 
 /**
