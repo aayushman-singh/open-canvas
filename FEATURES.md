@@ -113,7 +113,7 @@ The core editing experience. A desktop-first visual editor where the owner drags
 | Link interaction popover | Inline links, action links, and nav links expose Open/Edit/Unlink affordances plus a visitor-view preview inside the editor |
 | Element visual style controls | Inspector controls for background color/image, background sizing, border color/width/radius, opacity, shadow, text color, and overflow |
 | Undo/redo | Full undo/redo stack via Yjs history |
-| Sidebar tabs | Add (14 direct-add component buttons + style kits), Sections (searchable catalog), Pages (page list with SEO links) |
+| Sidebar tabs | Add (14 direct-add component buttons + style kits), Sections (searchable catalog), Pages (page list with SEO links), Interactions (Load Experience, Route Transition, Overlays, and Motion Sequence Lite) |
 | Pan + zoom | Mouse wheel zoom (25%-200%), fit-to-viewport, select/pan mode toggle |
 | Live preview | Real-time preview of editable state |
 | Status line | Collaboration indicators, save status, presence |
@@ -620,12 +620,17 @@ Per [ADR 0035](docs/adr/0035-visitor-dark-mode-three-way-enum.md), visitor dark 
 |---|---|
 | Accordion | Expand/collapse with keyboard support, multi-open |
 | Carousel | Slide navigation with dots, prev/next buttons |
-| Popup/Modal | Trigger-based popup modals |
-| Smart injection | Interactive runtime only injected when accordion/carousel elements are present |
+| Popup/Modal | Legacy trigger-based popup sections are migrated into first-class Overlays on editor load |
+| Premium Interactions | Interactions editor tab for site-level Load Experience, Route Transition, first-class Overlays, and Motion Sequence Lite step previews |
+| Overlays | Site-wide or page-scoped overlays with load, delay, scroll, exit-intent, or element-click triggers; dismissal policy covers close button, Escape, backdrop click, body scroll lock, focus trap, and return focus |
+| Load Experience | Optional published-site load shell with preset, run policy, readiness gates, timeout, and handoff sequence controls |
+| Route Transition | Optional same-origin navigation transition with fade, slide, or wipe mode plus outgoing/incoming Motion Sequence Lite hooks |
+| Editor preview controls | Owners can preview overlays, load screens, and route transitions from the Interactions tab; selected elements can be assigned as overlay click triggers from the element inspector |
+| Smart injection | Interactive runtime only injected when accordion/carousel/premium interaction features are present |
 | Zero-byte when unused | No client-side JS when no interactive elements exist |
 | CSS-driven animations | No framework dependency — pure CSS transitions |
 
-**Key files:** [interactive/](src/interactive/)
+**Key files:** [interactive/](src/interactive/), [interactions-panel.ts](src/editor-client/interactions-panel.ts)
 
 ---
 
@@ -872,6 +877,8 @@ Dark color scheme, Google Fonts integration, a JS-driven hero demo canvas, and f
 | `parallax-soft` | Soft parallax translateY |
 
 Each kit customizes the exact values (distance, scale factor, delay) to match its personality.
+
+Premium Interaction v1 also includes **Motion Sequence Lite**: a constrained step list for overlay open/close, load handoff, and route outgoing/incoming sequences. It is intentionally smaller than a full timeline editor: targets are limited to page container, overlay surface/backdrop, and load-screen parts; effects are fade, slide, scale, wipe, and blur.
 
 ---
 

@@ -1,7 +1,7 @@
 # Designer Template Fidelity Gaps
 
 **Status:** Investigation
-**Date:** 2026-06-16
+**Date:** 2026-06-17
 
 ## User-Visible Done State
 
@@ -58,15 +58,53 @@ Open Canvas has real motion and interaction primitives already:
   `spotlight` is attached to a catalogued variant.
 - Carousel has `paginate` and `scroll-snap` modes, plus style variants such as
   `coverflow`, `ken-burns`, and `editorial`.
-- Sections can become popups via `exit-intent`, `delay`, or `scroll` triggers.
+- Legacy sections with `exit-intent`, `delay`, or `scroll` popup triggers are
+  migrated into first-class Overlays on editor load.
 - Layout has top-only sticky elements (`stickyOffset`) and carousel-local
   horizontal scroll snap.
 - The importer captures computed `transition`, `animation`, `transform`, and
   `will-change`, then maps them to the nearest Motion Preset
   (`services/scraper/src/dom-walker.ts`).
+- Premium Interaction v1 adds schema-owned `Overlay`, `LoadExperience`,
+  `RouteTransition`, and `MotionSequenceLite` fields to editable and
+  published site state. The editor exposes them in the Interactions sidebar
+  tab, with preview controls and a selected-element shortcut for overlay
+  click triggers.
+- Published output now emits first-class overlay shells, load-experience
+  shells, route-transition metadata, and Motion Sequence Lite descriptors.
+  The Runtime Hydrator rehydrates these after live-publish HTML swaps.
 
-That baseline is useful, but it is not enough for 1:1 designer-template
-fidelity.
+That baseline is useful, and Premium Interaction v1 closes the first typed
+slice of the modal/preload/route gap. It is still not enough for 1:1
+designer-template fidelity.
+
+## Premium Interaction v1 Ship Update
+
+Shipped on June 17, 2026:
+
+- **Overlays v1:** site/page scoped content sections with load, delay, scroll,
+  exit-intent, and element-click triggers; explicit dismissal policy; editor
+  preview; legacy popup migration.
+- **Load Experience v1:** preset, run policy, readiness gates, timeout, and
+  handoff sequence metadata.
+- **Route Transition v1:** same-origin navigation interception with fade,
+  slide, and wipe modes; live-publish rehydration handoff.
+- **Motion Sequence Lite:** constrained ordered steps for overlay open/close,
+  load handoff, and route outgoing/incoming states. Targets are page
+  container, overlay surface/backdrop, and load-screen parts; effects are
+  fade, slide, scale, wipe, and blur.
+
+Still explicitly out of scope after v1:
+
+- Full timeline authoring with arbitrary properties, repeats, yoyo/reverse,
+  waits, text splits, SVG stroke drawing, variable-font axes, and per-step
+  completion behaviour.
+- Scroll Scene: pinned/scrubbed progress, horizontal storytelling, image
+  sequence scrubs, and scroll-bound Motion Sequence progress.
+- Shared-element or FLIP route transitions across pages, filters, tabs, and
+  overlay/detail states.
+- Rich Motion Assets: Lottie/Rive, WebGL/Three.js, shader distortion, Spline
+  surfaces, and particle fields.
 
 ## Benchmark Behaviours
 
@@ -92,7 +130,7 @@ renderer, validator, import path, and published runtime all understand.
 
 ## Gaps
 
-### 1. No Motion Graph Or Timeline
+### 1. No Full Motion Graph Or Timeline
 
 Current state:
 
@@ -102,6 +140,8 @@ Current state:
   `transform` and `opacity`.
 - The editor exposes a select and delay input; element delay is capped at
   2000ms in the inspector.
+- Motion Sequence Lite now exists for Premium Interaction v1, but only for
+  overlay, load, and route surfaces with a small target/effect vocabulary.
 
 User-visible miss:
 
@@ -143,15 +183,16 @@ Needed primitive:
   progress, snap points, and a Motion Sequence bound to progress rather than
   time.
 
-### 3. No Template-Native Preloader
+### 3. Load Experience V1 Exists, Full Preloader Authoring Does Not
 
 Current state:
 
-- Published pages do not have a site-level loading/preloader object.
-- There are loading states in dashboard/editor chrome, but not in Template
-  state or public page rendering.
+- Published pages can carry `loadExperience` with enabled state, preset,
+  run policy, readiness gates, timeout, and optional Motion Sequence Lite
+  handoff.
+- The editor exposes this in the Interactions tab with preview.
 - Media elements use native loading behaviour where relevant, but no authored
-  loading choreography exists.
+  custom preloader content or progress-number choreography exists yet.
 
 User-visible miss:
 
@@ -162,20 +203,21 @@ User-visible miss:
 
 Needed primitive:
 
-- A Load Experience at site/page level: visual content, run policy, readiness
-  gate, timeout/error behaviour, and transition into the first page state.
-- The failure path must be explicit. Do not silently skip the loader when an
+- Next wave: custom visual content, media readiness mapping, branded progress
+  numbers/logo draws, and richer transition into the first page state. The
+  failure path must stay explicit; do not silently skip the loader when an
   asset is late.
 
-### 4. No Page Or Route Transition System
+### 4. Route Transition V1 Exists, Shared-Element Navigation Does Not
 
 Current state:
 
 - Public navigation is multi-page HTML routing.
-- The live-update script swaps snapshot HTML via `innerHTML`, but inline
-  scripts do not execute after that swap; ADR 0066 already calls out live
-  re-hydration as a follow-up.
-- There is no View Transition API integration or schema-owned route transition.
+- The live-update script swaps snapshot HTML via `innerHTML` and now calls the
+  Runtime Hydrator after the swap.
+- `routeTransition` can enable fade, slide, or wipe transitions with
+  outgoing/incoming Motion Sequence Lite hooks.
+- There is no View Transition API shared-element mapping yet.
 
 User-visible miss:
 
@@ -186,22 +228,22 @@ User-visible miss:
 
 Needed primitive:
 
-- A Route Transition contract: trigger, outgoing animation, incoming
-  animation, optional shared-element mapping, hydration handoff, and reduced
-  motion behaviour.
+- Next wave: shared-element mapping, geometry capture, View Transition API or
+  FLIP handoff, reduced-motion policy, and explicit failure events when a
+  source/destination relation cannot be resolved.
 
-### 5. Popup Sections Are Not Designer-Grade Modals
+### 5. Overlay V1 Replaces Popup Sections, But Designer-Grade Modals Need More
 
 Current state:
 
-- A section becomes a popup when it has an `exit-intent`, `delay`, or `scroll`
-  trigger.
-- The runtime creates a hard-coded backdrop and close button with inline
-  styles.
-- Popup show mutates the section into fixed center positioning.
-- No element-click trigger exists; ADR 0054 documents it as a deferred drill-in
-  overlay contract.
-- The editor skips popup hydration so Owners do not get trapped while editing.
+- Legacy popup-triggered sections migrate into `EditableSite.overlays` on
+  editor load.
+- Overlay v1 supports site/page scope, load/delay/scroll/exit-intent/
+  element-click triggers, template-owned content sections, focus/scroll
+  dismissal policy, open/close Motion Sequence Lite metadata, and editor
+  preview.
+- Chrome styling is still base-level; there is not yet a reusable overlay
+  chrome style catalog.
 
 User-visible miss:
 
@@ -209,14 +251,14 @@ User-visible miss:
   full-screen menu transitions, iframe drill-ins, gallery lightboxes, or
   product-tour overlays.
 - Cannot style modal chrome as part of a Template.
-- No entrance/exit variants, backdrop variants, close-button placement, focus
-  trap, return focus, body scroll lock, or modal preview mode.
+- Entrance/exit variants, backdrop variants, close-button placement, and
+  reusable modal chrome presets are still missing.
 
 Needed primitive:
 
-- An Overlay/Modal model: content section, trigger relation, chrome style,
-  open/close Motion Sequences, focus and scroll contract, dismissal policy,
-  and editor preview controls.
+- Next wave: reusable chrome styles, close-button placement presets, backdrop
+  variants, lightbox/gallery/product-tour presets, iframe drill-in contracts,
+  and richer open/close sequences.
 
 ### 6. Pointer, Hover, And Cursor Effects Are Too Narrow
 
@@ -384,6 +426,8 @@ Current state:
 - Editor hydration mirrors those behaviours manually in
   `src/editor-client/hydrate-interactives.ts`.
 - ADR 0066 identifies this duplication as a follow-up.
+- Premium Interaction v1 adds explicit editor preview helpers and smokes for
+  the new surfaces, but it does not remove the two-source runtime shape.
 
 User-visible miss:
 
@@ -404,8 +448,10 @@ Current state:
 
 - Element inspector exposes Motion Preset, delay, and replay.
 - Section inspector exposes Entrance Preset and Popup Trigger.
-- Page fields exist in schema and context, but there is no visible timeline or
-  transition editor.
+- The Interactions sidebar tab exposes Load Experience, Route Transition,
+  Overlays, and Motion Sequence Lite step lists.
+- There is still no full timeline editor for arbitrary elements, text splits,
+  scroll scenes, or shared-layout transitions.
 
 User-visible miss:
 
@@ -419,17 +465,17 @@ Needed primitive:
 
 ## Priority Order
 
-1. **Canonical Motion/Interaction model.** Add the smallest set of new concepts
-   before adding more one-off variants: Trigger, Target, Motion Sequence,
-   Scroll Scene, Overlay, and Route Transition.
-2. **Runtime single-source/parity.** New interactions will multiply risk unless
+1. **Runtime single-source/parity.** New interactions will multiply risk unless
    visitor and editor hydration are unified or generated.
-3. **Designer-grade Overlay/Modal.** This is the highest-value concrete gap for
-   portfolio/project templates and product sites.
-4. **Preloader and Route Transition.** These define first impression and
-   navigation polish.
-5. **Scroll Scene.** Needed for the most visible "fancy site" storytelling
-   patterns.
+2. **Full timeline and Scroll Scene.** Needed for the most visible "fancy site"
+   choreography and storytelling patterns.
+3. **Shared-element route/layout transitions.** Needed for list/detail,
+   filters, tabs, and overlay/detail continuity.
+4. **Designer-grade Overlay/Modal v2.** Overlay v1 is real; reusable chrome,
+   richer sequences, and modal-specific presets remain.
+5. **Rich Motion Assets.** Needed for Lottie/Rive/WebGL/shader/particle
+   surfaces, but only after asset type, CSP, editor preview, and
+   reduced-motion contracts are defined.
 6. **Component Style and Collection rendering.** ADR 0067 is already pointed at
    this, but collection render must be real before styling it.
 7. **Pointer/Hover FX catalog.** Useful, but should compose with the Motion
