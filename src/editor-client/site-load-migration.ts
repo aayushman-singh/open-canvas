@@ -41,6 +41,7 @@
 //     contradictory single-source-of-truth pages per ADR 0063 dec 2.
 
 import type { CanvasElement, CanvasPage, CanvasSection } from '../canvas/schema.js';
+import { migratePopupTriggersToOverlays } from '../canvas/premium-interactions-migration.js';
 import type { CollectionElement } from '../canvas/elements/collection.js';
 
 /** Narrow ctx shape the migration depends on. Mirrors the
@@ -154,6 +155,11 @@ function normaliseLegacySort(element: CollectionElement): boolean {
 export function migrateLegacyCollectionIndexPagesImpl(ctx: SiteLoadMigrationCtx): void {
   if (!ctx.state || !Array.isArray(ctx.state.pages)) return;
 
+  const popupMigration = migratePopupTriggersToOverlays(ctx.state);
+  if (popupMigration.changed) {
+    ctx.state = popupMigration.site;
+  }
+
   let migrated = 0;
   let normalisedLegacySort = 0;
   let multiCollectionPages = 0;
@@ -209,7 +215,7 @@ export function migrateLegacyCollectionIndexPagesImpl(ctx: SiteLoadMigrationCtx)
     }
   }
 
-  if (migrated > 0 || normalisedLegacySort > 0) {
+  if (popupMigration.changed || migrated > 0 || normalisedLegacySort > 0) {
     ctx.scheduleSave();
   }
 

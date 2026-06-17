@@ -18,6 +18,7 @@ export const RUNTIME_ENTRY_SRC = String.raw`
 function hydratePremiumInteractions(scope, options) {
   var root = scope || document;
   hydratePointerFx(root);
+  if (typeof window === 'undefined') return;
   if (typeof hydrateOverlays === 'function') hydrateOverlays(root, options || {});
   if (typeof hydrateLoadExperience === 'function') hydrateLoadExperience(root, options || {});
   if (typeof hydrateRouteTransition === 'function') hydrateRouteTransition(root, options || {});

@@ -1072,6 +1072,29 @@ const variantCss = String.raw`
 .opencanvas-load-error[hidden] {
   display: none;
 }
+
+[data-opencanvas-motion-running="true"] {
+  transition:
+    opacity var(--opencanvas-motion-lite-duration, 180ms) var(--opencanvas-motion-lite-easing, ease) var(--opencanvas-motion-lite-delay, 0ms),
+    transform var(--opencanvas-motion-lite-duration, 180ms) var(--opencanvas-motion-lite-easing, ease) var(--opencanvas-motion-lite-delay, 0ms),
+    filter var(--opencanvas-motion-lite-duration, 180ms) var(--opencanvas-motion-lite-easing, ease) var(--opencanvas-motion-lite-delay, 0ms),
+    clip-path var(--opencanvas-motion-lite-duration, 180ms) var(--opencanvas-motion-lite-easing, ease) var(--opencanvas-motion-lite-delay, 0ms);
+}
+[data-opencanvas-motion-effect="fade"][data-opencanvas-motion-running="true"] {
+  opacity: 0;
+}
+[data-opencanvas-motion-effect="slide"][data-opencanvas-motion-running="true"] {
+  transform: translateY(16px);
+}
+[data-opencanvas-motion-effect="scale"][data-opencanvas-motion-running="true"] {
+  transform: scale(0.96);
+}
+[data-opencanvas-motion-effect="wipe"][data-opencanvas-motion-running="true"] {
+  clip-path: inset(0 100% 0 0);
+}
+[data-opencanvas-motion-effect="blur"][data-opencanvas-motion-running="true"] {
+  filter: blur(8px);
+}
 `;
 
 export const canvasPublishedStyles = `${baseCss}\n${carouselActiveCss}\n${variantCss}\n${kitCss}`;

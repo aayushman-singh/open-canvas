@@ -28,6 +28,8 @@ import type {
   CanvasPage,
   CanvasSection,
   ElementStyle,
+  MotionSequenceLite,
+  MotionSequenceLiteTarget,
   PublishedSnapshot,
   StyleKitPreset,
 } from './schema.js';
@@ -477,6 +479,21 @@ function renderPage(
   return `<article class="opencanvas-page" data-opencanvas-page="${escapeAttr(page.id)}"${motionAttr}${entranceAttr}${triggerAttr} style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
 }
 
+function motionTargetAttr(target: MotionSequenceLiteTarget): string {
+  if (target.type === 'load-screen-part') return `load-screen-part:${target.part}`;
+  return target.type;
+}
+
+function renderMotionSequenceLite(sequence: MotionSequenceLite | undefined): string {
+  if (!sequence) return '';
+  return sequence.steps
+    .map(
+      (step) =>
+        `<span hidden data-opencanvas-motion-sequence-lite="${escapeAttr(sequence.id)}" data-opencanvas-motion-step="${escapeAttr(step.id)}" data-opencanvas-motion-target="${escapeAttr(motionTargetAttr(step.target))}" data-opencanvas-motion-effect="${escapeAttr(step.effect)}" data-opencanvas-motion-delay-ms="${escapeAttr(String(step.delayMs))}" data-opencanvas-motion-duration-ms="${escapeAttr(String(step.durationMs))}" data-opencanvas-motion-easing="${escapeAttr(step.easing)}"></span>`,
+    )
+    .join('');
+}
+
 function renderOverlays(
   snapshot: PublishedSnapshot,
   ctx: Omit<ElementRenderCtx, 'pageSlug'>,
@@ -504,7 +521,8 @@ function renderOverlays(
           : trigger.type === 'element-click'
             ? ` data-opencanvas-overlay-trigger-target="${escapeAttr(trigger.targetElementId)}"`
             : '';
-      return `<div class="opencanvas-overlay" data-opencanvas-overlay="${escapeAttr(overlay.id)}" data-opencanvas-overlay-trigger-type="${escapeAttr(trigger.type)}"${triggerAttrs} data-opencanvas-overlay-close-button="${String(overlay.dismissal.closeButton)}" data-opencanvas-overlay-escape="${String(overlay.dismissal.escape)}" data-opencanvas-overlay-backdrop-click="${String(overlay.dismissal.backdropClick)}" data-opencanvas-overlay-body-scroll-lock="${String(overlay.dismissal.bodyScrollLock)}" data-opencanvas-overlay-focus-trap="${String(overlay.dismissal.focusTrap)}" data-opencanvas-overlay-return-focus="${String(overlay.dismissal.returnFocus)}" hidden><div class="opencanvas-overlay-backdrop" data-opencanvas-overlay-backdrop></div><div class="opencanvas-overlay-surface" data-opencanvas-overlay-surface role="dialog" aria-modal="true" aria-label="${escapeAttr(overlay.name)}">${contentHtml}</div></div>`;
+      const sequenceAttrs = `${overlay.openSequence ? ` data-opencanvas-overlay-open-sequence="${escapeAttr(overlay.openSequence.id)}"` : ''}${overlay.closeSequence ? ` data-opencanvas-overlay-close-sequence="${escapeAttr(overlay.closeSequence.id)}"` : ''}`;
+      return `<div class="opencanvas-overlay" data-opencanvas-overlay="${escapeAttr(overlay.id)}" data-opencanvas-overlay-trigger-type="${escapeAttr(trigger.type)}"${triggerAttrs}${sequenceAttrs} data-opencanvas-overlay-close-button="${String(overlay.dismissal.closeButton)}" data-opencanvas-overlay-escape="${String(overlay.dismissal.escape)}" data-opencanvas-overlay-backdrop-click="${String(overlay.dismissal.backdropClick)}" data-opencanvas-overlay-body-scroll-lock="${String(overlay.dismissal.bodyScrollLock)}" data-opencanvas-overlay-focus-trap="${String(overlay.dismissal.focusTrap)}" data-opencanvas-overlay-return-focus="${String(overlay.dismissal.returnFocus)}" hidden><div class="opencanvas-overlay-backdrop" data-opencanvas-overlay-backdrop></div><div class="opencanvas-overlay-surface" data-opencanvas-overlay-surface role="dialog" aria-modal="true" aria-label="${escapeAttr(overlay.name)}">${contentHtml}</div>${renderMotionSequenceLite(overlay.openSequence)}${renderMotionSequenceLite(overlay.closeSequence)}</div>`;
     })
     .join('');
   if (!overlays) return '';
@@ -514,7 +532,10 @@ function renderOverlays(
 function renderLoadExperience(snapshot: PublishedSnapshot): string {
   const load = snapshot.loadExperience;
   if (!load || load.enabled !== true) return '';
-  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-preset="${escapeAttr(load.preset)}" data-opencanvas-load-run-policy="${escapeAttr(load.runPolicy)}" data-opencanvas-load-gates="${escapeAttr(load.gates.join(' '))}" data-opencanvas-load-timeout-ms="${escapeAttr(String(load.timeoutMs))}"><div class="opencanvas-load-brand" data-opencanvas-load-part="brand">${escapeAttr(snapshot.pages[0]?.title ?? 'Loading')}</div><div class="opencanvas-load-progress" data-opencanvas-load-part="progress"><span></span></div><div class="opencanvas-load-error" data-opencanvas-load-part="error" hidden>Loading failed</div></div>`;
+  const sequenceAttr = load.handoffSequence
+    ? ` data-opencanvas-load-handoff-sequence="${escapeAttr(load.handoffSequence.id)}"`
+    : '';
+  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-preset="${escapeAttr(load.preset)}" data-opencanvas-load-run-policy="${escapeAttr(load.runPolicy)}" data-opencanvas-load-gates="${escapeAttr(load.gates.join(' '))}" data-opencanvas-load-timeout-ms="${escapeAttr(String(load.timeoutMs))}"${sequenceAttr}><div class="opencanvas-load-brand" data-opencanvas-load-part="brand">${escapeAttr(snapshot.pages[0]?.title ?? 'Loading')}</div><div class="opencanvas-load-progress" data-opencanvas-load-part="progress"><span></span></div><div class="opencanvas-load-error" data-opencanvas-load-part="error" hidden>Loading failed</div>${renderMotionSequenceLite(load.handoffSequence)}</div>`;
 }
 
 /**
@@ -593,9 +614,9 @@ export function renderCanvasSnapshot(
   const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
   const routeAttrs =
     snapshot.routeTransition?.enabled === true
-      ? ` data-opencanvas-route-transition="${escapeAttr(snapshot.routeTransition.id)}" data-opencanvas-route-mode="${escapeAttr(snapshot.routeTransition.mode)}" data-opencanvas-route-duration-ms="${escapeAttr(String(snapshot.routeTransition.durationMs))}" data-opencanvas-route-easing="${escapeAttr(snapshot.routeTransition.easing)}"`
+      ? ` data-opencanvas-route-transition="${escapeAttr(snapshot.routeTransition.id)}" data-opencanvas-route-mode="${escapeAttr(snapshot.routeTransition.mode)}" data-opencanvas-route-duration-ms="${escapeAttr(String(snapshot.routeTransition.durationMs))}" data-opencanvas-route-easing="${escapeAttr(snapshot.routeTransition.easing)}"${snapshot.routeTransition.outgoingSequence ? ` data-opencanvas-route-outgoing-sequence="${escapeAttr(snapshot.routeTransition.outgoingSequence.id)}"` : ''}${snapshot.routeTransition.incomingSequence ? ` data-opencanvas-route-incoming-sequence="${escapeAttr(snapshot.routeTransition.incomingSequence.id)}"` : ''}`
       : '';
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${pagesHtml}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${copyScript}${tabsScript}</main>`;
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${copyScript}${tabsScript}</main>`;
 }
 
 /**

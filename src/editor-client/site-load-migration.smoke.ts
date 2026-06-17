@@ -270,6 +270,37 @@ function makeSite(pages: CanvasPage[]): EditableSite {
   assert(saveCalls.count === 1, '(5) third run: still a no-op');
 }
 
+// (10) Legacy popup sections migrate into site-owned Overlays.
+{
+  const page: CanvasPage = {
+    id: 'page-popup',
+    slug: 'popup',
+    title: 'Popup',
+    width: 1440,
+    sections: [
+      {
+        id: 'legacy-popup',
+        recipeId: 'custom',
+        name: 'Legacy Popup',
+        height: 320,
+        trigger: { type: 'delay', value: 5000 },
+        elements: [],
+      },
+    ],
+  };
+  const site = makeSite([page]);
+  const { ctx, saveCalls } = makeCtx(site);
+  migrateLegacyCollectionIndexPagesImpl(ctx);
+  assert(saveCalls.count === 1, '(10) popup migration schedules exactly one save');
+  assert(ctx.state?.pages[0]?.sections.length === 0, '(10) legacy popup section leaves page body');
+  assert(ctx.state?.overlays?.[0]?.id === 'overlay-legacy-popup', '(10) overlay id derives from section id');
+  assert(ctx.state?.overlays?.[0]?.trigger.type === 'delay', '(10) overlay keeps delay trigger');
+  assert(
+    ctx.state?.overlays?.[0]?.content.id === 'legacy-popup',
+    '(10) overlay content preserves section id',
+  );
+}
+
 // (7) ADR 0063 F3 audit shape — pwtest-engineer's affected page.
 //
 // The prod audit (F3, 2026-06-05) found exactly one site
