@@ -46,6 +46,14 @@ synchronisation:
    shape. This would be wrong if Motion Preset and Motion Sequence needed
    independent runtime paths. They do not; the preset is a named macro.
 
+   **V1 editor surface:** Premium Interaction v1 ships **Motion Sequence Lite**:
+   a step-list editor, not a full timeline canvas. Each step can choose a
+   target, curated effect, delay, duration, and easing. Targets are limited to
+   page container, overlay surface, overlay backdrop, and load-screen parts.
+   Effects are limited to `fade`, `slide`, `scale`, `wipe`, and `blur`. Text
+   splitting, arbitrary CSS property animation, scroll-scene editing,
+   shared-element timelines, and keyframe-canvas editing are deferred.
+
 3. **Scroll Scene is a separate scroll-progress relation, not another Motion
    Preset.**
 

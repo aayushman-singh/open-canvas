@@ -64,6 +64,13 @@ sources would make the Owner's preview untrustworthy.
    would be wrong only if the editor were an approximate preview. It is a live
    site builder, so approximation is a product bug.
 
+   **V1 execution boundary:** the published-site runtime exposes one
+   idempotent hydrator entrypoint that can hydrate a supplied root after initial
+   load, live-publish replacement, or route-transition swaps. The existing
+   TypeScript editor hydrator may remain as a temporary mirror for V1, but
+   Premium Interaction preview paths must have parity smokes so drift is
+   visible.
+
 4. **Runtime adapters are replaceable implementation nodes behind Open Canvas
    concepts.**
 
@@ -76,6 +83,12 @@ sources would make the Owner's preview untrustworthy.
    cover rich media. None of those names should leak into the saved schema as
    the concept itself. This would be wrong if one library were the product
    contract. It is not.
+
+   **V1 dependency rule:** Premium Interaction v1 starts native-first
+   (DOM/CSS/WAAPI/fetch/history). Anime.js, Swup, Floating UI, or other
+   license-safe adapters are added only when implementation proves the native
+   path is expanding faster than the adapter would shrink it, and the adapter
+   still does not leak into saved site state.
 
 5. **`addon_custom_scripts` remains exceptional Owner-authored code and is not
    the template-fidelity path.**
@@ -102,8 +115,9 @@ sources would make the Owner's preview untrustworthy.
   and the third-party runtime only as implementation evidence.
 - Implementations need an explicit dependency-license check before package
   adoption. A zero-price but restricted dependency fails that check.
-- The editor/public runtime split becomes blocking debt for new premium
-  interactions, not a nice-to-have refactor.
+- The editor/public runtime split remains debt, but V1 may ship with a
+  temporary editor mirror if the published-site Runtime Hydrator is idempotent
+  and post-swap capable.
 - Open Canvas can still integrate strong third-party systems while keeping the
   persisted site model durable and editable.
 - Some GSAP-specific effects may need re-expression through Anime.js, Motion,

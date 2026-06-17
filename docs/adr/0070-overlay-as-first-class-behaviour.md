@@ -55,6 +55,11 @@ but the Open Canvas behaviour must be an Overlay.
    close button, route change, or programmatic close is allowed. This would be
    wrong if all overlays shared the same close rules. They do not.
 
+   **V1 trigger set:** `load`, `delay`, `scroll`, `exit-intent`, and
+   `element-click`. Hover, route-state, media-readiness, form-success, and other
+   triggers stay out of V1 so the first implementation can ship with complete
+   validation, editor target selection, and accessibility behaviour.
+
 4. **Overlay focus, scroll, and modality are part of the stored contract.**
 
    **Why:** a modal that animates well but loses focus, scrolls the body behind
@@ -63,6 +68,13 @@ but the Open Canvas behaviour must be an Overlay.
    scroll policy, and initial focus target. Native `<dialog>` can implement the
    modal path; Floating UI can implement anchored non-modal positioning. This
    would be wrong if overlays were visual-only. They are interaction surfaces.
+
+   **V1 dismissal controls:** a newly created modal Overlay enables close
+   button, Escape dismissal, backdrop-click dismissal, body scroll lock, focus
+   trap, and return-focus by default. The Owner may disable close button,
+   Escape, and backdrop-click independently; body scroll lock, focus trap, and
+   return-focus remain explicit stored fields rather than hard-coded runtime
+   assumptions.
 
 5. **Overlay entrance and exit are Motion Sequences.**
 
@@ -102,7 +114,8 @@ but the Open Canvas behaviour must be an Overlay.
 ## Consequences
 
 - `CanvasSection.trigger` should stop accumulating new overlay concerns. Existing
-  popup triggers need a migration path into Overlay.
+  popup triggers migrate into Overlay on read, and the editor stops writing
+  `CanvasSection.trigger` as an authoring path.
 - Public rendering needs an overlay layer separate from page body sections.
 - The Runtime Hydrator must attach overlay triggers, dismissal handlers, focus
   handling, scroll handling, and Motion Sequence execution from one source.
@@ -113,8 +126,8 @@ but the Open Canvas behaviour must be an Overlay.
 
 ## Follow-ups
 
-- Define the Overlay TypeScript shape and migration from existing popup
-  section triggers.
+- Define the Overlay TypeScript shape and implement the read-time migration
+  from existing popup section triggers.
 - Add element-click Interaction Trigger support.
 - Define overlay chrome Component Style fields after ADR 0067 lands.
 - Add overlay preview mode to the editor.

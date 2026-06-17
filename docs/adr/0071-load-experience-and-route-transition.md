@@ -28,7 +28,7 @@ Route Transition.
 
 ## Decisions
 
-1. **Load Experience is a site/page authored object, not an incidental loading
+1. **Load Experience is a site-authored object in V1, not an incidental loading
    spinner.**
 
    **Why:** designer preloaders carry brand, sequence, readiness, and handoff.
@@ -36,6 +36,13 @@ Route Transition.
    mask reveal, or "run once per session" rule. This would be wrong if the
    only need were dashboard waiting states. The need is visitor-facing template
    choreography.
+
+   **V1 scope:** Load Experience is site-level. It offers curated visual
+   presets (`fade`, `wipe`, `logo-card`, `progress-bar`), run policy
+   (`every-visit` or `once-per-session`), explicit gates (`document-ready`,
+   `fonts-ready`, `hero-media-ready`), and a bounded timeout that emits a
+   visible failure state and named failure event. Arbitrary custom preloader
+   composition is out of V1.
 
 2. **Readiness gates are explicit and bounded.**
 
@@ -54,16 +61,24 @@ Route Transition.
    CSS classes on links. Designer transitions are stateful navigation
    choreography.
 
+   **V1 scope:** Route Transition intercepts same-site links on the Published
+   Site, fetches the next document, swaps the stable site container, calls the
+   Runtime Hydrator, restores scroll and focus, and animates with one of three
+   curated modes: `fade`, `slide`, or `wipe`. Shared-element mapping, View
+   Transition API adapters, and full layout continuity are deferred.
+
 4. **Published pages stay server-rendered; the route runtime owns same-site
    navigation lifecycle.**
 
    **Why:** the existing public renderer, SEO path, password gate, assets,
    custom domains, and page routing already depend on server-rendered HTML.
    Turning published sites into a client SPA would add a large new system to
-   solve animation. Swup fits the existing MPA shape by intercepting internal
-   navigation, loading the next document, swapping the configured content
-   container, and emitting lifecycle hooks. This would be wrong if the site
-   model required client-side route data. It does not.
+   solve animation. A same-site MPA transition runtime fits the existing shape
+   by intercepting internal navigation, loading the next document, swapping the
+   configured content container, and emitting lifecycle hooks. Swup remains an
+   eligible adapter if implementation proves it reduces work without leaking
+   into the saved schema. This would be wrong if the site model required
+   client-side route data. It does not.
 
 5. **Every content swap must call the Runtime Hydrator before the transition is
    considered complete.**

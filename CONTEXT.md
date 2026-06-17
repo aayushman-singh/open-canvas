@@ -64,6 +64,10 @@ _Avoid_: CSS selector, DOM node, query target
 An ordered animation relation from one Interaction Trigger to one or more Interaction Targets. It carries explicit steps, timings, easing, target parts, and animated properties.
 _Avoid_: Keyframe blob, custom animation code, motion preset
 
+**Motion Sequence Lite**:
+An owner-facing step-list editor for simple Motion Sequences used by premium interactions.
+_Avoid_: Timeline, keyframe editor, animation canvas
+
 **Scroll Scene**:
 A scroll-position relation that binds progress through a page or section range to a Motion Sequence.
 _Avoid_: Scroll trigger, parallax preset, scroll script
@@ -73,11 +77,11 @@ The shared behaviour runner that reads schema-owned interactions and attaches th
 _Avoid_: Per-component script, custom code, visitor-only runtime
 
 **Overlay**:
-A temporary visitor-facing surface opened above the current page from an explicit Interaction Trigger and closed by an explicit dismissal rule.
+A temporary visitor-facing surface owned by an Editable Site, scoped to one or more pages, opened above the current page from an explicit Interaction Trigger, and closed by an explicit dismissal rule.
 _Avoid_: Popup, modal widget, iframe drill-in
 
 **Load Experience**:
-An authored first-load choreography that can wait on explicit readiness gates before handing control to the page.
+A site-owned authored first-load choreography that can wait on explicit readiness gates before handing control to the page.
 _Avoid_: Spinner, preloader script, loading state
 
 **Route Transition**:
@@ -319,9 +323,13 @@ _Avoid_: Undo stack, version history, asset trail
 - A **Component Style** belongs to one **Content Element** and overrides that element's **Variant**
 - A **Pinned Style** belongs to one **Positioned Element**, does not duplicate its **Component Style**, and survives **Theme Choice** changes
 - A **Motion Sequence** starts from one **Interaction Trigger** and affects one or more **Interaction Targets**
+- **Motion Sequence Lite** edits a constrained subset of **Motion Sequences**
 - A **Scroll Scene** drives one **Motion Sequence** from scroll progress rather than elapsed time
+- An **Editable Site** may own one or more **Overlays**
+- An **Overlay** may be scoped to all pages or to named **Canvas Pages**
+- An **Overlay** has one **Canvas Section**-shaped content surface that is not a body section of any **Canvas Page**
 - An **Overlay** opens from one **Interaction Trigger** and closes by one explicit dismissal rule
-- A **Load Experience** belongs to an **Editable Site** or **Page** and hands off to the initial page state
+- A **Load Experience** belongs to an **Editable Site** and hands off to the initial page state
 - A **Route Transition** belongs to page navigation and may include one or more **Layout Transitions**
 - A **Runtime Hydrator** runs schema-owned interactions for both the **Editable Site** preview and the **Published Site**
 - A **Rich Motion Asset** belongs to one **Owner** and may be referenced by media elements in any of that owner's editable sites
