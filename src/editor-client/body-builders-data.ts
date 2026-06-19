@@ -823,9 +823,16 @@ export function buildCollectionBodyImpl(
       node.setAttribute('data-opencanvas-collection-filter-default', element.filterChips.defaultValue);
     }
   }
+  if (element.viewToggle?.enabled === true) {
+    node.setAttribute('data-opencanvas-collection-view-toggle', 'true');
+    node.setAttribute('data-opencanvas-collection-view-default', element.viewToggle.defaultMode);
+    node.setAttribute('data-opencanvas-collection-view-active', element.viewToggle.defaultMode);
+    node.setAttribute('data-opencanvas-collection-view-reduced-motion', element.viewToggle.reducedMotion);
+  }
   node.style.display = 'grid';
   node.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
   node.style.gap = '8px';
+  appendCollectionViewControls(node, element.viewToggle);
   appendCollectionFilterControls(node, element.filterChips);
   appendCollectionSearchControls(node, element.search);
   for (let i = 0; i < entries.length; i++) {
@@ -844,6 +851,29 @@ export function buildCollectionBodyImpl(
     node.appendChild(card);
   }
   return node;
+}
+
+function appendCollectionViewControls(
+  host: HTMLElement,
+  viewToggle: CollectionElement['viewToggle'],
+): void {
+  if (viewToggle?.enabled !== true) return;
+  const controls = document.createElement('div');
+  controls.className = 'opencanvas-collection-view';
+  controls.setAttribute('data-opencanvas-collection-view-controls', '');
+  controls.style.gridColumn = '1 / -1';
+  for (const mode of ['grid', 'list'] as const) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'opencanvas-collection-view-button';
+    button.setAttribute('data-opencanvas-collection-view-option', mode);
+    const active = viewToggle.defaultMode === mode;
+    button.setAttribute('data-opencanvas-collection-view-active', String(active));
+    button.setAttribute('aria-pressed', String(active));
+    button.textContent = mode === 'grid' ? 'Grid' : 'List';
+    controls.appendChild(button);
+  }
+  host.appendChild(controls);
 }
 
 function appendCollectionFilterControls(

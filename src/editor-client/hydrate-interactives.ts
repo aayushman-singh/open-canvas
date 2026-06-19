@@ -163,6 +163,18 @@ function emitCollectionFilterFailure(root: Element, code: string, message: strin
   throw new Error('[opencanvas collection-filter] ' + message);
 }
 
+function emitCollectionViewFailure(root: Element, code: string, message: string, cause: unknown): never {
+  const detail = {
+    code,
+    message,
+    collectionId: root.getAttribute('data-opencanvas-element'),
+    cause: cause === null ? null : describeCollectionSearchCause(cause),
+  };
+  window.dispatchEvent(new CustomEvent('opencanvas:collection-view-failed', { detail }));
+  console.error('[opencanvas collection-view] ' + message, detail);
+  throw new Error('[opencanvas collection-view] ' + message);
+}
+
 function describeCollectionSearchCause(cause: unknown): string {
   if (cause instanceof Error) return cause.message;
   if (typeof cause === 'string') return cause;
@@ -205,7 +217,8 @@ function hydrateCollectionSearches(root: ParentNode, options: HydrateOptions): v
   if (
     isCollectionSearchRoot(root) &&
     (root.getAttribute('data-opencanvas-collection-search') === 'true' ||
-      root.getAttribute('data-opencanvas-collection-filter') !== null)
+      root.getAttribute('data-opencanvas-collection-filter') !== null ||
+      root.getAttribute('data-opencanvas-collection-view-toggle') === 'true')
   ) {
     nodes.push(root);
   }
@@ -213,6 +226,8 @@ function hydrateCollectionSearches(root: ParentNode, options: HydrateOptions): v
   for (let i = 0; i < searchNodes.length; i++) nodes.push(searchNodes[i]!);
   const filterNodes = root.querySelectorAll('[data-opencanvas-collection-filter]');
   for (let i = 0; i < filterNodes.length; i++) nodes.push(filterNodes[i]!);
+  const viewNodes = root.querySelectorAll('[data-opencanvas-collection-view-toggle="true"]');
+  for (let i = 0; i < viewNodes.length; i++) nodes.push(viewNodes[i]!);
   for (const node of nodes) {
     const entries = node.querySelectorAll<HTMLElement>('[data-opencanvas-collection-entry]');
     const empty = node.querySelector<HTMLElement>('[data-opencanvas-collection-search-empty]');
@@ -227,6 +242,12 @@ function hydrateCollectionSearches(root: ParentNode, options: HydrateOptions): v
       node.getAttribute('data-opencanvas-collection-filter-hydrated') !== 'true'
     ) {
       hydrateCollectionFilter(node, entries, empty, options);
+    }
+    if (
+      node.getAttribute('data-opencanvas-collection-view-toggle') === 'true' &&
+      node.getAttribute('data-opencanvas-collection-view-hydrated') !== 'true'
+    ) {
+      hydrateCollectionViewToggle(node, options);
     }
   }
 }
@@ -365,6 +386,58 @@ function hydrateCollectionFilter(
   }
   setActive(node.getAttribute('data-opencanvas-collection-filter-default') ?? '__all__');
   node.setAttribute('data-opencanvas-collection-filter-hydrated', 'true');
+}
+
+function hydrateCollectionViewToggle(node: Element, options: HydrateOptions): void {
+  const defaultMode = node.getAttribute('data-opencanvas-collection-view-default') ?? 'grid';
+  const reducedMotion = node.getAttribute('data-opencanvas-collection-view-reduced-motion');
+  if (defaultMode !== 'grid' && defaultMode !== 'list') {
+    emitCollectionViewFailure(node, 'invalid-view-default', 'Collection view default must be grid or list', defaultMode);
+  }
+  if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
+    emitCollectionViewFailure(
+      node,
+      'invalid-view-reduced-motion',
+      'Collection view reduced-motion mode must be instant or allow',
+      reducedMotion,
+    );
+  }
+  const buttons = node.querySelectorAll<HTMLElement>('[data-opencanvas-collection-view-option]');
+  if (buttons.length === 0) {
+    emitCollectionViewFailure(node, 'missing-view-options', 'Collection view toggle requires rendered option buttons', null);
+  }
+  if (prefersReducedMotion(options) && reducedMotion === 'instant') {
+    node.setAttribute('data-opencanvas-collection-view-reduced', 'instant');
+  }
+  const setView = (mode: string): void => {
+    if (mode !== 'grid' && mode !== 'list') {
+      emitCollectionViewFailure(node, 'invalid-view-option', 'Collection view option must be grid or list', mode);
+    }
+    let matchedButton = false;
+    for (let i = 0; i < buttons.length; i++) {
+      const button = buttons[i]!;
+      const buttonMode = button.getAttribute('data-opencanvas-collection-view-option');
+      const active = buttonMode === mode;
+      button.setAttribute('data-opencanvas-collection-view-active', String(active));
+      button.setAttribute('aria-pressed', String(active));
+      if (active) matchedButton = true;
+    }
+    if (!matchedButton) {
+      emitCollectionViewFailure(node, 'missing-default-view', 'Collection view default must match a rendered option', mode);
+    }
+    node.setAttribute('data-opencanvas-collection-view-active', mode);
+  };
+  for (let i = 0; i < buttons.length; i++) {
+    const button = buttons[i]!;
+    button.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      setView(button.getAttribute('data-opencanvas-collection-view-option') ?? 'grid');
+    });
+    button.addEventListener('mousedown', (ev) => ev.stopPropagation());
+  }
+  setView(defaultMode);
+  node.setAttribute('data-opencanvas-collection-view-hydrated', 'true');
 }
 
 // ---------------------------------------------------------------------------

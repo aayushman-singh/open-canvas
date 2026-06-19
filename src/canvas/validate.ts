@@ -16,6 +16,8 @@ import {
   COLLECTION_GALLERY_MODES,
   COLLECTION_GALLERY_REDUCED_MOTION_MODES,
   COLLECTION_SEARCH_REDUCED_MOTION_MODES,
+  COLLECTION_VIEW_MODES,
+  COLLECTION_VIEW_REDUCED_MOTION_MODES,
   COLLECTION_SORTS,
 } from './elements/collection.js';
 import type { CollectionDisplay, CollectionSort } from './elements/collection.js';
@@ -2110,6 +2112,27 @@ function validateElement(
               });
             }
           });
+        }
+      }
+      if (element.viewToggle !== undefined) {
+        if (!isRecord(element.viewToggle)) {
+          errors.push(`${basePath}.viewToggle must be an object when present`);
+        } else {
+          if (element.viewToggle.enabled !== true) {
+            errors.push(`${basePath}.viewToggle.enabled must be true when viewToggle is present`);
+          }
+          assertOneOf(
+            element.viewToggle.defaultMode,
+            COLLECTION_VIEW_MODES,
+            `${basePath}.viewToggle.defaultMode`,
+            errors,
+          );
+          assertOneOf(
+            element.viewToggle.reducedMotion,
+            COLLECTION_VIEW_REDUCED_MOTION_MODES,
+            `${basePath}.viewToggle.reducedMotion`,
+            errors,
+          );
         }
       }
       // `manualOrder` is required-shape iff `sort === 'manual'`, optional

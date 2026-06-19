@@ -82,6 +82,13 @@ export const COLLECTION_FILTER_REDUCED_MOTION_MODES = ['instant', 'allow'] as co
 export type CollectionFilterReducedMotionMode =
   (typeof COLLECTION_FILTER_REDUCED_MOTION_MODES)[number];
 
+export const COLLECTION_VIEW_MODES = ['grid', 'list'] as const;
+export type CollectionViewMode = (typeof COLLECTION_VIEW_MODES)[number];
+
+export const COLLECTION_VIEW_REDUCED_MOTION_MODES = ['instant', 'allow'] as const;
+export type CollectionViewReducedMotionMode =
+  (typeof COLLECTION_VIEW_REDUCED_MOTION_MODES)[number];
+
 export interface CollectionGalleryBehaviour {
   mode: CollectionGalleryMode;
   detailMode: CollectionGalleryDetailMode;
@@ -118,6 +125,12 @@ export interface CollectionEntryMetadata {
   folder: string | null;
   category: string;
   tags: string[];
+}
+
+export interface CollectionViewToggleBehaviour {
+  enabled: true;
+  defaultMode: CollectionViewMode;
+  reducedMotion: CollectionViewReducedMotionMode;
 }
 
 export interface CollectionStyle {
@@ -205,6 +218,9 @@ export interface CollectionElement extends BaseElement {
   /** Materializer-written metadata aligned by index with entries. */
   entryMetadata?: CollectionEntryMetadata[];
 
+  /** Owner-authored grid/list view switch for materialized Collection entries. */
+  viewToggle?: CollectionViewToggleBehaviour;
+
   /**
    * Per-entry instances written by the materializer (ADR 0063 dec 6).
    * The materializer is the only writer; downstream renderers
@@ -280,6 +296,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
   const gallery = readGalleryBehaviour(el);
   const search = readSearchBehaviour(el);
   const filter = readFilterBehaviour(el);
+  const viewToggle = readViewToggleBehaviour(el);
   const galleryAttrs = gallery
     ?
       ` data-opencanvas-collection-gallery="${escapeAttr(gallery.mode)}"` +
@@ -306,6 +323,13 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
         ? ` data-opencanvas-collection-filter-default="${escapeAttr(filter.defaultValue)}"`
         : '')
     : '';
+  const viewAttrs = viewToggle
+    ?
+      ` data-opencanvas-collection-view-toggle="true"` +
+      ` data-opencanvas-collection-view-default="${escapeAttr(viewToggle.defaultMode)}"` +
+      ` data-opencanvas-collection-view-active="${escapeAttr(viewToggle.defaultMode)}"` +
+      ` data-opencanvas-collection-view-reduced-motion="${escapeAttr(viewToggle.reducedMotion)}"`
+    : '';
   const effectiveFrameStyle =
     gallery?.mode === 'drag-slider'
       ? styleFromEntries([
@@ -326,6 +350,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
   const progressHtml = renderCollectionGalleryProgress(el, gallery);
   const searchHtml = renderCollectionSearchControls(search);
   const filterHtml = renderCollectionFilterControls(filter);
+  const viewHtml = renderCollectionViewControls(viewToggle);
   const keyboardAttrs = gallery?.mode === 'drag-slider' ? ` tabindex="0"` : '';
   return (
     `<div class="opencanvas-collection" data-opencanvas-interactive="collection"` +
@@ -335,9 +360,28 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
     ` data-collection-folder="${folderAttr}"` +
     searchAttrs +
     filterAttrs +
+    viewAttrs +
     galleryAttrs +
     keyboardAttrs +
-    ` style="${escapeAttr(effectiveFrameStyle)}">${filterHtml}${searchHtml}${entriesHtml}${progressHtml}</div>`
+    ` style="${escapeAttr(effectiveFrameStyle)}">${viewHtml}${filterHtml}${searchHtml}${entriesHtml}${progressHtml}</div>`
+  );
+}
+
+function renderCollectionViewControls(viewToggle: CollectionViewToggleBehaviour | null): string {
+  if (viewToggle === null) return '';
+  return (
+    `<div class="opencanvas-collection-view" data-opencanvas-collection-view-controls>` +
+    COLLECTION_VIEW_MODES.map((mode) => {
+      const active = mode === viewToggle.defaultMode;
+      const label = mode === 'grid' ? 'Grid' : 'List';
+      return (
+        `<button type="button" class="opencanvas-collection-view-button"` +
+        ` data-opencanvas-collection-view-option="${mode}"` +
+        ` data-opencanvas-collection-view-active="${String(active)}"` +
+        ` aria-pressed="${String(active)}">${label}</button>`
+      );
+    }).join('') +
+    `</div>`
   );
 }
 
@@ -641,6 +685,34 @@ function readFilterBehaviour(el: CollectionElement): CollectionFilterBehaviour |
     );
   }
   return el.filterChips;
+}
+
+function readViewToggleBehaviour(el: CollectionElement): CollectionViewToggleBehaviour | null {
+  if (el.viewToggle === undefined) return null;
+  if (el.viewToggle.enabled !== true) {
+    throw new Error(
+      `Collection element ${el.id}: viewToggle.enabled must be true when viewToggle is present.`,
+    );
+  }
+  if (!(COLLECTION_VIEW_MODES as readonly string[]).includes(el.viewToggle.defaultMode)) {
+    throw new Error(
+      `Collection element ${el.id}: viewToggle.defaultMode has malformed value ${JSON.stringify(
+        el.viewToggle.defaultMode,
+      )}; expected one of ${COLLECTION_VIEW_MODES.join(' | ')}.`,
+    );
+  }
+  if (
+    !(COLLECTION_VIEW_REDUCED_MOTION_MODES as readonly string[]).includes(
+      el.viewToggle.reducedMotion,
+    )
+  ) {
+    throw new Error(
+      `Collection element ${el.id}: viewToggle.reducedMotion has malformed value ${JSON.stringify(
+        el.viewToggle.reducedMotion,
+      )}; expected one of ${COLLECTION_VIEW_REDUCED_MOTION_MODES.join(' | ')}.`,
+    );
+  }
+  return el.viewToggle;
 }
 
 function readSortString(el: CollectionElement): CollectionSort {

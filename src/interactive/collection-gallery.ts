@@ -44,6 +44,21 @@ function emitCollectionFilterFailure(root, code, message, cause) {
   }
   throw new Error('[opencanvas collection-filter] ' + message);
 }
+function emitCollectionViewFailure(root, code, message, cause) {
+  var detail = {
+    code: code,
+    message: message,
+    collectionId: root && root.getAttribute ? root.getAttribute('data-opencanvas-element') : null,
+    cause: cause === null ? null : String(cause)
+  };
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('opencanvas:collection-view-failed', { detail: detail }));
+  }
+  if (typeof console !== 'undefined' && console.error) {
+    console.error('[opencanvas collection-view] ' + message, detail);
+  }
+  throw new Error('[opencanvas collection-view] ' + message);
+}
 function normaliseCollectionSearchText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
@@ -155,6 +170,48 @@ function wireCollectionFilter(collectionRoot) {
   }
   setActive(collectionRoot.getAttribute('data-opencanvas-collection-filter-default') || '__all__');
 }
+function wireCollectionViewToggle(collectionRoot) {
+  var defaultMode = collectionRoot.getAttribute('data-opencanvas-collection-view-default') || 'grid';
+  var reducedMotion = collectionRoot.getAttribute('data-opencanvas-collection-view-reduced-motion');
+  if (defaultMode !== 'grid' && defaultMode !== 'list') {
+    emitCollectionViewFailure(collectionRoot, 'invalid-view-default', 'Collection view default must be grid or list', defaultMode);
+  }
+  if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
+    emitCollectionViewFailure(collectionRoot, 'invalid-view-reduced-motion', 'Collection view reduced-motion mode must be instant or allow', reducedMotion);
+  }
+  var buttons = collectionRoot.querySelectorAll('[data-opencanvas-collection-view-option]');
+  if (!buttons || buttons.length === 0) {
+    emitCollectionViewFailure(collectionRoot, 'missing-view-options', 'Collection view toggle requires rendered option buttons', null);
+  }
+  var reduce = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce && reducedMotion === 'instant') collectionRoot.setAttribute('data-opencanvas-collection-view-reduced', 'instant');
+  function setView(mode) {
+    if (mode !== 'grid' && mode !== 'list') {
+      emitCollectionViewFailure(collectionRoot, 'invalid-view-option', 'Collection view option must be grid or list', mode);
+    }
+    var matchedButton = false;
+    for (var i = 0; i < buttons.length; i++) {
+      var buttonMode = buttons[i].getAttribute('data-opencanvas-collection-view-option');
+      var active = buttonMode === mode;
+      buttons[i].setAttribute('data-opencanvas-collection-view-active', active ? 'true' : 'false');
+      buttons[i].setAttribute('aria-pressed', active ? 'true' : 'false');
+      if (active) matchedButton = true;
+    }
+    if (!matchedButton) {
+      emitCollectionViewFailure(collectionRoot, 'missing-default-view', 'Collection view default must match a rendered option', mode);
+    }
+    collectionRoot.setAttribute('data-opencanvas-collection-view-active', mode);
+  }
+  for (var b = 0; b < buttons.length; b++) {
+    (function (button) {
+      button.addEventListener('click', function (ev) {
+        if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+        setView(button.getAttribute('data-opencanvas-collection-view-option') || 'grid');
+      });
+    })(buttons[b]);
+  }
+  setView(defaultMode);
+}
 function scheduleCollectionGalleryFrame(callback) {
   if (typeof window !== 'undefined' && window.requestAnimationFrame) {
     return window.requestAnimationFrame(callback);
@@ -262,10 +319,11 @@ function hydrateCollectionGalleries(scope) {
     root.getAttribute &&
     (root.getAttribute('data-opencanvas-collection-gallery') ||
       root.getAttribute('data-opencanvas-collection-search') === 'true' ||
-      root.getAttribute('data-opencanvas-collection-filter') !== null)
+      root.getAttribute('data-opencanvas-collection-filter') !== null ||
+      root.getAttribute('data-opencanvas-collection-view-toggle') === 'true')
   ) nodes.push(root);
   if (root && root.querySelectorAll) {
-    var found = root.querySelectorAll('[data-opencanvas-collection-gallery],[data-opencanvas-collection-search="true"],[data-opencanvas-collection-filter]');
+    var found = root.querySelectorAll('[data-opencanvas-collection-gallery],[data-opencanvas-collection-search="true"],[data-opencanvas-collection-filter],[data-opencanvas-collection-view-toggle="true"]');
     for (var i = 0; i < found.length; i++) nodes.push(found[i]);
   }
   for (var n = 0; n < nodes.length; n++) {
@@ -273,6 +331,7 @@ function hydrateCollectionGalleries(scope) {
       var hasGallery = galleryRoot.getAttribute('data-opencanvas-collection-gallery') !== null;
       var hasSearch = galleryRoot.getAttribute('data-opencanvas-collection-search') === 'true';
       var hasFilter = galleryRoot.getAttribute('data-opencanvas-collection-filter') !== null;
+      var hasViewToggle = galleryRoot.getAttribute('data-opencanvas-collection-view-toggle') === 'true';
       if (hasSearch && galleryRoot.getAttribute('data-opencanvas-collection-search-hydrated') !== 'true') {
         wireCollectionSearch(galleryRoot);
         galleryRoot.setAttribute('data-opencanvas-collection-search-hydrated', 'true');
@@ -280,6 +339,10 @@ function hydrateCollectionGalleries(scope) {
       if (hasFilter && galleryRoot.getAttribute('data-opencanvas-collection-filter-hydrated') !== 'true') {
         wireCollectionFilter(galleryRoot);
         galleryRoot.setAttribute('data-opencanvas-collection-filter-hydrated', 'true');
+      }
+      if (hasViewToggle && galleryRoot.getAttribute('data-opencanvas-collection-view-hydrated') !== 'true') {
+        wireCollectionViewToggle(galleryRoot);
+        galleryRoot.setAttribute('data-opencanvas-collection-view-hydrated', 'true');
       }
       if (!hasGallery) return;
       if (galleryRoot.getAttribute('data-opencanvas-collection-gallery-hydrated') === 'true') return;

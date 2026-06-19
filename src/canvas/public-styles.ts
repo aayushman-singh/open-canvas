@@ -335,6 +335,45 @@ html, body {
 .opencanvas-collection-entry {
   position: relative;
 }
+.opencanvas-collection-view[data-opencanvas-collection-view-controls] {
+  flex: 0 0 100%;
+  width: 100%;
+  margin: 0 0 12px;
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid color-mix(in oklab, currentColor 16%, transparent);
+  border-radius: 999px;
+  width: max-content;
+  max-width: 100%;
+}
+.opencanvas-collection-view-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.opencanvas-collection-view-button[data-opencanvas-collection-view-active="true"] {
+  background: var(--opencanvas-kit-accent, currentColor);
+  color: var(--opencanvas-kit-accent-text, var(--opencanvas-kit-bg, #0c0c0d));
+}
+.opencanvas-collection[data-opencanvas-collection-view-active="list"] {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+.opencanvas-collection[data-opencanvas-collection-view-active="list"] .opencanvas-collection-entry {
+  width: 100% !important;
+  flex-basis: auto !important;
+}
+.opencanvas-collection[data-opencanvas-collection-view-reduced="instant"] .opencanvas-collection-entry,
+.opencanvas-collection[data-opencanvas-collection-view-reduced="instant"] .opencanvas-collection-view-button {
+  transition: none;
+}
 .opencanvas-collection-filter[data-opencanvas-collection-filter-controls] {
   flex: 0 0 100%;
   width: 100%;
@@ -513,6 +552,7 @@ html, body {
   .opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry { transition: none; }
   .opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry::after { transition: none; }
   .opencanvas-collection[data-opencanvas-collection-gallery="drag-slider"] .opencanvas-collection-entry { transition: none; }
+  .opencanvas-collection-view-button { transition: none; }
   .opencanvas-collection-filter-chip { transition: none; }
   .opencanvas-collection-gallery-progress-dot { transition: none; }
 }

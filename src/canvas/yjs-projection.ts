@@ -898,6 +898,13 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
     }
     out.set('entryMetadata', metadataRows);
   }
+  if (el.viewToggle !== undefined) {
+    const viewToggle = new Y.Map<unknown>();
+    viewToggle.set('enabled', el.viewToggle.enabled);
+    viewToggle.set('defaultMode', el.viewToggle.defaultMode);
+    viewToggle.set('reducedMotion', el.viewToggle.reducedMotion);
+    out.set('viewToggle', viewToggle);
+  }
   if (el.manualOrder !== undefined) {
     const arr = new Y.Array<string>();
     for (const id of el.manualOrder) arr.push([id]);
@@ -1839,6 +1846,21 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
         tags: tags.toArray() as string[],
       };
     });
+  }
+  if (map.has('viewToggle')) {
+    const rawViewToggle = map.get('viewToggle');
+    if (!(rawViewToggle instanceof Y.Map)) {
+      throw new Error(`Collection element ${el.id}: viewToggle must decode from a Y.Map`);
+    }
+    el.viewToggle = {
+      enabled: rawViewToggle.get('enabled') === true,
+      defaultMode: rawViewToggle.get('defaultMode') as NonNullable<
+        CollectionElement['viewToggle']
+      >['defaultMode'],
+      reducedMotion: rawViewToggle.get('reducedMotion') as NonNullable<
+        CollectionElement['viewToggle']
+      >['reducedMotion'],
+    } as NonNullable<CollectionElement['viewToggle']>;
   }
   if (map.has('entries')) {
     const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;

@@ -180,6 +180,20 @@ assert(
   filterValidation.valid ? 'valid collection filter chips should pass' : filterValidation.errors.join('; '),
 );
 
+const viewToggleCollection = makeCollection({
+  viewToggle: {
+    enabled: true,
+    defaultMode: 'list',
+    reducedMotion: 'instant',
+  },
+});
+const viewToggleState = makeSite(viewToggleCollection);
+const viewToggleValidation = validateEditableSite(viewToggleState);
+assert(
+  viewToggleValidation.valid,
+  viewToggleValidation.valid ? 'valid collection view toggle should pass' : viewToggleValidation.errors.join('; '),
+);
+
 const invalidSearch = makeSite(
   makeCollection({
     search: {
@@ -225,6 +239,26 @@ assert(
 assert(
   invalidFilterResult.errors.some((error) => error.includes('filterChips.defaultValue')),
   `validation error must name filterChips.defaultValue; got ${invalidFilterResult.valid ? 'valid' : invalidFilterResult.errors.join(' | ')}`,
+);
+
+const invalidViewToggle = makeSite(
+  makeCollection({
+    viewToggle: {
+      enabled: true,
+      defaultMode: 'masonry',
+      reducedMotion: 'fade',
+    },
+  } as unknown as Partial<CollectionElement>),
+);
+const invalidViewToggleResult = validateEditableSite(invalidViewToggle);
+assert(!invalidViewToggleResult.valid, 'invalid collection view toggle config must fail validation');
+assert(
+  invalidViewToggleResult.errors.some((error) => error.includes('viewToggle.defaultMode')),
+  `validation error must name viewToggle.defaultMode; got ${invalidViewToggleResult.valid ? 'valid' : invalidViewToggleResult.errors.join(' | ')}`,
+);
+assert(
+  invalidViewToggleResult.errors.some((error) => error.includes('viewToggle.reducedMotion')),
+  `validation error must name viewToggle.reducedMotion; got ${invalidViewToggleResult.valid ? 'valid' : invalidViewToggleResult.errors.join(' | ')}`,
 );
 
 const invalidDragSlider = makeSite(
@@ -363,6 +397,25 @@ assert(
   'renderer must emit per-entry tags metadata',
 );
 
+const viewToggleHtml = renderCollection(viewToggleCollection, {
+  styleKit: 'charcoal',
+  assetBasePath: '/assets',
+  renderChild: (child) => `<span data-opencanvas-element="${child.id}"></span>`,
+});
+assert(
+  viewToggleHtml.includes('data-opencanvas-collection-view-toggle="true"'),
+  'renderer must emit collection view-toggle metadata',
+);
+assert(
+  viewToggleHtml.includes('data-opencanvas-collection-view-active="list"'),
+  'renderer must emit default collection view state',
+);
+assert(
+  viewToggleHtml.includes('data-opencanvas-collection-view-option="grid"') &&
+    viewToggleHtml.includes('data-opencanvas-collection-view-option="list"'),
+  'renderer must emit grid/list view toggle buttons',
+);
+
 const videoHoverCollection = makeCollection({
   gallery: {
     mode: 'hover-reveal-detail',
@@ -450,6 +503,14 @@ assert(
     decodedFilter.entryMetadata?.[0]?.tags.join('|') === 'aero|race',
   'Yjs projection must preserve collection filter chip policy and entry metadata',
 );
+const decodedViewToggle = decodeYDoc(encodeYDoc(viewToggleState)).pages[0]!.sections[0]!
+  .elements[0]! as CollectionElement;
+assert(
+  decodedViewToggle.viewToggle?.enabled === true &&
+    decodedViewToggle.viewToggle.defaultMode === 'list' &&
+    decodedViewToggle.viewToggle.reducedMotion === 'instant',
+  'Yjs projection must preserve collection view toggle policy',
+);
 
 const snapshot: PublishedSnapshot = {
   ...state,
@@ -494,6 +555,15 @@ const filterSnapshot: PublishedSnapshot = {
 assert(
   snapshotNeedsInteractiveRuntime(filterSnapshot),
   'filter-enabled Collection must require the visitor interactive runtime',
+);
+const viewToggleSnapshot: PublishedSnapshot = {
+  ...viewToggleState,
+  version: 1,
+  publishedAt: '2026-06-19T00:00:00.000Z',
+};
+assert(
+  snapshotNeedsInteractiveRuntime(viewToggleSnapshot),
+  'view-toggle-enabled Collection must require the visitor interactive runtime',
 );
 
 interface StubNode {
@@ -556,6 +626,9 @@ const makeHydrateCollectionGalleries = new Function(
 const hydrateCollectionGalleries = makeHydrateCollectionGalleries();
 function stubHidden(node: StubNode): boolean {
   return node.hidden;
+}
+function stubAttr(node: StubNode, key: string): string | undefined {
+  return node.attrs[key];
 }
 {
   const firstEntry = makeStubNode({
@@ -714,6 +787,33 @@ function stubHidden(node: StubNode): boolean {
   allButton.listeners.click![0]!({ preventDefault(): void {} });
   assert(stubHidden(firstEntry) === false && stubHidden(secondEntry) === false, 'all filter chip must restore every entry');
 }
+{
+  const gridButton = makeStubNode({
+    'data-opencanvas-collection-view-option': 'grid',
+    'data-opencanvas-collection-view-active': 'false',
+  });
+  const listButton = makeStubNode({
+    'data-opencanvas-collection-view-option': 'list',
+    'data-opencanvas-collection-view-active': 'true',
+  });
+  const root = makeStubNode({
+    'data-opencanvas-collection-view-toggle': 'true',
+    'data-opencanvas-collection-view-default': 'list',
+    'data-opencanvas-collection-view-reduced-motion': 'instant',
+  });
+  root.querySelectorAll = (selector: string): StubNode[] => {
+    if (selector === '[data-opencanvas-collection-gallery],[data-opencanvas-collection-search="true"],[data-opencanvas-collection-filter],[data-opencanvas-collection-view-toggle="true"]') return [];
+    if (selector === '[data-opencanvas-collection-view-option]') return [gridButton, listButton];
+    if (selector === '[data-opencanvas-collection-entry]') return [];
+    return [];
+  };
+  hydrateCollectionGalleries(root);
+  assert(stubAttr(root, 'data-opencanvas-collection-view-active') === 'list', 'view toggle runtime must apply default view');
+  assert((gridButton.listeners.click?.length ?? 0) === 1, 'view toggle runtime must wire option clicks');
+  gridButton.listeners.click![0]!({ preventDefault(): void {} });
+  assert(stubAttr(root, 'data-opencanvas-collection-view-active') === 'grid', 'view toggle click must update active view');
+  assert(stubAttr(gridButton, 'data-opencanvas-collection-view-active') === 'true', 'view toggle click must activate selected button');
+}
 
 const inspectorSource = readFileSync(join(repoSrcDir, 'editor-client', 'element-inspector.ts'), 'utf8');
 assert(inspectorSource.includes('Collection gallery'), 'inspector must expose collection gallery controls');
@@ -735,6 +835,8 @@ assert(inspectorSource.includes('search?.enabled'), 'inspector must read collect
 assert(inspectorSource.includes('Collection filter chips'), 'inspector must expose collection filter chip controls');
 assert(inspectorSource.includes('Filter options'), 'inspector must expose filter option editing');
 assert(inspectorSource.includes('filterChips?.enabled'), 'inspector must read collection filter enabled state');
+assert(inspectorSource.includes('Collection view toggle'), 'inspector must expose collection view toggle controls');
+assert(inspectorSource.includes('viewToggle?.enabled'), 'inspector must read collection view toggle enabled state');
 
 const publicStyles = readFileSync(join(repoSrcDir, 'canvas', 'public-styles.ts'), 'utf8');
 assert(
@@ -756,6 +858,10 @@ assert(
 assert(
   publicStyles.includes('data-opencanvas-collection-filter-controls'),
   'public styles must include collection filter controls',
+);
+assert(
+  publicStyles.includes('data-opencanvas-collection-view-controls'),
+  'public styles must include collection view-toggle controls',
 );
 
 const packageJson = JSON.parse(readFileSync(join(repoSrcDir, '..', 'package.json'), 'utf8')) as {

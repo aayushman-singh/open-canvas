@@ -63,6 +63,8 @@ import type {
   CollectionFilterReducedMotionMode,
   CollectionGalleryAxis,
   CollectionGalleryReducedMotionMode,
+  CollectionViewMode,
+  CollectionViewReducedMotionMode,
   CollectionSearchReducedMotionMode,
   CollectionSort,
 } from '../canvas/elements/collection.js';
@@ -72,6 +74,8 @@ import {
   COLLECTION_FILTER_REDUCED_MOTION_MODES,
   COLLECTION_GALLERY_AXES,
   COLLECTION_GALLERY_REDUCED_MOTION_MODES,
+  COLLECTION_VIEW_MODES,
+  COLLECTION_VIEW_REDUCED_MOTION_MODES,
   COLLECTION_SEARCH_REDUCED_MOTION_MODES,
   COLLECTION_SORTS,
 } from '../canvas/elements/collection.js';
@@ -2508,6 +2512,57 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
       ctx.scheduleSave();
     });
     inspector.appendChild(field('Default filter', filterDefault));
+  }
+
+  const viewToggleEnabled = document.createElement('input');
+  viewToggleEnabled.type = 'checkbox';
+  viewToggleEnabled.checked = collection.viewToggle?.enabled === true;
+  viewToggleEnabled.addEventListener('change', () => {
+    ctx.captureForUndo();
+    if (viewToggleEnabled.checked) {
+      collection.viewToggle = collection.viewToggle ?? {
+        enabled: true,
+        defaultMode: 'grid',
+        reducedMotion: 'allow',
+      };
+    } else {
+      delete collection.viewToggle;
+    }
+    ctx.rebuildElement(collection.id);
+    ctx.scheduleSave();
+    ctx.renderInspector();
+  });
+  inspector.appendChild(field('Collection view toggle', viewToggleEnabled));
+
+  if (collection.viewToggle?.enabled === true) {
+    const defaultView = selectInput(COLLECTION_VIEW_MODES, collection.viewToggle.defaultMode);
+    defaultView.addEventListener('change', () => {
+      ctx.captureForUndo();
+      collection.viewToggle = {
+        ...collection.viewToggle!,
+        enabled: true,
+        defaultMode: defaultView.value as CollectionViewMode,
+      };
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+    });
+    inspector.appendChild(field('Default view', defaultView));
+
+    const viewReduced = selectInput(
+      COLLECTION_VIEW_REDUCED_MOTION_MODES,
+      collection.viewToggle.reducedMotion,
+    );
+    viewReduced.addEventListener('change', () => {
+      ctx.captureForUndo();
+      collection.viewToggle = {
+        ...collection.viewToggle!,
+        enabled: true,
+        reducedMotion: viewReduced.value as CollectionViewReducedMotionMode,
+      };
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+    });
+    inspector.appendChild(field('View reduced motion', viewReduced));
   }
 
   mountComponentStyle(ctx, collection, inspector);
