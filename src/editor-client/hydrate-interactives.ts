@@ -151,6 +151,18 @@ function emitCollectionSearchFailure(root: Element, code: string, message: strin
   throw new Error('[opencanvas collection-search] ' + message);
 }
 
+function emitCollectionFilterFailure(root: Element, code: string, message: string, cause: unknown): never {
+  const detail = {
+    code,
+    message,
+    collectionId: root.getAttribute('data-opencanvas-element'),
+    cause: cause === null ? null : describeCollectionSearchCause(cause),
+  };
+  window.dispatchEvent(new CustomEvent('opencanvas:collection-filter-failed', { detail }));
+  console.error('[opencanvas collection-filter] ' + message, detail);
+  throw new Error('[opencanvas collection-filter] ' + message);
+}
+
 function describeCollectionSearchCause(cause: unknown): string {
   if (cause instanceof Error) return cause.message;
   if (typeof cause === 'string') return cause;
@@ -284,7 +296,7 @@ function collectionEntryMatchesFilter(
       if (!Array.isArray(parsed)) return false;
       return parsed.includes(value);
     } catch (err: unknown) {
-      emitCollectionSearchFailure(
+      emitCollectionFilterFailure(
         node,
         'invalid-filter-tags',
         'Collection filter tag metadata must be valid JSON',
@@ -304,10 +316,10 @@ function hydrateCollectionFilter(
   const field = node.getAttribute('data-opencanvas-collection-filter');
   const reducedMotion = node.getAttribute('data-opencanvas-collection-filter-reduced-motion');
   if (field !== 'folder' && field !== 'category' && field !== 'tag') {
-    emitCollectionSearchFailure(node, 'invalid-filter-field', 'Collection filter field must be folder, category, or tag', field);
+    emitCollectionFilterFailure(node, 'invalid-filter-field', 'Collection filter field must be folder, category, or tag', field);
   }
   if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
-    emitCollectionSearchFailure(
+    emitCollectionFilterFailure(
       node,
       'invalid-filter-reduced-motion',
       'Collection filter reduced-motion mode must be instant or allow',
@@ -316,7 +328,7 @@ function hydrateCollectionFilter(
   }
   const buttons = node.querySelectorAll<HTMLElement>('[data-opencanvas-collection-filter-option]');
   if (buttons.length === 0) {
-    emitCollectionSearchFailure(node, 'missing-filter-options', 'Collection filter requires rendered option buttons', null);
+    emitCollectionFilterFailure(node, 'missing-filter-options', 'Collection filter requires rendered option buttons', null);
   }
   if (prefersReducedMotion(options) && reducedMotion === 'instant') {
     node.setAttribute('data-opencanvas-collection-filter-reduced', 'instant');
@@ -332,7 +344,7 @@ function hydrateCollectionFilter(
       if (active) matchedButton = true;
     }
     if (!matchedButton) {
-      emitCollectionSearchFailure(node, 'missing-default-filter', 'Collection filter default must match a rendered option', value);
+      emitCollectionFilterFailure(node, 'missing-default-filter', 'Collection filter default must match a rendered option', value);
     }
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]!;

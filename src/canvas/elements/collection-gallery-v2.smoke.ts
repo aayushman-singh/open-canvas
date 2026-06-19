@@ -472,6 +472,10 @@ assert(
   INTERACTIVE_RUNTIME_SRC.includes('opencanvas:collection-search-failed'),
   'collection search runtime must emit a named failure event',
 );
+assert(
+  INTERACTIVE_RUNTIME_SRC.includes('opencanvas:collection-filter-failed'),
+  'collection filter runtime must emit a named failure event',
+);
 
 const searchSnapshot: PublishedSnapshot = {
   ...searchState,
