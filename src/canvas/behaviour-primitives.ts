@@ -56,6 +56,7 @@ export interface MotionSequenceStep {
   to: Partial<Record<(typeof MOTION_SEQUENCE_PROPERTIES)[number], string | number>>;
   durationMs: number;
   delayMs?: number;
+  waitAfterMs?: number;
   staggerMs?: number;
   easing?: string;
 }

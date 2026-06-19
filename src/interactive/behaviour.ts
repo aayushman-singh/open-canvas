@@ -183,7 +183,7 @@ function behaviourSequenceRepeatOptions(repeat) {
   };
 }
 
-function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, playbackDirection) {
+function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, playbackDirection, baseDelayMs) {
   var from = step.from || {};
   var to = step.to || {};
   var direction = playbackDirection || 'normal';
@@ -217,7 +217,7 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, p
     var repeatOptions = behaviourSequenceRepeatOptions(repeat);
     var options = {
       duration: step.durationMs || 0,
-      delay: (step.delayMs || 0) + index * stagger,
+      delay: (baseDelayMs || 0) + (step.delayMs || 0) + index * stagger,
       easing: step.easing || 'ease',
       fill: 'forwards',
       iterations: repeatOptions.iterations,
@@ -239,8 +239,13 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, p
 
 function behaviourRunSequence(sequence, root, reducedMode, progress) {
   var steps = sequence.steps || [];
+  var cursorMs = 0;
   for (var i = 0; i < steps.length; i++) {
     var step = steps[i];
+    if (progress !== undefined && step.waitAfterMs !== undefined) {
+      behaviourFailure('motion-sequence-wait-scroll-scene', { sequenceId: sequence.id, stepId: step.id }, new Error('waitAfterMs is not supported for scroll-scene Motion Sequences'));
+      return;
+    }
     var targets = behaviourResolveTarget(step.target, root);
     behaviourAnimateTargets(
       targets,
@@ -249,7 +254,11 @@ function behaviourRunSequence(sequence, root, reducedMode, progress) {
       progress,
       progress === undefined ? sequence.repeat : null,
       sequence.playbackDirection || 'normal',
+      cursorMs,
     );
+    if (progress === undefined) {
+      cursorMs += (step.delayMs || 0) + (step.durationMs || 0) + (step.staggerMs || 0) * Math.max(0, targets.length - 1) + (step.waitAfterMs || 0);
+    }
   }
 }
 

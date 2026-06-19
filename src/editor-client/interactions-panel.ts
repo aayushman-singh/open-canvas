@@ -1739,6 +1739,13 @@ function renderFullMotionSequenceStep(
   delay.addEventListener('change', () => updateMotionStepFinite(ctx, sequence.id, step, 'delayMs', delay, 0, 10000));
   card.appendChild(field('Delay (ms)', delay));
 
+  const waitAfter = numberInput(step.waitAfterMs ?? 0, 0, 10000, 10);
+  waitAfter.disabled = sequence.trigger.type === 'scroll-scene';
+  waitAfter.addEventListener('change', () =>
+    updateMotionStepFinite(ctx, sequence.id, step, 'waitAfterMs', waitAfter, 0, 10000),
+  );
+  card.appendChild(field('Wait after (ms)', waitAfter));
+
   const duration = numberInput(step.durationMs, 0, 10000, 10);
   duration.addEventListener('change', () =>
     updateMotionStepFinite(ctx, sequence.id, step, 'durationMs', duration, 0, 10000),
@@ -1910,7 +1917,7 @@ function updateMotionStepFinite(
   ctx: InteractionsPanelContext,
   sequenceId: string,
   step: MotionSequenceStep,
-  key: 'delayMs' | 'durationMs' | 'staggerMs',
+  key: 'delayMs' | 'durationMs' | 'waitAfterMs' | 'staggerMs',
   input: HTMLInputElement,
   min: number,
   max: number,

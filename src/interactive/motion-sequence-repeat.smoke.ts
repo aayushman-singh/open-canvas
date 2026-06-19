@@ -182,6 +182,13 @@ function baseSite(): EditableSite & Record<string, unknown> {
 
 const valid = baseSite();
 (valid.motionSequences![0] as unknown as Record<string, unknown>).playbackDirection = 'reverse';
+(valid.motionSequences![0]!.steps[0] as unknown as Record<string, unknown>).waitAfterMs = 180;
+valid.motionSequences![0]!.steps.push({
+  id: 'site-lift',
+  target: { type: 'site' },
+  to: { translateY: -24 },
+  durationMs: 100,
+});
 const validation = validateEditableSite(valid);
 assert(
   validation.valid,
@@ -254,6 +261,39 @@ assert(
   `scroll reverse failure must mention playbackDirection; got ${invalidScrollReverseValidation.valid ? '' : invalidScrollReverseValidation.errors.join('; ')}`,
 );
 
+const invalidScrollWait = baseSite();
+invalidScrollWait.motionSequences = [
+  {
+    id: 'scroll-wait',
+    trigger: { type: 'scroll-scene', scrollSceneId: 'scene-hero' },
+    steps: [
+      {
+        id: 'site-fade',
+        target: { type: 'site' },
+        to: { opacity: 1 },
+        durationMs: 1,
+      },
+    ],
+  },
+];
+(invalidScrollWait.motionSequences[0]!.steps[0] as unknown as Record<string, unknown>).waitAfterMs = 100;
+invalidScrollWait.scrollScenes = [
+  {
+    id: 'scene-hero',
+    sectionId: 'hero',
+    sequenceId: 'scroll-wait',
+    pinTarget: { type: 'section', sectionId: 'hero' },
+    startOffsetPx: 0,
+    endOffsetPx: 720,
+  },
+];
+const invalidScrollWaitValidation = validateEditableSite(invalidScrollWait);
+assert(!invalidScrollWaitValidation.valid, 'scroll-scrubbed Motion Sequences must reject waitAfterMs');
+assert(
+  invalidScrollWaitValidation.errors.some((error) => error.includes('motionSequences[0].steps[0].waitAfterMs')),
+  `scroll wait failure must mention waitAfterMs; got ${invalidScrollWaitValidation.valid ? '' : invalidScrollWaitValidation.errors.join('; ')}`,
+);
+
 const invalidDirection = baseSite();
 (invalidDirection.motionSequences![0] as unknown as Record<string, unknown>).playbackDirection = 'sideways';
 const invalidDirectionValidation = validateEditableSite(invalidDirection);
@@ -272,6 +312,15 @@ assert(!invalidCountValidation.valid, 'repeat count above the supported range mu
 assert(
   invalidCountValidation.errors.some((error) => error.includes('motionSequences[0].repeat.count')),
   `repeat count failure must mention count; got ${invalidCountValidation.valid ? '' : invalidCountValidation.errors.join('; ')}`,
+);
+
+const invalidWait = baseSite();
+(invalidWait.motionSequences![0]!.steps[0] as unknown as Record<string, unknown>).waitAfterMs = -1;
+const invalidWaitValidation = validateEditableSite(invalidWait);
+assert(!invalidWaitValidation.valid, 'negative Motion Sequence waitAfterMs must fail validation');
+assert(
+  invalidWaitValidation.errors.some((error) => error.includes('motionSequences[0].steps[0].waitAfterMs')),
+  `negative wait failure must mention waitAfterMs; got ${invalidWaitValidation.valid ? '' : invalidWaitValidation.errors.join('; ')}`,
 );
 
 const doc = new StubDocument();
@@ -296,10 +345,17 @@ assert(
   (animation.keyframes[1] as { opacity?: number }).opacity === 0,
   'reverse playback must end at the authored from state',
 );
+const secondAnimation = doc.documentElement.animations[1];
+assert(secondAnimation !== undefined, 'timed Motion Sequence must animate the next authored step');
+assert(
+  secondAnimation.options.delay === 420,
+  `waitAfterMs must offset the next timed step by prior duration plus wait; got ${String(secondAnimation.options.delay)}`,
+);
 
 const panelSource = readFileSync(join(process.cwd(), 'src', 'editor-client', 'interactions-panel.ts'), 'utf8');
 assert(panelSource.includes('Repeat count'), 'Interactions panel must expose Motion Sequence repeat count');
 assert(panelSource.includes('Repeat mode'), 'Interactions panel must expose Motion Sequence repeat mode');
 assert(panelSource.includes('Playback direction'), 'Interactions panel must expose Motion Sequence playback direction');
+assert(panelSource.includes('Wait after'), 'Interactions panel must expose Motion Sequence wait-after controls');
 
 console.log('[motion-sequence-repeat:smoke] OK');
