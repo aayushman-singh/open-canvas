@@ -371,6 +371,17 @@ function behaviourRunSequence(sequence, root, reducedMode, progress) {
       behaviourFailure('motion-sequence-wait-scroll-scene', { sequenceId: sequence.id, stepId: step.id }, new Error('waitAfterMs is not supported for scroll-scene Motion Sequences'));
       return;
     }
+    if (progress !== undefined && step.startAtMs !== undefined) {
+      behaviourFailure('motion-sequence-start-scroll-scene', { sequenceId: sequence.id, stepId: step.id }, new Error('startAtMs is not supported for scroll-scene Motion Sequences'));
+      return;
+    }
+    var baseDelayMs = cursorMs;
+    if (progress === undefined && step.startAtMs !== undefined) {
+      baseDelayMs = Number(step.startAtMs);
+      if (!isFinite(baseDelayMs) || baseDelayMs < 0) {
+        behaviourFailure('motion-sequence-start-at', { sequenceId: sequence.id, stepId: step.id, startAtMs: step.startAtMs }, new Error('startAtMs must be a finite number >= 0'));
+      }
+    }
     var targets = behaviourResolveTarget(step.target, root);
     behaviourAnimateTargets(
       targets,
@@ -379,10 +390,11 @@ function behaviourRunSequence(sequence, root, reducedMode, progress) {
       progress,
       progress === undefined ? sequence.repeat : null,
       sequence.playbackDirection || 'normal',
-      cursorMs,
+      baseDelayMs,
     );
     if (progress === undefined) {
-      cursorMs += (step.delayMs || 0) + (step.durationMs || 0) + (step.staggerMs || 0) * Math.max(0, targets.length - 1) + (step.waitAfterMs || 0);
+      var stepEndMs = baseDelayMs + (step.delayMs || 0) + (step.durationMs || 0) + (step.staggerMs || 0) * Math.max(0, targets.length - 1) + (step.waitAfterMs || 0);
+      cursorMs = Math.max(cursorMs, stepEndMs);
     }
   }
 }

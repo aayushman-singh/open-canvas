@@ -189,6 +189,13 @@ valid.motionSequences![0]!.steps.push({
   to: { translateY: -24 },
   durationMs: 100,
 });
+valid.motionSequences![0]!.steps.push({
+  id: 'site-overlap',
+  target: { type: 'site' },
+  to: { scale: 1.2 },
+  durationMs: 80,
+});
+(valid.motionSequences![0]!.steps[2] as unknown as Record<string, unknown>).startAtMs = 120;
 const strokeStep = valid.motionSequences![0]!.steps[1] as unknown as {
   from: Record<string, number>;
   to: Record<string, number>;
@@ -311,6 +318,41 @@ assert(
   `scroll wait failure must mention waitAfterMs; got ${invalidScrollWaitValidation.valid ? '' : invalidScrollWaitValidation.errors.join('; ')}`,
 );
 
+const invalidScrollStartAt = baseSite();
+invalidScrollStartAt.motionSequences = [
+  {
+    id: 'scroll-start-at',
+    trigger: { type: 'scroll-scene', scrollSceneId: 'scene-hero' },
+    steps: [
+      {
+        id: 'site-fade',
+        target: { type: 'site' },
+        to: { opacity: 1 },
+        durationMs: 1,
+      },
+    ],
+  },
+];
+(invalidScrollStartAt.motionSequences[0]!.steps[0] as unknown as Record<string, unknown>).startAtMs = 100;
+invalidScrollStartAt.scrollScenes = [
+  {
+    id: 'scene-hero',
+    sectionId: 'hero',
+    sequenceId: 'scroll-start-at',
+    pinTarget: { type: 'section', sectionId: 'hero' },
+    startOffsetPx: 0,
+    endOffsetPx: 720,
+  },
+];
+const invalidScrollStartAtValidation = validateEditableSite(invalidScrollStartAt);
+assert(!invalidScrollStartAtValidation.valid, 'scroll-scrubbed Motion Sequences must reject startAtMs');
+assert(
+  invalidScrollStartAtValidation.errors.some((error) =>
+    error.includes('motionSequences[0].steps[0].startAtMs'),
+  ),
+  `scroll startAtMs failure must mention startAtMs; got ${invalidScrollStartAtValidation.valid ? '' : invalidScrollStartAtValidation.errors.join('; ')}`,
+);
+
 const invalidDirection = baseSite();
 (invalidDirection.motionSequences![0] as unknown as Record<string, unknown>).playbackDirection = 'sideways';
 const invalidDirectionValidation = validateEditableSite(invalidDirection);
@@ -338,6 +380,15 @@ assert(!invalidWaitValidation.valid, 'negative Motion Sequence waitAfterMs must 
 assert(
   invalidWaitValidation.errors.some((error) => error.includes('motionSequences[0].steps[0].waitAfterMs')),
   `negative wait failure must mention waitAfterMs; got ${invalidWaitValidation.valid ? '' : invalidWaitValidation.errors.join('; ')}`,
+);
+
+const invalidStartAt = baseSite();
+(invalidStartAt.motionSequences![0]!.steps[0] as unknown as Record<string, unknown>).startAtMs = -1;
+const invalidStartAtValidation = validateEditableSite(invalidStartAt);
+assert(!invalidStartAtValidation.valid, 'negative Motion Sequence startAtMs must fail validation');
+assert(
+  invalidStartAtValidation.errors.some((error) => error.includes('motionSequences[0].steps[0].startAtMs')),
+  `negative startAtMs failure must mention startAtMs; got ${invalidStartAtValidation.valid ? '' : invalidStartAtValidation.errors.join('; ')}`,
 );
 
 const doc = new StubDocument();
@@ -388,11 +439,22 @@ assert(
   (secondAnimation.keyframes[1] as { fontVariationSettings?: string }).fontVariationSettings === '"wght" 300, "wdth" 80',
   'reverse variable font playback must end at the authored axis from state',
 );
+const overlapAnimation = doc.documentElement.animations[2];
+assert(overlapAnimation !== undefined, 'timed Motion Sequence must animate the absolute-positioned step');
+assert(
+  overlapAnimation.options.delay === 120,
+  `startAtMs must schedule the step at its authored absolute offset; got ${String(overlapAnimation.options.delay)}`,
+);
+assert(
+  (overlapAnimation.keyframes[0] as { transform?: string }).transform?.includes('scale(1.2)') === true,
+  'reverse overlapping step must still emit authored transform keyframes',
+);
 
 const panelSource = readFileSync(join(process.cwd(), 'src', 'editor-client', 'interactions-panel.ts'), 'utf8');
 assert(panelSource.includes('Repeat count'), 'Interactions panel must expose Motion Sequence repeat count');
 assert(panelSource.includes('Repeat mode'), 'Interactions panel must expose Motion Sequence repeat mode');
 assert(panelSource.includes('Playback direction'), 'Interactions panel must expose Motion Sequence playback direction');
+assert(panelSource.includes('Start at'), 'Interactions panel must expose Motion Sequence absolute start controls');
 assert(panelSource.includes('Wait after'), 'Interactions panel must expose Motion Sequence wait-after controls');
 assert(panelSource.includes('Stroke dash offset'), 'Interactions panel must expose Motion Sequence stroke-draw controls');
 assert(panelSource.includes('Clip path'), 'Interactions panel must expose Motion Sequence clip-path controls');

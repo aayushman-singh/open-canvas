@@ -205,15 +205,17 @@ Current state:
   The Interactions panel exposes repeat count/mode, the Runtime Hydrator maps
   this to finite Web Animations iterations/direction, and scroll-scene
   sequences reject repeat instead of silently ignoring it.
+- **June 2026 update:** Motion Sequence steps now support `startAtMs` for
+  absolute timeline placement on time-based sequences. Owners can overlap logo,
+  headline, media, nav, and CTA steps from the Interactions panel; validation
+  rejects negative offsets and scroll-scene offsets, and the Runtime Hydrator
+  schedules steps by absolute timeline position instead of forcing every step
+  to serialize.
 
 User-visible miss:
 
-- Cannot reproduce staged hero intros where logo, mask, headline words, media,
-  nav, and CTA all enter on one choreographed timeline.
-- Cannot chain animations across multiple elements.
-- Cannot yet define visual timeline keyframes, SVG stroke drawing,
-  variable-font axis animation, non-numeric filter / clip-path editing from the
-  UI.
+- Cannot yet edit multi-step choreography on a visual timeline canvas with
+  drag handles and lane visualization.
 
 Needed primitive:
 
@@ -221,7 +223,8 @@ Needed primitive:
   properties, duration, easing, delay, stagger, and completion behaviour.
 - Validation must reject unsupported targets/properties instead of silently
   dropping steps.
-- Remaining next wave: timeline canvas UX.
+- Remaining next wave: timeline canvas UX and richer property affordances
+  beyond the current form controls.
 
 ### 2. Scroll Motion Is Triggered, Not Scrubbed
 

@@ -3353,10 +3353,14 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           validateMotionProperties(step.from, `${stepPath}.from`, errors, false);
           validateMotionProperties(step.to, `${stepPath}.to`, errors, true);
           validateNonNegativeFiniteNumber(step.durationMs, `${stepPath}.durationMs`, errors, true);
+          validateNonNegativeFiniteNumber(step.startAtMs, `${stepPath}.startAtMs`, errors, false);
           validateNonNegativeFiniteNumber(step.delayMs, `${stepPath}.delayMs`, errors, false);
           validateNonNegativeFiniteNumber(step.waitAfterMs, `${stepPath}.waitAfterMs`, errors, false);
           if (isRecord(sequence.trigger) && sequence.trigger.type === 'scroll-scene' && step.waitAfterMs !== undefined) {
             errors.push(`${stepPath}.waitAfterMs is not supported for scroll-scene Motion Sequences`);
+          }
+          if (isRecord(sequence.trigger) && sequence.trigger.type === 'scroll-scene' && step.startAtMs !== undefined) {
+            errors.push(`${stepPath}.startAtMs is not supported for scroll-scene Motion Sequences`);
           }
           validateNonNegativeFiniteNumber(step.staggerMs, `${stepPath}.staggerMs`, errors, false);
           assertOptionalNonEmptyString(step.easing, `${stepPath}.easing`, errors);

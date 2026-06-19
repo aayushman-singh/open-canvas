@@ -1786,6 +1786,13 @@ function renderFullMotionSequenceStep(
   renderMotionPropertyGroup(ctx, card, sequence, step, 'from');
   renderMotionPropertyGroup(ctx, card, sequence, step, 'to');
 
+  const startAt = optionalNumberInput(step.startAtMs, 0, 60000, 10);
+  startAt.disabled = sequence.trigger.type === 'scroll-scene';
+  startAt.addEventListener('change', () =>
+    updateMotionStepOptionalFinite(ctx, sequence.id, step, 'startAtMs', startAt, 0, 60000),
+  );
+  card.appendChild(field('Start at (ms)', startAt));
+
   const delay = numberInput(step.delayMs ?? 0, 0, 10000, 10);
   delay.addEventListener('change', () => updateMotionStepFinite(ctx, sequence.id, step, 'delayMs', delay, 0, 10000));
   card.appendChild(field('Delay (ms)', delay));
@@ -2039,6 +2046,42 @@ function updateMotionStepFinite(
   if (next === null) {
     ctx.setStatus('Motion Sequence ' + key + ' must be ' + String(min) + '-' + String(max), 'error');
     input.value = String(step[key] ?? 0);
+    return;
+  }
+  mutate(ctx, () => updateScrollSequenceStep(ctx, sequenceId, step.id, { [key]: next }));
+}
+
+function updateMotionStepOptionalFinite(
+  ctx: InteractionsPanelContext,
+  sequenceId: string,
+  step: MotionSequenceStep,
+  key: 'startAtMs',
+  input: HTMLInputElement,
+  min: number,
+  max: number,
+): void {
+  const value = input.value.trim();
+  if (value.length === 0) {
+    mutate(ctx, () => {
+      ctx.state!.motionSequences = (ctx.state!.motionSequences ?? []).map((sequence) => {
+        if (sequence.id !== sequenceId) return sequence;
+        return {
+          ...sequence,
+          steps: sequence.steps.map((candidate) => {
+            if (candidate.id !== step.id) return candidate;
+            const next = { ...candidate };
+            delete next[key];
+            return next;
+          }),
+        };
+      });
+    });
+    return;
+  }
+  const next = Number(value);
+  if (!Number.isFinite(next) || next < min || next > max) {
+    ctx.setStatus('Motion Sequence ' + key + ' must be ' + String(min) + '-' + String(max), 'error');
+    input.value = String(step[key] ?? '');
     return;
   }
   mutate(ctx, () => updateScrollSequenceStep(ctx, sequenceId, step.id, { [key]: next }));
