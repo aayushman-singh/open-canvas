@@ -331,21 +331,26 @@ Current state:
   logo/wordmark draw choreography. The renderer emits bounded SVG text, the
   Behaviour runtime measures and animates stroke dash with WAAPI, and the
   Interactions panel exposes text, duration, and stroke width.
+- **June 2026 update:** Behaviour Load Experience now supports schema-owned
+  handoff choreography for fade, mask-open, and slide-up. The renderer emits
+  explicit handoff metadata, the Behaviour runtime applies the transition and
+  emits named failures for missing or invalid metadata, and the Interactions
+  panel exposes effect, duration, and easing controls.
 
 User-visible miss:
 
-- Cannot reproduce branded preloaders, progress numbers, logo draws, mask
-  openings, media-readiness gates, or first-load page reveals.
+- Cannot reproduce arbitrary branded preloader canvases or fully custom
+  first-page reveal choreography.
 - Custom arbitrary preloader canvas content remains intentionally out of scope;
   Behaviour Load Experience now covers label, enter action, progress, media
-  readiness, run policy, and bounded logo/wordmark draw.
+  readiness, run policy, bounded logo/wordmark draw, and bounded handoff
+  transitions.
 
 Needed primitive:
 
-- Next wave: custom visual content, media readiness mapping, branded progress
-  numbers/logo draws, and richer transition into the first page state. The
-  failure path must stay explicit; do not silently skip the loader when an
-  asset is late.
+- Next wave: custom visual content and richer transition into the first page
+  state. The failure path must stay explicit; do not silently skip the loader
+  when an asset is late.
 
 ### 4. Route Transition V1 Exists, Shared-Element Navigation Does Not
 

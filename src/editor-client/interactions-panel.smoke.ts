@@ -183,6 +183,10 @@ assert(panelSrc.includes('Progress display'), 'panel must expose load progress d
 assert(panelSrc.includes('Behaviour run policy'), 'panel must expose behaviour load run policy');
 assert(panelSrc.includes('Media readiness assets'), 'panel must expose behaviour load media readiness assets');
 assert(panelSrc.includes('Logo draw text'), 'panel must expose behaviour load logo draw controls');
+assert(panelSrc.includes('LOAD_HANDOFF_EFFECTS'), 'panel must use schema load handoff effect values');
+assert(panelSrc.includes('Handoff effect'), 'panel must expose behaviour load handoff effect');
+assert(panelSrc.includes('Handoff duration'), 'panel must expose behaviour load handoff duration');
+assert(panelSrc.includes('Handoff easing'), 'panel must expose behaviour load handoff easing');
 assert(panelSrc.includes('Create linked sequence'), 'panel must restore missing load-enter sequence');
 assert(panelSrc.includes('Linked load-enter Motion Sequence is missing'), 'panel must fail loudly for missing behaviour load sequence');
 assert(panelSrc.includes('renderScrollSceneControls'), 'panel must render scroll scene controls');

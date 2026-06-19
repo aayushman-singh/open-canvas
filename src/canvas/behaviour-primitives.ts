@@ -35,6 +35,7 @@ export const SHADER_SCENE_REDUCED_MOTION_MODES = ['static', 'animate'] as const;
 export const VIDEO_STREAM_TRIGGERS = ['hover-focus', 'click-toggle', 'load'] as const;
 export const VIDEO_STREAM_REDUCED_MOTION_MODES = ['poster', 'play'] as const;
 export const LOAD_PROGRESS_DISPLAY_MODES = ['hidden', 'bar', 'number', 'bar-number'] as const;
+export const LOAD_HANDOFF_EFFECTS = ['fade', 'mask-open', 'slide-up'] as const;
 export const BEHAVIOUR_LOAD_RUN_POLICIES = ['every-visit', 'once-per-session'] as const;
 export const RIVE_INPUT_TYPES = ['boolean', 'number', 'trigger'] as const;
 export const RIVE_INPUT_EVENTS = [
@@ -241,6 +242,11 @@ export interface LoadExperience {
     text: string;
     durationMs: number;
     strokeWidth: number;
+  };
+  handoff?: {
+    effect: (typeof LOAD_HANDOFF_EFFECTS)[number];
+    durationMs: number;
+    easing?: string;
   };
   sequenceId: string;
 }

@@ -451,6 +451,11 @@ function baseSnapshot(): PublishedSnapshot {
         durationMs: 1000,
         strokeWidth: 2,
       },
+      handoff: {
+        effect: 'mask-open',
+        durationMs: 420,
+        easing: 'cubic-bezier(.76,0,.24,1)',
+      },
       sequenceId: 'load-sequence',
     },
     motionSequences: [
@@ -532,6 +537,18 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   const load = new StubElement('div');
   load.setAttribute('data-opencanvas-load-experience', 'load-main');
   load.setAttribute('data-opencanvas-load-sequence', 'load-sequence');
+  const handoffEffectMatch = html.match(/data-opencanvas-load-handoff-effect="([^"]*)"/);
+  if (handoffEffectMatch?.[1]) {
+    load.setAttribute('data-opencanvas-load-handoff-effect', handoffEffectMatch[1]);
+  }
+  const handoffDurationMatch = html.match(/data-opencanvas-load-handoff-duration-ms="([^"]*)"/);
+  if (handoffDurationMatch?.[1]) {
+    load.setAttribute('data-opencanvas-load-handoff-duration-ms', handoffDurationMatch[1]);
+  }
+  const handoffEasingMatch = html.match(/data-opencanvas-load-handoff-easing="([^"]*)"/);
+  if (handoffEasingMatch?.[1]) {
+    load.setAttribute('data-opencanvas-load-handoff-easing', handoffEasingMatch[1]);
+  }
   const enter = new StubElement('button');
   enter.setAttribute('data-opencanvas-load-enter', '');
   load.appendChild(enter);
@@ -610,6 +627,14 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
     'rendered load experience must emit logo draw svg',
   );
   assert(
+    html.includes('data-opencanvas-load-handoff-effect="mask-open"'),
+    'rendered load experience must emit handoff effect metadata',
+  );
+  assert(
+    html.includes('data-opencanvas-load-handoff-duration-ms="420"'),
+    'rendered load experience must emit handoff duration metadata',
+  );
+  assert(
     html.includes('data-opencanvas-load-progress-number'),
     'rendered load experience must include progress number node',
   );
@@ -640,6 +665,14 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(
     BEHAVIOUR_RUNTIME_SRC.includes('load-logo-draw-missing'),
     'behaviour runtime must fail loudly when logo draw node is missing',
+  );
+  assert(
+    BEHAVIOUR_RUNTIME_SRC.includes('behaviourApplyLoadHandoff'),
+    'behaviour runtime must apply load handoff choreography',
+  );
+  assert(
+    BEHAVIOUR_RUNTIME_SRC.includes('load-handoff-effect'),
+    'behaviour runtime must fail loudly when handoff effect is unsupported',
   );
   mountRenderedHtml(doc, html);
   runBehaviour(doc, win, StubImage);
@@ -675,6 +708,14 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(
     win.sessionStorage.getItem('opencanvas:load-experience:load-main') === 'seen',
     'once-per-session load experience must mark the enter moment as seen',
+  );
+  assert(
+    load.getAttribute('data-opencanvas-load-handoff-applied') === 'mask-open',
+    'load handoff must mark the applied effect',
+  );
+  assert(
+    load.style.clipPath === 'circle(0% at 50% 50%)',
+    'mask-open handoff must clip the load screen away from the page opening',
   );
 }
 

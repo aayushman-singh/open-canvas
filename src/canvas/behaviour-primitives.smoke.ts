@@ -85,6 +85,11 @@ function buildValidState(): EditableSite & Record<string, unknown> {
         durationMs: 1000,
         strokeWidth: 2,
       },
+      handoff: {
+        effect: 'mask-open',
+        durationMs: 420,
+        easing: 'cubic-bezier(.76,0,.24,1)',
+      },
       sequenceId: 'sequence-load',
     },
     motionSequences: [
@@ -184,6 +189,26 @@ function expectInvalid(
 
 const validState = buildValidState();
 expectValid(validState, 'valid behaviour primitive state');
+
+const invalidLoadHandoffEffect = structuredClone(validState);
+(
+  invalidLoadHandoffEffect.loadExperience as { handoff: { effect: string } }
+).handoff.effect = 'custom-js';
+expectInvalid(
+  invalidLoadHandoffEffect,
+  'loadExperience.handoff.effect',
+  'invalid load handoff effect',
+);
+
+const invalidLoadHandoffDuration = structuredClone(validState);
+(
+  invalidLoadHandoffDuration.loadExperience as { handoff: { durationMs: number } }
+).handoff.durationMs = 40000;
+expectInvalid(
+  invalidLoadHandoffDuration,
+  'loadExperience.handoff.durationMs',
+  'invalid load handoff duration',
+);
 
 const missingElementTarget = structuredClone(validState);
 (

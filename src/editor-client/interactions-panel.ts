@@ -51,6 +51,7 @@ import {
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
   BEHAVIOUR_LOAD_RUN_POLICIES,
+  LOAD_HANDOFF_EFFECTS,
   LOAD_PROGRESS_DISPLAY_MODES,
   MOTION_SEQUENCE_PLAYBACK_DIRECTIONS,
   MOTION_SEQUENCE_REPEAT_MODES,
@@ -419,6 +420,11 @@ function defaultBehaviourLoadExperience(ctx: InteractionsPanelContext): Behaviou
       display: 'bar-number',
       durationMs: 1200,
       label: 'Loading',
+    },
+    handoff: {
+      effect: 'mask-open',
+      durationMs: 420,
+      easing: 'cubic-bezier(.76,0,.24,1)',
     },
     sequenceId: existing?.id ?? 'load-enter-sequence',
   };
@@ -3386,6 +3392,48 @@ function renderBehaviourLoadControls(
   });
   wrap.appendChild(field('Logo draw stroke', logoDrawStroke));
 
+  const handoffEffect = selectInput([...LOAD_HANDOFF_EFFECTS], load.handoff?.effect ?? 'mask-open');
+  handoffEffect.addEventListener('change', () => {
+    updateBehaviourLoadHandoff(ctx, {
+      effect: handoffEffect.value as NonNullable<BehaviourLoadExperience['handoff']>['effect'],
+      durationMs: load.handoff?.durationMs ?? 420,
+      easing: load.handoff?.easing ?? 'cubic-bezier(.76,0,.24,1)',
+    });
+  });
+  wrap.appendChild(field('Handoff effect', handoffEffect));
+
+  const handoffDuration = numberInput(load.handoff?.durationMs ?? 420, 0, 30000, 20);
+  handoffDuration.addEventListener('change', () => {
+    const value = Number(handoffDuration.value);
+    if (!Number.isFinite(value) || value < 0 || value > 30000) {
+      ctx.setStatus('Load handoff duration must be 0-30000ms', 'error');
+      handoffDuration.value = String(load.handoff?.durationMs ?? 420);
+      return;
+    }
+    updateBehaviourLoadHandoff(ctx, {
+      effect: load.handoff?.effect ?? 'mask-open',
+      durationMs: value,
+      easing: load.handoff?.easing ?? 'cubic-bezier(.76,0,.24,1)',
+    });
+  });
+  wrap.appendChild(field('Handoff duration', handoffDuration));
+
+  const handoffEasing = textInput(load.handoff?.easing ?? 'cubic-bezier(.76,0,.24,1)', 'ease-out');
+  handoffEasing.addEventListener('change', () => {
+    const value = handoffEasing.value.trim();
+    if (value.length === 0) {
+      ctx.setStatus('Load handoff easing cannot be empty', 'error');
+      handoffEasing.value = load.handoff?.easing ?? 'cubic-bezier(.76,0,.24,1)';
+      return;
+    }
+    updateBehaviourLoadHandoff(ctx, {
+      effect: load.handoff?.effect ?? 'mask-open',
+      durationMs: load.handoff?.durationMs ?? 420,
+      easing: value,
+    });
+  });
+  wrap.appendChild(field('Handoff easing', handoffEasing));
+
   const sequences = loadEnterSequences(ctx);
   const sequenceIds = sequences.map((sequence) => sequence.id);
   if (sequenceIds.length > 0) {
@@ -3464,6 +3512,17 @@ function updateBehaviourLoadLogoDraw(
       next.logoDraw = logoDraw;
     }
     ctx.state!.loadExperience = next;
+  });
+}
+
+function updateBehaviourLoadHandoff(
+  ctx: InteractionsPanelContext,
+  handoff: NonNullable<BehaviourLoadExperience['handoff']>,
+): void {
+  mutate(ctx, () => {
+    const current = ctx.state!.loadExperience;
+    if (!isBehaviourLoadExperience(current)) return;
+    ctx.state!.loadExperience = { ...current, handoff };
   });
 }
 

@@ -838,6 +838,9 @@ function renderLoadExperienceChrome(load: BehaviourLoadExperience, assetBasePath
   const readinessAttrs = load.mediaReadiness
     ? ` data-opencanvas-load-readiness-urls="${escapeAttr(load.mediaReadiness.assetIds.map((assetId) => `${assetBasePath}/${assetId}`).join(' '))}" data-opencanvas-load-readiness-timeout-ms="${escapeAttr(String(load.mediaReadiness.timeoutMs))}"`
     : '';
+  const handoffAttrs = load.handoff
+    ? ` data-opencanvas-load-handoff-effect="${escapeAttr(load.handoff.effect)}" data-opencanvas-load-handoff-duration-ms="${escapeAttr(String(load.handoff.durationMs))}"${load.handoff.easing ? ` data-opencanvas-load-handoff-easing="${escapeAttr(load.handoff.easing)}"` : ''}`
+    : '';
   const runPolicy = load.runPolicy ?? 'every-visit';
   const style = styleFromEntries([
     ['position', 'fixed'],
@@ -849,8 +852,14 @@ function renderLoadExperienceChrome(load: BehaviourLoadExperience, assetBasePath
     ['gap', '24px'],
     ['background', background],
     ['color', foreground],
+    ...(load.handoff?.effect === 'mask-open'
+      ? ([['clip-path', 'circle(150% at 50% 50%)']] as Array<[string, string]>)
+      : []),
+    ...(load.handoff?.effect === 'slide-up'
+      ? ([['transform', 'translateY(0%)']] as Array<[string, string]>)
+      : []),
   ]);
-  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}" data-opencanvas-load-run-policy="${escapeAttr(runPolicy)}"${progressAttrs}${readinessAttrs} style="${style}">${renderBehaviourLoadLogoDraw(load)}<div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div>${renderBehaviourLoadProgress(load)}<button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
+  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}" data-opencanvas-load-run-policy="${escapeAttr(runPolicy)}"${progressAttrs}${readinessAttrs}${handoffAttrs} style="${style}">${renderBehaviourLoadLogoDraw(load)}<div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div>${renderBehaviourLoadProgress(load)}<button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
 }
 
 function renderBehaviourLoadLogoDraw(load: BehaviourLoadExperience): string {

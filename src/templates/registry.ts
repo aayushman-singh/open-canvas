@@ -307,6 +307,11 @@ export const velocityAthleteTemplate: TemplateSeed = {
     enterLabel: 'Load Vale',
     background: '#111112',
     foreground: '#C8FF1A',
+    handoff: {
+      effect: 'mask-open',
+      durationMs: 420,
+      easing: 'cubic-bezier(.76,0,.24,1)',
+    },
     sequenceId: 'velocity-load-sequence',
   },
   richMotionAssets: [

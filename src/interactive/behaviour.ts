@@ -1424,8 +1424,7 @@ function behaviourHydrateLoadExperience(load, payload, root) {
     behaviourMarkLoadExperienceSeen(load);
     finishProgress();
     node.setAttribute('data-opencanvas-load-hidden', 'true');
-    node.style.pointerEvents = 'none';
-    node.style.opacity = '0';
+    behaviourApplyLoadHandoff(node, load);
     var reducedMode = behaviourPrefersReducedMotion() ? (sequence.reducedMotion || 'skip') : null;
     behaviourRunSequence(sequence, root, reducedMode);
   }
@@ -1435,6 +1434,47 @@ function behaviourHydrateLoadExperience(load, payload, root) {
       dismiss();
     });
   }
+}
+
+function behaviourApplyLoadHandoff(node, load) {
+  var handoff = load.handoff;
+  node.style.pointerEvents = 'none';
+  if (!handoff) {
+    node.style.opacity = '0';
+    return;
+  }
+  var effect = node.getAttribute('data-opencanvas-load-handoff-effect');
+  if (!effect) {
+    behaviourFailure('load-handoff-effect-missing', { loadExperienceId: load.id }, new Error('load handoff effect metadata missing'));
+  }
+  if (effect !== handoff.effect) {
+    behaviourFailure('load-handoff-effect-mismatch', { loadExperienceId: load.id, expected: handoff.effect, actual: effect }, new Error('load handoff effect metadata mismatch'));
+  }
+  if (effect !== 'fade' && effect !== 'mask-open' && effect !== 'slide-up') {
+    behaviourFailure('load-handoff-effect', { loadExperienceId: load.id, effect: effect }, new Error('unsupported load handoff effect'));
+  }
+  var durationAttr = node.getAttribute('data-opencanvas-load-handoff-duration-ms');
+  if (durationAttr === null) {
+    behaviourFailure('load-handoff-duration-missing', { loadExperienceId: load.id }, new Error('load handoff duration metadata missing'));
+  }
+  var duration = Number(durationAttr);
+  if (!isFinite(duration) || duration < 0 || duration > 30000) {
+    behaviourFailure('load-handoff-duration', { loadExperienceId: load.id, durationMs: durationAttr }, new Error('invalid load handoff duration'));
+  }
+  var easing = node.getAttribute('data-opencanvas-load-handoff-easing') || handoff.easing || 'ease-out';
+  var effectiveDuration = behaviourPrefersReducedMotion() ? 0 : duration;
+  node.setAttribute('data-opencanvas-load-handoff-applied', effect);
+  node.style.transition = 'opacity ' + String(effectiveDuration) + 'ms ' + easing + ', transform ' + String(effectiveDuration) + 'ms ' + easing + ', clip-path ' + String(effectiveDuration) + 'ms ' + easing;
+  if (effect === 'fade') {
+    node.style.opacity = '0';
+    return;
+  }
+  if (effect === 'slide-up') {
+    node.style.transform = 'translateY(-100%)';
+    node.style.opacity = '0';
+    return;
+  }
+  node.style.clipPath = 'circle(0% at 50% 50%)';
 }
 
 function behaviourHydrateLoadReadiness(node, load, enter) {

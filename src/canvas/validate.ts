@@ -57,6 +57,7 @@ import {
   BEHAVIOUR_LOAD_RUN_POLICIES,
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
+  LOAD_HANDOFF_EFFECTS,
   LOAD_PROGRESS_DISPLAY_MODES,
   MOTION_SEQUENCE_PLAYBACK_DIRECTIONS,
   MOTION_SEQUENCE_PROPERTIES,
@@ -3222,6 +3223,28 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
             state.loadExperience.logoDraw.strokeWidth > 20
           ) {
             errors.push('loadExperience.logoDraw.strokeWidth must be a finite number between 0 and 20');
+          }
+        }
+      }
+      if (state.loadExperience.handoff !== undefined) {
+        if (!isRecord(state.loadExperience.handoff)) {
+          errors.push('loadExperience.handoff must be an object when present');
+        } else {
+          assertOneOf(
+            state.loadExperience.handoff.effect,
+            LOAD_HANDOFF_EFFECTS,
+            'loadExperience.handoff.effect',
+            errors,
+          );
+          if (
+            !isFiniteNumber(state.loadExperience.handoff.durationMs) ||
+            state.loadExperience.handoff.durationMs < 0 ||
+            state.loadExperience.handoff.durationMs > 30000
+          ) {
+            errors.push('loadExperience.handoff.durationMs must be a finite number between 0 and 30000');
+          }
+          if (state.loadExperience.handoff.easing !== undefined) {
+            assertNonEmptyString(state.loadExperience.handoff.easing, 'loadExperience.handoff.easing', errors);
           }
         }
       }
