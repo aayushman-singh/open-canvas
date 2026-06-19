@@ -779,24 +779,42 @@ function buildKitTokenBlock(kitName: string, preset: StyleKitPreset): string {
   return `[data-style-kit=${quoteCssString(kitName)}] {\n  ${tokens.join('\n  ')}\n}`;
 }
 
+function actionStyleVar(cssVar: string, fallback: string | number): string {
+  return `var(${cssVar}, ${String(fallback)})`;
+}
+
 function buildActionVariantBlock(
   kitName: string,
   variant: ActionVariant,
   tokens: ActionVariantTokens,
 ): string {
   const decls: string[] = [];
-  if (tokens.background !== undefined) decls.push(declaration('background', tokens.background));
-  if (tokens.color !== undefined) decls.push(declaration('color', tokens.color));
+  if (tokens.background !== undefined) {
+    decls.push(declaration('background', actionStyleVar('--opencanvas-action-bg', tokens.background)));
+  }
+  if (tokens.color !== undefined) {
+    decls.push(declaration('color', actionStyleVar('--opencanvas-action-color', tokens.color)));
+  }
   if (tokens.border !== undefined) decls.push(declaration('border', tokens.border));
-  if (tokens.weight !== undefined) decls.push(declaration('font-weight', tokens.weight));
-  if (tokens.borderRadius !== undefined) decls.push(declaration('border-radius', tokens.borderRadius));
+  if (tokens.weight !== undefined) {
+    decls.push(declaration('font-weight', actionStyleVar('--opencanvas-action-font-weight', tokens.weight)));
+  }
+  if (tokens.borderRadius !== undefined) {
+    decls.push(declaration('border-radius', actionStyleVar('--opencanvas-action-radius', tokens.borderRadius)));
+  }
   if (tokens.textDecoration !== undefined) decls.push(declaration('text-decoration', tokens.textDecoration));
   if (tokens.backdropFilter !== undefined) decls.push(declaration('backdrop-filter', tokens.backdropFilter));
-  if (tokens.boxShadow !== undefined) decls.push(declaration('box-shadow', tokens.boxShadow));
+  if (tokens.boxShadow !== undefined) {
+    decls.push(declaration('box-shadow', actionStyleVar('--opencanvas-action-shadow', tokens.boxShadow)));
+  }
   if (tokens.padding !== undefined) decls.push(declaration('padding', tokens.padding));
-  if (tokens.letterSpacing !== undefined) decls.push(declaration('letter-spacing', tokens.letterSpacing));
+  if (tokens.letterSpacing !== undefined) {
+    decls.push(declaration('letter-spacing', actionStyleVar('--opencanvas-action-letter-spacing', tokens.letterSpacing)));
+  }
   if (decls.length === 0) return '';
-  return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="action"][data-variant=${quoteCssString(variant)}] .opencanvas-action {\n  ${decls.join('\n  ')}\n}`;
+  return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="action"][data-variant=${quoteCssString(variant)}] .opencanvas-action {
+  ${decls.join('\n  ')}
+}`;
 }
 
 function buildSurfaceVariantBlock(

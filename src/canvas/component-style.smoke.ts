@@ -4,6 +4,7 @@
 // Run with `bun run component-style:smoke`.
 
 import type {
+  ActionElement,
   CanvasElement,
   EditableSite,
   PublishedSnapshot,
@@ -44,6 +45,18 @@ function baseText(overrides: Partial<TextElement> = {}): TextElement {
     align: 'left',
     ...overrides,
   };
+}
+
+function action(overrides: Partial<ActionElement> = {}): ActionElement {
+  return {
+    id: 'el-action',
+    type: 'action',
+    box: { x: 0, y: 0, w: 220, h: 64, z: 1 },
+    label: [{ text: 'Race' }],
+    variant: 'solid',
+    href: { type: 'external', url: '#' },
+    ...overrides,
+  } as ActionElement;
 }
 
 function accordion(overrides: Partial<AccordionElement> = {}): AccordionElement {
@@ -328,6 +341,21 @@ expectInvalid(
   'pinnedStyle',
   'modeled collectionStyle key duplicated in pinnedStyle',
 );
+expectInvalid(
+  siteWith([
+    withStyle(
+      {
+        ...action(),
+        pinnedStyle: { '--opencanvas-action-bg': '#000000' },
+      },
+      'actionStyle',
+      { backgroundColor: '#ffffff' },
+    ),
+  ]),
+  'pinnedStyle',
+  'modeled actionStyle key duplicated in pinnedStyle',
+);
+
 
 {
   const patch = accordionAgentToolSpec.parsePatch({

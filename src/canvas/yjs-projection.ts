@@ -153,6 +153,7 @@ import type {
 import type { IconName } from './icons.js';
 import {
   ACCORDION_STYLE_SPEC,
+  ACTION_STYLE_SPEC,
   CAROUSEL_STYLE_SPEC,
   COLLECTION_STYLE_SPEC,
   FORM_STYLE_SPEC,
@@ -429,6 +430,9 @@ function encodeActionElement(el: ActionElement): Y.Map<unknown> {
   // text + action go through one code path.
   out.set('label', encodeInlineRuns(el.label));
   out.set('variant', el.variant);
+  if (el.actionStyle !== undefined) {
+    out.set('actionStyle', encodeComponentStyle(el.actionStyle as Record<string, unknown>, ACTION_STYLE_SPEC));
+  }
   // ADR 0051 dec 2 — optional icon glyph.
   setIfDefined(out, 'iconKind', el.iconKind);
   // ADR 0051 dec 3 — discriminated union: exactly one of href / behavior is
@@ -1275,6 +1279,14 @@ function decodeActionElement(map: Y.Map<unknown>, base: BaseElement): ActionElem
   const label = decodeInlineRuns(map.get('label') as Y.Array<Y.Map<unknown>>);
   const variant = map.get('variant') as ActionVariant;
   const iconKind = map.has('iconKind') ? (map.get('iconKind') as IconName) : undefined;
+  const actionStyle = map.has('actionStyle')
+    ? {
+        actionStyle: decodeComponentStyle(
+          map.get('actionStyle') as Y.Map<unknown>,
+          ACTION_STYLE_SPEC,
+        ) as NonNullable<ActionElement['actionStyle']>,
+      }
+    : {};
 
   // ADR 0051 dec 3 — exactly one of href or behavior is encoded.
   if (map.has('behavior')) {
@@ -1289,6 +1301,7 @@ function decodeActionElement(map: Y.Map<unknown>, base: BaseElement): ActionElem
       label,
       variant,
       behavior,
+      ...actionStyle,
       ...(iconKind !== undefined ? { iconKind } : {}),
     };
   }
@@ -1309,6 +1322,7 @@ function decodeActionElement(map: Y.Map<unknown>, base: BaseElement): ActionElem
     label,
     variant,
     href,
+    ...actionStyle,
     ...(iconKind !== undefined ? { iconKind } : {}),
   };
 }

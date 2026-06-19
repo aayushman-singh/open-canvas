@@ -27,6 +27,11 @@ import {
 } from '../schema.js';
 import { isAllowedHref } from '../validate.js';
 import { ICON_NAMES, type IconName, isIconName, renderIconSvg } from '../icons.js';
+import {
+  ACTION_STYLE_SPEC,
+  componentStylePatchProperty,
+  parseComponentStylePatchValue,
+} from './component-style.js';
 import { inlineRunSchema, parseTextInlineRuns } from './text.js';
 
 export type ActionHref =
@@ -40,6 +45,19 @@ export type ActionHref =
  */
 export type ActionBehavior = { type: 'copy'; value: string };
 
+export interface ActionStyle {
+  backgroundColor?: string;
+  color?: string;
+  borderRadius?: number;
+  shadow?: string;
+  fontFamily?: 'inherit' | 'kit-display' | 'kit-body' | 'kit-mono' | 'custom';
+  fontFamilyCustom?: string;
+  fontSize?: number;
+  fontWeight?: 'normal' | 'medium' | 'bold';
+  letterSpacing?: number;
+  iconGap?: number;
+}
+
 /**
  * Action interface — a discriminated union over the link / behaviour split.
  * Both members carry the common label / variant / iconKind shape; only the
@@ -52,6 +70,7 @@ export type ActionElement = BaseElement & {
   label: InlineRun[];
   variant: ActionVariant;
   iconKind?: IconName;
+  actionStyle?: ActionStyle;
 } & ({ href: ActionHref; behavior?: undefined } | { href?: undefined; behavior: ActionBehavior });
 
 export function renderAction(element: ActionElement, ctx: { pages: CanvasPage[] }): string {
@@ -98,6 +117,7 @@ export const actionInspectorSpec: InspectorSpec = {
     { kind: 'custom-mount', name: 'action-label' },
     { kind: 'select', label: 'Variant', path: 'variant', options: ACTION_VARIANTS },
     { kind: 'icon', label: 'Icon', path: 'iconKind' },
+    { kind: 'custom-mount', name: 'component-style' },
     {
       kind: 'action-href',
       discriminatorLabel: 'Link Type',
@@ -213,6 +233,7 @@ export const actionAgentToolSpec: AgentToolSpec = {
       enum: [...ICON_NAMES],
       description: `Optional icon glyph rendered before the label. One of [${ICON_NAMES.join(', ')}]. Action elements only.`,
     },
+    actionStyle: componentStylePatchProperty(ACTION_STYLE_SPEC),
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
@@ -222,6 +243,9 @@ export const actionAgentToolSpec: AgentToolSpec = {
     }
     if (args.label !== undefined) {
       patch.label = parseActionLabel(args.label);
+    }
+    if (args.actionStyle !== undefined) {
+      patch.actionStyle = parseComponentStylePatchValue(args.actionStyle, ACTION_STYLE_SPEC);
     }
     if (args.iconKind !== undefined) {
       if (args.iconKind === null || args.iconKind === '') {

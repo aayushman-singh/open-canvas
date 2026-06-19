@@ -43,6 +43,7 @@ import {
 import { NAV_LAYOUTS, NAV_LINK_KINDS, type NavLayout, type NavLinkKind } from './elements/nav.js';
 import {
   ACCORDION_STYLE_SPEC,
+  ACTION_STYLE_SPEC,
   CAROUSEL_STYLE_SPEC,
   COLLECTION_STYLE_SPEC,
   COMPONENT_STYLE_FONT_WEIGHTS,
@@ -1488,6 +1489,13 @@ function validateElement(
       break;
     }
     case 'action': {
+      validateComponentStyleObject(
+        element.actionStyle,
+        ACTION_STYLE_SPEC,
+        basePath,
+        errors,
+        element.pinnedStyle,
+      );
       // ADR 0051 dec 1 — label is InlineRun[], same shape as TextElement.content.
       // Editor can produce empty labels (Owner deletes every char in the
       // toolbar). Two posture branches:

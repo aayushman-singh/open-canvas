@@ -31,6 +31,18 @@ export interface ComponentStyleSpec {
   fields: readonly ComponentStyleFieldDef[];
 }
 
+export const ACTION_STYLE_FIELDS = [
+  { key: 'backgroundColor', kind: 'string', cssVar: '--opencanvas-action-bg' },
+  { key: 'color', kind: 'string', cssVar: '--opencanvas-action-color' },
+  { key: 'borderRadius', kind: 'numberPx', cssVar: '--opencanvas-action-radius' },
+  { key: 'shadow', kind: 'string', cssVar: '--opencanvas-action-shadow' },
+  { key: 'fontFamily', kind: 'fontFamily', cssVar: '--opencanvas-action-font-family' },
+  { key: 'fontFamilyCustom', kind: 'string' },
+  { key: 'fontSize', kind: 'numberPx', cssVar: '--opencanvas-action-font-size' },
+  { key: 'fontWeight', kind: 'fontWeight', cssVar: '--opencanvas-action-font-weight' },
+  { key: 'letterSpacing', kind: 'numberPx', cssVar: '--opencanvas-action-letter-spacing' },
+  { key: 'iconGap', kind: 'numberPx', cssVar: '--opencanvas-action-gap' },
+] as const satisfies readonly ComponentStyleFieldDef[];
 export const FORM_STYLE_FIELDS = [
   { key: 'fontFamily', kind: 'fontFamily', cssVar: '--opencanvas-form-font-family' },
   { key: 'fontFamilyCustom', kind: 'string' },
@@ -271,6 +283,10 @@ export const COLLECTION_STYLE_FIELDS = [
   },
 ] as const satisfies readonly ComponentStyleFieldDef[];
 
+export const ACTION_STYLE_SPEC: ComponentStyleSpec = {
+  styleKey: 'actionStyle',
+  fields: ACTION_STYLE_FIELDS,
+};
 export const FORM_STYLE_SPEC: ComponentStyleSpec = {
   styleKey: 'formStyle',
   fields: FORM_STYLE_FIELDS,
@@ -293,6 +309,7 @@ export const COLLECTION_STYLE_SPEC: ComponentStyleSpec = {
 };
 
 export const COMPONENT_STYLE_SPECS = [
+  ACTION_STYLE_SPEC,
   FORM_STYLE_SPEC,
   ACCORDION_STYLE_SPEC,
   TABS_STYLE_SPEC,
@@ -462,6 +479,12 @@ export function componentStyleCssEntries(
 }
 
 export function componentStyleEntriesForElement(element: CanvasElement): Array<[string, string]> {
+  if (element.type === 'action') {
+    return componentStyleCssEntries(
+      ACTION_STYLE_SPEC,
+      element.actionStyle as Record<string, unknown> | undefined,
+    );
+  }
   if (element.type === 'form') {
     return componentStyleCssEntries(
       FORM_STYLE_SPEC,

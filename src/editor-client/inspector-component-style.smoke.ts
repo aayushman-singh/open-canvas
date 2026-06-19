@@ -3,7 +3,8 @@
 // ADR 0067 editor smoke for the generic Component Style inspector mount.
 // Run with `bun run inspector-component-style:smoke`.
 
-import type { TabsElement } from '../canvas/schema.js';
+import type { ActionElement, TabsElement } from '../canvas/schema.js';
+import { actionInspectorSpec } from '../canvas/elements/action.js';
 import { accordionInspectorSpec } from '../canvas/elements/accordion.js';
 import { carouselInspectorSpec } from '../canvas/elements/carousel.js';
 import { formInspectorSpec } from '../canvas/elements/form.js';
@@ -133,6 +134,10 @@ function hasComponentStyleMount(fields: readonly { kind: string; name?: string }
 }
 
 assert(
+  hasComponentStyleMount(actionInspectorSpec.fields),
+  'action inspector spec must expose Component Style',
+);
+assert(
   hasComponentStyleMount(formInspectorSpec.fields),
   'form inspector spec must use the generic component-style mount',
 );
@@ -169,6 +174,17 @@ function makeCtx(): { ctx: Parameters<typeof mountComponentStyle>[0]; log: Rebui
   return { ctx, log };
 }
 
+function makeAction(overrides: Partial<ActionElement> = {}): ActionElement {
+  return {
+    id: 'action-1',
+    type: 'action',
+    box: { x: 0, y: 0, w: 220, h: 64, z: 1 },
+    label: [{ text: 'Race' }],
+    variant: 'solid',
+    href: { type: 'external', url: '#' },
+    ...overrides,
+  } as ActionElement;
+}
 function makeTabs(overrides: Partial<TabsElement> = {}): TabsElement {
   return {
     id: 'tabs-1',
@@ -204,6 +220,29 @@ function control(host: StubNode, key: string): StubNode {
   return found!;
 }
 
+{
+  const action = makeAction({
+    pinnedStyle: { '--opencanvas-action-bg': '#000000' },
+  });
+  const host = makeStubNode('div');
+  const { ctx, log } = makeCtx();
+  mountComponentStyle(ctx, action, host as unknown as HTMLElement);
+
+  const input = control(host, 'backgroundColor');
+  input.value = '#ff5a1f';
+  input.dispatchEvent('input');
+
+  assert(
+    action.actionStyle?.backgroundColor === '#ff5a1f',
+    'typing a color must set actionStyle.backgroundColor',
+  );
+  assert(
+    action.pinnedStyle?.['--opencanvas-action-bg'] === undefined,
+    'setting a modeled action field must remove the conflicting pinnedStyle key',
+  );
+  assert(log.rebuildCalls.join(',') === 'action-1', 'setting an action field must rebuild the element');
+  assert(log.saveCalls === 1, 'setting an action field must schedule one save');
+}
 {
   const tabs = makeTabs({
     pinnedStyle: { '--opencanvas-tabs-active-tab-bg': '#000000' },

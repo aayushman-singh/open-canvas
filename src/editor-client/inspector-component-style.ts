@@ -9,6 +9,7 @@ import { field } from './dom-builders.js';
 import type { CanvasElement } from '../canvas/schema.js';
 import {
   ACCORDION_STYLE_SPEC,
+  ACTION_STYLE_SPEC,
   CAROUSEL_STYLE_SPEC,
   COLLECTION_STYLE_SPEC,
   COMPONENT_STYLE_FONT_WEIGHTS,
@@ -38,6 +39,18 @@ const COMMON_WEIGHT_LABELS: Record<string, string> = {
 };
 
 const STYLE_META: Record<string, Record<string, ComponentStyleMeta>> = {
+  actionStyle: {
+    backgroundColor: { section: 'Button', label: 'Background', swatchDefault: '#111111' },
+    color: { section: 'Button', label: 'Text color', swatchDefault: '#ffffff' },
+    borderRadius: { section: 'Button', label: 'Radius', min: 0, max: 999, placeholder: '8' },
+    shadow: { section: 'Button', label: 'Shadow', placeholder: '0 8px 24px rgba(0,0,0,.2)' },
+    fontFamily: { section: 'Typography', label: 'Font' },
+    fontFamilyCustom: { section: 'Typography', label: 'Custom font', placeholder: 'Inter, system-ui' },
+    fontSize: { section: 'Typography', label: 'Size', min: 8, max: 48, placeholder: 'inherit' },
+    fontWeight: { section: 'Typography', label: 'Weight' },
+    letterSpacing: { section: 'Typography', label: 'Letter spacing', min: 0, max: 20, step: 0.1, placeholder: '0' },
+    iconGap: { section: 'Icon', label: 'Gap', min: 0, max: 64, placeholder: '8' },
+  },
   formStyle: {
     fontFamily: { section: 'Typography', label: 'Font' },
     fontFamilyCustom: { section: 'Typography', label: 'Custom font', placeholder: 'Inter, system-ui' },
@@ -264,6 +277,7 @@ const STYLE_META: Record<string, Record<string, ComponentStyleMeta>> = {
 };
 
 function specForElement(element: CanvasElement): ComponentStyleSpec | null {
+  if (element.type === 'action') return ACTION_STYLE_SPEC;
   if (element.type === 'form') return FORM_STYLE_SPEC;
   if (element.type === 'accordion') return ACCORDION_STYLE_SPEC;
   if (element.type === 'tabs') return TABS_STYLE_SPEC;
@@ -273,6 +287,7 @@ function specForElement(element: CanvasElement): ComponentStyleSpec | null {
 }
 
 function currentVariant(element: CanvasElement): string {
+  if (element.type === 'action') return element.variant;
   if (element.type === 'form') return element.variant ?? 'classic';
   if (element.type === 'accordion') return element.variant ?? 'list';
   if (element.type === 'tabs') return element.variant ?? 'classic';

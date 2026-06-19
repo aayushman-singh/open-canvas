@@ -711,3 +711,9 @@ Intentional deferral: this does not add a 3D helmet viewer or marketplace media 
 Status: addressed for the schema-owned Embed drill-in slice. Embed elements can opt into `drillInEnabled` with an explicit reduced-motion policy; render output emits drill-in metadata and a keyboard-accessible trigger, the Runtime Hydrator opens a controlled fullscreen iframe shell, invalid reduced-motion values fail validation, and the generic inspector exposes the owner controls.
 
 Intentional deferral: this does not reintroduce legacy popup-section click wiring. Owners who need authored overlay content beyond the iframe should use the schema-owned Overlay primitive.
+
+### 20. Component Style Wave 2 — Action Buttons
+
+Status: addressed for the Action button slice. `ActionElement` now owns sparse `actionStyle` fields for modeled button chrome, the generic Component Style inspector exposes the controls, validator gates unknown fields and pinnedStyle conflicts, Yjs preserves the object, agent patches can set it, and style-kit action variants consume the modeled variables so ActionStyle wins without raw CSS.
+
+Intentional deferral: NavStyle, compound padding controls, and modeled border shorthand remain separate slices. This wave deliberately avoids widening pinnedStyle or adding arbitrary owner CSS.
