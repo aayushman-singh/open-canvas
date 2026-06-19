@@ -78,6 +78,7 @@ assert(
   html.includes('data-rich-motion-asset-ref="motion-seq-hero"'),
   'render output must stamp the asset ref id',
 );
+assert(html.includes('data-rich-motion-fit="contain"'), 'render output must stamp fit metadata');
 assert(
   html.includes('data-opencanvas-rich-motion-canvas="motion-hero"'),
   'render output must include the canvas mount',
@@ -124,13 +125,36 @@ assert(
 const unsupportedKindState = structuredClone(goodSnapshot);
 unsupportedKindState.richMotionAssets[0] = {
   ...unsupportedKindState.richMotionAssets[0]!,
-  kind: 'video-loop',
+  kind: 'lottie',
 } as unknown as (typeof unsupportedKindState.richMotionAssets)[number];
 const unsupportedKindValidation = validatePublishedSnapshot(unsupportedKindState);
 assert(!unsupportedKindValidation.valid, 'unsupported rich motion asset kind must fail publish validation');
 assert(
   unsupportedKindValidation.errors.some((error) => error.includes('richMotion.assetRefId-resolves')),
   `unsupported kind publish failure must mention richMotion.assetRefId-resolves, got ${unsupportedKindValidation.valid ? '' : unsupportedKindValidation.errors.join('; ')}`,
+);
+
+const riveState = structuredClone(goodSnapshot);
+riveState.pages[0]!.sections[0]!.elements[0] = {
+  ...riveState.pages[0]!.sections[0]!.elements[0],
+  assetRefId: 'motion-rive-hero',
+} as unknown as typeof richMotionElement;
+(riveState as { richMotionAssets: unknown[] }).richMotionAssets = [
+  {
+    id: 'motion-rive-hero',
+    kind: 'rive',
+    assetId: 'hero.riv',
+    alt: 'Hero Rive state machine',
+    artboard: 'Hero',
+    stateMachine: 'HeroMachine',
+    autoplay: true,
+    reducedMotion: 'pause',
+  },
+];
+const riveValidation = validatePublishedSnapshot(riveState);
+assert(
+  riveValidation.valid,
+  `rive rich-motion snapshot must publish: ${riveValidation.valid ? '' : riveValidation.errors.join('; ')}`,
 );
 
 assert(
@@ -176,6 +200,10 @@ const bodyBuilderSource = readFileSync(
 assert(
   bodyBuilderSource.includes("case 'rich-motion':"),
   'editor body builder switch must handle rich-motion',
+);
+assert(
+  bodyBuilderSource.includes("data-rich-motion-fit', element.fit"),
+  'editor rich-motion body must stamp fit metadata',
 );
 
 const yjsState = {

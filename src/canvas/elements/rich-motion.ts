@@ -17,7 +17,7 @@ export function renderRichMotion(element: RichMotionElement): string {
     ['height', '100%'],
     ['display', 'block'],
   ]);
-  return `<div class="opencanvas-rich-motion" data-opencanvas-rich-motion="${escapeAttr(element.id)}" data-rich-motion-asset-ref="${escapeAttr(element.assetRefId)}" aria-label="${escapeAttr(element.label)}" style="${style}"><canvas data-opencanvas-rich-motion-canvas="${escapeAttr(element.id)}" style="${style}"></canvas></div>`;
+  return `<div class="opencanvas-rich-motion" data-opencanvas-rich-motion="${escapeAttr(element.id)}" data-rich-motion-asset-ref="${escapeAttr(element.assetRefId)}" data-rich-motion-fit="${escapeAttr(element.fit)}" aria-label="${escapeAttr(element.label)}" style="${style}"><canvas data-opencanvas-rich-motion-canvas="${escapeAttr(element.id)}" style="${style}"></canvas></div>`;
 }
 
 export const richMotionInspectorSpec: InspectorSpec = {

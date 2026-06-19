@@ -14,7 +14,7 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'clipPath',
   'filter',
 ] as const;
-export const RICH_MOTION_KINDS = ['image-sequence'] as const;
+export const RICH_MOTION_KINDS = ['image-sequence', 'rive'] as const;
 
 export type BehaviourTarget =
   | { type: 'site' }
@@ -67,7 +67,18 @@ export interface ImageSequenceRichMotionAsset {
   };
 }
 
-export type RichMotionAsset = ImageSequenceRichMotionAsset;
+export interface RiveRichMotionAsset {
+  id: string;
+  kind: 'rive';
+  assetId: string;
+  alt: string;
+  artboard?: string;
+  stateMachine?: string;
+  autoplay?: boolean;
+  reducedMotion: 'pause' | 'play';
+}
+
+export type RichMotionAsset = ImageSequenceRichMotionAsset | RiveRichMotionAsset;
 
 export interface LoadExperience {
   id: string;

@@ -339,6 +339,67 @@ function behaviourHydrateImageSequence(asset, root, payload) {
   }
 }
 
+var behaviourRiveRuntimePromise = null;
+var behaviourRiveRuntimeUrl = 'https://unpkg.com/@rive-app/canvas@2.38.1/rive.js';
+function behaviourLoadRiveRuntime() {
+  if (typeof window !== 'undefined' && window.rive && typeof window.rive.Rive === 'function') {
+    return Promise.resolve(window.rive);
+  }
+  if (behaviourRiveRuntimePromise) return behaviourRiveRuntimePromise;
+  behaviourRiveRuntimePromise = new Promise(function (resolve, reject) {
+    var script = document.createElement('script');
+    script.src = behaviourRiveRuntimeUrl;
+    script.async = true;
+    script.onload = function () {
+      if (window.rive && typeof window.rive.Rive === 'function') {
+        resolve(window.rive);
+      } else {
+        reject(new Error('Rive runtime loaded without window.rive.Rive'));
+      }
+    };
+    script.onerror = function () {
+      reject(new Error('Rive runtime failed to load'));
+    };
+    document.head.appendChild(script);
+  });
+  return behaviourRiveRuntimePromise;
+}
+
+function behaviourHydrateRive(asset, root) {
+  if (!asset.srcUrl) {
+    behaviourFailure('rich-motion-rive-src-missing', { assetId: asset.id }, new Error('Rive asset srcUrl missing'));
+  }
+  var nodes = behaviourFindRichMotionNodes(root, asset.id);
+  if (!nodes.length) {
+    behaviourFailure('rich-motion-node-missing', { assetId: asset.id }, new Error('rich motion element not found'));
+  }
+  behaviourLoadRiveRuntime().then(function (riveRuntime) {
+    for (var n = 0; n < nodes.length; n++) {
+      var node = nodes[n];
+      if (node.getAttribute('data-opencanvas-rive-hydrated') === 'true') continue;
+      var canvas = behaviourFindRichMotionCanvas(node);
+      var reduced = behaviourPrefersReducedMotion() && asset.reducedMotion === 'pause';
+      try {
+        var options = {
+          src: asset.srcUrl,
+          canvas: canvas,
+          autoplay: reduced ? false : asset.autoplay !== false
+        };
+        if (asset.artboard) options.artboard = asset.artboard;
+        if (asset.stateMachine) options.stateMachines = asset.stateMachine;
+        var instance = new riveRuntime.Rive(options);
+        node.__opencanvasRive = instance;
+        if (reduced) node.setAttribute('data-opencanvas-rive-reduced', 'pause');
+        node.setAttribute('data-opencanvas-rive-hydrated', 'true');
+      } catch (err) {
+        behaviourFailure('rich-motion-rive-init', { assetId: asset.id }, err || new Error('Rive init failed'));
+      }
+    }
+  }).catch(function (err) {
+    behaviourFailure('rich-motion-rive-runtime', { assetId: asset.id, runtimeUrl: behaviourRiveRuntimeUrl }, err || new Error('Rive runtime unavailable'));
+  });
+}
+
 function behaviourDrawFrame(canvas, image, fit) {
   var ctx = canvas.getContext('2d');
   if (!ctx) {
@@ -468,7 +529,13 @@ function hydrateBehaviour(scope) {
   }
   var assets = payload.richMotionAssets || [];
   for (var a = 0; a < assets.length; a++) {
-    behaviourHydrateImageSequence(assets[a], root, payload);
+    if (assets[a].kind === 'image-sequence') {
+      behaviourHydrateImageSequence(assets[a], root, payload);
+    } else if (assets[a].kind === 'rive') {
+      behaviourHydrateRive(assets[a], root);
+    } else {
+      behaviourFailure('rich-motion-unsupported-kind', { assetId: assets[a].id, kind: assets[a].kind }, new Error('unsupported rich motion kind'));
+    }
   }
   if (root === document) document.documentElement.setAttribute('data-opencanvas-behaviour-hydrated', 'true');
 }

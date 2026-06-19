@@ -9,7 +9,7 @@ export interface BehaviourPayload {
   loadExperience?: LoadExperience;
   motionSequences: MotionSequence[];
   scrollScenes: ScrollScene[];
-  richMotionAssets: Array<RichMotionAsset & { frameUrls?: string[]; posterUrl?: string }>;
+  richMotionAssets: Array<RichMotionAsset & { frameUrls?: string[]; posterUrl?: string; srcUrl?: string }>;
 }
 
 export function snapshotHasBehaviourPrimitives(snapshot: {
@@ -41,6 +41,12 @@ export function buildBehaviourPayload(
         ...asset,
         frameUrls: asset.frameAssetIds.map((id) => `${assetBasePath}/${id}`),
         posterUrl: `${assetBasePath}/${asset.posterAssetId}`,
+      };
+    }
+    if (asset.kind === 'rive') {
+      return {
+        ...asset,
+        srcUrl: `${assetBasePath}/${asset.assetId}`,
       };
     }
     return asset;

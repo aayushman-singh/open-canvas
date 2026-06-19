@@ -2864,46 +2864,69 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           );
         }
         if (!assertOneOf(asset.kind, RICH_MOTION_KINDS, `${assetPath}.kind`, errors)) return;
-        if (!Array.isArray(asset.frameAssetIds) || asset.frameAssetIds.length < 2) {
-          errors.push(`${assetPath}.frameAssetIds must be an array with length >= 2`);
-        } else {
-          asset.frameAssetIds.forEach((frameAssetId, frameIdx) => {
-            if (!isAssetIdLike(frameAssetId)) {
+        if (asset.kind === 'image-sequence') {
+          if (!Array.isArray(asset.frameAssetIds) || asset.frameAssetIds.length < 2) {
+            errors.push(`${assetPath}.frameAssetIds must be an array with length >= 2`);
+          } else {
+            asset.frameAssetIds.forEach((frameAssetId, frameIdx) => {
+              if (!isAssetIdLike(frameAssetId)) {
+                errors.push(
+                  `${assetPath}.frameAssetIds[${String(frameIdx)}] must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(frameAssetId)})`,
+                );
+              }
+            });
+          }
+          assertNonEmptyString(asset.posterAssetId, `${assetPath}.posterAssetId`, errors);
+          assertNonEmptyString(asset.alt, `${assetPath}.alt`, errors);
+          if (!isRecord(asset.playback)) {
+            errors.push(`${assetPath}.playback must be an object`);
+          } else {
+            if (asset.playback.driver !== 'load' && asset.playback.driver !== 'scroll-scene') {
               errors.push(
-                `${assetPath}.frameAssetIds[${String(frameIdx)}] must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(frameAssetId)})`,
+                `${assetPath}.playback.driver must be "load" or "scroll-scene" (got ${describe(asset.playback.driver)})`,
               );
             }
-          });
+            if (asset.playback.fps !== undefined) {
+              if (!isFiniteNumber(asset.playback.fps) || asset.playback.fps <= 0) {
+                errors.push(
+                  `${assetPath}.playback.fps must be a finite number > 0 when present (got ${describe(asset.playback.fps)})`,
+                );
+              }
+            }
+            if (asset.playback.loop !== undefined && typeof asset.playback.loop !== 'boolean') {
+              errors.push(
+                `${assetPath}.playback.loop must be a boolean when present (got ${describe(asset.playback.loop)})`,
+              );
+            }
+            if (asset.playback.driver === 'scroll-scene') {
+              assertNonEmptyString(
+                asset.playback.scrollSceneId,
+                `${assetPath}.playback.scrollSceneId`,
+                errors,
+              );
+            }
+          }
+          return;
         }
-        assertNonEmptyString(asset.posterAssetId, `${assetPath}.posterAssetId`, errors);
+        if (!isAssetIdLike(asset.assetId)) {
+          errors.push(
+            `${assetPath}.assetId must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(asset.assetId)})`,
+          );
+        }
         assertNonEmptyString(asset.alt, `${assetPath}.alt`, errors);
-        if (!isRecord(asset.playback)) {
-          errors.push(`${assetPath}.playback must be an object`);
-        } else {
-          if (asset.playback.driver !== 'load' && asset.playback.driver !== 'scroll-scene') {
-            errors.push(
-              `${assetPath}.playback.driver must be "load" or "scroll-scene" (got ${describe(asset.playback.driver)})`,
-            );
-          }
-          if (asset.playback.fps !== undefined) {
-            if (!isFiniteNumber(asset.playback.fps) || asset.playback.fps <= 0) {
-              errors.push(
-                `${assetPath}.playback.fps must be a finite number > 0 when present (got ${describe(asset.playback.fps)})`,
-              );
-            }
-          }
-          if (asset.playback.loop !== undefined && typeof asset.playback.loop !== 'boolean') {
-            errors.push(
-              `${assetPath}.playback.loop must be a boolean when present (got ${describe(asset.playback.loop)})`,
-            );
-          }
-          if (asset.playback.driver === 'scroll-scene') {
-            assertNonEmptyString(
-              asset.playback.scrollSceneId,
-              `${assetPath}.playback.scrollSceneId`,
-              errors,
-            );
-          }
+        if (asset.artboard !== undefined) {
+          assertNonEmptyString(asset.artboard, `${assetPath}.artboard`, errors);
+        }
+        if (asset.stateMachine !== undefined) {
+          assertNonEmptyString(asset.stateMachine, `${assetPath}.stateMachine`, errors);
+        }
+        if (asset.autoplay !== undefined && typeof asset.autoplay !== 'boolean') {
+          errors.push(`${assetPath}.autoplay must be a boolean when present`);
+        }
+        if (asset.reducedMotion !== 'pause' && asset.reducedMotion !== 'play') {
+          errors.push(
+            `${assetPath}.reducedMotion must be "pause" or "play" (got ${describe(asset.reducedMotion)})`,
+          );
         }
       });
     }
@@ -3327,7 +3350,7 @@ function validatePublishedRichMotionReferencesInElement(
       );
       return;
     }
-    if (asset.kind !== 'image-sequence') {
+    if (asset.kind !== 'image-sequence' && asset.kind !== 'rive') {
       errors.push(
         `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: ${asset.path}.kind ${JSON.stringify(asset.kind)} is not supported for published rich-motion elements`,
       );

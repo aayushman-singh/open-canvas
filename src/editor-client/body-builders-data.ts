@@ -991,6 +991,7 @@ export function buildRichMotionBodyImpl(
   node.className = 'opencanvas-rich-motion';
   node.setAttribute('data-opencanvas-rich-motion-editor', element.id);
   node.setAttribute('data-rich-motion-asset-ref', element.assetRefId);
+  node.setAttribute('data-rich-motion-fit', element.fit);
   node.setAttribute('aria-label', element.label);
   node.style.width = '100%';
   node.style.height = '100%';
