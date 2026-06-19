@@ -567,11 +567,24 @@ function hydratePointerFx(scope: ParentNode, options: HydrateOptions = {}): void
         el.style.setProperty('--opencanvas-cursor-follow-x', '0px');
         el.style.setProperty('--opencanvas-cursor-follow-y', '0px');
       });
+    } else if (primitive === 'pointer-parallax') {
+      el.addEventListener('pointermove', (ev: PointerEvent): void => {
+        const r = el.getBoundingClientRect();
+        if (!(r.width > 0) || !(r.height > 0)) return;
+        const nx = (ev.clientX - r.left) / r.width - 0.5;
+        const ny = (ev.clientY - r.top) / r.height - 0.5;
+        el.style.setProperty('--opencanvas-parallax-x', (nx * -18).toFixed(2) + 'px');
+        el.style.setProperty('--opencanvas-parallax-y', (ny * -18).toFixed(2) + 'px');
+      });
+      el.addEventListener('pointerleave', (): void => {
+        el.style.setProperty('--opencanvas-parallax-x', '0px');
+        el.style.setProperty('--opencanvas-parallax-y', '0px');
+      });
     } else {
       failPointerFx(
         el,
         'invalid-primitive',
-        'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, or reveal-mask',
+        'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, or pointer-parallax',
         primitive,
       );
     }

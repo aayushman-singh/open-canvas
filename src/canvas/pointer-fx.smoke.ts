@@ -67,6 +67,17 @@ function makeSite(): EditableSite {
                   reducedMotion: 'disabled',
                 },
               },
+              {
+                id: 'pointer-parallax-card',
+                type: 'container',
+                variant: 'glass',
+                box: { x: 120, y: 300, w: 180, h: 64, z: 5 },
+                pointerFx: {
+                  enabled: true,
+                  primitive: 'pointer-parallax',
+                  reducedMotion: 'disabled',
+                },
+              },
             ],
           },
         ],
@@ -96,6 +107,10 @@ assert(
   decoded.pages[0]?.sections[0]?.elements[3]?.pointerFx?.primitive === 'reveal-mask',
   'Yjs projection must preserve reveal-mask pointerFx config',
 );
+assert(
+  decoded.pages[0]?.sections[0]?.elements[4]?.pointerFx?.primitive === 'pointer-parallax',
+  'Yjs projection must preserve pointer-parallax pointerFx config',
+);
 
 const snapshot: PublishedSnapshot = {
   ...site,
@@ -120,6 +135,10 @@ assert(
 assert(
   html.includes('data-opencanvas-pointer-fx="reveal-mask"'),
   'renderer must emit reveal-mask pointer-fx primitive',
+);
+assert(
+  html.includes('data-opencanvas-pointer-fx="pointer-parallax"'),
+  'renderer must emit pointer-parallax pointer-fx primitive',
 );
 assert(
   html.includes('data-opencanvas-pointer-fx-reduced-motion="disabled"'),

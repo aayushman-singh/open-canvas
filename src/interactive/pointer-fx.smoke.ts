@@ -204,6 +204,24 @@ const hydratePointerFx = makeHydratePointerFx();
   assert(el.props['--opencanvas-reveal-y'] === '50%', 'pointerleave recentres reveal-mask y to 50%');
 }
 
+// -- 2f. pointer-parallax publishes --opencanvas-parallax-x/y -----------------
+{
+  const el = makeStub('pointer-parallax', { left: 0, top: 0, width: 200, height: 100 });
+  hydratePointerFx({ querySelectorAll: () => [el] });
+  el.listeners['pointermove']![0]!({ clientX: 200, clientY: 100 }); // bottom-right
+  assert(
+    el.props['--opencanvas-parallax-x'] === '-9.00px',
+    `parallax-x right edge should be -9px; got ${el.props['--opencanvas-parallax-x']}`,
+  );
+  assert(
+    el.props['--opencanvas-parallax-y'] === '-9.00px',
+    `parallax-y bottom edge should be -9px; got ${el.props['--opencanvas-parallax-y']}`,
+  );
+  el.listeners['pointerleave']![0]!({ clientX: 0, clientY: 0 });
+  assert(el.props['--opencanvas-parallax-x'] === '0px', 'pointerleave recentres parallax-x to 0px');
+  assert(el.props['--opencanvas-parallax-y'] === '0px', 'pointerleave recentres parallax-y to 0px');
+}
+
 // -- 3. idempotence: re-run does not double-wire -----------------------------
 {
   const el = makeStub('spotlight', { left: 0, top: 0, width: 200, height: 100 });

@@ -1125,7 +1125,8 @@ const variantCss = String.raw`
    tilt publishes --opencanvas-tilt-x/y, applied generically here;
    magnetic publishes --opencanvas-magnetic-x/y, applied generically here;
    cursor-follow publishes --opencanvas-cursor-follow-x/y, applied here;
-   reveal-mask publishes --opencanvas-reveal-x/y, applied here. */
+   reveal-mask publishes --opencanvas-reveal-x/y, applied here;
+   pointer-parallax publishes --opencanvas-parallax-x/y, applied here. */
 .opencanvas-element[data-opencanvas-pointer-fx="spotlight"]::before {
   content: "";
   position: absolute;
@@ -1173,6 +1174,16 @@ const variantCss = String.raw`
     0
   );
   transition: transform 90ms linear;
+  will-change: transform;
+}
+
+[data-opencanvas-pointer-fx="pointer-parallax"] {
+  transform: translate3d(
+    var(--opencanvas-parallax-x, 0px),
+    var(--opencanvas-parallax-y, 0px),
+    0
+  );
+  transition: transform 180ms ease-out;
   will-change: transform;
 }
 

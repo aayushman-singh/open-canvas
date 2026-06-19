@@ -39,6 +39,8 @@ const POINTER_FX_TOKENS = [
   '--opencanvas-cursor-follow-y',
   '--opencanvas-reveal-x',
   '--opencanvas-reveal-y',
+  '--opencanvas-parallax-x',
+  '--opencanvas-parallax-y',
   'data-opencanvas-pointer-fx',
   'data-opencanvas-pfx-hydrated',
   'spotlight',
@@ -46,6 +48,7 @@ const POINTER_FX_TOKENS = [
   'magnetic',
   'cursor-follow',
   'reveal-mask',
+  'pointer-parallax',
 ];
 
 for (const token of POINTER_FX_TOKENS) {
@@ -88,6 +91,13 @@ assert(
 assert(
   visitorPointerFx.includes('* 96') && editorMirror.includes('* 96'),
   'cursor-follow attraction factor (96) must match between visitor fragment and editor mirror',
+);
+
+// Pointer parallax moves opposite the pointer at a bounded distance; the
+// factor must match between editor preview and published runtime.
+assert(
+  visitorPointerFx.includes('* -18') && editorMirror.includes('* -18'),
+  'pointer-parallax factor (-18) must match between visitor fragment and editor mirror',
 );
 
 console.log('[variant-parity:smoke] OK');

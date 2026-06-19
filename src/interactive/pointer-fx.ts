@@ -25,6 +25,9 @@
 //   - `reveal-mask` — publishes `--opencanvas-reveal-x` /
 //     `--opencanvas-reveal-y` as percentages of the element box. CSS owns the
 //     clip-path reveal; the runtime only publishes pointer state.
+//   - `pointer-parallax` — publishes `--opencanvas-parallax-x` /
+//     `--opencanvas-parallax-y` as small inverse px translations from centre.
+//     CSS owns the transform; the runtime only publishes pointer state.
 //
 // Scroll / entrance motion is deliberately NOT here — that stays with the
 // existing `motion.preset` + `data-scroll-trigger` system (ADR dec 4).
@@ -140,8 +143,21 @@ function hydratePointerFx(scope, options) {
           el.style.setProperty('--opencanvas-cursor-follow-x', '0px');
           el.style.setProperty('--opencanvas-cursor-follow-y', '0px');
         });
+      } else if (primitive === 'pointer-parallax') {
+        el.addEventListener('pointermove', function (ev) {
+          var r = el.getBoundingClientRect();
+          if (!(r.width > 0) || !(r.height > 0)) return;
+          var nx = (ev.clientX - r.left) / r.width - 0.5;
+          var ny = (ev.clientY - r.top) / r.height - 0.5;
+          el.style.setProperty('--opencanvas-parallax-x', (nx * -18).toFixed(2) + 'px');
+          el.style.setProperty('--opencanvas-parallax-y', (ny * -18).toFixed(2) + 'px');
+        });
+        el.addEventListener('pointerleave', function () {
+          el.style.setProperty('--opencanvas-parallax-x', '0px');
+          el.style.setProperty('--opencanvas-parallax-y', '0px');
+        });
       } else {
-        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, or reveal-mask', primitive);
+        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, or pointer-parallax', primitive);
       }
     })(nodes[i]);
   }
