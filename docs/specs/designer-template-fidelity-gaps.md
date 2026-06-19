@@ -486,26 +486,34 @@ Current state:
   and bounded `model-3d` GLB scenes. Rive/Lottie/3D support is schema-owned
   and runtime-owned: no owner JS blobs, with explicit runtime loading/init
   failures and reduced-motion policy.
+- **June 2026 update:** Rive assets can now carry schema-owned state-machine
+  input bindings for pointer enter/leave, focus/blur, click, and scroll
+  progress. Validation rejects impossible input/event relations, Yjs preserves
+  the bindings, the behaviour payload serializes them, and the Runtime
+  Hydrator fails through named Rive input errors when the state machine,
+  input, type, API, or scroll target cannot resolve.
 
 User-visible miss:
 
-- Cannot reproduce common designer-site surfaces such as Lottie/Rive
+- Can now reproduce basic Lottie/Rive/model surfaces plus Rive button and
+  scroll-progress state-machine control when the underlying asset exposes the
+  named inputs.
 - Cannot yet reproduce arbitrary WebGL/Three.js scenes, shader distortion,
   Spline-like embeds as editable first-class media, or canvas-based particle
   fields.
 - `model-3d` covers bounded GLB-style product/helmet scenes, not custom shader
   pipelines or owner-authored Three.js code.
-- Rive state-machine inputs are not yet editable; v1 can choose artboard and
-  state-machine name, autoplay, and reduced-motion policy.
+- Rive input bindings are schema/runtime-owned, but rich-motion asset upload
+  and binding management still need dedicated editor asset-picker UI.
 
 Needed primitive:
 
 - A deliberate media-extension decision. Do not add arbitrary "animation file"
   blobs without defining asset type, playback controls, CSP, editor preview,
   reduced-motion handling, and publish-time failure behaviour.
-- Remaining next wave: Rive input bindings, Rive/Lottie/model events, custom
-  shader/WebGL scene kind, CSP policy hardening, and editor asset picker
-  support for uploading/managing rich motion assets.
+- Remaining next wave: rich-motion asset picker/editor UI, Rive/Lottie/model
+  events, custom shader/WebGL scene kind, CSP policy hardening, and upload /
+  management support for rich motion assets.
 
 ### 12. Import Collapses Source Motion Too Aggressively
 

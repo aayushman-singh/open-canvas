@@ -15,6 +15,15 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'filter',
 ] as const;
 export const RICH_MOTION_KINDS = ['image-sequence', 'rive', 'lottie', 'model-3d'] as const;
+export const RIVE_INPUT_TYPES = ['boolean', 'number', 'trigger'] as const;
+export const RIVE_INPUT_EVENTS = [
+  'pointer-enter',
+  'pointer-leave',
+  'focus',
+  'blur',
+  'click',
+  'scroll-progress',
+] as const;
 export const LAYOUT_TRANSITION_INITIAL_STATES = ['source', 'target'] as const;
 export const LAYOUT_TRANSITION_REDUCED_MOTION_MODES = ['instant', 'allow'] as const;
 
@@ -78,7 +87,37 @@ export interface RiveRichMotionAsset {
   stateMachine?: string;
   autoplay?: boolean;
   reducedMotion: 'pause' | 'play';
+  inputs?: RiveInputBinding[];
 }
+
+export type RiveInputBinding =
+  | {
+      id: string;
+      inputName: string;
+      inputType: 'boolean';
+      event: Exclude<(typeof RIVE_INPUT_EVENTS)[number], 'scroll-progress'>;
+      value: boolean;
+    }
+  | {
+      id: string;
+      inputName: string;
+      inputType: 'number';
+      event: Exclude<(typeof RIVE_INPUT_EVENTS)[number], 'scroll-progress'>;
+      value: number;
+    }
+  | {
+      id: string;
+      inputName: string;
+      inputType: 'trigger';
+      event: Exclude<(typeof RIVE_INPUT_EVENTS)[number], 'scroll-progress'>;
+    }
+  | {
+      id: string;
+      inputName: string;
+      inputType: 'number';
+      event: 'scroll-progress';
+      scrollSceneId: string;
+    };
 
 export interface LottieRichMotionAsset {
   id: string;

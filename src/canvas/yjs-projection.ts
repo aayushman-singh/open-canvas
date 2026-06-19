@@ -32,6 +32,7 @@
 //   'routeTransition'? -> Y.Map<unknown>             (RouteTransition)
 //   'motionSequences'? -> Y.Array<Y.Map<unknown>>    (MotionSequence[])
 //   'scrollScenes'?    -> Y.Array<Y.Map<unknown>>    (ScrollScene[])
+//   'richMotionAssets'? -> Y.Array<Y.Map<unknown>>   (RichMotionAsset[])
 //   'pages'            -> Y.Array<Y.Map<unknown>>    (CanvasPage[])
 //
 // Each CanvasPage Y.Map:
@@ -1079,6 +1080,9 @@ export function encodeYDoc(state: EditableSite): Y.Doc {
     if (state.layoutTransitions !== undefined) {
       root.set('layoutTransitions', encodeJsonValue(state.layoutTransitions));
     }
+    if (state.richMotionAssets !== undefined) {
+      root.set('richMotionAssets', encodeJsonValue(state.richMotionAssets));
+    }
     if (state.importAnimationInventory !== undefined) {
       root.set('importAnimationInventory', encodeJsonValue(state.importAnimationInventory));
     }
@@ -2005,6 +2009,11 @@ export function decodeYDoc(doc: Y.Doc): EditableSite {
     state.layoutTransitions = decodeJsonValue(
       root.get('layoutTransitions'),
     ) as NonNullable<EditableSite['layoutTransitions']>;
+  }
+  if (root.has('richMotionAssets')) {
+    state.richMotionAssets = decodeJsonValue(
+      root.get('richMotionAssets'),
+    ) as NonNullable<EditableSite['richMotionAssets']>;
   }
   if (root.has('importAnimationInventory')) {
     state.importAnimationInventory = decodeJsonValue(

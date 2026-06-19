@@ -58,6 +58,8 @@ import {
   MOTION_SEQUENCE_PROPERTIES,
   MOTION_SEQUENCE_TRIGGER_TYPES,
   RICH_MOTION_KINDS,
+  RIVE_INPUT_EVENTS,
+  RIVE_INPUT_TYPES,
   TEXT_SPLIT_UNITS,
 } from './behaviour-primitives.js';
 
@@ -3154,6 +3156,80 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
             errors.push(
               `${assetPath}.reducedMotion must be "pause" or "play" (got ${describe(asset.reducedMotion)})`,
             );
+          }
+          if (asset.inputs !== undefined) {
+            if (!Array.isArray(asset.inputs)) {
+              errors.push(`${assetPath}.inputs must be an array when present`);
+            } else {
+              if (!assertNonEmptyString(asset.stateMachine, `${assetPath}.stateMachine`, errors)) {
+                errors.push(`${assetPath}.inputs requires ${assetPath}.stateMachine`);
+              }
+              const knownInputBindingIds = new Set<string>();
+              asset.inputs.forEach((binding, bindingIdx) => {
+                const bindingPath = `${assetPath}.inputs[${String(bindingIdx)}]`;
+                if (!isRecord(binding)) {
+                  errors.push(`${bindingPath} must be an object`);
+                  return;
+                }
+                if (assertNonEmptyString(binding.id, `${bindingPath}.id`, errors)) {
+                  assertUnique(
+                    binding.id,
+                    knownInputBindingIds,
+                    `${bindingPath}.id`,
+                    `within ${assetPath}.inputs`,
+                    errors,
+                  );
+                }
+                assertNonEmptyString(binding.inputName, `${bindingPath}.inputName`, errors);
+                const validInputType = assertOneOf(
+                  binding.inputType,
+                  RIVE_INPUT_TYPES,
+                  `${bindingPath}.inputType`,
+                  errors,
+                );
+                const validEvent = assertOneOf(
+                  binding.event,
+                  RIVE_INPUT_EVENTS,
+                  `${bindingPath}.event`,
+                  errors,
+                );
+                if (!validInputType || !validEvent) return;
+                if (binding.event === 'scroll-progress') {
+                  if (binding.inputType !== 'number') {
+                    errors.push(
+                      `${bindingPath}.inputType must be "number" when event is "scroll-progress" (got ${describe(binding.inputType)})`,
+                    );
+                  }
+                  if (assertNonEmptyString(binding.scrollSceneId, `${bindingPath}.scrollSceneId`, errors)) {
+                    if (!knownScrollSceneIds.has(binding.scrollSceneId)) {
+                      errors.push(
+                        `${bindingPath}.scrollSceneId "${binding.scrollSceneId}" must reference an existing scroll scene`,
+                      );
+                    }
+                  }
+                  if ('value' in binding) {
+                    errors.push(`${bindingPath}.value is not allowed for scroll-progress bindings`);
+                  }
+                } else {
+                  if ('scrollSceneId' in binding) {
+                    errors.push(`${bindingPath}.scrollSceneId is only allowed for scroll-progress bindings`);
+                  }
+                  if (binding.inputType === 'boolean' && typeof binding.value !== 'boolean') {
+                    errors.push(
+                      `${bindingPath}.value must be a boolean for boolean Rive input bindings (got ${describe(binding.value)})`,
+                    );
+                  }
+                  if (binding.inputType === 'number' && !isFiniteNumber(binding.value)) {
+                    errors.push(
+                      `${bindingPath}.value must be a finite number for number Rive input bindings (got ${describe(binding.value)})`,
+                    );
+                  }
+                  if (binding.inputType === 'trigger' && 'value' in binding) {
+                    errors.push(`${bindingPath}.value is not allowed for trigger Rive input bindings`);
+                  }
+                }
+              });
+            }
           }
           return;
         }

@@ -149,12 +149,74 @@ riveState.pages[0]!.sections[0]!.elements[0] = {
     stateMachine: 'HeroMachine',
     autoplay: true,
     reducedMotion: 'pause',
+    inputs: [
+      {
+        id: 'hover-on',
+        inputName: 'isHovered',
+        inputType: 'boolean',
+        event: 'pointer-enter',
+        value: true,
+      },
+      {
+        id: 'scroll-progress',
+        inputName: 'scrollProgress',
+        inputType: 'number',
+        event: 'scroll-progress',
+        scrollSceneId: 'hero-scroll',
+      },
+      {
+        id: 'activate',
+        inputName: 'activate',
+        inputType: 'trigger',
+        event: 'click',
+      },
+    ],
+  },
+];
+(riveState as unknown as { motionSequences: unknown[] }).motionSequences = [
+  {
+    id: 'hero-scroll-sequence',
+    trigger: { type: 'scroll-scene', scrollSceneId: 'hero-scroll' },
+    steps: [
+      {
+        id: 'hero-scroll-step',
+        target: { type: 'element', elementId: 'motion-hero' },
+        to: { opacity: 1 },
+        durationMs: 1,
+      },
+    ],
+  },
+];
+(riveState as unknown as { scrollScenes: unknown[] }).scrollScenes = [
+  {
+    id: 'hero-scroll',
+    sectionId: 'section-hero',
+    sequenceId: 'hero-scroll-sequence',
+    pinTarget: { type: 'section', sectionId: 'section-hero' },
+    startOffsetPx: 0,
+    endOffsetPx: 720,
   },
 ];
 const riveValidation = validatePublishedSnapshot(riveState);
 assert(
   riveValidation.valid,
   `rive rich-motion snapshot must publish: ${riveValidation.valid ? '' : riveValidation.errors.join('; ')}`,
+);
+
+const invalidRiveInputState = structuredClone(riveState);
+(
+  (
+    invalidRiveInputState as unknown as {
+      richMotionAssets: Array<{ inputs: Array<Record<string, unknown>> }>;
+    }
+  )
+    .richMotionAssets[0]!.inputs[1]!
+).inputType = 'boolean';
+const invalidRiveInputValidation = validatePublishedSnapshot(invalidRiveInputState);
+assert(!invalidRiveInputValidation.valid, 'scroll-progress Rive input binding must reject non-number inputs');
+assert(
+  invalidRiveInputValidation.errors.some((error) => error.includes('richMotionAssets[0].inputs[1].inputType')),
+  `invalid Rive input failure must mention inputType, got ${invalidRiveInputValidation.valid ? '' : invalidRiveInputValidation.errors.join('; ')}`,
 );
 
 const lottieState = structuredClone(goodSnapshot);

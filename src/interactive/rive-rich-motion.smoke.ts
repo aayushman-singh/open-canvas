@@ -22,6 +22,28 @@ const snapshot: PublishedSnapshot = {
       stateMachine: 'HeroMachine',
       autoplay: true,
       reducedMotion: 'pause',
+      inputs: [
+        {
+          id: 'hover-on',
+          inputName: 'isHovered',
+          inputType: 'boolean',
+          event: 'pointer-enter',
+          value: true,
+        },
+        {
+          id: 'scroll-progress',
+          inputName: 'scrollProgress',
+          inputType: 'number',
+          event: 'scroll-progress',
+          scrollSceneId: 'hero-scroll',
+        },
+        {
+          id: 'activate',
+          inputName: 'activate',
+          inputType: 'trigger',
+          event: 'click',
+        },
+      ],
     },
   ],
   pages: [
@@ -54,13 +76,16 @@ const snapshot: PublishedSnapshot = {
 
 const payload = buildBehaviourPayload(snapshot, '/assets');
 assert(payload !== null, 'rive rich motion must build a behaviour payload');
-const riveAsset = payload.richMotionAssets[0] as { kind: string; srcUrl?: string };
+const riveAsset = payload.richMotionAssets[0] as { kind: string; srcUrl?: string; inputs?: unknown[] };
 assert(riveAsset.kind === 'rive', 'payload must preserve rive kind');
 assert(riveAsset.srcUrl === '/assets/hero.riv', 'payload must resolve rive asset URL');
+assert(Array.isArray(riveAsset.inputs) && riveAsset.inputs.length === 3, 'payload must preserve Rive input bindings');
 
 const payloadJson = serializeBehaviourPayload(payload);
 assert(payloadJson.includes('"kind":"rive"'), 'serialized payload must include rive kind');
 assert(payloadJson.includes('"srcUrl":"/assets/hero.riv"'), 'serialized payload must include rive src URL');
+assert(payloadJson.includes('"inputName":"isHovered"'), 'serialized payload must include Rive input names');
+assert(payloadJson.includes('"event":"scroll-progress"'), 'serialized payload must include Rive input events');
 
 assert(snapshotNeedsInteractiveRuntime(snapshot), 'rive rich motion must request interactive runtime');
 const html = renderCanvasSnapshot(snapshot, '/assets', 'site-rive', {
@@ -74,6 +99,8 @@ assert(
 
 assert(BEHAVIOUR_RUNTIME_SRC.includes('@rive-app/canvas@2.38.1'), 'runtime must pin Rive canvas runtime URL');
 assert(BEHAVIOUR_RUNTIME_SRC.includes('function behaviourHydrateRive'), 'runtime must include Rive hydrator');
+assert(BEHAVIOUR_RUNTIME_SRC.includes('function behaviourBindRiveInputs'), 'runtime must include Rive input binding hydrator');
+assert(BEHAVIOUR_RUNTIME_SRC.includes('stateMachineInputs'), 'runtime must call the Rive state machine input API');
 assert(
   BEHAVIOUR_RUNTIME_SRC.includes('rich-motion-rive-runtime'),
   'runtime must fail loudly when Rive runtime cannot load',
@@ -81,6 +108,10 @@ assert(
 assert(
   BEHAVIOUR_RUNTIME_SRC.includes('rich-motion-rive-init'),
   'runtime must fail loudly when Rive init fails',
+);
+assert(
+  BEHAVIOUR_RUNTIME_SRC.includes('rich-motion-rive-input-missing'),
+  'runtime must fail loudly when a Rive input binding cannot resolve',
 );
 assert(
   BEHAVIOUR_RUNTIME_SRC.includes("asset.reducedMotion === 'pause'"),

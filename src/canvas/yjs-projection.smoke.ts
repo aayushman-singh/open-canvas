@@ -118,9 +118,9 @@ const syntheticElements: CanvasElement[] = [
     id: 'el-rich-motion',
     type: 'rich-motion',
     box: { x: 220, y: 50, w: 240, h: 240, z: 2 },
-    assetRefId: 'motion-seq-synthetic',
+    assetRefId: 'motion-rive-synthetic',
     fit: 'contain',
-    label: 'Synthetic motion sequence',
+    label: 'Synthetic Rive controls',
   },
   {
     id: 'el-action',
@@ -476,6 +476,34 @@ const syntheticState: EditableSite = {
       pinTarget: { type: 'section', sectionId: 'syn-section' },
       startOffsetPx: 0,
       endOffsetPx: 720,
+    },
+  ],
+  richMotionAssets: [
+    {
+      id: 'motion-rive-synthetic',
+      kind: 'rive',
+      assetId: 'synthetic.riv',
+      alt: 'Synthetic Rive controls',
+      artboard: 'Controls',
+      stateMachine: 'ControlsMachine',
+      autoplay: true,
+      reducedMotion: 'play',
+      inputs: [
+        {
+          id: 'hover-on',
+          inputName: 'isHovered',
+          inputType: 'boolean',
+          event: 'pointer-enter',
+          value: true,
+        },
+        {
+          id: 'progress',
+          inputName: 'scrollProgress',
+          inputType: 'number',
+          event: 'scroll-progress',
+          scrollSceneId: 'synthetic-scroll-scene',
+        },
+      ],
     },
   ],
 };

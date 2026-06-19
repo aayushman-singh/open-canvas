@@ -730,6 +730,123 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
 }
 
 // (6) layout transition toggles same-page source/detail elements through View Transition API
+// (6) Rive input bindings drive state-machine inputs through schema-owned events
+{
+  const doc = new StubDocument();
+  const win = new StubWindow() as StubWindow & {
+    rive: { Rive: new (options: Record<string, unknown>) => unknown };
+  };
+  const captured = { options: null as Record<string, unknown> | null };
+  let triggerFireCount = 0;
+  const isHovered = { name: 'isHovered', type: 'Boolean', value: false };
+  const scrollProgress = { name: 'scrollProgress', type: 'Number', value: 0 };
+  const activate = {
+    name: 'activate',
+    type: 'Trigger',
+    fire() {
+      triggerFireCount += 1;
+    },
+  };
+  const fakeInstance = {
+    stateMachineInputs(name: string) {
+      assert(name === 'HeroMachine', 'Rive binding must request the authored state machine');
+      return [isHovered, scrollProgress, activate];
+    },
+  };
+  win.rive = {
+    Rive: function Rive(options: Record<string, unknown>) {
+      captured.options = options;
+      return fakeInstance;
+    } as unknown as new (options: Record<string, unknown>) => unknown,
+  };
+
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'hero-scroll-sequence',
+        trigger: { type: 'scroll-scene', scrollSceneId: 'hero-scroll' },
+        steps: [],
+      },
+    ],
+    scrollScenes: [
+      {
+        id: 'hero-scroll',
+        sectionId: 'hero',
+        sequenceId: 'hero-scroll-sequence',
+        pinTarget: { type: 'section', sectionId: 'hero' },
+        startOffsetPx: 0,
+        endOffsetPx: 720,
+      },
+    ],
+    richMotionAssets: [
+      {
+        id: 'rive-bound',
+        kind: 'rive',
+        assetId: 'hero.riv',
+        srcUrl: '/assets/hero.riv',
+        alt: 'Bound Rive',
+        stateMachine: 'HeroMachine',
+        reducedMotion: 'play',
+        inputs: [
+          {
+            id: 'hover-on',
+            inputName: 'isHovered',
+            inputType: 'boolean',
+            event: 'pointer-enter',
+            value: true,
+          },
+          {
+            id: 'scroll-progress',
+            inputName: 'scrollProgress',
+            inputType: 'number',
+            event: 'scroll-progress',
+            scrollSceneId: 'hero-scroll',
+          },
+          {
+            id: 'activate',
+            inputName: 'activate',
+            inputType: 'trigger',
+            event: 'click',
+          },
+        ],
+      },
+    ],
+  });
+  doc.body.appendChild(script);
+
+  const section = new StubElement('section');
+  section.setAttribute('data-opencanvas-section', 'hero');
+  section.getBoundingClientRect = () => ({ top: -360, left: 0, width: 1200, height: 720 });
+  const richMotion = new StubElement('div');
+  richMotion.setAttribute('data-opencanvas-rich-motion', 'rive-el');
+  richMotion.setAttribute('data-rich-motion-asset-ref', 'rive-bound');
+  const canvas = new StubElement('canvas');
+  canvas.setAttribute('data-opencanvas-rich-motion-canvas', 'rive-el');
+  richMotion.appendChild(canvas);
+  section.appendChild(richMotion);
+  doc.body.appendChild(section);
+
+  runBehaviour(doc, win, StubImage);
+  await Promise.resolve();
+  assert(captured.options !== null, 'Rive runtime must be constructed');
+  assert(typeof captured.options.onLoad === 'function', 'Rive input bindings must attach an onLoad hook');
+  (captured.options.onLoad as () => void)();
+
+  assert(scrollProgress.value === 0.5, `scroll-progress binding must set number input, got ${scrollProgress.value}`);
+  richMotion.dispatchEvent(makeEvent('pointerenter'));
+  assert(isHovered.value === true, 'pointer-enter binding must set boolean input');
+  richMotion.dispatchEvent(makeEvent('click'));
+  assert(triggerFireCount === 1, 'click binding must fire trigger input');
+  assert(
+    richMotion.getAttribute('data-opencanvas-rive-inputs-hydrated') === 'true',
+    'Rive input bindings must mark the node hydrated',
+  );
+}
+
+// (7) layout transition toggles same-page source/detail elements through View Transition API
 {
   const doc = new StubDocument();
   const win = new StubWindow();

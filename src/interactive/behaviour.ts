@@ -420,7 +420,163 @@ function behaviourLoadModelViewerRuntime() {
   return behaviourModelViewerRuntimePromise;
 }
 
-function behaviourHydrateRive(asset, root) {
+function behaviourRiveEventName(eventName) {
+  if (eventName === 'pointer-enter') return 'pointerenter';
+  if (eventName === 'pointer-leave') return 'pointerleave';
+  if (eventName === 'focus') return 'focusin';
+  if (eventName === 'blur') return 'focusout';
+  if (eventName === 'click') return 'click';
+  behaviourFailure('rich-motion-rive-input-event', { event: eventName }, new Error('unsupported Rive input event'));
+}
+
+function behaviourRiveInputTypeName(input) {
+  return String(input && input.type !== undefined ? input.type : '').toLowerCase();
+}
+
+function behaviourRiveInputMatches(input, binding) {
+  var actual = behaviourRiveInputTypeName(input);
+  if (binding.inputType === 'boolean') return actual === 'boolean' || actual === 'bool';
+  if (binding.inputType === 'number') return actual === 'number';
+  if (binding.inputType === 'trigger') return actual === 'trigger' || typeof input.fire === 'function';
+  return false;
+}
+
+function behaviourFindRiveInput(asset, binding, inputs) {
+  var input = null;
+  for (var i = 0; i < inputs.length; i++) {
+    if (inputs[i] && inputs[i].name === binding.inputName) {
+      input = inputs[i];
+      break;
+    }
+  }
+  if (!input) {
+    behaviourFailure('rich-motion-rive-input-missing', {
+      assetId: asset.id,
+      bindingId: binding.id,
+      inputName: binding.inputName,
+      stateMachine: asset.stateMachine
+    }, new Error('Rive state machine input not found'));
+  }
+  if (!behaviourRiveInputMatches(input, binding)) {
+    behaviourFailure('rich-motion-rive-input-type', {
+      assetId: asset.id,
+      bindingId: binding.id,
+      inputName: binding.inputName,
+      expectedType: binding.inputType,
+      actualType: input.type
+    }, new Error('Rive state machine input type mismatch'));
+  }
+  return input;
+}
+
+function behaviourApplyRiveInput(asset, binding, input, value) {
+  if (binding.inputType === 'trigger') {
+    if (typeof input.fire !== 'function') {
+      behaviourFailure('rich-motion-rive-input-fire', {
+        assetId: asset.id,
+        bindingId: binding.id,
+        inputName: binding.inputName
+      }, new Error('Rive trigger input cannot fire'));
+    }
+    input.fire();
+    return;
+  }
+  if (binding.inputType === 'boolean') {
+    if (typeof value !== 'boolean') {
+      behaviourFailure('rich-motion-rive-input-value', {
+        assetId: asset.id,
+        bindingId: binding.id,
+        inputName: binding.inputName,
+        value: value
+      }, new Error('Rive boolean input value must be boolean'));
+    }
+    input.value = value;
+    return;
+  }
+  if (binding.inputType === 'number') {
+    if (typeof value !== 'number' || !isFinite(value)) {
+      behaviourFailure('rich-motion-rive-input-value', {
+        assetId: asset.id,
+        bindingId: binding.id,
+        inputName: binding.inputName,
+        value: value
+      }, new Error('Rive number input value must be finite number'));
+    }
+    input.value = value;
+    return;
+  }
+  behaviourFailure('rich-motion-rive-input-type', {
+    assetId: asset.id,
+    bindingId: binding.id,
+    inputName: binding.inputName,
+    expectedType: binding.inputType
+  }, new Error('unsupported Rive input binding type'));
+}
+
+function behaviourBindRiveInputs(asset, node, instance, root, payload) {
+  var bindings = asset.inputs || [];
+  if (!bindings.length) return;
+  if (node.getAttribute('data-opencanvas-rive-inputs-hydrated') === 'true') return;
+  if (behaviourPrefersReducedMotion() && asset.reducedMotion === 'pause') {
+    node.setAttribute('data-opencanvas-rive-inputs-reduced', 'skip');
+    return;
+  }
+  if (!asset.stateMachine) {
+    behaviourFailure('rich-motion-rive-state-machine-missing', { assetId: asset.id }, new Error('Rive input bindings require stateMachine'));
+  }
+  if (!instance || typeof instance.stateMachineInputs !== 'function') {
+    behaviourFailure('rich-motion-rive-input-api', { assetId: asset.id }, new Error('Rive stateMachineInputs API unavailable'));
+  }
+  var inputs = instance.stateMachineInputs(asset.stateMachine);
+  if (!inputs || typeof inputs.length !== 'number') {
+    behaviourFailure('rich-motion-rive-input-api', { assetId: asset.id, stateMachine: asset.stateMachine }, new Error('Rive stateMachineInputs did not return an input list'));
+  }
+  for (var i = 0; i < bindings.length; i++) {
+    var binding = bindings[i];
+    var input = behaviourFindRiveInput(asset, binding, inputs);
+    if (binding.event === 'scroll-progress') {
+      var scene = behaviourFindScrollScene(payload, binding.scrollSceneId || '');
+      var section = root.querySelector('[data-opencanvas-section="' + scene.sectionId + '"]');
+      if (!section) {
+        behaviourFailure('rich-motion-rive-scroll-target-missing', {
+          assetId: asset.id,
+          bindingId: binding.id,
+          scrollSceneId: scene.id,
+          sectionId: scene.sectionId
+        }, new Error('Rive scroll-progress section not found'));
+      }
+      (function (sceneRef, sectionRef, bindingRef, inputRef) {
+        var ticking = false;
+        function paint() {
+          ticking = false;
+          behaviourApplyRiveInput(asset, bindingRef, inputRef, behaviourSceneProgress(sceneRef, sectionRef));
+          node.setAttribute('data-opencanvas-rive-input-last', bindingRef.id);
+        }
+        window.addEventListener('scroll', function () {
+          if (!ticking) {
+            ticking = true;
+            requestAnimationFrame(paint);
+          }
+        }, { passive: true });
+        paint();
+      })(scene, section, binding, input);
+      continue;
+    }
+    var eventName = behaviourRiveEventName(binding.event);
+    if ((eventName === 'focusin' || eventName === 'focusout') && !node.getAttribute('tabindex')) {
+      node.setAttribute('tabindex', '0');
+    }
+    (function (bindingRef, inputRef, eventRef) {
+      node.addEventListener(eventRef, function () {
+        behaviourApplyRiveInput(asset, bindingRef, inputRef, bindingRef.value);
+        node.setAttribute('data-opencanvas-rive-input-last', bindingRef.id);
+      });
+    })(binding, input, eventName);
+  }
+  node.setAttribute('data-opencanvas-rive-inputs-hydrated', 'true');
+}
+
+function behaviourHydrateRive(asset, root, payload) {
   if (!asset.srcUrl) {
     behaviourFailure('rich-motion-rive-src-missing', { assetId: asset.id }, new Error('Rive asset srcUrl missing'));
   }
@@ -434,21 +590,29 @@ function behaviourHydrateRive(asset, root) {
       if (node.getAttribute('data-opencanvas-rive-hydrated') === 'true') continue;
       var canvas = behaviourFindRichMotionCanvas(node);
       var reduced = behaviourPrefersReducedMotion() && asset.reducedMotion === 'pause';
+      (function (nodeRef, canvasRef) {
       try {
+        var instance = null;
         var options = {
           src: asset.srcUrl,
-          canvas: canvas,
+          canvas: canvasRef,
           autoplay: reduced ? false : asset.autoplay !== false
         };
         if (asset.artboard) options.artboard = asset.artboard;
         if (asset.stateMachine) options.stateMachines = asset.stateMachine;
-        var instance = new riveRuntime.Rive(options);
-        node.__opencanvasRive = instance;
-        if (reduced) node.setAttribute('data-opencanvas-rive-reduced', 'pause');
-        node.setAttribute('data-opencanvas-rive-hydrated', 'true');
+        if (asset.inputs && asset.inputs.length) {
+          options.onLoad = function () {
+            behaviourBindRiveInputs(asset, nodeRef, instance, root, payload);
+          };
+        }
+        instance = new riveRuntime.Rive(options);
+        nodeRef.__opencanvasRive = instance;
+        if (reduced) nodeRef.setAttribute('data-opencanvas-rive-reduced', 'pause');
+        nodeRef.setAttribute('data-opencanvas-rive-hydrated', 'true');
       } catch (err) {
         behaviourFailure('rich-motion-rive-init', { assetId: asset.id }, err || new Error('Rive init failed'));
       }
+      })(node, canvas);
     }
   }).catch(function (err) {
     behaviourFailure('rich-motion-rive-runtime', { assetId: asset.id, runtimeUrl: behaviourRiveRuntimeUrl }, err || new Error('Rive runtime unavailable'));
@@ -946,7 +1110,7 @@ function hydrateBehaviour(scope, options) {
     if (assets[a].kind === 'image-sequence') {
       behaviourHydrateImageSequence(assets[a], root, payload);
     } else if (assets[a].kind === 'rive') {
-      behaviourHydrateRive(assets[a], root);
+      behaviourHydrateRive(assets[a], root, payload);
     } else if (assets[a].kind === 'lottie') {
       behaviourHydrateLottie(assets[a], root);
     } else if (assets[a].kind === 'model-3d') {
