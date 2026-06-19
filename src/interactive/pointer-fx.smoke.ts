@@ -8,9 +8,10 @@
 //      `snapshotNeedsInteractiveRuntime`, so the runtime hydrates. A Form with
 //      the `classic` variant (no pointer-fx) does not trip it on its own.
 //   2. PUBLISH: evaluating `POINTER_FX_RUNTIME_SRC` and firing a synthetic
-//      `pointermove` publishes the expected `--opencanvas-ptr-*` (spotlight) and
-//      `--opencanvas-tilt-*` (tilt) custom properties; `pointerleave` recentres
-//      them (the authored static base, dec 6).
+//      `pointermove` publishes the expected `--opencanvas-ptr-*` (spotlight),
+//      `--opencanvas-tilt-*` (tilt), and `--opencanvas-magnetic-*` (magnetic)
+//      custom properties; `pointerleave` recentres them (the authored static
+//      base, dec 6).
 //   3. IDEMPOTENCE: re-running the pass does not double-wire listeners.
 //
 // No jsdom — a minimal hand-rolled element/scope stub exposes exactly the DOM
@@ -147,6 +148,24 @@ const hydratePointerFx = makeHydratePointerFx();
   assert(el.props['--opencanvas-tilt-x'] === '6.00deg', `tilt-x right edge should be 6deg; got ${el.props['--opencanvas-tilt-x']}`);
   el.listeners['pointerleave']![0]!({ clientX: 0, clientY: 0 });
   assert(el.props['--opencanvas-tilt-x'] === '0deg', 'pointerleave recentres tilt-x to 0deg');
+}
+
+// -- 2c. magnetic publishes --opencanvas-magnetic-x/y -------------------------
+{
+  const el = makeStub('magnetic', { left: 0, top: 0, width: 200, height: 100 });
+  hydratePointerFx({ querySelectorAll: () => [el] });
+  el.listeners['pointermove']![0]!({ clientX: 200, clientY: 100 }); // bottom-right
+  assert(
+    el.props['--opencanvas-magnetic-x'] === '12.00px',
+    `magnetic-x right edge should be 12px; got ${el.props['--opencanvas-magnetic-x']}`,
+  );
+  assert(
+    el.props['--opencanvas-magnetic-y'] === '12.00px',
+    `magnetic-y bottom edge should be 12px; got ${el.props['--opencanvas-magnetic-y']}`,
+  );
+  el.listeners['pointerleave']![0]!({ clientX: 0, clientY: 0 });
+  assert(el.props['--opencanvas-magnetic-x'] === '0px', 'pointerleave recentres magnetic-x to 0px');
+  assert(el.props['--opencanvas-magnetic-y'] === '0px', 'pointerleave recentres magnetic-y to 0px');
 }
 
 // -- 3. idempotence: re-run does not double-wire -----------------------------

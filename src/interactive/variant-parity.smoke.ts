@@ -33,10 +33,13 @@ const POINTER_FX_TOKENS = [
   '--opencanvas-ptr-y',
   '--opencanvas-tilt-x',
   '--opencanvas-tilt-y',
+  '--opencanvas-magnetic-x',
+  '--opencanvas-magnetic-y',
   'data-opencanvas-pointer-fx',
   'data-opencanvas-pfx-hydrated',
   'spotlight',
   'tilt',
+  'magnetic',
 ];
 
 for (const token of POINTER_FX_TOKENS) {
@@ -65,6 +68,13 @@ assert(
 assert(
   visitorPointerFx.includes('* 12') && editorMirror.includes('* 12'),
   'tilt rotation factor (12) must match between visitor fragment and editor mirror',
+);
+
+// The magnetic attraction distance must match across both sides; otherwise
+// editor preview and published pages diverge under the same pointer movement.
+assert(
+  visitorPointerFx.includes('* 24') && editorMirror.includes('* 24'),
+  'magnetic attraction factor (24) must match between visitor fragment and editor mirror',
 );
 
 console.log('[variant-parity:smoke] OK');

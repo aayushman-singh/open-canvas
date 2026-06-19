@@ -16,6 +16,9 @@
 //     `deg` rotations from the pointer's offset from centre. Recentres to 0deg
 //     on leave. (Implemented + smoke-tested; available for a future catalog
 //     arm — no shipped variant uses it yet, see DECISIONS_V4 D5.)
+//   - `magnetic` — publishes `--opencanvas-magnetic-x` /
+//     `--opencanvas-magnetic-y` as small px translations from centre. CSS owns
+//     the transform; the runtime only publishes pointer state.
 //
 // Scroll / entrance motion is deliberately NOT here — that stays with the
 // existing `motion.preset` + `data-scroll-trigger` system (ADR dec 4).
@@ -92,8 +95,21 @@ function hydratePointerFx(scope, options) {
           el.style.setProperty('--opencanvas-tilt-x', '0deg');
           el.style.setProperty('--opencanvas-tilt-y', '0deg');
         });
+      } else if (primitive === 'magnetic') {
+        el.addEventListener('pointermove', function (ev) {
+          var r = el.getBoundingClientRect();
+          if (!(r.width > 0) || !(r.height > 0)) return;
+          var nx = (ev.clientX - r.left) / r.width - 0.5;
+          var ny = (ev.clientY - r.top) / r.height - 0.5;
+          el.style.setProperty('--opencanvas-magnetic-x', (nx * 24).toFixed(2) + 'px');
+          el.style.setProperty('--opencanvas-magnetic-y', (ny * 24).toFixed(2) + 'px');
+        });
+        el.addEventListener('pointerleave', function () {
+          el.style.setProperty('--opencanvas-magnetic-x', '0px');
+          el.style.setProperty('--opencanvas-magnetic-y', '0px');
+        });
       } else {
-        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight or tilt', primitive);
+        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, or magnetic', primitive);
       }
     })(nodes[i]);
   }

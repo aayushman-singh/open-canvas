@@ -21,8 +21,8 @@ Observable success:
   element inspector and match between editor preview and published pages.
 - Hover video previews are authored on video media elements and execute via
   the same Runtime Hydrator in editor preview and published pages.
-- Pointer-reactive spotlight and tilt effects are selectable on arbitrary
-  elements with explicit reduced-motion behaviour.
+- Pointer-reactive spotlight, tilt, and magnetic effects are selectable on
+  arbitrary elements with explicit reduced-motion behaviour.
 - Rich Motion Assets can represent Rive files as schema-owned assets with
   artboard/state-machine metadata and a bounded runtime adapter.
 - Rich Motion Assets can represent Lottie JSON files as schema-owned assets
@@ -67,8 +67,8 @@ Open Canvas has real motion and interaction primitives already:
 - The interactive runtime hydrates accordion, carousel, popup sections, and
   pointer-fx in one inline IIFE (`src/interactive/*`).
 - ADR 0066 added Variant presets for forms, carousels, accordions, and tabs;
-  the shipped pointer-fx primitives are `spotlight` and `tilt`, but only Form
-  `spotlight` is attached to a catalogued variant.
+  the shipped pointer-fx primitives are `spotlight`, `tilt`, and `magnetic`,
+  but only Form `spotlight` is attached to a catalogued variant.
 - Carousel has `paginate` and `scroll-snap` modes, plus style variants such as
   `coverflow`, `ken-burns`, and `editorial`.
 - Legacy sections with `exit-intent`, `delay`, or `scroll` popup triggers are
@@ -98,9 +98,10 @@ Open Canvas has real motion and interaction primitives already:
   via the same named Runtime Hydrator; validation rejects image/autoplay
   conflicts and malformed modes.
 - **June 2026 update:** Pointer FX is now owner-facing beyond Form
-  `spotlight`. Element wrappers can store `pointerFx` with `spotlight` or
-  `tilt`, explicit reduced-motion mode, validator/Yjs persistence, renderer
-  metadata, editor inspector controls, and named runtime failure events.
+  `spotlight`. Element wrappers can store `pointerFx` with `spotlight`, `tilt`,
+  or `magnetic`, explicit reduced-motion mode, validator/Yjs persistence,
+  renderer metadata, editor inspector controls, and named runtime failure
+  events.
 - **June 2026 update:** Rich Motion Assets now include a `rive` kind. The
   schema stores the Rive asset id, artboard, state machine, autoplay, alt text,
   and explicit reduced-motion policy; renderer/editor emit fit metadata; the
@@ -341,7 +342,8 @@ Needed primitive:
 
 Current state:
 
-- Pointer-fx exists as a runtime concept with `spotlight` and `tilt`.
+- Pointer-fx exists as a runtime concept with `spotlight`, `tilt`, and
+  `magnetic`.
 - Only Form `spotlight` is attached to a shipped variant.
 - Hover states are mostly fixed CSS inside component/style-kit selectors.
 - **June 2026 update:** Marquee is no longer template-JSON-only. Any element
@@ -353,22 +355,21 @@ Current state:
   reduced-motion-aware, and fails through `opencanvas:video-hover-failure`
   instead of silently ignoring rejected playback.
 - **June 2026 update:** Pointer FX now has an element-level inspector catalog.
-  Owners can apply `spotlight` or `tilt` to arbitrary elements; Form
-  `spotlight` also emits explicit reduced-motion metadata; malformed runtime
-  attributes fail through `opencanvas:pointer-fx-failure`.
+  Owners can apply `spotlight`, `tilt`, or `magnetic` to arbitrary elements;
+  Form `spotlight` also emits explicit reduced-motion metadata; malformed
+  runtime attributes fail through `opencanvas:pointer-fx-failure`.
 
 User-visible miss:
 
-- Cannot reproduce magnetic buttons, cursor trails, image-follow cursors,
-  hover reveal masks, card tilt on arbitrary surfaces, pointer-driven parallax,
-  drag/inertia sliders, or hover-to-preview grids.
+- Cannot reproduce cursor trails, image-follow cursors, hover reveal masks,
+  pointer-driven parallax, drag/inertia sliders, or hover-to-preview grids.
 - Cannot author touch-specific equivalents for mobile.
 - Marquee does not yet include multi-row staggering, masked edge fades,
   hover-reverse, or collection-driven ticker sources.
 - Video Stream Hover does not yet support separate hover poster/video assets,
   hover scrub by pointer position, or collection-gallery batch authoring.
-- Pointer FX does not yet include magnetic attraction, cursor followers,
-  drag/inertia, or touch-specific alternate gestures.
+- Pointer FX does not yet include cursor followers, drag/inertia, or
+  touch-specific alternate gestures.
 
 Needed primitive:
 

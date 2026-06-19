@@ -1117,7 +1117,8 @@ const variantCss = String.raw`
 
 /* ---- pointer-fx: generic CSS hooks any element with the attribute uses.
    spotlight publishes --opencanvas-ptr-x/y (consumed per-variant above);
-   tilt publishes --opencanvas-tilt-x/y, applied generically here. */
+   tilt publishes --opencanvas-tilt-x/y, applied generically here;
+   magnetic publishes --opencanvas-magnetic-x/y, applied generically here. */
 .opencanvas-element[data-opencanvas-pointer-fx="spotlight"]::before {
   content: "";
   position: absolute;
@@ -1139,6 +1140,16 @@ const variantCss = String.raw`
     rotateY(var(--opencanvas-tilt-x, 0deg));
   transition: transform 120ms ease;
   transform-style: preserve-3d;
+}
+
+[data-opencanvas-pointer-fx="magnetic"] {
+  transform: translate3d(
+    var(--opencanvas-magnetic-x, 0px),
+    var(--opencanvas-magnetic-y, 0px),
+    0
+  );
+  transition: transform 160ms ease-out;
+  will-change: transform;
 }
 
 [data-opencanvas-route-container] {

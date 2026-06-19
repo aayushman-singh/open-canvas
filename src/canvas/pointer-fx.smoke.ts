@@ -34,6 +34,17 @@ function makeSite(): EditableSite {
                   reducedMotion: 'disabled',
                 },
               },
+              {
+                id: 'magnetic-card',
+                type: 'container',
+                variant: 'glass',
+                box: { x: 540, y: 160, w: 180, h: 64, z: 2 },
+                pointerFx: {
+                  enabled: true,
+                  primitive: 'magnetic',
+                  reducedMotion: 'disabled',
+                },
+              },
             ],
           },
         ],
@@ -49,7 +60,11 @@ assert(validation.valid, validation.valid ? 'valid pointer-fx site should pass' 
 const decoded = decodeYDoc(encodeYDoc(site));
 assert(
   decoded.pages[0]?.sections[0]?.elements[0]?.pointerFx?.primitive === 'tilt',
-  'Yjs projection must preserve pointerFx config',
+  'Yjs projection must preserve tilt pointerFx config',
+);
+assert(
+  decoded.pages[0]?.sections[0]?.elements[1]?.pointerFx?.primitive === 'magnetic',
+  'Yjs projection must preserve magnetic pointerFx config',
 );
 
 const snapshot: PublishedSnapshot = {
@@ -62,7 +77,11 @@ const html = renderCanvasSnapshot(snapshot, '/assets', 'site-pointer-fx', {
 });
 assert(
   html.includes('data-opencanvas-pointer-fx="tilt"'),
-  'renderer must emit pointer-fx primitive',
+  'renderer must emit tilt pointer-fx primitive',
+);
+assert(
+  html.includes('data-opencanvas-pointer-fx="magnetic"'),
+  'renderer must emit magnetic pointer-fx primitive',
 );
 assert(
   html.includes('data-opencanvas-pointer-fx-reduced-motion="disabled"'),
