@@ -62,6 +62,8 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     url: 'https://youtube.com/watch?v=test',
     title: 'Test embed',
     aspectRatio: 16 / 9,
+    drillInEnabled: true,
+    drillInReducedMotion: 'allow',
   },
   text: {
     id: 'fx-text',
@@ -361,3 +363,4 @@ for (const type of types) {
 }
 
 console.log(`[inspector-dispatch:smoke] OK — ${String(types.length)} dispatch entries verified`);
+

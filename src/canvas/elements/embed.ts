@@ -37,12 +37,20 @@ import type { SidebarSpec } from './sidebar-spec.js';
 import type { BaseElement } from '../schema.js';
 import { resolveEmbed } from '../../embed/oembed-resolve.js';
 
+export const EMBED_DRILL_IN_REDUCED_MOTION_MODES = ['instant', 'allow'] as const;
+export type EmbedDrillInReducedMotionMode =
+  (typeof EMBED_DRILL_IN_REDUCED_MOTION_MODES)[number];
+
 export interface EmbedElement extends BaseElement {
   type: 'embed';
   url: string;
   title?: string;
   /** width / height. Defaults to 16/9 when undefined. */
   aspectRatio?: number;
+  /** Opens this embed URL in a schema-owned fullscreen iframe overlay. */
+  drillInEnabled?: boolean;
+  /** Reduced-motion policy for the drill-in overlay open/close shell. */
+  drillInReducedMotion?: EmbedDrillInReducedMotionMode;
 }
 
 export interface EmbedRenderCtx {
@@ -95,9 +103,10 @@ export function renderEmbed(el: EmbedElement, ctx: EmbedRenderCtx): string {
   // because the URL has already gone through WHATWG URL parsing inside
   // `parseEmbedUrl`. We escapeAttr it on the way out as defence-in-depth.
   const src = escapeAttr(resolved.embedUrl);
+  const drillIn = drillInAttrs(el, resolved.embedUrl, titleAttr);
 
   return (
-    `<div class="opencanvas-embed" data-opencanvas-embed-provider="${escapeAttr(resolved.providerName)}"${aspectAttr}>` +
+    `<div class="opencanvas-embed" data-opencanvas-embed-provider="${escapeAttr(resolved.providerName)}"${aspectAttr}${drillIn.rootAttrs}>` +
     `<iframe ` +
     `src="${src}" ` +
     `width="100%" height="100%" ` +
@@ -107,8 +116,37 @@ export function renderEmbed(el: EmbedElement, ctx: EmbedRenderCtx): string {
     `title="${titleAttr}" ` +
     `allowfullscreen` +
     `></iframe>` +
+    drillIn.triggerHtml +
     `</div>`
   );
+}
+
+function drillInAttrs(
+  el: EmbedElement,
+  resolvedSrc: string,
+  title: string,
+): { rootAttrs: string; triggerHtml: string } {
+  if (el.drillInEnabled !== true) return { rootAttrs: '', triggerHtml: '' };
+  const reducedMotion = el.drillInReducedMotion ?? 'instant';
+  if (!(EMBED_DRILL_IN_REDUCED_MOTION_MODES as readonly string[]).includes(reducedMotion)) {
+    throw new Error(
+      `Embed element ${el.id}: drillInReducedMotion has malformed value ${JSON.stringify(
+        reducedMotion,
+      )}; expected one of ${EMBED_DRILL_IN_REDUCED_MOTION_MODES.join(' | ')}.`,
+    );
+  }
+  const titleAttr = escapeAttr(title);
+  const rootAttrs =
+    ` data-opencanvas-embed-drill-in="true"` +
+    ` data-opencanvas-embed-drill-in-src="${escapeAttr(resolvedSrc)}"` +
+    ` data-opencanvas-embed-drill-in-title="${titleAttr}"` +
+    ` data-opencanvas-embed-drill-in-reduced-motion="${escapeAttr(reducedMotion)}"` +
+    ` role="button" tabindex="0" aria-label="Open ${titleAttr} fullscreen"`;
+  const triggerHtml =
+    `<button type="button" class="opencanvas-embed-drill-in-trigger" ` +
+    `data-opencanvas-embed-drill-in-trigger aria-label="Open ${titleAttr} fullscreen">` +
+    `Open fullscreen</button>`;
+  return { rootAttrs, triggerHtml };
 }
 
 export const EMBED_RECIPE_ID = 'embed-card' as const;
@@ -117,6 +155,14 @@ export const embedInspectorSpec: InspectorSpec = {
   fields: [
     { kind: 'text', label: 'URL', path: 'url', placeholder: 'https://youtube.com/...' },
     { kind: 'text', label: 'Title', path: 'title', placeholder: 'Title (optional)' },
+    { kind: 'checkbox', label: 'Drill-in overlay', path: 'drillInEnabled' },
+    {
+      kind: 'select',
+      label: 'Drill-in reduced motion',
+      path: 'drillInReducedMotion',
+      options: EMBED_DRILL_IN_REDUCED_MOTION_MODES,
+      defaultValue: 'instant',
+    },
     {
       kind: 'select-mapped',
       label: 'Aspect ratio',

@@ -15,6 +15,10 @@ import {
   COLLECTION_SORTS,
 } from './elements/collection.js';
 import type { CollectionDisplay, CollectionSort } from './elements/collection.js';
+import {
+  EMBED_DRILL_IN_REDUCED_MOTION_MODES,
+  type EmbedDrillInReducedMotionMode,
+} from './elements/embed.js';
 import { escapeCssValue } from './elements/render-utils.js';
 import { isAllowedHref } from './action-href.js';
 import { FORM_VARIANTS } from './elements/form.js';
@@ -1438,6 +1442,18 @@ function validateElement(
             );
           }
         }
+      }
+      break;
+    }
+    case 'embed': {
+      assertOptionalBoolean(element.drillInEnabled, `${basePath}.drillInEnabled`, errors);
+      if (element.drillInReducedMotion !== undefined) {
+        assertOneOf<EmbedDrillInReducedMotionMode>(
+          element.drillInReducedMotion,
+          EMBED_DRILL_IN_REDUCED_MOTION_MODES,
+          `${basePath}.drillInReducedMotion`,
+          errors,
+        );
       }
       break;
     }

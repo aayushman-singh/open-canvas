@@ -44,6 +44,7 @@ function hydrateAll(scope, options) {
   // is safe.
   hydratePremiumInteractions(rootScope, options || {});
   hydrateCollectionGalleries(rootScope);
+  hydrateEmbedDrillIns(rootScope);
   hydrateBehaviour(rootScope);
   hydrateMarquees(rootScope);
   hydrateVideoHoverStreams(rootScope);

@@ -536,6 +536,8 @@ function encodeEmbedElement(el: EmbedElement): Y.Map<unknown> {
   out.set('url', el.url);
   setIfDefined(out, 'title', el.title);
   setIfDefined(out, 'aspectRatio', el.aspectRatio);
+  setIfDefined(out, 'drillInEnabled', el.drillInEnabled);
+  setIfDefined(out, 'drillInReducedMotion', el.drillInReducedMotion);
   return out;
 }
 
@@ -1366,6 +1368,12 @@ function decodeEmbedElement(map: Y.Map<unknown>, base: BaseElement): EmbedElemen
   };
   if (map.has('title')) el.title = map.get('title') as string;
   if (map.has('aspectRatio')) el.aspectRatio = map.get('aspectRatio') as number;
+  if (map.has('drillInEnabled')) el.drillInEnabled = map.get('drillInEnabled') as boolean;
+  if (map.has('drillInReducedMotion')) {
+    el.drillInReducedMotion = map.get(
+      'drillInReducedMotion',
+    ) as NonNullable<EmbedElement['drillInReducedMotion']>;
+  }
   return el;
 }
 

@@ -704,3 +704,9 @@ Intentional deferral: richer nested overlay-canvas editing affordances, overlay-
 Status: addressed for the schema-owned Collection gallery v2 slice. A Collection can now opt into `gallery.mode = hover-reveal-detail` with explicit inline detail and reduced-motion policies; the renderer emits collection/entry metadata, the Runtime Hydrator owns active-entry state, the inspector exposes owner controls, and invalid gallery modes fail validation.
 
 Intentional deferral: this does not add a 3D helmet viewer or marketplace media inventory; gallery entries continue to be materialized Collection content and can compose existing media/text/card primitives.
+
+### 19. Iframe Drill-in Overlay
+
+Status: addressed for the schema-owned Embed drill-in slice. Embed elements can opt into `drillInEnabled` with an explicit reduced-motion policy; render output emits drill-in metadata and a keyboard-accessible trigger, the Runtime Hydrator opens a controlled fullscreen iframe shell, invalid reduced-motion values fail validation, and the generic inspector exposes the owner controls.
+
+Intentional deferral: this does not reintroduce legacy popup-section click wiring. Owners who need authored overlay content beyond the iframe should use the schema-owned Overlay primitive.

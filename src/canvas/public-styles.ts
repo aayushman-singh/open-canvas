@@ -818,6 +818,60 @@ html, body {
   height: 100%;
   border: 0;
 }
+.opencanvas-embed[data-opencanvas-embed-drill-in="true"] {
+  cursor: zoom-in;
+}
+.opencanvas-embed-drill-in-trigger {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: zoom-in;
+}
+.opencanvas-embed-drill-in-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100002;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: rgba(0, 0, 0, 0.88);
+  color: #fff;
+}
+.opencanvas-embed-drill-in-overlay[hidden] { display: none; }
+.opencanvas-embed-drill-in-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+}
+.opencanvas-embed-drill-in-close {
+  padding: 9px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.opencanvas-embed-drill-in-frame {
+  width: min(1480px, calc(100vw - 40px));
+  height: calc(100vh - 96px);
+  justify-self: center;
+  border: 0;
+  border-radius: 18px 18px 0 0;
+  background: #000;
+}
+.opencanvas-embed-drill-in-overlay[data-opencanvas-embed-drill-in-reduced="instant"] {
+  transition: none;
+}
 .opencanvas-embed-invalid {
   width: 100%;
   height: 100%;

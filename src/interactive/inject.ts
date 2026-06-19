@@ -75,6 +75,7 @@ export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): bo
     if (INTERACTIVE_ELEMENT_TYPES.has(element.type)) return true;
     if (element.marquee?.enabled === true) return true;
     if (element.type === 'media' && element.mediaKind === 'video' && element.hoverPlayback?.enabled === true) return true;
+    if (element.type === 'embed' && element.drillInEnabled === true) return true;
     if (elementHasPointerFx(element)) return true; // ADR 0066 dec 5
     if (element.type === 'tabs') {
       return element.tabs.some((tab) => tab.elements.some(elementNeedsRuntime));
