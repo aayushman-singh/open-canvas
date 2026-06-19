@@ -19,6 +19,8 @@ Observable success:
   published as part of the Template, not hidden in raw scripts.
 - Repeating motion motifs such as logo/text marquees are editable in the
   element inspector and match between editor preview and published pages.
+- Hover video previews are authored on video media elements and execute via
+  the same Runtime Hydrator in editor preview and published pages.
 - Modal and overlay behaviour matches the reference: trigger, backdrop,
   entrance, exit, close affordance, focus handling, and body scroll behaviour.
 - Page navigation can preserve visual continuity through page/state
@@ -80,6 +82,12 @@ Open Canvas has real motion and interaction primitives already:
   reduced-motion mode; renderer/editor wrappers emit `data-opencanvas-marquee*`
   metadata; the Runtime Hydrator duplicates the visual track and animates it in
   visitor and editor contexts; validator/Yjs/smokes cover the contract.
+- **June 2026 update:** video media elements can now opt into Video Stream
+  Hover. The media inspector exposes play-on-hover/focus mode and explicit
+  reduced-motion behaviour; renderer emits `data-opencanvas-video-hover*`
+  metadata on the `<video>`; visitor/editor hydrators play, pause, and reset
+  via the same named Runtime Hydrator; validation rejects image/autoplay
+  conflicts and malformed modes.
 
 That baseline is useful, and Premium Interaction v1 closes the first typed
 slice of the modal/preload/route gap. It is still not enough for 1:1
@@ -294,6 +302,10 @@ Current state:
   can opt into a schema-owned continuous marquee with inspector controls,
   render metadata, editor/visitor Runtime Hydrator support, named failure
   events, and explicit reduced-motion behaviour.
+- **June 2026 update:** Video Stream Hover is now first-class for video media.
+  It is video-only, muted by contract for browser autoplay policy, focus-aware,
+  reduced-motion-aware, and fails through `opencanvas:video-hover-failure`
+  instead of silently ignoring rejected playback.
 
 User-visible miss:
 
@@ -303,6 +315,8 @@ User-visible miss:
 - Cannot author touch-specific equivalents for mobile.
 - Marquee does not yet include multi-row staggering, masked edge fades,
   hover-reverse, or collection-driven ticker sources.
+- Video Stream Hover does not yet support separate hover poster/video assets,
+  hover scrub by pointer position, or collection-gallery batch authoring.
 
 Needed primitive:
 

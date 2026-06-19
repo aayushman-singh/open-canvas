@@ -45,6 +45,7 @@ function hydrateAll(scope, options) {
   hydratePremiumInteractions(rootScope, options || {});
   hydrateBehaviour(rootScope);
   hydrateMarquees(rootScope);
+  hydrateVideoHoverStreams(rootScope);
 }
 if (typeof window !== 'undefined') window.__opencanvasHydrate = hydrateAll;
 if (document.readyState === 'loading') {

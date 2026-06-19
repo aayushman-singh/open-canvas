@@ -127,6 +127,121 @@ export function hydrateInteractives(
     hydrateBehaviourPreview(root, options.behaviourState, options.behaviourAssetBasePath);
   }
   hydrateMarquees(root);
+  hydrateVideoHoverStreams(root);
+}
+
+// ---------------------------------------------------------------------------
+// Video Stream Hover — mirrors VIDEO_HOVER_RUNTIME_SRC in `src/interactive/video-hover.ts`.
+// ---------------------------------------------------------------------------
+
+function failVideoHover(
+  video: HTMLVideoElement,
+  code: string,
+  message: string,
+  cause: string | Error | null,
+): never {
+  const wrapper = video.closest('[data-opencanvas-element]');
+  const detail = {
+    code,
+    message,
+    elementId: wrapper?.getAttribute('data-opencanvas-element') ?? null,
+    cause: cause instanceof Error ? cause.message : cause,
+  };
+  window.dispatchEvent(new CustomEvent('opencanvas:video-hover-failure', { detail }));
+  console.error('[opencanvas video-hover] ' + message, detail);
+  throw new Error('[opencanvas video-hover] ' + message);
+}
+
+function readVideoHoverConfig(video: HTMLVideoElement): {
+  mode: 'play-pause' | 'play-reset';
+  reducedMotion: 'disabled' | 'allow';
+} {
+  const mode = video.getAttribute('data-opencanvas-video-hover-mode');
+  if (mode !== 'play-pause' && mode !== 'play-reset') {
+    failVideoHover(video, 'invalid-mode', 'Video hover mode must be play-pause or play-reset', mode);
+  }
+  const reducedMotion = video.getAttribute('data-opencanvas-video-hover-reduced-motion');
+  if (reducedMotion !== 'disabled' && reducedMotion !== 'allow') {
+    failVideoHover(
+      video,
+      'invalid-reduced-motion',
+      'Video hover reduced-motion mode must be disabled or allow',
+      reducedMotion,
+    );
+  }
+  return { mode, reducedMotion };
+}
+
+function videoHoverError(err: unknown): Error {
+  if (err instanceof Error) return err;
+  if (typeof err === 'string') return new Error(err);
+  if (typeof err === 'number' || typeof err === 'boolean') return new Error(String(err));
+  return new Error('non-error video hover failure');
+}
+
+function hydrateVideoHoverStreams(scope: ParentNode): void {
+  const videos = scope.querySelectorAll('[data-opencanvas-video-hover="true"]');
+  for (let i = 0; i < videos.length; i++) {
+    const node = videos[i];
+    if (!(node instanceof HTMLVideoElement)) continue;
+    if (node.getAttribute('data-opencanvas-video-hover-hydrated') === 'true') continue;
+    const config = readVideoHoverConfig(node);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce && config.reducedMotion === 'disabled') {
+      node.setAttribute('data-opencanvas-video-hover-hydrated', 'true');
+      node.setAttribute('data-opencanvas-video-hover-reduced', 'disabled');
+      continue;
+    }
+    if (typeof node.play !== 'function' || typeof node.pause !== 'function') {
+      failVideoHover(node, 'missing-video-api', 'Video hover requires play and pause support', null);
+    }
+    node.muted = true;
+    node.playsInline = true;
+    const target = node.closest('[data-opencanvas-element]') ?? node;
+    let active = false;
+    const enter = (): void => {
+      if (active) return;
+      active = true;
+      try {
+        if (config.mode === 'play-reset') node.currentTime = 0;
+        node.play().catch((err: unknown) => {
+          failVideoHover(
+            node,
+            'play-rejected',
+            'Video hover play() was rejected',
+            videoHoverError(err),
+          );
+        });
+      } catch (err: unknown) {
+        failVideoHover(
+          node,
+          'play-failed',
+          'Video hover play failed',
+          videoHoverError(err),
+        );
+      }
+    };
+    const leave = (): void => {
+      if (!active) return;
+      active = false;
+      try {
+        node.pause();
+        if (config.mode === 'play-reset') node.currentTime = 0;
+      } catch (err: unknown) {
+        failVideoHover(
+          node,
+          'pause-failed',
+          'Video hover pause failed',
+          videoHoverError(err),
+        );
+      }
+    };
+    target.addEventListener('pointerenter', enter);
+    target.addEventListener('pointerleave', leave);
+    target.addEventListener('focusin', enter);
+    target.addEventListener('focusout', leave);
+    node.setAttribute('data-opencanvas-video-hover-hydrated', 'true');
+  }
 }
 
 // ---------------------------------------------------------------------------

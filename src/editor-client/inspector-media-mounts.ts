@@ -16,6 +16,12 @@
 
 import type { EditorContext, PersistContext } from './editor-context.js';
 import type { MediaElement } from '../canvas/elements/media.js';
+import {
+  VIDEO_HOVER_PLAYBACK_MODES,
+  VIDEO_HOVER_REDUCED_MOTION_MODES,
+  type VideoHoverPlaybackMode,
+  type VideoHoverReducedMotionMode,
+} from '../canvas/elements/media.js';
 
 // ADR 0064 — media inspector mounts split into two narrow surfaces.
 // `mountMediaAi` reaches into the AI sidecar's busy flag + the inspector
@@ -29,7 +35,8 @@ export type InspectorMediaAiContext = Pick<
   'aiBusy' | 'INSPECTOR_ACTION_HANDLERS'
 >;
 
-export type InspectorVideoPlaybackContext = PersistContext;
+export type InspectorVideoPlaybackContext = PersistContext &
+  Pick<EditorContext, 'rebuildElement' | 'renderInspector' | 'setStatus'>;
 
 // AI media generation is image-only. Skip rendering for video elements
 // entirely — the upstream model has no video synthesis endpoint, so the
@@ -146,4 +153,77 @@ export function mountVideoPlayback(
   host.appendChild(mutedBuilt.row);
   host.appendChild(loopBuilt.row);
   host.appendChild(controlsBuilt.row);
+
+  const hoverHeading = document.createElement('h3');
+  hoverHeading.textContent = 'Video Stream Hover';
+  hoverHeading.className = 'inspector-section-heading';
+  host.appendChild(hoverHeading);
+
+  const hoverBuilt = buildToggle('play on hover/focus', element.hoverPlayback?.enabled === true);
+  const hoverEnabled = hoverBuilt.input;
+  hoverEnabled.addEventListener('change', function () {
+    ctx.captureForUndo();
+    if (hoverEnabled.checked) {
+      playback.autoplay = false;
+      autoplay.checked = false;
+      enforceMuted();
+      element.hoverPlayback = {
+        enabled: true,
+        mode: 'play-reset',
+        reducedMotion: 'disabled',
+      };
+    } else {
+      delete element.hoverPlayback;
+    }
+    ctx.rebuildElement(element.id);
+    ctx.renderInspector();
+    ctx.scheduleSave();
+  });
+  host.appendChild(hoverBuilt.row);
+
+  if (element.hoverPlayback?.enabled !== true) return;
+
+  function buildSelect(
+    labelText: string,
+    options: readonly string[],
+    value: string,
+  ): { row: HTMLDivElement; select: HTMLSelectElement } {
+    const row = document.createElement('div');
+    row.className = 'field';
+    const label = document.createElement('label');
+    label.textContent = labelText;
+    const select = document.createElement('select');
+    for (const option of options) {
+      const item = document.createElement('option');
+      item.value = option;
+      item.textContent = option;
+      if (option === value) item.selected = true;
+      select.appendChild(item);
+    }
+    label.appendChild(select);
+    row.appendChild(label);
+    return { row, select };
+  }
+
+  const modeBuilt = buildSelect('Hover mode', VIDEO_HOVER_PLAYBACK_MODES, element.hoverPlayback.mode);
+  modeBuilt.select.addEventListener('change', function () {
+    ctx.captureForUndo();
+    element.hoverPlayback!.mode = modeBuilt.select.value as VideoHoverPlaybackMode;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  host.appendChild(modeBuilt.row);
+
+  const reducedBuilt = buildSelect(
+    'Reduced motion',
+    VIDEO_HOVER_REDUCED_MOTION_MODES,
+    element.hoverPlayback.reducedMotion,
+  );
+  reducedBuilt.select.addEventListener('change', function () {
+    ctx.captureForUndo();
+    element.hoverPlayback!.reducedMotion = reducedBuilt.select.value as VideoHoverReducedMotionMode;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  host.appendChild(reducedBuilt.row);
 }

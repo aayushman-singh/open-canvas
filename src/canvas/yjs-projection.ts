@@ -378,6 +378,9 @@ function encodeMediaElement(el: MediaElement): Y.Map<unknown> {
   out.set('fit', el.fit);
   if (el.mediaKind === 'video') {
     setIfDefined(out, 'posterAssetId', el.posterAssetId);
+    if (el.hoverPlayback !== undefined) {
+      out.set('hoverPlayback', encodeJsonValue(el.hoverPlayback));
+    }
     if (el.playback !== undefined) {
       const playback = new Y.Map<unknown>();
       setIfDefined(playback, 'autoplay', el.playback.autoplay);
@@ -1210,6 +1213,10 @@ function decodeMediaElement(map: Y.Map<unknown>, base: BaseElement): MediaElemen
   }
   const el: VideoMediaElement = { ...shared, mediaKind: 'video' };
   if (map.has('posterAssetId')) el.posterAssetId = map.get('posterAssetId') as string;
+  if (map.has('hoverPlayback')) {
+    const hoverPlayback = decodeJsonValue(map.get('hoverPlayback')) as VideoMediaElement['hoverPlayback'];
+    if (hoverPlayback !== undefined) el.hoverPlayback = hoverPlayback;
+  }
   if (map.has('playback')) {
     const playback = map.get('playback') as Y.Map<unknown>;
     const playbackOut: NonNullable<VideoMediaElement['playback']> = {};

@@ -33,6 +33,7 @@ import { POINTER_FX_RUNTIME_SRC } from './pointer-fx.js';
 import { POPUP_RUNTIME_SRC } from './popup.js';
 import { ROUTE_TRANSITION_RUNTIME_SRC } from './route-transition.js';
 import { RUNTIME_ENTRY_SRC } from './runtime.js';
+import { VIDEO_HOVER_RUNTIME_SRC } from './video-hover.js';
 
 /**
  * The full interactive runtime as an IIFE string. Stable across builds — same
@@ -51,6 +52,7 @@ export const INTERACTIVE_RUNTIME_SRC: string = [
   ROUTE_TRANSITION_RUNTIME_SRC,
   BEHAVIOUR_RUNTIME_SRC,
   MARQUEE_RUNTIME_SRC,
+  VIDEO_HOVER_RUNTIME_SRC,
   RUNTIME_ENTRY_SRC,
   '})();',
 ].join('\n');

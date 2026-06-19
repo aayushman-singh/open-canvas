@@ -9,6 +9,18 @@ import type { SidebarSpec } from './sidebar-spec.js';
 import { escapeAttr, styleFromEntries } from './render-utils.js';
 import { MEDIA_KINDS, type BackgroundSize, type BaseElement } from '../schema.js';
 
+export const VIDEO_HOVER_PLAYBACK_MODES = ['play-pause', 'play-reset'] as const;
+export type VideoHoverPlaybackMode = (typeof VIDEO_HOVER_PLAYBACK_MODES)[number];
+
+export const VIDEO_HOVER_REDUCED_MOTION_MODES = ['disabled', 'allow'] as const;
+export type VideoHoverReducedMotionMode = (typeof VIDEO_HOVER_REDUCED_MOTION_MODES)[number];
+
+export interface VideoHoverPlayback {
+  enabled: boolean;
+  mode: VideoHoverPlaybackMode;
+  reducedMotion: VideoHoverReducedMotionMode;
+}
+
 /** Fields shared by both media variants. */
 interface MediaElementShared extends BaseElement {
   type: 'media';
@@ -28,6 +40,7 @@ export interface ImageMediaElement extends MediaElementShared {
 export interface VideoMediaElement extends MediaElementShared {
   mediaKind: 'video';
   posterAssetId?: string;
+  hoverPlayback?: VideoHoverPlayback;
   /**
    * Each flag is truthy-only: undefined or `false` means the corresponding
    * `<video>` attribute is NOT emitted and the browser's default applies
@@ -63,10 +76,18 @@ export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string 
   const playback = element.playback ?? {};
   const attrs: string[] = [];
   if (playback.autoplay) attrs.push('autoplay');
-  if (playback.muted) attrs.push('muted');
+  if (playback.muted || element.hoverPlayback?.enabled === true) attrs.push('muted');
   if (playback.loop) attrs.push('loop');
   if (playback.controls) attrs.push('controls');
   attrs.push('playsinline');
+  if (element.hoverPlayback?.enabled === true) {
+    attrs.push(`data-opencanvas-video-hover="true"`);
+    attrs.push(`data-opencanvas-video-hover-mode="${escapeAttr(element.hoverPlayback.mode)}"`);
+    attrs.push(
+      `data-opencanvas-video-hover-reduced-motion="${escapeAttr(element.hoverPlayback.reducedMotion)}"`,
+    );
+    attrs.push('preload="metadata"');
+  }
   const posterAttr =
     element.posterAssetId !== undefined && element.posterAssetId !== '__placeholder__'
       ? ` poster="${escapeAttr(`${ctx.assetBasePath}/${element.posterAssetId}`)}"`

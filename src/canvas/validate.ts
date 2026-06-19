@@ -16,6 +16,12 @@ import { ICON_NAMES, isIconName } from './icons.js';
 import { TABS_DEFAULT_BAR_HEIGHT, TABS_VARIANTS } from './elements/tabs.js';
 import { CAROUSEL_MODES, CAROUSEL_VARIANTS } from './elements/carousel.js';
 import {
+  VIDEO_HOVER_PLAYBACK_MODES,
+  VIDEO_HOVER_REDUCED_MOTION_MODES,
+  type VideoHoverPlaybackMode,
+  type VideoHoverReducedMotionMode,
+} from './elements/media.js';
+import {
   FLOW_ALIGNMENTS,
   FLOW_BREAKPOINTS,
   FLOW_JUSTIFY_VALUES,
@@ -1318,6 +1324,9 @@ function validateElement(
         if (element.playback !== undefined) {
           errors.push(`${basePath}.playback is only allowed when mediaKind is "video"`);
         }
+        if (element.hoverPlayback !== undefined) {
+          errors.push(`${basePath}.hoverPlayback is only allowed when mediaKind is "video"`);
+        }
         break;
       }
 
@@ -1339,6 +1348,35 @@ function validateElement(
           errors.push(
             `${basePath}.playback: video with autoplay=true must also set muted=true (visitor autoplay policy)`,
           );
+        }
+      }
+      if (element.hoverPlayback !== undefined) {
+        if (!isRecord(element.hoverPlayback)) {
+          errors.push(`${basePath}.hoverPlayback must be an object when present`);
+          break;
+        }
+        if (typeof element.hoverPlayback.enabled !== 'boolean') {
+          errors.push(`${basePath}.hoverPlayback.enabled must be a boolean`);
+          break;
+        }
+        if (element.hoverPlayback.enabled === true) {
+          assertOneOf<VideoHoverPlaybackMode>(
+            element.hoverPlayback.mode,
+            VIDEO_HOVER_PLAYBACK_MODES,
+            `${basePath}.hoverPlayback.mode`,
+            errors,
+          );
+          assertOneOf<VideoHoverReducedMotionMode>(
+            element.hoverPlayback.reducedMotion,
+            VIDEO_HOVER_REDUCED_MOTION_MODES,
+            `${basePath}.hoverPlayback.reducedMotion`,
+            errors,
+          );
+          if (element.playback?.autoplay === true) {
+            errors.push(
+              `${basePath}.hoverPlayback cannot be enabled when playback.autoplay=true`,
+            );
+          }
         }
       }
       break;

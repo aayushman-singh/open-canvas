@@ -1,0 +1,40 @@
+export {};
+
+declare const Bun: {
+  file(input: URL): { text(): Promise<string> };
+};
+
+function assert(condition: boolean, message: string): asserts condition {
+  if (!condition) throw new Error('[video-hover-inspector:smoke] ' + message);
+}
+
+const mountsSrc = await Bun.file(new URL('./inspector-media-mounts.ts', import.meta.url)).text();
+const hydrateSrc = await Bun.file(new URL('./hydrate-interactives.ts', import.meta.url)).text();
+
+assert(
+  mountsSrc.includes('Video Stream Hover'),
+  'media inspector must expose video stream hover controls',
+);
+assert(
+  mountsSrc.includes('VIDEO_HOVER_PLAYBACK_MODES'),
+  'hover mode select must use schema modes',
+);
+assert(
+  mountsSrc.includes('VIDEO_HOVER_REDUCED_MOTION_MODES'),
+  'reduced-motion select must use schema modes',
+);
+assert(mountsSrc.includes('playback.autoplay = false'), 'enabling hover must clear autoplay conflict');
+assert(
+  hydrateSrc.includes('function hydrateVideoHoverStreams'),
+  'editor runtime must hydrate video hover streams',
+);
+assert(
+  hydrateSrc.includes('opencanvas:video-hover-failure'),
+  'editor runtime must emit named video-hover failure event',
+);
+assert(
+  hydrateSrc.indexOf('hydrateMarquees(root)') < hydrateSrc.indexOf('hydrateVideoHoverStreams(root)'),
+  'editor video-hover hydration must run after marquee hydration',
+);
+
+console.log('[video-hover-inspector:smoke] OK');
