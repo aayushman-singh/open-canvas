@@ -19,6 +19,8 @@ export interface VideoHoverPlayback {
   enabled: boolean;
   mode: VideoHoverPlaybackMode;
   scrubOnHover?: boolean;
+  streamAssetId?: string;
+  streamPosterAssetId?: string;
   reducedMotion: VideoHoverReducedMotionMode;
 }
 
@@ -64,6 +66,8 @@ export interface MediaRenderCtx {
 export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string {
   if (element.assetId === '__placeholder__') return '';
   const src = `${ctx.assetBasePath}/${element.assetId}`;
+  const assetSrc = (assetId: string): string =>
+    assetId === '' || assetId === '__placeholder__' ? '' : `${ctx.assetBasePath}/${assetId}`;
   const baseStyle = styleFromEntries([
     ['object-fit', element.fit],
     ['width', '100%'],
@@ -85,6 +89,16 @@ export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string 
     attrs.push(`data-opencanvas-video-hover="true"`);
     attrs.push(`data-opencanvas-video-hover-mode="${escapeAttr(element.hoverPlayback.mode)}"`);
     attrs.push(`data-opencanvas-video-hover-scrub="${escapeAttr(String(element.hoverPlayback.scrubOnHover === true))}"`);
+    if (element.hoverPlayback.streamAssetId !== undefined) {
+      attrs.push(
+        `data-opencanvas-video-hover-stream-src="${escapeAttr(assetSrc(element.hoverPlayback.streamAssetId))}"`,
+      );
+    }
+    if (element.hoverPlayback.streamPosterAssetId !== undefined) {
+      attrs.push(
+        `data-opencanvas-video-hover-poster-src="${escapeAttr(assetSrc(element.hoverPlayback.streamPosterAssetId))}"`,
+      );
+    }
     attrs.push(
       `data-opencanvas-video-hover-reduced-motion="${escapeAttr(element.hoverPlayback.reducedMotion)}"`,
     );

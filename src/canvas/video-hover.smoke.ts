@@ -36,6 +36,8 @@ function makeSite(): EditableSite {
                 hoverPlayback: {
                   enabled: true,
                   mode: 'play-reset',
+                  streamAssetId: 'clip-hover',
+                  streamPosterAssetId: 'poster-hover',
                   reducedMotion: 'disabled',
                 },
               },
@@ -63,6 +65,8 @@ assert(
   decodedVideo?.type === 'media' &&
     decodedVideo.mediaKind === 'video' &&
     decodedVideo.hoverPlayback?.mode === 'play-reset' &&
+    decodedVideo.hoverPlayback.streamAssetId === 'clip-hover' &&
+    decodedVideo.hoverPlayback.streamPosterAssetId === 'poster-hover' &&
     (decodedVideo.hoverPlayback as unknown as Record<string, unknown>).scrubOnHover === true,
   'Yjs projection must preserve video hover config',
 );
@@ -87,6 +91,14 @@ assert(
 assert(
   html.includes('data-opencanvas-video-hover-scrub="true"'),
   'renderer must emit hover scrub metadata',
+);
+assert(
+  html.includes('data-opencanvas-video-hover-stream-src="/assets/clip-hover"'),
+  'renderer must emit alternate hover stream source',
+);
+assert(
+  html.includes('data-opencanvas-video-hover-poster-src="/assets/poster-hover"'),
+  'renderer must emit alternate hover poster source',
 );
 assert(html.includes(' muted'), 'hover video must render muted for autoplay policy');
 
@@ -133,6 +145,33 @@ assert(!invalidScrubResult.valid, 'invalid scrub config must fail validation');
 assert(
   invalidScrubResult.errors.some((error) => error.includes('.hoverPlayback.scrubOnHover')),
   'invalid scrub config must be named',
+);
+
+const invalidStream = makeSite() as unknown as Record<string, unknown>;
+const invalidStreamElement = (
+  (
+    (((invalidStream.pages as unknown[])[0] as Record<string, unknown>).sections as unknown[])[0] as Record<
+      string,
+      unknown
+    >
+  ).elements as Record<string, unknown>[]
+)[0]!;
+invalidStreamElement.hoverPlayback = {
+  enabled: true,
+  mode: 'play-reset',
+  streamAssetId: '',
+  streamPosterAssetId: 42,
+  reducedMotion: 'disabled',
+};
+const invalidStreamResult = validateEditableSite(invalidStream);
+assert(!invalidStreamResult.valid, 'invalid hover stream assets must fail validation');
+assert(
+  invalidStreamResult.errors.some((error) => error.includes('.hoverPlayback.streamAssetId')),
+  'invalid hover stream asset failure must be named',
+);
+assert(
+  invalidStreamResult.errors.some((error) => error.includes('.hoverPlayback.streamPosterAssetId')),
+  'invalid hover poster asset failure must be named',
 );
 
 const invalidAutoplay = makeSite();

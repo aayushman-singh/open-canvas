@@ -164,6 +164,8 @@ function readVideoHoverConfig(video: HTMLVideoElement): {
   mode: 'play-pause' | 'play-reset';
   scrubOnHover: boolean;
   reducedMotion: 'disabled' | 'allow';
+  streamSrc: string | null;
+  posterSrc: string | null;
 } {
   const mode = video.getAttribute('data-opencanvas-video-hover-mode');
   if (mode !== 'play-pause' && mode !== 'play-reset') {
@@ -179,7 +181,25 @@ function readVideoHoverConfig(video: HTMLVideoElement): {
     );
   }
   const scrubOnHover = video.getAttribute('data-opencanvas-video-hover-scrub') === 'true';
-  return { mode, scrubOnHover, reducedMotion };
+  const streamSrc = video.getAttribute('data-opencanvas-video-hover-stream-src');
+  if (streamSrc !== null && streamSrc.trim() === '') {
+    failVideoHover(
+      video,
+      'stream-src-empty',
+      'Video hover alternate stream source cannot be empty',
+      streamSrc,
+    );
+  }
+  const posterSrc = video.getAttribute('data-opencanvas-video-hover-poster-src');
+  if (posterSrc !== null && posterSrc.trim() === '') {
+    failVideoHover(
+      video,
+      'poster-src-empty',
+      'Video hover alternate poster source cannot be empty',
+      posterSrc,
+    );
+  }
+  return { mode, scrubOnHover, reducedMotion, streamSrc, posterSrc };
 }
 
 function videoHoverError(err: unknown): Error {
@@ -187,6 +207,52 @@ function videoHoverError(err: unknown): Error {
   if (typeof err === 'string') return new Error(err);
   if (typeof err === 'number' || typeof err === 'boolean') return new Error(String(err));
   return new Error('non-error video hover failure');
+}
+
+function setVideoHoverSource(
+  video: HTMLVideoElement,
+  src: string | null,
+  poster: string | null,
+  code: string,
+): void {
+  if (src === null) return;
+  try {
+    if (video.getAttribute('src') !== src) {
+      video.setAttribute('src', src);
+      video.load();
+    }
+    if (poster !== null) video.setAttribute('poster', poster);
+  } catch (err: unknown) {
+    failVideoHover(video, code, 'Video hover source swap failed', videoHoverError(err));
+  }
+}
+
+function restoreVideoHoverSource(
+  video: HTMLVideoElement,
+  originalSrc: string,
+  originalPoster: string | null,
+): void {
+  if (originalSrc.length === 0) {
+    failVideoHover(
+      video,
+      'original-src-missing',
+      'Video hover cannot restore the original video source',
+      null,
+    );
+  }
+  try {
+    if (video.getAttribute('src') !== originalSrc) {
+      video.setAttribute('src', originalSrc);
+      video.load();
+    }
+    if (originalPoster === null) {
+      video.removeAttribute('poster');
+    } else {
+      video.setAttribute('poster', originalPoster);
+    }
+  } catch (err: unknown) {
+    failVideoHover(video, 'source-restore-failed', 'Video hover source restore failed', videoHoverError(err));
+  }
 }
 
 function scrubVideoHover(video: HTMLVideoElement, target: Element, ev: Event): void {
@@ -232,11 +298,22 @@ function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {
     node.muted = true;
     node.playsInline = true;
     const target = node.closest('[data-opencanvas-element]') ?? node;
+    const originalSrc = node.getAttribute('src') ?? '';
+    const originalPoster = node.getAttribute('poster');
+    if (config.streamSrc !== null && originalSrc.length === 0) {
+      failVideoHover(
+        node,
+        'original-src-missing',
+        'Video hover alternate stream requires an original source to restore',
+        null,
+      );
+    }
     let active = false;
     const enter = (ev: Event): void => {
       if (active) return;
       active = true;
       try {
+        setVideoHoverSource(node, config.streamSrc, config.posterSrc, 'source-swap-failed');
         if (config.scrubOnHover) {
           node.pause();
           scrubVideoHover(node, target, ev);
@@ -266,6 +343,7 @@ function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {
       try {
         node.pause();
         if (config.mode === 'play-reset') node.currentTime = 0;
+        if (config.streamSrc !== null) restoreVideoHoverSource(node, originalSrc, originalPoster);
       } catch (err: unknown) {
         failVideoHover(
           node,

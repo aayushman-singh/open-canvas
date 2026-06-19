@@ -25,6 +25,14 @@ assert(
 );
 assert(mountsSrc.includes('Scrub by pointer'), 'media inspector must expose pointer scrub control');
 assert(mountsSrc.includes('scrubOnHover'), 'media inspector must save pointer scrub config');
+assert(
+  mountsSrc.includes('Hover stream asset') && mountsSrc.includes('streamAssetId'),
+  'media inspector must expose alternate hover stream asset control',
+);
+assert(
+  mountsSrc.includes('Hover poster asset') && mountsSrc.includes('streamPosterAssetId'),
+  'media inspector must expose alternate hover poster asset control',
+);
 assert(mountsSrc.includes('playback.autoplay = false'), 'enabling hover must clear autoplay conflict');
 assert(
   hydrateSrc.includes('function hydrateVideoHoverStreams'),

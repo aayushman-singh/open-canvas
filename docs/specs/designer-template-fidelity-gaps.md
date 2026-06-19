@@ -358,7 +358,8 @@ Current state:
 - **June 2026 update:** Video Stream Hover is now first-class for video media.
   It is video-only, muted by contract for browser autoplay policy, focus-aware,
   reduced-motion-aware, and fails through `opencanvas:video-hover-failure`
-  instead of silently ignoring rejected playback.
+  instead of silently ignoring rejected playback. Pointer scrub and alternate
+  hover stream/poster assets are schema-owned and editor-exposed.
 - **June 2026 update:** Pointer FX now has an element-level inspector catalog.
   Owners can apply `spotlight`, `tilt`, `magnetic`, `cursor-follow`,
   `reveal-mask`, `pointer-parallax`, `cursor-trail`, or `image-follow` to
@@ -372,8 +373,7 @@ User-visible miss:
 - Cannot author touch-specific equivalents for mobile.
 - Marquee does not yet include multi-row staggering or collection-driven ticker
   sources.
-- Video Stream Hover does not yet support separate hover poster/video assets or
-  collection-gallery batch authoring.
+- Video Stream Hover does not yet support collection-gallery batch authoring.
 - Pointer FX does not yet include drag/inertia or touch-specific alternate
   gestures.
 

@@ -206,6 +206,24 @@ export function mountVideoPlayback(
     return { row, select };
   }
 
+  function buildText(
+    labelText: string,
+    value: string,
+    placeholder: string,
+  ): { row: HTMLDivElement; input: HTMLInputElement } {
+    const row = document.createElement('div');
+    row.className = 'field';
+    const label = document.createElement('label');
+    label.textContent = labelText;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+    input.placeholder = placeholder;
+    label.appendChild(input);
+    row.appendChild(label);
+    return { row, input };
+  }
+
   const modeBuilt = buildSelect('Hover mode', VIDEO_HOVER_PLAYBACK_MODES, element.hoverPlayback.mode);
   modeBuilt.select.addEventListener('change', function () {
     ctx.captureForUndo();
@@ -223,6 +241,42 @@ export function mountVideoPlayback(
     ctx.scheduleSave();
   });
   host.appendChild(scrubBuilt.row);
+
+  const streamBuilt = buildText(
+    'Hover stream asset',
+    element.hoverPlayback.streamAssetId ?? '',
+    'uploaded video asset id',
+  );
+  streamBuilt.input.addEventListener('change', function () {
+    ctx.captureForUndo();
+    const value = streamBuilt.input.value.trim();
+    if (value.length === 0) {
+      delete element.hoverPlayback!.streamAssetId;
+    } else {
+      element.hoverPlayback!.streamAssetId = value;
+    }
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  host.appendChild(streamBuilt.row);
+
+  const posterBuilt = buildText(
+    'Hover poster asset',
+    element.hoverPlayback.streamPosterAssetId ?? '',
+    'uploaded image asset id',
+  );
+  posterBuilt.input.addEventListener('change', function () {
+    ctx.captureForUndo();
+    const value = posterBuilt.input.value.trim();
+    if (value.length === 0) {
+      delete element.hoverPlayback!.streamPosterAssetId;
+    } else {
+      element.hoverPlayback!.streamPosterAssetId = value;
+    }
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  host.appendChild(posterBuilt.row);
 
   const reducedBuilt = buildSelect(
     'Reduced motion',

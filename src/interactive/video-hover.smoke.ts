@@ -37,6 +37,8 @@ const snapshot: PublishedSnapshot = {
               hoverPlayback: {
                 enabled: true,
                 mode: 'play-pause',
+                streamAssetId: 'hover-clip',
+                streamPosterAssetId: 'hover-poster',
                 reducedMotion: 'allow',
               },
             },
@@ -67,6 +69,14 @@ assert(
   'runtime must read hover scrub metadata',
 );
 assert(
+  VIDEO_HOVER_RUNTIME_SRC.includes('data-opencanvas-video-hover-stream-src'),
+  'runtime must read alternate hover stream source',
+);
+assert(
+  VIDEO_HOVER_RUNTIME_SRC.includes('stream-src-empty'),
+  'runtime must fail loudly when alternate hover stream source is empty',
+);
+assert(
   VIDEO_HOVER_RUNTIME_SRC.includes('currentTime') && VIDEO_HOVER_RUNTIME_SRC.includes('duration'),
   'runtime must scrub video currentTime from pointer position',
 );
@@ -89,6 +99,10 @@ const html = renderCanvasSnapshot(snapshot, '/assets', 'site-video-hover', {
 assert(
   html.includes('data-opencanvas-video-hover-scrub="true"'),
   'renderer must emit hover scrub metadata',
+);
+assert(
+  html.includes('data-opencanvas-video-hover-stream-src="/assets/hover-clip"'),
+  'renderer must emit alternate hover stream source',
 );
 const withRuntime = injectInteractiveRuntime(html, snapshot);
 assert(

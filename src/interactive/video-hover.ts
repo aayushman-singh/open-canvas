@@ -36,7 +36,45 @@ function readVideoHoverConfig(video) {
     emitVideoHoverFailure(video, 'invalid-reduced-motion', 'Video hover reduced-motion mode must be disabled or allow', reducedMotion);
   }
   var scrubOnHover = video.getAttribute('data-opencanvas-video-hover-scrub') === 'true';
-  return { mode: mode, scrubOnHover: scrubOnHover, reducedMotion: reducedMotion };
+  var streamSrc = video.getAttribute('data-opencanvas-video-hover-stream-src');
+  if (streamSrc !== null && streamSrc.trim() === '') {
+    emitVideoHoverFailure(video, 'stream-src-empty', 'Video hover alternate stream source cannot be empty', streamSrc);
+  }
+  var posterSrc = video.getAttribute('data-opencanvas-video-hover-poster-src');
+  if (posterSrc !== null && posterSrc.trim() === '') {
+    emitVideoHoverFailure(video, 'poster-src-empty', 'Video hover alternate poster source cannot be empty', posterSrc);
+  }
+  return { mode: mode, scrubOnHover: scrubOnHover, reducedMotion: reducedMotion, streamSrc: streamSrc, posterSrc: posterSrc };
+}
+function setVideoHoverSource(video, src, poster, code) {
+  if (!src) return;
+  try {
+    if (video.getAttribute('src') !== src) {
+      video.setAttribute('src', src);
+      if (typeof video.load === 'function') video.load();
+    }
+    if (poster !== null && poster !== undefined) video.setAttribute('poster', poster);
+  } catch (err) {
+    emitVideoHoverFailure(video, code, 'Video hover source swap failed', err);
+  }
+}
+function restoreVideoHoverSource(video, originalSrc, originalPoster) {
+  if (!originalSrc) {
+    emitVideoHoverFailure(video, 'original-src-missing', 'Video hover cannot restore the original video source', null);
+  }
+  try {
+    if (video.getAttribute('src') !== originalSrc) {
+      video.setAttribute('src', originalSrc);
+      if (typeof video.load === 'function') video.load();
+    }
+    if (originalPoster === null || originalPoster === undefined) {
+      video.removeAttribute('poster');
+    } else {
+      video.setAttribute('poster', originalPoster);
+    }
+  } catch (err) {
+    emitVideoHoverFailure(video, 'source-restore-failed', 'Video hover source restore failed', err);
+  }
 }
 function scrubVideoHover(video, target, ev) {
   if (!ev || typeof ev.clientX !== 'number') return;
@@ -75,11 +113,17 @@ function hydrateVideoHoverStreams(scope, options) {
     video.muted = true;
     video.playsInline = true;
     var target = video.closest ? video.closest('[data-opencanvas-element]') || video : video;
+    var originalSrc = video.getAttribute('src') || '';
+    var originalPoster = video.getAttribute('poster');
+    if (config.streamSrc && !originalSrc) {
+      emitVideoHoverFailure(video, 'original-src-missing', 'Video hover alternate stream requires an original source to restore', null);
+    }
     var active = false;
     var enter = function(ev) {
       if (active) return;
       active = true;
       try {
+        setVideoHoverSource(video, config.streamSrc, config.posterSrc, 'source-swap-failed');
         if (config.scrubOnHover) {
           video.pause();
           scrubVideoHover(video, target, ev);
@@ -100,6 +144,7 @@ function hydrateVideoHoverStreams(scope, options) {
       try {
         video.pause();
         if (config.mode === 'play-reset') video.currentTime = 0;
+        if (config.streamSrc) restoreVideoHoverSource(video, originalSrc, originalPoster);
       } catch (err) {
         emitVideoHoverFailure(video, 'pause-failed', 'Video hover pause failed', err);
       }

@@ -1473,6 +1473,16 @@ function validateElement(
           ) {
             errors.push(`${basePath}.hoverPlayback.scrubOnHover must be a boolean when present`);
           }
+          for (const field of ['streamAssetId', 'streamPosterAssetId'] as const) {
+            const value = element.hoverPlayback[field];
+            if (value !== undefined) {
+              if (typeof value !== 'string' || value.length === 0 || value === '__placeholder__') {
+                errors.push(
+                  `${basePath}.hoverPlayback.${field} must be a non-empty uploaded asset id when present`,
+                );
+              }
+            }
+          }
           if (element.playback?.autoplay === true) {
             errors.push(
               `${basePath}.hoverPlayback cannot be enabled when playback.autoplay=true`,
