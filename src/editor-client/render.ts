@@ -80,7 +80,7 @@ import {
 import { applyCustomKitCss } from './custom-kit-css.js';
 import type { MountTemplateEditChromeContext } from './collection-template-edit-view.js';
 import { mountTemplateEditChromeImpl } from './collection-template-edit-view.js';
-import { hydrateInteractives } from './hydrate-interactives.js';
+import { runEditorRuntimeHydrator } from './hydrate-interactives.js';
 
 // ADR 0064 — narrow Pick-based contexts for render.ts. The camera +
 // pagePositions cluster has no canonical alias yet; per-function shapes
@@ -497,7 +497,8 @@ export function renderAllImpl(ctx: RenderAllContext): void {
   // no-op. `skipPopups: true` keeps popup chrome from hijacking the canvas
   // while editing; popups are visitor-only behaviour.
   if (ctx.root) {
-    hydrateInteractives(ctx.root, {
+    runEditorRuntimeHydrator(ctx.root, {
+      reason: 'editor-render',
       skipPopups: true,
       behaviourState: ctx.state,
       behaviourAssetBasePath: `${ctx.siteBase}/assets`,

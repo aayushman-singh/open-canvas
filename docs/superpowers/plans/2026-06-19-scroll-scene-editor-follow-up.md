@@ -12,6 +12,9 @@
   backed by Motion Sequence steps and explicit runtime accessibility handling.
 - Added Behaviour Load Experience editor controls for designer enter moments
   and linked `load-enter` Motion Sequence recovery.
+- Added Runtime Hydrator boundary parity: editor render now consumes
+  `window.__opencanvasHydrate`, matching visitor, live-publish, and route
+  transition swap surfaces.
 
 ## Next
 
@@ -23,3 +26,5 @@
   text-specific effects.
 - Add Behaviour Load Experience run policy, progress choreography, and
   media-readiness gates.
+- Continue collapsing duplicated runtime adapter implementations behind shared
+  generated modules.

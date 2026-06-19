@@ -446,6 +446,12 @@ Current state:
 - ADR 0066 identifies this duplication as a follow-up.
 - Premium Interaction v1 adds explicit editor preview helpers and smokes for
   the new surfaces, but it does not remove the two-source runtime shape.
+- **June 2026 update:** editor render, visitor initial load, live publish
+  swaps, and route transitions now share the named Runtime Hydrator boundary
+  `window.__opencanvasHydrate`. A parity smoke pins that every swap surface
+  consumes the same entrypoint and that editor hydration fails loudly if the
+  boundary is missing. The underlying visitor string fragments and TS editor
+  adapters are still separate implementation nodes.
 
 User-visible miss:
 
@@ -459,6 +465,8 @@ Needed primitive:
 - One interaction runtime source that can be consumed by both visitor output
   and editor preview, or a stricter code-generation/parity boundary that makes
   drift impossible to miss.
+- Remaining next wave: move individual runtime adapters behind generated or
+  shared modules so parity is structural, not only boundary-pinned.
 
 ### 14. Motion Authoring UX Is Too Thin
 

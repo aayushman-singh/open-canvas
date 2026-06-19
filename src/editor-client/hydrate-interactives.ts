@@ -43,6 +43,42 @@ export interface HydrateOptions {
   behaviourAssetBasePath?: string;
 }
 
+export interface RuntimeHydratorOptions extends HydrateOptions {
+  /** Diagnostic reason supplied by visitor/editor/live-publish callers. */
+  reason?: string;
+}
+
+declare global {
+  interface Window {
+    __opencanvasHydrate?: (scope?: ParentNode, options?: RuntimeHydratorOptions) => void;
+  }
+}
+
+/**
+ * Editor Runtime Hydrator boundary. Visitor pages expose the same
+ * window.__opencanvasHydrate name from src/interactive/runtime.ts; the editor
+ * installs a TS-native implementation that delegates to the existing editor
+ * hydrators, then consumes the same named entrypoint after every render.
+ */
+export function installEditorRuntimeHydrator(baseOptions: HydrateOptions): void {
+  window.__opencanvasHydrate = (scope?: ParentNode, options: RuntimeHydratorOptions = {}): void => {
+    const { reason: _reason, ...runtimeOptions } = options;
+    hydrateInteractives(scope ?? document, { ...baseOptions, ...runtimeOptions });
+  };
+}
+
+export function runEditorRuntimeHydrator(
+  root: ParentNode,
+  options: RuntimeHydratorOptions,
+): void {
+  installEditorRuntimeHydrator(options);
+  const hydrate = window.__opencanvasHydrate;
+  if (typeof hydrate !== 'function') {
+    throw new Error('Runtime Hydrator missing in editor after install');
+  }
+  hydrate(root, options);
+}
+
 /**
  * Walk `root` (any element subtree, typically the editor's canvas-root)
  * and hydrate every `[data-opencanvas-interactive]` element that is not
