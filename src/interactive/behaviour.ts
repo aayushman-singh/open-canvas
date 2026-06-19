@@ -341,6 +341,8 @@ function behaviourHydrateImageSequence(asset, root, payload) {
 
 var behaviourRiveRuntimePromise = null;
 var behaviourRiveRuntimeUrl = 'https://unpkg.com/@rive-app/canvas@2.38.1/rive.js';
+var behaviourLottieRuntimePromise = null;
+var behaviourLottieRuntimeUrl = 'https://cdn.jsdelivr.net/npm/lottie-web@5.13.0/build/player/lottie.min.js';
 function behaviourLoadRiveRuntime() {
   if (typeof window !== 'undefined' && window.rive && typeof window.rive.Rive === 'function') {
     return Promise.resolve(window.rive);
@@ -363,6 +365,30 @@ function behaviourLoadRiveRuntime() {
     document.head.appendChild(script);
   });
   return behaviourRiveRuntimePromise;
+}
+
+function behaviourLoadLottieRuntime() {
+  if (typeof window !== 'undefined' && window.lottie && typeof window.lottie.loadAnimation === 'function') {
+    return Promise.resolve(window.lottie);
+  }
+  if (behaviourLottieRuntimePromise) return behaviourLottieRuntimePromise;
+  behaviourLottieRuntimePromise = new Promise(function (resolve, reject) {
+    var script = document.createElement('script');
+    script.src = behaviourLottieRuntimeUrl;
+    script.async = true;
+    script.onload = function () {
+      if (window.lottie && typeof window.lottie.loadAnimation === 'function') {
+        resolve(window.lottie);
+      } else {
+        reject(new Error('Lottie runtime loaded without window.lottie.loadAnimation'));
+      }
+    };
+    script.onerror = function () {
+      reject(new Error('Lottie runtime failed to load'));
+    };
+    document.head.appendChild(script);
+  });
+  return behaviourLottieRuntimePromise;
 }
 
 function behaviourHydrateRive(asset, root) {
@@ -397,6 +423,45 @@ function behaviourHydrateRive(asset, root) {
     }
   }).catch(function (err) {
     behaviourFailure('rich-motion-rive-runtime', { assetId: asset.id, runtimeUrl: behaviourRiveRuntimeUrl }, err || new Error('Rive runtime unavailable'));
+  });
+}
+
+function behaviourHydrateLottie(asset, root) {
+  if (!asset.srcUrl) {
+    behaviourFailure('rich-motion-lottie-src-missing', { assetId: asset.id }, new Error('Lottie asset srcUrl missing'));
+  }
+  var nodes = behaviourFindRichMotionNodes(root, asset.id);
+  if (!nodes.length) {
+    behaviourFailure('rich-motion-node-missing', { assetId: asset.id }, new Error('rich motion element not found'));
+  }
+  behaviourLoadLottieRuntime().then(function (lottieRuntime) {
+    for (var n = 0; n < nodes.length; n++) {
+      var node = nodes[n];
+      if (node.getAttribute('data-opencanvas-lottie-hydrated') === 'true') continue;
+      var reduced = behaviourPrefersReducedMotion() && asset.reducedMotion === 'pause';
+      try {
+        var container = document.createElement('div');
+        container.setAttribute('data-opencanvas-lottie-container', asset.id);
+        container.style.width = '100%';
+        container.style.height = '100%';
+        container.style.display = 'block';
+        node.appendChild(container);
+        var instance = lottieRuntime.loadAnimation({
+          container: container,
+          renderer: asset.renderer || 'svg',
+          loop: asset.loop === true,
+          autoplay: reduced ? false : asset.autoplay !== false,
+          path: asset.srcUrl
+        });
+        node.__opencanvasLottie = instance;
+        if (reduced) node.setAttribute('data-opencanvas-lottie-reduced', 'pause');
+        node.setAttribute('data-opencanvas-lottie-hydrated', 'true');
+      } catch (err) {
+        behaviourFailure('rich-motion-lottie-init', { assetId: asset.id }, err || new Error('Lottie init failed'));
+      }
+    }
+  }).catch(function (err) {
+    behaviourFailure('rich-motion-lottie-runtime', { assetId: asset.id, runtimeUrl: behaviourLottieRuntimeUrl }, err || new Error('Lottie runtime unavailable'));
   });
 }
 
@@ -533,6 +598,8 @@ function hydrateBehaviour(scope) {
       behaviourHydrateImageSequence(assets[a], root, payload);
     } else if (assets[a].kind === 'rive') {
       behaviourHydrateRive(assets[a], root);
+    } else if (assets[a].kind === 'lottie') {
+      behaviourHydrateLottie(assets[a], root);
     } else {
       behaviourFailure('rich-motion-unsupported-kind', { assetId: assets[a].id, kind: assets[a].kind }, new Error('unsupported rich motion kind'));
     }

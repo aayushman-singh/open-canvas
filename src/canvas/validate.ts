@@ -2908,17 +2908,42 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           }
           return;
         }
+        if (asset.kind === 'rive') {
+          if (!isAssetIdLike(asset.assetId)) {
+            errors.push(
+              `${assetPath}.assetId must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(asset.assetId)})`,
+            );
+          }
+          assertNonEmptyString(asset.alt, `${assetPath}.alt`, errors);
+          if (asset.artboard !== undefined) {
+            assertNonEmptyString(asset.artboard, `${assetPath}.artboard`, errors);
+          }
+          if (asset.stateMachine !== undefined) {
+            assertNonEmptyString(asset.stateMachine, `${assetPath}.stateMachine`, errors);
+          }
+          if (asset.autoplay !== undefined && typeof asset.autoplay !== 'boolean') {
+            errors.push(`${assetPath}.autoplay must be a boolean when present`);
+          }
+          if (asset.reducedMotion !== 'pause' && asset.reducedMotion !== 'play') {
+            errors.push(
+              `${assetPath}.reducedMotion must be "pause" or "play" (got ${describe(asset.reducedMotion)})`,
+            );
+          }
+          return;
+        }
         if (!isAssetIdLike(asset.assetId)) {
           errors.push(
             `${assetPath}.assetId must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(asset.assetId)})`,
           );
         }
         assertNonEmptyString(asset.alt, `${assetPath}.alt`, errors);
-        if (asset.artboard !== undefined) {
-          assertNonEmptyString(asset.artboard, `${assetPath}.artboard`, errors);
+        if (asset.renderer !== 'svg' && asset.renderer !== 'canvas') {
+          errors.push(
+            `${assetPath}.renderer must be "svg" or "canvas" (got ${describe(asset.renderer)})`,
+          );
         }
-        if (asset.stateMachine !== undefined) {
-          assertNonEmptyString(asset.stateMachine, `${assetPath}.stateMachine`, errors);
+        if (asset.loop !== undefined && typeof asset.loop !== 'boolean') {
+          errors.push(`${assetPath}.loop must be a boolean when present`);
         }
         if (asset.autoplay !== undefined && typeof asset.autoplay !== 'boolean') {
           errors.push(`${assetPath}.autoplay must be a boolean when present`);
@@ -3350,7 +3375,7 @@ function validatePublishedRichMotionReferencesInElement(
       );
       return;
     }
-    if (asset.kind !== 'image-sequence' && asset.kind !== 'rive') {
+    if (asset.kind !== 'image-sequence' && asset.kind !== 'rive' && asset.kind !== 'lottie') {
       errors.push(
         `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: ${asset.path}.kind ${JSON.stringify(asset.kind)} is not supported for published rich-motion elements`,
       );

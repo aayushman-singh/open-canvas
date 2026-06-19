@@ -49,6 +49,12 @@ export function buildBehaviourPayload(
         srcUrl: `${assetBasePath}/${asset.assetId}`,
       };
     }
+    if (asset.kind === 'lottie') {
+      return {
+        ...asset,
+        srcUrl: `${assetBasePath}/${asset.assetId}`,
+      };
+    }
     return asset;
   });
   const payload: BehaviourPayload = {

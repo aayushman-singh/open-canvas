@@ -14,7 +14,7 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'clipPath',
   'filter',
 ] as const;
-export const RICH_MOTION_KINDS = ['image-sequence', 'rive'] as const;
+export const RICH_MOTION_KINDS = ['image-sequence', 'rive', 'lottie'] as const;
 
 export type BehaviourTarget =
   | { type: 'site' }
@@ -78,7 +78,21 @@ export interface RiveRichMotionAsset {
   reducedMotion: 'pause' | 'play';
 }
 
-export type RichMotionAsset = ImageSequenceRichMotionAsset | RiveRichMotionAsset;
+export interface LottieRichMotionAsset {
+  id: string;
+  kind: 'lottie';
+  assetId: string;
+  alt: string;
+  renderer: 'svg' | 'canvas';
+  loop?: boolean;
+  autoplay?: boolean;
+  reducedMotion: 'pause' | 'play';
+}
+
+export type RichMotionAsset =
+  | ImageSequenceRichMotionAsset
+  | RiveRichMotionAsset
+  | LottieRichMotionAsset;
 
 export interface LoadExperience {
   id: string;

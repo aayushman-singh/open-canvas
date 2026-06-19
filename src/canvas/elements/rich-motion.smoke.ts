@@ -125,7 +125,7 @@ assert(
 const unsupportedKindState = structuredClone(goodSnapshot);
 unsupportedKindState.richMotionAssets[0] = {
   ...unsupportedKindState.richMotionAssets[0]!,
-  kind: 'lottie',
+  kind: 'video-loop',
 } as unknown as (typeof unsupportedKindState.richMotionAssets)[number];
 const unsupportedKindValidation = validatePublishedSnapshot(unsupportedKindState);
 assert(!unsupportedKindValidation.valid, 'unsupported rich motion asset kind must fail publish validation');
@@ -155,6 +155,29 @@ const riveValidation = validatePublishedSnapshot(riveState);
 assert(
   riveValidation.valid,
   `rive rich-motion snapshot must publish: ${riveValidation.valid ? '' : riveValidation.errors.join('; ')}`,
+);
+
+const lottieState = structuredClone(goodSnapshot);
+lottieState.pages[0]!.sections[0]!.elements[0] = {
+  ...lottieState.pages[0]!.sections[0]!.elements[0],
+  assetRefId: 'motion-lottie-hero',
+} as unknown as typeof richMotionElement;
+(lottieState as { richMotionAssets: unknown[] }).richMotionAssets = [
+  {
+    id: 'motion-lottie-hero',
+    kind: 'lottie',
+    assetId: 'hero.json',
+    alt: 'Hero Lottie animation',
+    renderer: 'svg',
+    loop: true,
+    autoplay: true,
+    reducedMotion: 'pause',
+  },
+];
+const lottieValidation = validatePublishedSnapshot(lottieState);
+assert(
+  lottieValidation.valid,
+  `lottie rich-motion snapshot must publish: ${lottieValidation.valid ? '' : lottieValidation.errors.join('; ')}`,
 );
 
 assert(
