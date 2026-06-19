@@ -233,11 +233,15 @@ Current state:
 - **June 2026 update:** Timeline bar handles can now be dragged to set
   `durationMs` directly, with invalid editor measurements reported through the
   status channel instead of ignored.
+- **June 2026 update:** Timeline quick properties now edit common per-step
+  `from`/`to` opacity, transform, and filter values beside the visual timeline,
+  using the same schema-owned Motion Sequence step fields as the detailed form.
 
 User-visible miss:
 
-- Cannot yet edit per-step motion properties directly from the visual timeline
-  canvas.
+- Cannot yet edit every advanced property through a direct-manipulation
+  timeline canvas; uncommon properties and detailed target/easing controls
+  remain in the field-level editor.
 
 Needed primitive:
 
@@ -245,7 +249,7 @@ Needed primitive:
   properties, duration, easing, delay, stagger, and completion behaviour.
 - Validation must reject unsupported targets/properties instead of silently
   dropping steps.
-- Remaining next wave: richer property affordances beyond the current form
+- Remaining next wave: richer property affordances beyond the quick timeline
   controls.
 
 ### 2. Scroll Motion Is Triggered, Not Scrubbed
@@ -407,13 +411,16 @@ Current state:
   renderer/editor preview emit explicit presentation metadata and class hooks,
   the Runtime Hydrator validates the mode, and public styles provide the
   centered palette surface without arbitrary owner CSS.
+- **June 2026 update:** Overlay presentation now includes a bounded
+  `product-tour` mode. It provides a named tour-card presentation surface with
+  validation, render metadata, Runtime Hydrator allow-listing, and public styles;
+  multi-step tour state remains a future schema relation rather than custom JS.
 
 User-visible miss:
 
-- Cannot reproduce product-tour overlays as a named overlay preset yet.
 - Can now style modal/fullscreen chrome from a bounded Template-owned catalog
-  and publish lightbox-style gallery/media overlays or command-palette overlays.
-- Richer entrance/exit variants, product-tour presets, and menu choreography
+  and publish lightbox, command-palette, or product-tour overlay presentations.
+- Richer entrance/exit variants, multi-step tour state, and menu choreography
   presets are still missing.
 
 Needed primitive:

@@ -1437,6 +1437,23 @@ const variantCss = String.raw`
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38), 0 0 0 1px color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 22%, transparent);
   overflow: hidden;
 }
+.opencanvas-overlay[data-opencanvas-overlay-presentation="product-tour"][data-opencanvas-overlay-open] {
+  place-items: end center;
+  padding: 32px min(5vw, 48px) min(9vh, 72px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="product-tour"] .opencanvas-overlay-backdrop {
+  background: rgba(4, 5, 8, 0.34);
+  backdrop-filter: blur(8px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="product-tour"] .opencanvas-overlay-surface {
+  width: min(92vw, 560px);
+  max-height: min(68vh, 620px);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 18%, transparent), transparent 36%),
+    var(--opencanvas-kit-panel, #ffffff);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32), 0 0 0 1px color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 28%, transparent);
+}
 .opencanvas-overlay--fullscreen-menu .opencanvas-overlay-close {
   top: 24px;
   right: 24px;

@@ -114,6 +114,18 @@ assert.equal(
   commandPaletteValidation.valid ? undefined : commandPaletteValidation.errors.join('\n'),
 );
 
+const productTourSnapshot = structuredClone(snapshot) as PublishedSnapshot;
+(productTourSnapshot.overlays![0] as unknown as { presentation: { mode: string; chrome: string } }).presentation.mode =
+  'product-tour';
+(productTourSnapshot.overlays![0] as unknown as { presentation: { mode: string; chrome: string } }).presentation.chrome =
+  'editorial-frame';
+const productTourValidation = validatePublishedSnapshot(productTourSnapshot);
+assert.equal(
+  productTourValidation.valid,
+  true,
+  productTourValidation.valid ? undefined : productTourValidation.errors.join('\n'),
+);
+
 const invalid = structuredClone(snapshot) as PublishedSnapshot;
 (invalid.overlays![0] as unknown as { presentation: { mode: string } }).presentation.mode = 'drawer';
 const invalidResult = validatePublishedSnapshot(invalid);
@@ -182,6 +194,18 @@ assert.ok(
   'renderer must expose command-palette overlay styling hook',
 );
 
+const productTourHtml = renderCanvasSnapshot(productTourSnapshot, '/assets', 'overlay-product-tour-site', {
+  turnstileSiteKey: 'test-key',
+});
+assert.ok(
+  productTourHtml.includes('data-opencanvas-overlay-presentation="product-tour"'),
+  'renderer must emit product-tour overlay presentation metadata',
+);
+assert.ok(
+  productTourHtml.includes('opencanvas-overlay--product-tour'),
+  'renderer must expose product-tour overlay styling hook',
+);
+
 const roundTrip = decodeYDoc(encodeYDoc(editable));
 assert.equal(
   roundTrip.overlays?.[0]?.presentation?.mode,
@@ -214,6 +238,10 @@ assert.ok(
   OVERLAY_RUNTIME_SRC.includes("presentation !== 'command-palette'"),
   'overlay runtime must explicitly allow command-palette presentation',
 );
+assert.ok(
+  OVERLAY_RUNTIME_SRC.includes("presentation !== 'product-tour'"),
+  'overlay runtime must explicitly allow product-tour presentation',
+);
 
 const interactionsPanel = readFileSync(join(thisDir, '../editor-client/interactions-panel.ts'), 'utf8');
 assert.ok(interactionsPanel.includes('OVERLAY_PRESENTATION_MODES'), 'editor panel must expose overlay presentation modes');
@@ -243,10 +271,13 @@ assert.ok(
   'public styles must include command-palette overlay presentation rules',
 );
 assert.ok(
+  publicStyles.includes('data-opencanvas-overlay-presentation="product-tour"'),
+  'public styles must include product-tour overlay presentation rules',
+);
+assert.ok(
   publicStyles.includes('data-opencanvas-overlay-chrome="glass-panel"'),
   'public styles must include overlay chrome preset rules',
 );
 
 console.log('[overlay-v2:smoke] OK');
-
 
