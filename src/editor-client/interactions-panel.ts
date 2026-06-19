@@ -1720,7 +1720,7 @@ function renderMotionSequenceCard(
     card.appendChild(note);
   }
 
-  renderMotionSequenceTimeline(card, sequence);
+  renderMotionSequenceTimeline(ctx, card, sequence);
 
   const addStep = compactButton('Add step', 'Add a Motion Sequence step');
   addStep.addEventListener('click', () => {
@@ -1739,9 +1739,14 @@ function renderMotionSequenceCard(
   host.appendChild(card);
 }
 
-function renderMotionSequenceTimeline(card: HTMLElement, sequence: MotionSequence): void {
+function renderMotionSequenceTimeline(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  sequence: MotionSequence,
+): void {
   const wrap = document.createElement('div');
   wrap.className = 'opencanvas-motion-timeline';
+  wrap.setAttribute('data-opencanvas-motion-preview-progress', '0');
   const label = document.createElement('div');
   label.className = 'opencanvas-motion-timeline-label';
   label.textContent = 'Timeline overview';
@@ -1750,6 +1755,11 @@ function renderMotionSequenceTimeline(card: HTMLElement, sequence: MotionSequenc
   const track = document.createElement('div');
   track.className = 'opencanvas-motion-timeline-track';
   const scheduled = motionSequenceTimelineItems(sequence);
+  const playhead = document.createElement('span');
+  playhead.className = 'opencanvas-motion-timeline-playhead';
+  playhead.style.left = '0%';
+  playhead.setAttribute('aria-hidden', 'true');
+  track.appendChild(playhead);
   for (const snapPercent of [0, 25, 50, 75, 100]) {
     const snap = document.createElement('span');
     snap.className = 'opencanvas-motion-timeline-snap';
@@ -1788,10 +1798,15 @@ function renderMotionSequenceTimeline(card: HTMLElement, sequence: MotionSequenc
     track.appendChild(lane);
   }
   wrap.appendChild(track);
+  renderMotionSequenceScrubPreview(ctx, wrap, sequence, playhead);
   card.appendChild(wrap);
 }
 
 interface MotionSequenceTimelineItem {
+  step: MotionSequenceStep;
+  startMs: number;
+  durationMs: number;
+  endMs: number;
   leftPercent: number;
   widthPercent: number;
   label: string;
@@ -1814,6 +1829,8 @@ function motionSequenceTimelineItems(
     return {
       start,
       duration,
+      end,
+      step,
       label: String(index + 1),
       laneKey: motionSequenceTimelineLaneKey(step),
       laneLabel: motionSequenceTimelineLaneLabel(step),
@@ -1834,6 +1851,10 @@ function motionSequenceTimelineItems(
     ...raw.map((item) => item.start + item.duration),
   );
   return raw.map((item) => ({
+    step: item.step,
+    startMs: item.start,
+    durationMs: item.duration,
+    endMs: item.end,
     leftPercent: Math.max(0, Math.min(100, (item.start / total) * 100)),
     widthPercent: Math.max(2, Math.min(100, (item.duration / total) * 100)),
     label: item.label,
@@ -1841,6 +1862,219 @@ function motionSequenceTimelineItems(
     laneKey: item.laneKey,
     laneLabel: item.laneLabel,
   }));
+}
+
+function renderMotionSequenceScrubPreview(
+  ctx: InteractionsPanelContext,
+  wrap: HTMLElement,
+  sequence: MotionSequence,
+  playhead: HTMLElement,
+): void {
+  const controls = row('opencanvas-motion-timeline-scrub');
+  const input = document.createElement('input');
+  input.type = 'range';
+  input.min = '0';
+  input.max = '100';
+  input.step = '1';
+  input.value = '0';
+  input.setAttribute('aria-label', 'Scrub preview');
+  const value = document.createElement('span');
+  value.className = 'opencanvas-motion-timeline-scrub-value';
+  value.textContent = '0%';
+  const clear = compactButton('Clear preview', 'Remove Motion Sequence scrub preview styles from the editor canvas');
+
+  const update = (percent: number, applyPreview: boolean) => {
+    const clamped = Math.max(0, Math.min(100, percent));
+    wrap.setAttribute('data-opencanvas-motion-preview-progress', String(clamped));
+    playhead.style.left = String(clamped) + '%';
+    value.textContent = String(clamped) + '%';
+    if (applyPreview) {
+      previewMotionSequenceAtProgress(ctx, sequence, clamped / 100);
+    }
+  };
+
+  input.addEventListener('input', () => {
+    const next = Number(input.value);
+    if (!Number.isFinite(next)) {
+      ctx.setStatus('Motion Sequence preview progress must be 0-100', 'error');
+      input.value = wrap.getAttribute('data-opencanvas-motion-preview-progress') ?? '0';
+      return;
+    }
+    update(Math.round(next), true);
+  });
+  clear.addEventListener('click', () => {
+    input.value = '0';
+    update(0, false);
+    clearMotionSequencePreview(ctx, sequence);
+    ctx.setStatus('Motion Sequence preview cleared', 'ok');
+  });
+
+  controls.appendChild(input);
+  controls.appendChild(value);
+  controls.appendChild(clear);
+  wrap.appendChild(field('Scrub preview', controls));
+}
+
+const MOTION_PREVIEW_STYLE_PROPS = [
+  'opacity',
+  'transform',
+  'filter',
+  'clip-path',
+  'font-variation-settings',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+] as const;
+
+function clearMotionSequencePreview(ctx: InteractionsPanelContext, sequence: MotionSequence): void {
+  const seen = new Set<HTMLElement>();
+  for (const step of sequence.steps) {
+    for (const node of resolveMotionPreviewTargets(ctx, step.target, false)) {
+      if (seen.has(node)) continue;
+      seen.add(node);
+      for (const prop of MOTION_PREVIEW_STYLE_PROPS) {
+        node.style.removeProperty(prop);
+      }
+      node.removeAttribute('data-opencanvas-motion-previewing');
+    }
+  }
+}
+
+function previewMotionSequenceAtProgress(
+  ctx: InteractionsPanelContext,
+  sequence: MotionSequence,
+  progress: number,
+): void {
+  clearMotionSequencePreview(ctx, sequence);
+  const scheduled = motionSequenceTimelineItems(sequence);
+  const totalMs = Math.max(1, ...scheduled.map((item) => item.endMs));
+  const currentMs = Math.max(0, Math.min(1, progress)) * totalMs;
+  for (const item of scheduled) {
+    if (currentMs < item.startMs) continue;
+    const localProgress = Math.max(0, Math.min(1, (currentMs - item.startMs) / item.durationMs));
+    const targets = resolveMotionPreviewTargets(ctx, item.step.target, true);
+    if (targets.length === 0) return;
+    for (const target of targets) {
+      applyMotionPreviewStep(target, item.step, localProgress);
+    }
+  }
+}
+
+function resolveMotionPreviewTargets(
+  ctx: InteractionsPanelContext,
+  target: MotionSequenceStep['target'],
+  reportMissing: boolean,
+): HTMLElement[] {
+  const root = ctx.root;
+  if (!root) {
+    if (reportMissing) ctx.setStatus('Motion Sequence preview root is missing', 'error');
+    return [];
+  }
+  const query = (selector: string) => Array.from(root.querySelectorAll<HTMLElement>(selector));
+  let nodes: HTMLElement[] = [];
+  if (target.type === 'site') {
+    nodes = [root];
+  } else if (target.type === 'page') {
+    nodes = query('[data-opencanvas-page="' + cssAttrEscape(target.pageId) + '"]');
+  } else if (target.type === 'section') {
+    nodes = query('[data-opencanvas-section="' + cssAttrEscape(target.sectionId) + '"]');
+  } else if (target.type === 'element') {
+    nodes = query('[data-opencanvas-element="' + cssAttrEscape(target.elementId) + '"]');
+  } else if (target.type === 'text-split') {
+    nodes = query(
+      '[data-opencanvas-element="' + cssAttrEscape(target.elementId) + '"] .opencanvas-text-split',
+    );
+  }
+  if (nodes.length === 0 && reportMissing) {
+    ctx.setStatus('Motion Sequence preview target missing: ' + motionPreviewTargetLabel(target), 'error');
+  }
+  return nodes;
+}
+
+function cssAttrEscape(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function motionPreviewTargetLabel(target: MotionSequenceStep['target']): string {
+  if (target.type === 'site') return 'site';
+  if (target.type === 'page') return 'page ' + target.pageId;
+  if (target.type === 'section') return 'section ' + target.sectionId;
+  if (target.type === 'element') return 'element ' + target.elementId;
+  if (target.type === 'text-split') return 'text split ' + target.elementId + ' (' + target.unit + ')';
+  return (target as { type: string }).type;
+}
+
+function applyMotionPreviewStep(
+  node: HTMLElement,
+  step: MotionSequenceStep,
+  progress: number,
+): void {
+  node.setAttribute('data-opencanvas-motion-previewing', 'true');
+  const opacity = motionPreviewNumber(step, 'opacity', 1, progress);
+  if (opacity !== null) node.style.opacity = opacity.toFixed(3);
+  const transform = motionPreviewTransform(step, progress);
+  if (transform !== '') node.style.transform = transform;
+  const filter = motionPreviewText(step, 'filter', progress);
+  if (filter !== null) node.style.filter = filter;
+  const clipPath = motionPreviewText(step, 'clipPath', progress);
+  if (clipPath !== null) node.style.clipPath = clipPath;
+  const fontVariation = motionPreviewFontVariation(step, progress);
+  if (fontVariation !== '') node.style.fontVariationSettings = fontVariation;
+  const strokeDasharray = motionPreviewNumber(step, 'strokeDasharray', 0, progress);
+  if (strokeDasharray !== null) node.style.strokeDasharray = strokeDasharray.toFixed(2);
+  const strokeDashoffset = motionPreviewNumber(step, 'strokeDashoffset', 0, progress);
+  if (strokeDashoffset !== null) node.style.strokeDashoffset = strokeDashoffset.toFixed(2);
+}
+
+function motionPreviewNumber(
+  step: MotionSequenceStep,
+  key: EditableMotionNumber,
+  defaultValue: number,
+  progress: number,
+): number | null {
+  const from = step.from?.[key];
+  const to = step.to?.[key];
+  if (from === undefined && to === undefined) return null;
+  const start = typeof from === 'number' ? from : defaultValue;
+  const end = typeof to === 'number' ? to : start;
+  return start + (end - start) * progress;
+}
+
+function motionPreviewText(
+  step: MotionSequenceStep,
+  key: EditableMotionText,
+  progress: number,
+): string | null {
+  const from = step.from?.[key];
+  const to = step.to?.[key];
+  if (from === undefined && to === undefined) return null;
+  if (progress >= 1 && typeof to === 'string') return to;
+  if (typeof from === 'string') return from;
+  return typeof to === 'string' ? to : null;
+}
+
+function motionPreviewTransform(step: MotionSequenceStep, progress: number): string {
+  const translateX = motionPreviewNumber(step, 'translateX', 0, progress);
+  const translateY = motionPreviewNumber(step, 'translateY', 0, progress);
+  const scale = motionPreviewNumber(step, 'scale', 1, progress);
+  const rotate = motionPreviewNumber(step, 'rotate', 0, progress);
+  const parts: string[] = [];
+  if (translateX !== null || translateY !== null) {
+    parts.push('translate(' + String(translateX ?? 0) + 'px,' + String(translateY ?? 0) + 'px)');
+  }
+  if (scale !== null) parts.push('scale(' + scale.toFixed(4) + ')');
+  if (rotate !== null) parts.push('rotate(' + rotate.toFixed(3) + 'deg)');
+  return parts.join(' ');
+}
+
+function motionPreviewFontVariation(step: MotionSequenceStep, progress: number): string {
+  const weight = motionPreviewNumber(step, 'fontVariationWeight', 400, progress);
+  const width = motionPreviewNumber(step, 'fontVariationWidth', 100, progress);
+  const slant = motionPreviewNumber(step, 'fontVariationSlant', 0, progress);
+  const parts: string[] = [];
+  if (weight !== null) parts.push('"wght" ' + weight.toFixed(2));
+  if (width !== null) parts.push('"wdth" ' + width.toFixed(2));
+  if (slant !== null) parts.push('"slnt" ' + slant.toFixed(2));
+  return parts.join(', ');
 }
 
 function motionSequenceTimelineLaneKey(step: MotionSequenceStep): string {

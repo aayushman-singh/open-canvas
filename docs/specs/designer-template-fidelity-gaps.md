@@ -217,6 +217,11 @@ Current state:
 - **June 2026 update:** The Timeline overview now groups steps into target
   lanes and shows explicit snap handles, so overlapping element/text/section
   choreography is readable before field-level edits.
+- **June 2026 update:** The Timeline overview now includes a scrub-preview
+  slider. Moving it advances the playhead and applies interpolated Motion
+  Sequence styles to the same editor canvas targets selected by the schema
+  target relation; missing targets surface an editor error instead of silently
+  doing nothing.
 
 User-visible miss:
 
@@ -681,13 +686,13 @@ Current state:
 - The Interactions sidebar tab exposes Load Experience, Route Transition,
   Overlays, and Motion Sequence Lite step lists.
 - Full Motion Sequence cards include a Timeline overview with visual bars,
-  target lanes, and snap handles for step start/duration. Step editing remains
-  form-based.
+  target lanes, snap handles, and scrub preview for step start/duration. Step
+  editing remains form-based.
 
 User-visible miss:
 
-- Template authors can inspect choreography as a lane-based timeline, but
-  cannot yet drag bars or scrub preview from the timeline overview.
+- Template authors can inspect and scrub choreography as a lane-based timeline,
+  but cannot yet drag bars from the timeline overview.
 - Long sequences still require field-level editing for detailed timing changes.
 
 Needed primitive:
