@@ -338,6 +338,42 @@ html, body {
 .opencanvas-collection[data-collection-display="image-only"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="media"] .opencanvas-media {
   border-radius: var(--opencanvas-collection-image-only-radius, 0);
 }
+.opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] {
+  align-items: stretch;
+}
+.opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry {
+  cursor: pointer;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: var(--opencanvas-kit-radius, 18px);
+  transition: transform 220ms ease, opacity 220ms ease, filter 220ms ease;
+}
+.opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry::after {
+  content: "";
+  position: absolute;
+  inset: auto 14px 14px 14px;
+  height: 2px;
+  background: var(--opencanvas-kit-accent, currentColor);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 220ms ease;
+  z-index: 10;
+}
+.opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry[data-opencanvas-collection-entry-active="true"] {
+  transform: translateY(-6px);
+  filter: saturate(1.08);
+}
+.opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry[data-opencanvas-collection-entry-active="true"]::after {
+  transform: scaleX(1);
+}
+.opencanvas-collection[data-opencanvas-collection-gallery-reduced="instant"] .opencanvas-collection-entry,
+.opencanvas-collection[data-opencanvas-collection-gallery-reduced="instant"] .opencanvas-collection-entry::after {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry { transition: none; }
+  .opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry::after { transition: none; }
+}
 
 /* ---- Forms ------------------------------------------------------------
    Visitor-facing form chrome. Browsers' default form widgets look broken

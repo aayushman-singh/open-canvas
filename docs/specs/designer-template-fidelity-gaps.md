@@ -698,3 +698,9 @@ adding disconnected one-off runtimes.
 Status: addressed for the schema-owned fullscreen menu presentation slice. Owners can set an Overlay presentation to `fullscreen-menu`, keep authoring the content through the existing `Overlay.content` Canvas Section, preview it from the Interactions panel, and publish explicit overlay presentation/content-canvas metadata consumed by the Runtime Hydrator. Unsupported presentation modes now fail validation instead of degrading to modal behaviour.
 
 Intentional deferral: richer nested overlay-canvas editing affordances, overlay-specific layout presets, and menu choreography presets remain outside this slice; Motion Sequence Lite can already animate the overlay surface/backdrop.
+
+### 18. Collection Gallery v2 Hover Reveal Detail
+
+Status: addressed for the schema-owned Collection gallery v2 slice. A Collection can now opt into `gallery.mode = hover-reveal-detail` with explicit inline detail and reduced-motion policies; the renderer emits collection/entry metadata, the Runtime Hydrator owns active-entry state, the inspector exposes owner controls, and invalid gallery modes fail validation.
+
+Intentional deferral: this does not add a 3D helmet viewer or marketplace media inventory; gallery entries continue to be materialized Collection content and can compose existing media/text/card primitives.

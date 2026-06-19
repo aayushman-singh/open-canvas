@@ -811,6 +811,13 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
   if (el.folder !== undefined) out.set('folder', el.folder);
   if (el.display !== undefined) out.set('display', el.display);
   if (el.sort !== undefined) out.set('sort', el.sort);
+  if (el.gallery !== undefined) {
+    const gallery = new Y.Map<unknown>();
+    gallery.set('mode', el.gallery.mode);
+    gallery.set('detailMode', el.gallery.detailMode);
+    gallery.set('reducedMotion', el.gallery.reducedMotion);
+    out.set('gallery', gallery);
+  }
   if (el.manualOrder !== undefined) {
     const arr = new Y.Array<string>();
     for (const id of el.manualOrder) arr.push([id]);
@@ -1603,6 +1610,21 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
   }
   if (map.has('manualOrder')) {
     el.manualOrder = (map.get('manualOrder') as Y.Array<string>).toArray();
+  }
+  if (map.has('gallery')) {
+    const rawGallery = map.get('gallery');
+    if (!(rawGallery instanceof Y.Map)) {
+      throw new Error(`Collection element ${el.id}: gallery must decode from a Y.Map`);
+    }
+    el.gallery = {
+      mode: rawGallery.get('mode') as NonNullable<CollectionElement['gallery']>['mode'],
+      detailMode: rawGallery.get('detailMode') as NonNullable<
+        CollectionElement['gallery']
+      >['detailMode'],
+      reducedMotion: rawGallery.get('reducedMotion') as NonNullable<
+        CollectionElement['gallery']
+      >['reducedMotion'],
+    };
   }
   if (map.has('entries')) {
     const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;

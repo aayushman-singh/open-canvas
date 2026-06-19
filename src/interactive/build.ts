@@ -25,6 +25,7 @@
 import { ACCORDION_RUNTIME_SRC } from './accordion.js';
 import { BEHAVIOUR_RUNTIME_SRC } from './behaviour.js';
 import { CAROUSEL_RUNTIME_SRC } from './carousel.js';
+import { COLLECTION_GALLERY_RUNTIME_SRC } from './collection-gallery.js';
 import { LOAD_EXPERIENCE_RUNTIME_SRC } from './load-experience.js';
 import { MARQUEE_RUNTIME_SRC } from './marquee.js';
 import { MOTION_SEQUENCE_LITE_RUNTIME_SRC } from './motion-sequence-lite.js';
@@ -44,6 +45,7 @@ export const INTERACTIVE_RUNTIME_SRC: string = [
   '(function(){',
   ACCORDION_RUNTIME_SRC,
   CAROUSEL_RUNTIME_SRC,
+  COLLECTION_GALLERY_RUNTIME_SRC,
   POINTER_FX_RUNTIME_SRC,
   POPUP_RUNTIME_SRC,
   MOTION_SEQUENCE_LITE_RUNTIME_SRC,

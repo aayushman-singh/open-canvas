@@ -56,6 +56,22 @@ export type CollectionDisplay = (typeof COLLECTION_DISPLAYS)[number];
 export const COLLECTION_SORTS = ['date-desc', 'date-asc', 'manual'] as const;
 export type CollectionSort = (typeof COLLECTION_SORTS)[number];
 
+export const COLLECTION_GALLERY_MODES = ['hover-reveal-detail'] as const;
+export type CollectionGalleryMode = (typeof COLLECTION_GALLERY_MODES)[number];
+
+export const COLLECTION_GALLERY_DETAIL_MODES = ['inline-panel'] as const;
+export type CollectionGalleryDetailMode = (typeof COLLECTION_GALLERY_DETAIL_MODES)[number];
+
+export const COLLECTION_GALLERY_REDUCED_MOTION_MODES = ['instant', 'allow'] as const;
+export type CollectionGalleryReducedMotionMode =
+  (typeof COLLECTION_GALLERY_REDUCED_MOTION_MODES)[number];
+
+export interface CollectionGalleryBehaviour {
+  mode: CollectionGalleryMode;
+  detailMode: CollectionGalleryDetailMode;
+  reducedMotion: CollectionGalleryReducedMotionMode;
+}
+
 export interface CollectionStyle {
   gridGap?: number;
   cardBackgroundColor?: string;
@@ -109,6 +125,12 @@ export interface CollectionElement extends BaseElement {
    * tightens.
    */
   display?: CollectionDisplay;
+
+  /**
+   * Gallery v2 behaviour: hover/focus reveal plus active inline detail state.
+   * Optional because absence means the Collection renders in its normal display mode.
+   */
+  gallery?: CollectionGalleryBehaviour;
 
   /**
    * Per-entry instances written by the materializer (ADR 0063 dec 6).
@@ -182,18 +204,30 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
   const slugAttr = el.collectionSlug !== undefined ? escapeAttr(el.collectionSlug) : '';
   const folderAttr = el.folder !== undefined ? escapeAttr(el.folder) : '';
   const sortAttr = readSortString(el);
-  const entriesHtml = renderCollectionEntries(el, ctx);
+  const gallery = readGalleryBehaviour(el);
+  const galleryAttrs = gallery
+    ?
+      ` data-opencanvas-collection-gallery="${escapeAttr(gallery.mode)}"` +
+      ` data-opencanvas-collection-gallery-detail="${escapeAttr(gallery.detailMode)}"` +
+      ` data-opencanvas-collection-gallery-reduced-motion="${escapeAttr(gallery.reducedMotion)}"`
+    : '';
+  const entriesHtml = renderCollectionEntries(el, ctx, gallery);
   return (
     `<div class="opencanvas-collection" data-opencanvas-interactive="collection"` +
     ` data-collection-display="${escapeAttr(displayAttr)}"` +
     ` data-collection-sort="${escapeAttr(sortAttr)}"` +
     ` data-collection-slug="${slugAttr}"` +
     ` data-collection-folder="${folderAttr}"` +
+    galleryAttrs +
     ` style="${escapeAttr(frameStyle)}">${entriesHtml}</div>`
   );
 }
 
-function renderCollectionEntries(el: CollectionElement, ctx: CollectionRenderCtx): string {
+function renderCollectionEntries(
+  el: CollectionElement,
+  ctx: CollectionRenderCtx,
+  gallery: CollectionGalleryBehaviour | null,
+): string {
   const entries = el.entries ?? [];
   if (entries.length === 0) return '';
   if (typeof ctx.renderChild !== 'function') {
@@ -211,9 +245,15 @@ function renderCollectionEntries(el: CollectionElement, ctx: CollectionRenderCtx
         ['flex', '0 0 auto'],
       ]);
       const childrenHtml = entry.map((child) => ctx.renderChild!(child)).join('');
+      const galleryAttrs = gallery
+        ?
+          ` data-opencanvas-collection-entry-active="${idx === 0 ? 'true' : 'false'}"` +
+          ` role="button" tabindex="0" aria-expanded="${idx === 0 ? 'true' : 'false'}"`
+        : '';
       return (
         `<div class="opencanvas-collection-entry"` +
         ` data-opencanvas-collection-entry="${String(idx)}"` +
+        galleryAttrs +
         ` style="${escapeAttr(entryStyle)}">${childrenHtml}</div>`
       );
     })
@@ -228,6 +268,36 @@ function entryBounds(entry: readonly CanvasElement[]): { w: number; h: number } 
     h = Math.max(h, child.box.y + child.box.h);
   }
   return { w, h };
+}
+
+function readGalleryBehaviour(el: CollectionElement): CollectionGalleryBehaviour | null {
+  if (el.gallery === undefined) return null;
+  if (!(COLLECTION_GALLERY_MODES as readonly string[]).includes(el.gallery.mode)) {
+    throw new Error(
+      `Collection element ${el.id}: gallery.mode has malformed value ${JSON.stringify(
+        el.gallery.mode,
+      )}; expected one of ${COLLECTION_GALLERY_MODES.join(' | ')}.`,
+    );
+  }
+  if (!(COLLECTION_GALLERY_DETAIL_MODES as readonly string[]).includes(el.gallery.detailMode)) {
+    throw new Error(
+      `Collection element ${el.id}: gallery.detailMode has malformed value ${JSON.stringify(
+        el.gallery.detailMode,
+      )}; expected one of ${COLLECTION_GALLERY_DETAIL_MODES.join(' | ')}.`,
+    );
+  }
+  if (
+    !(COLLECTION_GALLERY_REDUCED_MOTION_MODES as readonly string[]).includes(
+      el.gallery.reducedMotion,
+    )
+  ) {
+    throw new Error(
+      `Collection element ${el.id}: gallery.reducedMotion has malformed value ${JSON.stringify(
+        el.gallery.reducedMotion,
+      )}; expected one of ${COLLECTION_GALLERY_REDUCED_MOTION_MODES.join(' | ')}.`,
+    );
+  }
+  return el.gallery;
 }
 
 function readSortString(el: CollectionElement): CollectionSort {

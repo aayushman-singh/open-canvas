@@ -50,8 +50,16 @@ import {
   type MotionSequence,
   type MotionSequenceStep,
 } from '../canvas/behaviour-primitives.js';
-import type { CollectionElement, CollectionSort } from '../canvas/elements/collection.js';
-import { COLLECTION_DISPLAYS, COLLECTION_SORTS } from '../canvas/elements/collection.js';
+import type {
+  CollectionElement,
+  CollectionGalleryReducedMotionMode,
+  CollectionSort,
+} from '../canvas/elements/collection.js';
+import {
+  COLLECTION_DISPLAYS,
+  COLLECTION_GALLERY_REDUCED_MOTION_MODES,
+  COLLECTION_SORTS,
+} from '../canvas/elements/collection.js';
 import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
 import { templateHasAnyPlaceholder } from '../canvas/elements/collection-materializer.js';
 import { renderSectionInspector } from './section-inspector.js';
@@ -1635,6 +1643,56 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
     ctx.renderInspector();
   });
   inspector.appendChild(field('Display', displaySelect));
+
+  const galleryModeSelect = document.createElement('select');
+  const galleryOff = document.createElement('option');
+  galleryOff.value = 'off';
+  galleryOff.textContent = 'Off';
+  galleryModeSelect.appendChild(galleryOff);
+  const galleryReveal = document.createElement('option');
+  galleryReveal.value = 'hover-reveal-detail';
+  galleryReveal.textContent = 'Hover reveal + detail';
+  galleryModeSelect.appendChild(galleryReveal);
+  galleryModeSelect.value = collection.gallery?.mode ?? 'off';
+  galleryModeSelect.addEventListener('change', () => {
+    ctx.captureForUndo();
+    if (galleryModeSelect.value === 'off') {
+      delete collection.gallery;
+    } else {
+      collection.gallery = {
+        mode: 'hover-reveal-detail',
+        detailMode: 'inline-panel',
+        reducedMotion: collection.gallery?.reducedMotion ?? 'allow',
+      };
+    }
+    ctx.rebuildElement(collection.id);
+    ctx.scheduleSave();
+    ctx.renderInspector();
+  });
+  inspector.appendChild(field('Collection gallery', galleryModeSelect));
+
+  if (collection.gallery?.mode === 'hover-reveal-detail') {
+    const reducedMotionSelect = document.createElement('select');
+    for (const mode of COLLECTION_GALLERY_REDUCED_MOTION_MODES) {
+      const option = document.createElement('option');
+      option.value = mode;
+      option.textContent = mode === 'instant' ? 'Instant under reduced motion' : 'Allow motion';
+      reducedMotionSelect.appendChild(option);
+    }
+    reducedMotionSelect.value = collection.gallery.reducedMotion;
+    reducedMotionSelect.addEventListener('change', () => {
+      ctx.captureForUndo();
+      collection.gallery = {
+        mode: 'hover-reveal-detail',
+        detailMode: 'inline-panel',
+        reducedMotion: reducedMotionSelect.value as CollectionGalleryReducedMotionMode,
+      };
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+      ctx.renderInspector();
+    });
+    inspector.appendChild(field('Gallery reduced motion', reducedMotionSelect));
+  }
 
   mountComponentStyle(ctx, collection, inspector);
 

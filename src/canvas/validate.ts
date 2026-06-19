@@ -7,7 +7,13 @@
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import { CUSTOM_404_PAGE_SLUG } from './page-routing.js';
 import { ACCORDION_VARIANTS } from './elements/accordion.js';
-import { COLLECTION_DISPLAYS, COLLECTION_SORTS } from './elements/collection.js';
+import {
+  COLLECTION_DISPLAYS,
+  COLLECTION_GALLERY_DETAIL_MODES,
+  COLLECTION_GALLERY_MODES,
+  COLLECTION_GALLERY_REDUCED_MOTION_MODES,
+  COLLECTION_SORTS,
+} from './elements/collection.js';
 import type { CollectionDisplay, CollectionSort } from './elements/collection.js';
 import { escapeCssValue } from './elements/render-utils.js';
 import { isAllowedHref } from './action-href.js';
@@ -1614,6 +1620,30 @@ function validateElement(
           `${basePath}.display`,
           errors,
         );
+      }
+      if (element.gallery !== undefined) {
+        if (!isRecord(element.gallery)) {
+          errors.push(`${basePath}.gallery must be an object when present`);
+        } else {
+          assertOneOf(
+            element.gallery.mode,
+            COLLECTION_GALLERY_MODES,
+            `${basePath}.gallery.mode`,
+            errors,
+          );
+          assertOneOf(
+            element.gallery.detailMode,
+            COLLECTION_GALLERY_DETAIL_MODES,
+            `${basePath}.gallery.detailMode`,
+            errors,
+          );
+          assertOneOf(
+            element.gallery.reducedMotion,
+            COLLECTION_GALLERY_REDUCED_MOTION_MODES,
+            `${basePath}.gallery.reducedMotion`,
+            errors,
+          );
+        }
       }
       // `manualOrder` is required-shape iff `sort === 'manual'`, optional
       // (but if present must be string[]) otherwise. Stale ids are stripped

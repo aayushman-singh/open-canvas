@@ -43,6 +43,7 @@ function hydrateAll(scope, options) {
   // idempotent, so running it every hydrateAll (incl. live-publish re-hydrate)
   // is safe.
   hydratePremiumInteractions(rootScope, options || {});
+  hydrateCollectionGalleries(rootScope);
   hydrateBehaviour(rootScope);
   hydrateMarquees(rootScope);
   hydrateVideoHoverStreams(rootScope);
