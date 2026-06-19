@@ -70,6 +70,11 @@ function buildValidState(): EditableSite & Record<string, unknown> {
       enterLabel: 'Enter site',
       background: '#050505',
       foreground: '#f5f5f5',
+      progress: {
+        display: 'bar-number',
+        durationMs: 900,
+        label: 'Loading',
+      },
       sequenceId: 'sequence-load',
     },
     motionSequences: [
@@ -178,6 +183,16 @@ expectInvalid(
 const missingLoadSequence = structuredClone(validState);
 (missingLoadSequence.loadExperience as { sequenceId: string }).sequenceId = 'missing-sequence';
 expectInvalid(missingLoadSequence, 'loadExperience.sequenceId', 'load experience missing sequence');
+
+const invalidLoadProgress = structuredClone(validState);
+(invalidLoadProgress.loadExperience as { progress: Record<string, unknown> }).progress = {
+  display: 'spinner',
+  durationMs: -1,
+  label: '',
+};
+expectInvalid(invalidLoadProgress, 'loadExperience.progress.display', 'load progress display');
+expectInvalid(invalidLoadProgress, 'loadExperience.progress.durationMs', 'load progress duration');
+expectInvalid(invalidLoadProgress, 'loadExperience.progress.label', 'load progress label');
 
 const unsupportedProperty = structuredClone(validState);
 (

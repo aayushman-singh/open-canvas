@@ -407,6 +407,11 @@ function baseSnapshot(): PublishedSnapshot {
       enterLabel: 'Enter',
       background: '#111112',
       foreground: '#C8FF1A',
+      progress: {
+        display: 'bar-number',
+        durationMs: 900,
+        label: 'Loading',
+      },
       sequenceId: 'load-sequence',
     },
     motionSequences: [
@@ -490,6 +495,15 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   const enter = new StubElement('button');
   enter.setAttribute('data-opencanvas-load-enter', '');
   load.appendChild(enter);
+  const progress = new StubElement('div');
+  progress.setAttribute('data-opencanvas-load-progress', 'bar-number');
+  const progressNumber = new StubElement('span');
+  progressNumber.setAttribute('data-opencanvas-load-progress-number', '');
+  const progressBar = new StubElement('span');
+  progressBar.setAttribute('data-opencanvas-load-progress-bar', '');
+  progress.appendChild(progressNumber);
+  progress.appendChild(progressBar);
+  load.appendChild(progress);
   doc.body.appendChild(load);
 
   const section = new StubElement('section');
@@ -523,6 +537,22 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   const html = renderCanvasSnapshot(snapshot, '/assets', 'site-behaviour-smoke', {
     turnstileSiteKey: 'test-key',
   });
+  assert(
+    html.includes('data-opencanvas-load-progress-display="bar-number"'),
+    'rendered load experience must emit progress display metadata',
+  );
+  assert(
+    html.includes('data-opencanvas-load-progress-number'),
+    'rendered load experience must include progress number node',
+  );
+  assert(
+    BEHAVIOUR_RUNTIME_SRC.includes('behaviourHydrateLoadProgress'),
+    'behaviour runtime must hydrate load progress choreography',
+  );
+  assert(
+    BEHAVIOUR_RUNTIME_SRC.includes('load-progress-number-missing'),
+    'behaviour runtime must fail loudly when progress number node is missing',
+  );
   mountRenderedHtml(doc, html);
   runBehaviour(doc, win, StubImage);
   const load = doc.querySelector('[data-opencanvas-load-experience="load-main"]');
@@ -530,6 +560,12 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(
     load.getAttribute('data-opencanvas-load-hydrated') === 'true',
     'load experience must be marked hydrated',
+  );
+  assert(
+    load.querySelector('[data-opencanvas-load-progress="bar-number"]')?.getAttribute(
+      'data-opencanvas-load-progress-hydrated',
+    ) === 'true',
+    'load progress choreography must be marked hydrated',
   );
 }
 

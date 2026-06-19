@@ -49,6 +49,7 @@ import type {
 import {
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
+  LOAD_PROGRESS_DISPLAY_MODES,
   MOTION_SEQUENCE_PLAYBACK_DIRECTIONS,
   MOTION_SEQUENCE_REPEAT_MODES,
   MOTION_SEQUENCE_TRIGGER_TYPES,
@@ -113,6 +114,7 @@ type RiveInputType = (typeof RIVE_INPUT_TYPES)[number];
 type RiveInputEvent = (typeof RIVE_INPUT_EVENTS)[number];
 type MotionSequenceRepeatMode = (typeof MOTION_SEQUENCE_REPEAT_MODES)[number];
 type MotionSequencePlaybackDirection = (typeof MOTION_SEQUENCE_PLAYBACK_DIRECTIONS)[number];
+type LoadProgressDisplayMode = (typeof LOAD_PROGRESS_DISPLAY_MODES)[number];
 type ShaderScenePreset = (typeof SHADER_SCENE_PRESETS)[number];
 type ShaderSceneReducedMotionMode = (typeof SHADER_SCENE_REDUCED_MOTION_MODES)[number];
 type VideoStreamTrigger = (typeof VIDEO_STREAM_TRIGGERS)[number];
@@ -396,6 +398,11 @@ function defaultBehaviourLoadExperience(ctx: InteractionsPanelContext): Behaviou
     enterLabel: 'Enter site',
     background: '#050505',
     foreground: '#ffffff',
+    progress: {
+      display: 'bar-number',
+      durationMs: 1200,
+      label: 'Loading',
+    },
     sequenceId: existing?.id ?? 'load-enter-sequence',
   };
 }
@@ -2130,6 +2137,59 @@ function renderBehaviourLoadControls(
   );
   wrap.appendChild(field('Foreground', foreground));
 
+  const progressDisplay = selectInput(
+    [...LOAD_PROGRESS_DISPLAY_MODES],
+    load.progress?.display ?? 'hidden',
+  );
+  progressDisplay.addEventListener('change', () => {
+    const display = progressDisplay.value as LoadProgressDisplayMode;
+    updateBehaviourLoadProgress(
+      ctx,
+      display === 'hidden'
+        ? undefined
+        : {
+            display,
+            durationMs: load.progress?.durationMs ?? 1200,
+            label: load.progress?.label ?? 'Loading',
+          },
+    );
+  });
+  wrap.appendChild(field('Progress display', progressDisplay));
+
+  const progressDuration = numberInput(load.progress?.durationMs ?? 1200, 0, 30000, 100);
+  progressDuration.disabled = !load.progress || load.progress.display === 'hidden';
+  progressDuration.addEventListener('change', () => {
+    const value = Number(progressDuration.value);
+    if (!Number.isFinite(value) || value < 0 || value > 30000) {
+      ctx.setStatus('Load progress duration must be 0-30000ms', 'error');
+      progressDuration.value = String(load.progress?.durationMs ?? 1200);
+      return;
+    }
+    updateBehaviourLoadProgress(ctx, {
+      display: load.progress?.display ?? 'bar-number',
+      durationMs: value,
+      label: load.progress?.label ?? 'Loading',
+    });
+  });
+  wrap.appendChild(field('Progress duration', progressDuration));
+
+  const progressLabel = textInput(load.progress?.label ?? 'Loading', 'Loading');
+  progressLabel.disabled = !load.progress || load.progress.display === 'hidden';
+  progressLabel.addEventListener('change', () => {
+    const value = progressLabel.value.trim();
+    if (value.length === 0) {
+      ctx.setStatus('Load progress label cannot be empty', 'error');
+      progressLabel.value = load.progress?.label ?? 'Loading';
+      return;
+    }
+    updateBehaviourLoadProgress(ctx, {
+      display: load.progress?.display ?? 'bar-number',
+      durationMs: load.progress?.durationMs ?? 1200,
+      label: value,
+    });
+  });
+  wrap.appendChild(field('Progress label', progressLabel));
+
   const sequences = loadEnterSequences(ctx);
   const sequenceIds = sequences.map((sequence) => sequence.id);
   if (sequenceIds.length > 0) {
@@ -2158,6 +2218,23 @@ function renderBehaviourLoadControls(
   const preview = actionButton('Preview enter moment', 'Show the behaviour load experience in the editor');
   preview.addEventListener('click', () => ctx.previewLoadExperience());
   wrap.appendChild(preview);
+}
+
+function updateBehaviourLoadProgress(
+  ctx: InteractionsPanelContext,
+  progress: BehaviourLoadExperience['progress'] | undefined,
+): void {
+  mutate(ctx, () => {
+    const current = ctx.state!.loadExperience;
+    if (!isBehaviourLoadExperience(current)) return;
+    const next: BehaviourLoadExperience = { ...current };
+    if (progress === undefined) {
+      delete next.progress;
+    } else {
+      next.progress = progress;
+    }
+    ctx.state!.loadExperience = next;
+  });
 }
 
 function updateBehaviourLoadText(

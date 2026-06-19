@@ -160,6 +160,8 @@ equal(shaderAsset.reducedMotion, 'static', 'shader reduced-motion default');
 const panelSrc = await Bun.file(new URL('./interactions-panel.ts', import.meta.url)).text();
 assert(panelSrc.includes('BehaviourLoadExperience'), 'panel must import behaviour load experience');
 assert(panelSrc.includes('Use designer enter moment'), 'panel must expose designer load mode');
+assert(panelSrc.includes('LOAD_PROGRESS_DISPLAY_MODES'), 'panel must use load progress display modes');
+assert(panelSrc.includes('Progress display'), 'panel must expose load progress display control');
 assert(panelSrc.includes('Create linked sequence'), 'panel must restore missing load-enter sequence');
 assert(panelSrc.includes('Linked load-enter Motion Sequence is missing'), 'panel must fail loudly for missing behaviour load sequence');
 assert(panelSrc.includes('renderScrollSceneControls'), 'panel must render scroll scene controls');

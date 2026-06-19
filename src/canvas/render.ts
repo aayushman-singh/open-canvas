@@ -769,6 +769,9 @@ function renderScrollBehaviourCss(scrollBehavior: PublishedSnapshot['scrollBehav
 function renderLoadExperienceChrome(load: BehaviourLoadExperience): string {
   const background = escapeCssValue(load.background) || load.background;
   const foreground = escapeCssValue(load.foreground) || load.foreground;
+  const progressAttrs = load.progress
+    ? ` data-opencanvas-load-progress-display="${escapeAttr(load.progress.display)}" data-opencanvas-load-progress-duration-ms="${escapeAttr(String(load.progress.durationMs))}"`
+    : '';
   const style = styleFromEntries([
     ['position', 'fixed'],
     ['inset', '0'],
@@ -780,7 +783,24 @@ function renderLoadExperienceChrome(load: BehaviourLoadExperience): string {
     ['background', background],
     ['color', foreground],
   ]);
-  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}" style="${style}"><div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div><button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
+  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}"${progressAttrs} style="${style}"><div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div>${renderBehaviourLoadProgress(load)}<button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
+}
+
+function renderBehaviourLoadProgress(load: BehaviourLoadExperience): string {
+  const progress = load.progress;
+  if (!progress || progress.display === 'hidden') return '';
+  const label = progress.label
+    ? `<div class="opencanvas-load-progress-label">${escapeHtml(progress.label)}</div>`
+    : '';
+  const bar =
+    progress.display === 'bar' || progress.display === 'bar-number'
+      ? `<span class="opencanvas-load-progress-bar" data-opencanvas-load-progress-bar></span>`
+      : '';
+  const number =
+    progress.display === 'number' || progress.display === 'bar-number'
+      ? `<span class="opencanvas-load-progress-number" data-opencanvas-load-progress-number>0</span>`
+      : '';
+  return `<div class="opencanvas-load-progress" data-opencanvas-load-progress="${escapeAttr(progress.display)}">${label}${bar}${number}</div>`;
 }
 
 function serializeJsonScriptData(value: unknown): string {

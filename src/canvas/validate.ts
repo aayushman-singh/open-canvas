@@ -55,6 +55,7 @@ import {
   BEHAVIOUR_TARGET_TYPES,
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
+  LOAD_PROGRESS_DISPLAY_MODES,
   MOTION_SEQUENCE_PLAYBACK_DIRECTIONS,
   MOTION_SEQUENCE_PROPERTIES,
   MOTION_SEQUENCE_REPEAT_MODES,
@@ -2925,6 +2926,32 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
       assertNonEmptyString(state.loadExperience.background, 'loadExperience.background', errors);
       assertNonEmptyString(state.loadExperience.foreground, 'loadExperience.foreground', errors);
       assertNonEmptyString(state.loadExperience.sequenceId, 'loadExperience.sequenceId', errors);
+      if (state.loadExperience.progress !== undefined) {
+        if (!isRecord(state.loadExperience.progress)) {
+          errors.push('loadExperience.progress must be an object when present');
+        } else {
+          assertOneOf(
+            state.loadExperience.progress.display,
+            LOAD_PROGRESS_DISPLAY_MODES,
+            'loadExperience.progress.display',
+            errors,
+          );
+          if (
+            !isFiniteNumber(state.loadExperience.progress.durationMs) ||
+            state.loadExperience.progress.durationMs < 0 ||
+            state.loadExperience.progress.durationMs > 30000
+          ) {
+            errors.push('loadExperience.progress.durationMs must be a finite number between 0 and 30000');
+          }
+          if (state.loadExperience.progress.label !== undefined) {
+            assertNonEmptyString(
+              state.loadExperience.progress.label,
+              'loadExperience.progress.label',
+              errors,
+            );
+          }
+        }
+      }
     } else if (!('enabled' in state.loadExperience)) {
       errors.push(
         'loadExperience must be a premium load experience (enabled/preset) or behaviour load chrome (label/sequenceId)',

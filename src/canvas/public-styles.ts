@@ -1376,6 +1376,39 @@ const variantCss = String.raw`
   background: var(--opencanvas-kit-accent, currentColor);
   animation: opencanvas-load-progress 1200ms ease-in-out infinite;
 }
+.opencanvas-load-progress[data-opencanvas-load-progress] {
+  display: grid;
+  gap: 8px;
+  width: min(280px, 64vw);
+  height: auto;
+  background: transparent;
+  overflow: visible;
+}
+.opencanvas-load-progress[data-opencanvas-load-progress] .opencanvas-load-progress-label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+.opencanvas-load-progress[data-opencanvas-load-progress] .opencanvas-load-progress-bar {
+  display: block;
+  width: 100%;
+  height: 3px;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: currentColor;
+  animation: none;
+}
+.opencanvas-load-progress[data-opencanvas-load-progress] .opencanvas-load-progress-number {
+  display: block;
+  width: auto;
+  height: auto;
+  transform: none;
+  background: transparent;
+  animation: none;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
 @keyframes opencanvas-load-progress {
   from { transform: translateX(-100%); }
   to { transform: translateX(100%); }

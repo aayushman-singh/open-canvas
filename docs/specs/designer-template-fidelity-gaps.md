@@ -264,13 +264,18 @@ Current state:
   Behaviour Load Experience enter moment used by designer templates: editable
   label, enter label, foreground/background colours, and a linked `load-enter`
   Motion Sequence with a restore gate when the relation is missing.
+- **June 2026 update:** Behaviour Load Experience now has schema-owned progress
+  choreography for hidden, bar, number, or bar+number displays. The renderer
+  emits explicit progress metadata/nodes, the Behaviour runtime drives the
+  counter and bar, and the Interactions panel exposes display, duration, and
+  label controls.
 
 User-visible miss:
 
 - Cannot reproduce branded preloaders, progress numbers, logo draws, mask
   openings, media-readiness gates, or first-load page reveals.
-- Cannot yet author custom progress numbers, logo draws, media-readiness maps,
-  or run policy for the Behaviour Load Experience model.
+- Cannot yet author logo draws, media-readiness maps, or run policy for the
+  Behaviour Load Experience model.
 
 Needed primitive:
 

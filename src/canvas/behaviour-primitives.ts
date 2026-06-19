@@ -28,6 +28,7 @@ export const SHADER_SCENE_PRESETS = ['aurora-flow', 'racing-lines', 'particle-fi
 export const SHADER_SCENE_REDUCED_MOTION_MODES = ['static', 'animate'] as const;
 export const VIDEO_STREAM_TRIGGERS = ['hover-focus', 'click-toggle', 'load'] as const;
 export const VIDEO_STREAM_REDUCED_MOTION_MODES = ['poster', 'play'] as const;
+export const LOAD_PROGRESS_DISPLAY_MODES = ['hidden', 'bar', 'number', 'bar-number'] as const;
 export const RIVE_INPUT_TYPES = ['boolean', 'number', 'trigger'] as const;
 export const RIVE_INPUT_EVENTS = [
   'pointer-enter',
@@ -203,6 +204,11 @@ export interface LoadExperience {
   enterLabel: string;
   background: string;
   foreground: string;
+  progress?: {
+    display: (typeof LOAD_PROGRESS_DISPLAY_MODES)[number];
+    durationMs: number;
+    label?: string;
+  };
   sequenceId: string;
 }
 

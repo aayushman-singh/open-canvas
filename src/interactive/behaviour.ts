@@ -1106,7 +1106,9 @@ function behaviourHydrateLoadExperience(load, payload, root) {
   node.setAttribute('data-opencanvas-load-hydrated', 'true');
   var enter = node.querySelector('[data-opencanvas-load-enter]');
   var sequence = behaviourFindSequence(payload, load.sequenceId);
+  var finishProgress = behaviourHydrateLoadProgress(node, load);
   function dismiss() {
+    finishProgress();
     node.setAttribute('data-opencanvas-load-hidden', 'true');
     node.style.pointerEvents = 'none';
     node.style.opacity = '0';
@@ -1119,6 +1121,63 @@ function behaviourHydrateLoadExperience(load, payload, root) {
       dismiss();
     });
   }
+}
+
+function behaviourHydrateLoadProgress(node, load) {
+  var progress = load.progress;
+  if (!progress || progress.display === 'hidden') return function(){};
+  var display = progress.display;
+  if (display !== 'bar' && display !== 'number' && display !== 'bar-number') {
+    behaviourFailure('load-progress-display', { loadExperienceId: load.id, display: display }, new Error('unsupported load progress display'));
+  }
+  var duration = Number(progress.durationMs);
+  if (!isFinite(duration) || duration < 0 || duration > 30000) {
+    behaviourFailure('load-progress-duration', { loadExperienceId: load.id, durationMs: progress.durationMs }, new Error('invalid load progress duration'));
+  }
+  var progressNode = node.querySelector('[data-opencanvas-load-progress]');
+  if (!progressNode) {
+    behaviourFailure('load-progress-missing', { loadExperienceId: load.id }, new Error('load progress node missing'));
+  }
+  var numberNode = display === 'number' || display === 'bar-number'
+    ? progressNode.querySelector('[data-opencanvas-load-progress-number]')
+    : null;
+  if ((display === 'number' || display === 'bar-number') && !numberNode) {
+    behaviourFailure('load-progress-number-missing', { loadExperienceId: load.id }, new Error('load progress number node missing'));
+  }
+  var barNode = display === 'bar' || display === 'bar-number'
+    ? progressNode.querySelector('[data-opencanvas-load-progress-bar]')
+    : null;
+  if ((display === 'bar' || display === 'bar-number') && !barNode) {
+    behaviourFailure('load-progress-bar-missing', { loadExperienceId: load.id }, new Error('load progress bar node missing'));
+  }
+  progressNode.setAttribute('data-opencanvas-load-progress-hydrated', 'true');
+  var done = false;
+  var started = Date.now();
+  var interval = null;
+  function setProgress(value) {
+    var clamped = Math.max(0, Math.min(100, Math.round(value)));
+    if (numberNode) numberNode.textContent = String(clamped);
+    if (barNode) barNode.style.transform = 'scaleX(' + (clamped / 100).toFixed(3) + ')';
+    progressNode.setAttribute('data-opencanvas-load-progress-value', String(clamped));
+  }
+  function finish() {
+    if (done) return;
+    done = true;
+    if (interval !== null) window.clearInterval(interval);
+    setProgress(100);
+  }
+  if (duration === 0) {
+    finish();
+    return finish;
+  }
+  interval = window.setInterval(function(){
+    var elapsed = Date.now() - started;
+    var pct = Math.min(100, elapsed / duration * 100);
+    setProgress(pct);
+    if (pct >= 100) finish();
+  }, 50);
+  setProgress(0);
+  return finish;
 }
 
 function behaviourAttrValue(value) {
