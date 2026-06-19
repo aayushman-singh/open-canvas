@@ -376,5 +376,7 @@ assert(panelSource.includes('Repeat mode'), 'Interactions panel must expose Moti
 assert(panelSource.includes('Playback direction'), 'Interactions panel must expose Motion Sequence playback direction');
 assert(panelSource.includes('Wait after'), 'Interactions panel must expose Motion Sequence wait-after controls');
 assert(panelSource.includes('Stroke dash offset'), 'Interactions panel must expose Motion Sequence stroke-draw controls');
+assert(panelSource.includes('Clip path'), 'Interactions panel must expose Motion Sequence clip-path controls');
+assert(panelSource.includes('Filter'), 'Interactions panel must expose Motion Sequence filter controls');
 
 console.log('[motion-sequence-repeat:smoke] OK');

@@ -1482,6 +1482,7 @@ type EditableMotionNumber =
   | 'rotate'
   | 'strokeDasharray'
   | 'strokeDashoffset';
+type EditableMotionText = 'clipPath' | 'filter';
 type MotionPropertySide = 'from' | 'to';
 
 const MOTION_TARGET_TYPES = ['site', 'page', 'section', 'element', 'text-split'] as const;
@@ -1499,6 +1500,14 @@ const MOTION_NUMBER_FIELDS: Array<{
   { key: 'rotate', label: 'Rotate', min: -1080, max: 1080, step: 1 },
   { key: 'strokeDasharray', label: 'Stroke dash array', min: 0, max: 10000, step: 1 },
   { key: 'strokeDashoffset', label: 'Stroke dash offset', min: -10000, max: 10000, step: 1 },
+];
+const MOTION_TEXT_FIELDS: Array<{
+  key: EditableMotionText;
+  label: string;
+  placeholder: string;
+}> = [
+  { key: 'clipPath', label: 'Clip path', placeholder: 'inset(0 0 0 0)' },
+  { key: 'filter', label: 'Filter', placeholder: 'blur(0px) contrast(1)' },
 ];
 
 function renderMotionSequenceControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
@@ -1860,6 +1869,11 @@ function renderMotionPropertyGroup(
     );
     card.appendChild(field((side === 'from' ? 'From ' : 'To ') + spec.label, input));
   }
+  for (const spec of MOTION_TEXT_FIELDS) {
+    const input = optionalMotionTextInput(motionTextValue(step[side], spec.key), spec.placeholder);
+    input.addEventListener('change', () => updateMotionStepTextProperty(ctx, sequence.id, step, side, spec.key, input));
+    card.appendChild(field((side === 'from' ? 'From ' : 'To ') + spec.label, input));
+  }
 }
 
 function optionalNumberInput(
@@ -1887,6 +1901,24 @@ function motionNumberValue(
     const parsed = Number(value);
     if (Number.isFinite(parsed)) return parsed;
   }
+  return undefined;
+}
+
+function optionalMotionTextInput(value: string | undefined, placeholder: string): HTMLInputElement {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = placeholder;
+  input.value = value ?? '';
+  return input;
+}
+
+function motionTextValue(
+  props: MotionSequenceStep['from'] | MotionSequenceStep['to'] | undefined,
+  key: EditableMotionText,
+): string | undefined {
+  const value = props?.[key];
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
   return undefined;
 }
 
@@ -1919,6 +1951,30 @@ function updateMotionStepProperty(
     return;
   }
   current[key] = next;
+  mutate(ctx, () => updateScrollSequenceStep(ctx, sequenceId, step.id, { [side]: current }));
+}
+
+function updateMotionStepTextProperty(
+  ctx: InteractionsPanelContext,
+  sequenceId: string,
+  step: MotionSequenceStep,
+  side: MotionPropertySide,
+  key: EditableMotionText,
+  input: HTMLInputElement,
+): void {
+  const value = input.value.trim();
+  const current = { ...(step[side] ?? {}) };
+  if (value.length === 0) {
+    delete current[key];
+    if (side === 'to' && Object.keys(current).length === 0) {
+      ctx.setStatus('Motion Sequence "to" properties need at least one value', 'error');
+      input.value = motionTextValue(step[side], key) ?? '';
+      return;
+    }
+    mutate(ctx, () => updateScrollSequenceStep(ctx, sequenceId, step.id, { [side]: current }));
+    return;
+  }
+  current[key] = value;
   mutate(ctx, () => updateScrollSequenceStep(ctx, sequenceId, step.id, { [side]: current }));
 }
 
