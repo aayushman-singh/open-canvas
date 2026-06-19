@@ -335,6 +335,34 @@ html, body {
 .opencanvas-collection-entry {
   position: relative;
 }
+.opencanvas-collection-filter[data-opencanvas-collection-filter-controls] {
+  flex: 0 0 100%;
+  width: 100%;
+  margin: 0 0 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.opencanvas-collection-filter-chip {
+  border: 1px solid color-mix(in oklab, currentColor 20%, transparent);
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.opencanvas-collection-filter-chip[data-opencanvas-collection-filter-active="true"] {
+  border-color: var(--opencanvas-kit-accent, currentColor);
+  background: var(--opencanvas-kit-accent, currentColor);
+  color: var(--opencanvas-kit-accent-text, var(--opencanvas-kit-bg, #0c0c0d));
+  transform: translateY(-1px);
+}
+.opencanvas-collection[data-opencanvas-collection-filter-reduced="instant"] .opencanvas-collection-filter-chip {
+  transition: none;
+}
 .opencanvas-collection-search[data-opencanvas-collection-search-controls] {
   flex: 0 0 100%;
   width: 100%;
@@ -485,6 +513,7 @@ html, body {
   .opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry { transition: none; }
   .opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry::after { transition: none; }
   .opencanvas-collection[data-opencanvas-collection-gallery="drag-slider"] .opencanvas-collection-entry { transition: none; }
+  .opencanvas-collection-filter-chip { transition: none; }
   .opencanvas-collection-gallery-progress-dot { transition: none; }
 }
 

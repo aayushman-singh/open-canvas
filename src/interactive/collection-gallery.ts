@@ -32,6 +32,19 @@ function emitCollectionSearchFailure(root, code, message, cause) {
 function normaliseCollectionSearchText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
+function updateCollectionQueryVisibility(collectionRoot, entries, empty) {
+  var visible = 0;
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i];
+    var searchMatch = entry.getAttribute('data-opencanvas-collection-entry-search-match') !== 'false';
+    var filterMatch = entry.getAttribute('data-opencanvas-collection-entry-filter-match') !== 'false';
+    var matched = searchMatch && filterMatch;
+    entry.hidden = !matched;
+    if (matched) visible += 1;
+  }
+  collectionRoot.setAttribute('data-opencanvas-collection-visible-count', String(visible));
+  if (empty) empty.hidden = visible !== 0;
+}
 function wireCollectionSearch(collectionRoot) {
   var reducedMotion = collectionRoot.getAttribute('data-opencanvas-collection-search-reduced-motion');
   if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
@@ -47,21 +60,85 @@ function wireCollectionSearch(collectionRoot) {
   if (reduce && reducedMotion === 'instant') collectionRoot.setAttribute('data-opencanvas-collection-search-reduced', 'instant');
   function applySearch() {
     var query = normaliseCollectionSearchText(input.value);
-    var visible = 0;
     for (var i = 0; i < entries.length; i++) {
       var entry = entries[i];
       var text = normaliseCollectionSearchText(entry.textContent);
       var matched = query.length === 0 || text.indexOf(query) !== -1;
-      entry.hidden = !matched;
       entry.setAttribute('data-opencanvas-collection-entry-search-match', matched ? 'true' : 'false');
-      if (matched) visible += 1;
     }
     collectionRoot.setAttribute('data-opencanvas-collection-search-query', query);
-    collectionRoot.setAttribute('data-opencanvas-collection-search-visible-count', String(visible));
-    if (empty) empty.hidden = visible !== 0;
+    updateCollectionQueryVisibility(collectionRoot, entries, empty);
   }
   input.addEventListener('input', applySearch);
   applySearch();
+}
+function collectionEntryMatchesFilter(collectionRoot, entry, field, value) {
+  if (value === '__all__') return true;
+  if (field === 'folder') {
+    return entry.getAttribute('data-opencanvas-collection-entry-folder') === value;
+  }
+  if (field === 'category') {
+    return entry.getAttribute('data-opencanvas-collection-entry-category') === value;
+  }
+  if (field === 'tag') {
+    var rawTags = entry.getAttribute('data-opencanvas-collection-entry-tags') || '[]';
+    try {
+      var parsed = JSON.parse(rawTags);
+      if (!parsed || typeof parsed.length !== 'number') return false;
+      for (var i = 0; i < parsed.length; i++) {
+        if (parsed[i] === value) return true;
+      }
+      return false;
+    } catch (err) {
+      emitCollectionSearchFailure(collectionRoot, 'invalid-filter-tags', 'Collection filter tag metadata must be valid JSON', err);
+    }
+  }
+  return false;
+}
+function wireCollectionFilter(collectionRoot) {
+  var field = collectionRoot.getAttribute('data-opencanvas-collection-filter');
+  var reducedMotion = collectionRoot.getAttribute('data-opencanvas-collection-filter-reduced-motion');
+  if (field !== 'folder' && field !== 'category' && field !== 'tag') {
+    emitCollectionSearchFailure(collectionRoot, 'invalid-filter-field', 'Collection filter field must be folder, category, or tag', field);
+  }
+  if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
+    emitCollectionSearchFailure(collectionRoot, 'invalid-filter-reduced-motion', 'Collection filter reduced-motion mode must be instant or allow', reducedMotion);
+  }
+  var entries = collectionRoot.querySelectorAll('[data-opencanvas-collection-entry]');
+  var buttons = collectionRoot.querySelectorAll('[data-opencanvas-collection-filter-option]');
+  if (!buttons || buttons.length === 0) {
+    emitCollectionSearchFailure(collectionRoot, 'missing-filter-options', 'Collection filter requires rendered option buttons', null);
+  }
+  var reduce = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce && reducedMotion === 'instant') collectionRoot.setAttribute('data-opencanvas-collection-filter-reduced', 'instant');
+  function setActive(value) {
+    var matchedButton = false;
+    for (var b = 0; b < buttons.length; b++) {
+      var buttonValue = buttons[b].getAttribute('data-opencanvas-collection-filter-option') || '__all__';
+      var active = buttonValue === value;
+      buttons[b].setAttribute('data-opencanvas-collection-filter-active', active ? 'true' : 'false');
+      buttons[b].setAttribute('aria-pressed', active ? 'true' : 'false');
+      if (active) matchedButton = true;
+    }
+    if (!matchedButton) {
+      emitCollectionSearchFailure(collectionRoot, 'missing-default-filter', 'Collection filter default must match a rendered option', value);
+    }
+    for (var i = 0; i < entries.length; i++) {
+      var matched = collectionEntryMatchesFilter(collectionRoot, entries[i], field, value);
+      entries[i].setAttribute('data-opencanvas-collection-entry-filter-match', matched ? 'true' : 'false');
+    }
+    collectionRoot.setAttribute('data-opencanvas-collection-filter-active-value', value);
+    updateCollectionQueryVisibility(collectionRoot, entries, null);
+  }
+  for (var c = 0; c < buttons.length; c++) {
+    (function (button) {
+      button.addEventListener('click', function (ev) {
+        if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+        setActive(button.getAttribute('data-opencanvas-collection-filter-option') || '__all__');
+      });
+    })(buttons[c]);
+  }
+  setActive(collectionRoot.getAttribute('data-opencanvas-collection-filter-default') || '__all__');
 }
 function scheduleCollectionGalleryFrame(callback) {
   if (typeof window !== 'undefined' && window.requestAnimationFrame) {
@@ -169,19 +246,25 @@ function hydrateCollectionGalleries(scope) {
     root &&
     root.getAttribute &&
     (root.getAttribute('data-opencanvas-collection-gallery') ||
-      root.getAttribute('data-opencanvas-collection-search') === 'true')
+      root.getAttribute('data-opencanvas-collection-search') === 'true' ||
+      root.getAttribute('data-opencanvas-collection-filter') !== null)
   ) nodes.push(root);
   if (root && root.querySelectorAll) {
-    var found = root.querySelectorAll('[data-opencanvas-collection-gallery],[data-opencanvas-collection-search="true"]');
+    var found = root.querySelectorAll('[data-opencanvas-collection-gallery],[data-opencanvas-collection-search="true"],[data-opencanvas-collection-filter]');
     for (var i = 0; i < found.length; i++) nodes.push(found[i]);
   }
   for (var n = 0; n < nodes.length; n++) {
     (function (galleryRoot) {
       var hasGallery = galleryRoot.getAttribute('data-opencanvas-collection-gallery') !== null;
       var hasSearch = galleryRoot.getAttribute('data-opencanvas-collection-search') === 'true';
+      var hasFilter = galleryRoot.getAttribute('data-opencanvas-collection-filter') !== null;
       if (hasSearch && galleryRoot.getAttribute('data-opencanvas-collection-search-hydrated') !== 'true') {
         wireCollectionSearch(galleryRoot);
         galleryRoot.setAttribute('data-opencanvas-collection-search-hydrated', 'true');
+      }
+      if (hasFilter && galleryRoot.getAttribute('data-opencanvas-collection-filter-hydrated') !== 'true') {
+        wireCollectionFilter(galleryRoot);
+        galleryRoot.setAttribute('data-opencanvas-collection-filter-hydrated', 'true');
       }
       if (!hasGallery) return;
       if (galleryRoot.getAttribute('data-opencanvas-collection-gallery-hydrated') === 'true') return;

@@ -59,6 +59,8 @@ import {
 } from '../canvas/behaviour-primitives.js';
 import type {
   CollectionElement,
+  CollectionFilterField,
+  CollectionFilterReducedMotionMode,
   CollectionGalleryAxis,
   CollectionGalleryReducedMotionMode,
   CollectionSearchReducedMotionMode,
@@ -66,6 +68,8 @@ import type {
 } from '../canvas/elements/collection.js';
 import {
   COLLECTION_DISPLAYS,
+  COLLECTION_FILTER_FIELDS,
+  COLLECTION_FILTER_REDUCED_MOTION_MODES,
   COLLECTION_GALLERY_AXES,
   COLLECTION_GALLERY_REDUCED_MOTION_MODES,
   COLLECTION_SEARCH_REDUCED_MOTION_MODES,
@@ -2384,6 +2388,126 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
       ctx.scheduleSave();
     });
     inspector.appendChild(field('Search empty message', searchEmptyMessage));
+  }
+
+  const filterChipsEnabled = document.createElement('input');
+  filterChipsEnabled.type = 'checkbox';
+  filterChipsEnabled.checked = collection.filterChips?.enabled === true;
+  filterChipsEnabled.addEventListener('change', () => {
+    ctx.captureForUndo();
+    if (filterChipsEnabled.checked) {
+      collection.filterChips = collection.filterChips ?? {
+        enabled: true,
+        field: 'category',
+        reducedMotion: 'allow',
+        options: [{ label: 'Featured', value: 'featured' }],
+      };
+    } else {
+      delete collection.filterChips;
+    }
+    ctx.rebuildElement(collection.id);
+    ctx.scheduleSave();
+    ctx.renderInspector();
+  });
+  inspector.appendChild(field('Collection filter chips', filterChipsEnabled));
+
+  if (collection.filterChips?.enabled === true) {
+    const filterField = selectInput(COLLECTION_FILTER_FIELDS, collection.filterChips.field);
+    filterField.addEventListener('change', () => {
+      ctx.captureForUndo();
+      collection.filterChips = {
+        ...collection.filterChips!,
+        enabled: true,
+        field: filterField.value as CollectionFilterField,
+      };
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+    });
+    inspector.appendChild(field('Filter field', filterField));
+
+    const filterReduced = selectInput(
+      COLLECTION_FILTER_REDUCED_MOTION_MODES,
+      collection.filterChips.reducedMotion,
+    );
+    filterReduced.addEventListener('change', () => {
+      ctx.captureForUndo();
+      collection.filterChips = {
+        ...collection.filterChips!,
+        enabled: true,
+        reducedMotion: filterReduced.value as CollectionFilterReducedMotionMode,
+      };
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+    });
+    inspector.appendChild(field('Filter reduced motion', filterReduced));
+
+    const filterOptions = document.createElement('textarea');
+    filterOptions.rows = 4;
+    filterOptions.spellcheck = false;
+    filterOptions.value = collection.filterChips.options
+      .map((option) => option.label + '=' + option.value)
+      .join('\n');
+    filterOptions.addEventListener('change', () => {
+      const options = filterOptions.value
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => {
+          const eq = line.indexOf('=');
+          if (eq < 0) return { label: line, value: line };
+          return {
+            label: line.slice(0, eq).trim(),
+            value: line.slice(eq + 1).trim(),
+          };
+        })
+        .filter((option) => option.label.length > 0 && option.value.length > 0);
+      if (options.length === 0) {
+        ctx.setStatus('Filter options require at least one non-empty option.', 'error');
+        filterOptions.value = collection.filterChips!.options
+          .map((option) => option.label + '=' + option.value)
+          .join('\n');
+        return;
+      }
+      ctx.captureForUndo();
+      const values = new Set(options.map((option) => option.value));
+      collection.filterChips = {
+        ...collection.filterChips!,
+        enabled: true,
+        options,
+        ...(collection.filterChips!.defaultValue !== undefined &&
+        values.has(collection.filterChips!.defaultValue)
+          ? { defaultValue: collection.filterChips!.defaultValue }
+          : {}),
+      };
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+      ctx.renderInspector();
+    });
+    inspector.appendChild(field('Filter options', filterOptions));
+
+    const filterDefault = document.createElement('select');
+    const allDefault = document.createElement('option');
+    allDefault.value = '__all__';
+    allDefault.textContent = 'All entries';
+    filterDefault.appendChild(allDefault);
+    for (const option of collection.filterChips.options) {
+      const opt = document.createElement('option');
+      opt.value = option.value;
+      opt.textContent = option.label;
+      filterDefault.appendChild(opt);
+    }
+    filterDefault.value = collection.filterChips.defaultValue ?? '__all__';
+    filterDefault.addEventListener('change', () => {
+      ctx.captureForUndo();
+      if (filterDefault.value === '__all__') {
+        delete collection.filterChips!.defaultValue;
+      } else {
+        collection.filterChips!.defaultValue = filterDefault.value;
+      }
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+    });
+    inspector.appendChild(field('Default filter', filterDefault));
   }
 
   mountComponentStyle(ctx, collection, inspector);

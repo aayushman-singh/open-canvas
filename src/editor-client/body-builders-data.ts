@@ -27,6 +27,8 @@ import type { CarouselElement } from '../canvas/elements/carousel.js';
 import type { ChartElement } from '../canvas/elements/chart.js';
 import type { CodeElement } from '../canvas/elements/code.js';
 import type {
+  CollectionEntryMetadata,
+  CollectionFilterBehaviour,
   CollectionElement,
   CollectionSearchBehaviour,
 } from '../canvas/elements/collection.js';
@@ -814,9 +816,17 @@ export function buildCollectionBodyImpl(
     node.setAttribute('data-opencanvas-collection-search', 'true');
     node.setAttribute('data-opencanvas-collection-search-reduced-motion', element.search.reducedMotion);
   }
+  if (element.filterChips?.enabled === true) {
+    node.setAttribute('data-opencanvas-collection-filter', element.filterChips.field);
+    node.setAttribute('data-opencanvas-collection-filter-reduced-motion', element.filterChips.reducedMotion);
+    if (element.filterChips.defaultValue !== undefined) {
+      node.setAttribute('data-opencanvas-collection-filter-default', element.filterChips.defaultValue);
+    }
+  }
   node.style.display = 'grid';
   node.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
   node.style.gap = '8px';
+  appendCollectionFilterControls(node, element.filterChips);
   appendCollectionSearchControls(node, element.search);
   for (let i = 0; i < entries.length; i++) {
     const raw = entries[i];
@@ -824,6 +834,7 @@ export function buildCollectionBodyImpl(
     const card = document.createElement('div');
     card.className = 'opencanvas-collection-entry';
     card.setAttribute('data-opencanvas-collection-entry', String(i));
+    applyCollectionEntryMetadata(card, element.entryMetadata?.[i]);
     card.style.position = 'relative';
     card.style.minHeight = '80px';
     for (let j = 0; j < entry.length; j++) {
@@ -833,6 +844,40 @@ export function buildCollectionBodyImpl(
     node.appendChild(card);
   }
   return node;
+}
+
+function appendCollectionFilterControls(
+  host: HTMLElement,
+  filter: CollectionFilterBehaviour | undefined,
+): void {
+  if (filter?.enabled !== true) return;
+  const controls = document.createElement('div');
+  controls.className = 'opencanvas-collection-filter';
+  controls.setAttribute('data-opencanvas-collection-filter-controls', '');
+  controls.style.gridColumn = '1 / -1';
+
+  const all = document.createElement('button');
+  all.type = 'button';
+  all.className = 'opencanvas-collection-filter-chip';
+  all.setAttribute('data-opencanvas-collection-filter-option', '__all__');
+  const allActive = filter.defaultValue === undefined;
+  all.setAttribute('data-opencanvas-collection-filter-active', String(allActive));
+  all.setAttribute('aria-pressed', String(allActive));
+  all.textContent = 'All';
+  controls.appendChild(all);
+
+  for (const option of filter.options) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'opencanvas-collection-filter-chip';
+    button.setAttribute('data-opencanvas-collection-filter-option', option.value);
+    const active = filter.defaultValue === option.value;
+    button.setAttribute('data-opencanvas-collection-filter-active', String(active));
+    button.setAttribute('aria-pressed', String(active));
+    button.textContent = option.label;
+    controls.appendChild(button);
+  }
+  host.appendChild(controls);
 }
 
 function appendCollectionSearchControls(
@@ -871,6 +916,20 @@ function appendCollectionSearchControls(
   controls.appendChild(empty);
 
   host.appendChild(controls);
+}
+
+function applyCollectionEntryMetadata(
+  node: HTMLElement,
+  metadata: CollectionEntryMetadata | undefined,
+): void {
+  if (metadata === undefined) return;
+  node.setAttribute('data-opencanvas-collection-entry-slug', metadata.slug);
+  node.setAttribute('data-opencanvas-collection-entry-title', metadata.title);
+  if (metadata.folder !== null) {
+    node.setAttribute('data-opencanvas-collection-entry-folder', metadata.folder);
+  }
+  node.setAttribute('data-opencanvas-collection-entry-category', metadata.category);
+  node.setAttribute('data-opencanvas-collection-entry-tags', JSON.stringify(metadata.tags));
 }
 
 export function buildTabsBodyImpl(ctx: BuildTabsBodyContext, element: TabsElement): HTMLElement {

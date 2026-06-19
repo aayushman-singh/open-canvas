@@ -1178,4 +1178,36 @@ function makeOwnerAuthoredCustomTemplate(): CanvasElement[] {
   );
 }
 
+// (23) Materialized Collections preserve per-entry metadata for runtime-owned
+//      filter chips. The matrix remains the visual child payload; metadata is
+//      aligned by index and never inferred from rendered text.
+{
+  const collection = makeCollectionElement({ display: 'card' });
+  const entries: MaterializerEntry[] = [
+    makeEntry({
+      slug: 'road-helmet',
+      title: 'Road Helmet',
+      folder: 'helmets',
+      category: 'road',
+      tags: ['aero', 'race'],
+      publishedDate: '2026-02-01T00:00:00.000Z',
+    }),
+    makeEntry({
+      slug: 'rain-helmet',
+      title: 'Rain Helmet',
+      folder: 'garage',
+      category: 'wet',
+      tags: ['rain'],
+      publishedDate: '2026-01-01T00:00:00.000Z',
+    }),
+  ];
+  const out = materializeCollections(makeSite([makeOrdinaryPageWithCollection(collection)]), entries);
+  const hydrated = getCollectionFrom(out);
+  assert(hydrated.entryMetadata?.length === 2, '(23) writes one metadata row per materialized entry');
+  assert(hydrated.entryMetadata[0]!.slug === 'road-helmet', '(23) metadata follows rendered order');
+  assert(hydrated.entryMetadata[0]!.folder === 'helmets', '(23) metadata preserves folder');
+  assert(hydrated.entryMetadata[0]!.category === 'road', '(23) metadata preserves category');
+  assert(hydrated.entryMetadata[0]!.tags.join('|') === 'aero|race', '(23) metadata preserves tags');
+}
+
 console.log('[collection-materializer:smoke] OK');

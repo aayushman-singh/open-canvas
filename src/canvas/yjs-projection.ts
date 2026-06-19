@@ -865,6 +865,39 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
     }
     out.set('search', search);
   }
+  if (el.filterChips !== undefined) {
+    const filterChips = new Y.Map<unknown>();
+    filterChips.set('enabled', el.filterChips.enabled);
+    filterChips.set('field', el.filterChips.field);
+    filterChips.set('reducedMotion', el.filterChips.reducedMotion);
+    const options = new Y.Array<Y.Map<unknown>>();
+    for (const option of el.filterChips.options) {
+      const encodedOption = new Y.Map<unknown>();
+      encodedOption.set('label', option.label);
+      encodedOption.set('value', option.value);
+      options.push([encodedOption]);
+    }
+    filterChips.set('options', options);
+    if (el.filterChips.defaultValue !== undefined) {
+      filterChips.set('defaultValue', el.filterChips.defaultValue);
+    }
+    out.set('filterChips', filterChips);
+  }
+  if (el.entryMetadata !== undefined) {
+    const metadataRows = new Y.Array<Y.Map<unknown>>();
+    for (const metadata of el.entryMetadata) {
+      const row = new Y.Map<unknown>();
+      row.set('slug', metadata.slug);
+      row.set('title', metadata.title);
+      row.set('folder', metadata.folder);
+      row.set('category', metadata.category);
+      const tags = new Y.Array<string>();
+      for (const tag of metadata.tags) tags.push([tag]);
+      row.set('tags', tags);
+      metadataRows.push([row]);
+    }
+    out.set('entryMetadata', metadataRows);
+  }
   if (el.manualOrder !== undefined) {
     const arr = new Y.Array<string>();
     for (const id of el.manualOrder) arr.push([id]);
@@ -1752,6 +1785,60 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
     if (rawSearch.has('emptyMessage')) {
       el.search.emptyMessage = rawSearch.get('emptyMessage') as string;
     }
+  }
+  if (map.has('filterChips')) {
+    const rawFilter = map.get('filterChips');
+    if (!(rawFilter instanceof Y.Map)) {
+      throw new Error(`Collection element ${el.id}: filterChips must decode from a Y.Map`);
+    }
+    const rawOptions: unknown = rawFilter.get('options');
+    if (!(rawOptions instanceof Y.Array)) {
+      throw new Error(`Collection element ${el.id}: filterChips.options must decode from a Y.Array`);
+    }
+    const decodedOptions: NonNullable<CollectionElement['filterChips']>['options'] = rawOptions
+      .toArray()
+      .map((option: unknown) => {
+        if (!(option instanceof Y.Map)) {
+          throw new Error(`Collection element ${el.id}: filterChips option must decode from a Y.Map`);
+        }
+        return {
+          label: option.get('label') as string,
+          value: option.get('value') as string,
+        };
+      });
+    el.filterChips = {
+      enabled: rawFilter.get('enabled') === true,
+      field: rawFilter.get('field') as NonNullable<CollectionElement['filterChips']>['field'],
+      reducedMotion: rawFilter.get('reducedMotion') as NonNullable<
+        CollectionElement['filterChips']
+      >['reducedMotion'],
+      options: decodedOptions,
+    } as NonNullable<CollectionElement['filterChips']>;
+    if (rawFilter.has('defaultValue')) {
+      el.filterChips.defaultValue = rawFilter.get('defaultValue') as string;
+    }
+  }
+  if (map.has('entryMetadata')) {
+    const rawMetadata = map.get('entryMetadata');
+    if (!(rawMetadata instanceof Y.Array)) {
+      throw new Error(`Collection element ${el.id}: entryMetadata must decode from a Y.Array`);
+    }
+    el.entryMetadata = rawMetadata.toArray().map((row: unknown) => {
+      if (!(row instanceof Y.Map)) {
+        throw new Error(`Collection element ${el.id}: entryMetadata row must decode from a Y.Map`);
+      }
+      const tags: unknown = row.get('tags');
+      if (!(tags instanceof Y.Array)) {
+        throw new Error(`Collection element ${el.id}: entryMetadata.tags must decode from a Y.Array`);
+      }
+      return {
+        slug: row.get('slug') as string,
+        title: row.get('title') as string,
+        folder: row.get('folder') as string | null,
+        category: row.get('category') as string,
+        tags: tags.toArray() as string[],
+      };
+    });
   }
   if (map.has('entries')) {
     const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;

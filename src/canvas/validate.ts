@@ -9,6 +9,8 @@ import { CUSTOM_404_PAGE_SLUG } from './page-routing.js';
 import { ACCORDION_VARIANTS } from './elements/accordion.js';
 import {
   COLLECTION_DISPLAYS,
+  COLLECTION_FILTER_FIELDS,
+  COLLECTION_FILTER_REDUCED_MOTION_MODES,
   COLLECTION_GALLERY_AXES,
   COLLECTION_GALLERY_DETAIL_MODES,
   COLLECTION_GALLERY_MODES,
@@ -2015,6 +2017,99 @@ function validateElement(
               );
             }
           }
+        }
+      }
+      if (element.filterChips !== undefined) {
+        if (!isRecord(element.filterChips)) {
+          errors.push(`${basePath}.filterChips must be an object when present`);
+        } else {
+          if (element.filterChips.enabled !== true) {
+            errors.push(`${basePath}.filterChips.enabled must be true when filterChips is present`);
+          }
+          assertOneOf(
+            element.filterChips.field,
+            COLLECTION_FILTER_FIELDS,
+            `${basePath}.filterChips.field`,
+            errors,
+          );
+          assertOneOf(
+            element.filterChips.reducedMotion,
+            COLLECTION_FILTER_REDUCED_MOTION_MODES,
+            `${basePath}.filterChips.reducedMotion`,
+            errors,
+          );
+          if (!Array.isArray(element.filterChips.options)) {
+            errors.push(
+              `${basePath}.filterChips.options must be an array (got ${describe(element.filterChips.options)})`,
+            );
+            if (element.filterChips.defaultValue !== undefined) {
+              errors.push(
+                `${basePath}.filterChips.defaultValue must match one of filterChips.options[].value`,
+              );
+            }
+          } else if (element.filterChips.options.length === 0) {
+            errors.push(`${basePath}.filterChips.options must contain at least one option`);
+            if (element.filterChips.defaultValue !== undefined) {
+              errors.push(
+                `${basePath}.filterChips.defaultValue must match one of filterChips.options[].value`,
+              );
+            }
+          } else {
+            const values = new Set<string>();
+            element.filterChips.options.forEach((option, optionIdx) => {
+              const optionPath = `${basePath}.filterChips.options[${String(optionIdx)}]`;
+              if (!isRecord(option)) {
+                errors.push(`${optionPath} must be an object`);
+                return;
+              }
+              if (assertNonEmptyString(option.label, `${optionPath}.label`, errors)) {
+                if (option.label.length > 48) {
+                  errors.push(`${optionPath}.label exceeds the 48-char cap`);
+                }
+              }
+              if (assertNonEmptyString(option.value, `${optionPath}.value`, errors)) {
+                if (option.value.length > 64) {
+                  errors.push(`${optionPath}.value exceeds the 64-char cap`);
+                }
+                assertUnique(option.value, values, `${optionPath}.value`, 'across filterChips.options', errors);
+              }
+            });
+            if (
+              element.filterChips.defaultValue !== undefined &&
+              (!isNonEmptyString(element.filterChips.defaultValue) ||
+                !values.has(element.filterChips.defaultValue))
+            ) {
+              errors.push(
+                `${basePath}.filterChips.defaultValue must match one of filterChips.options[].value`,
+              );
+            }
+          }
+        }
+      }
+      if (element.entryMetadata !== undefined) {
+        if (!Array.isArray(element.entryMetadata)) {
+          errors.push(`${basePath}.entryMetadata must be an array when present`);
+        } else {
+          element.entryMetadata.forEach((metadata, metadataIdx) => {
+            const metadataPath = `${basePath}.entryMetadata[${String(metadataIdx)}]`;
+            if (!isRecord(metadata)) {
+              errors.push(`${metadataPath} must be an object`);
+              return;
+            }
+            assertNonEmptyString(metadata.slug, `${metadataPath}.slug`, errors);
+            assertNonEmptyString(metadata.title, `${metadataPath}.title`, errors);
+            if (metadata.folder !== null && metadata.folder !== undefined) {
+              assertNonEmptyString(metadata.folder, `${metadataPath}.folder`, errors);
+            }
+            assertNonEmptyString(metadata.category, `${metadataPath}.category`, errors);
+            if (!Array.isArray(metadata.tags)) {
+              errors.push(`${metadataPath}.tags must be an array`);
+            } else {
+              metadata.tags.forEach((tag, tagIdx) => {
+                assertNonEmptyString(tag, `${metadataPath}.tags[${String(tagIdx)}]`, errors);
+              });
+            }
+          });
         }
       }
       // `manualOrder` is required-shape iff `sort === 'manual'`, optional

@@ -75,6 +75,13 @@ export const COLLECTION_SEARCH_REDUCED_MOTION_MODES = ['instant', 'allow'] as co
 export type CollectionSearchReducedMotionMode =
   (typeof COLLECTION_SEARCH_REDUCED_MOTION_MODES)[number];
 
+export const COLLECTION_FILTER_FIELDS = ['folder', 'category', 'tag'] as const;
+export type CollectionFilterField = (typeof COLLECTION_FILTER_FIELDS)[number];
+
+export const COLLECTION_FILTER_REDUCED_MOTION_MODES = ['instant', 'allow'] as const;
+export type CollectionFilterReducedMotionMode =
+  (typeof COLLECTION_FILTER_REDUCED_MOTION_MODES)[number];
+
 export interface CollectionGalleryBehaviour {
   mode: CollectionGalleryMode;
   detailMode: CollectionGalleryDetailMode;
@@ -90,6 +97,27 @@ export interface CollectionSearchBehaviour {
   reducedMotion: CollectionSearchReducedMotionMode;
   placeholder?: string;
   emptyMessage?: string;
+}
+
+export interface CollectionFilterOption {
+  label: string;
+  value: string;
+}
+
+export interface CollectionFilterBehaviour {
+  enabled: true;
+  field: CollectionFilterField;
+  reducedMotion: CollectionFilterReducedMotionMode;
+  options: CollectionFilterOption[];
+  defaultValue?: string;
+}
+
+export interface CollectionEntryMetadata {
+  slug: string;
+  title: string;
+  folder: string | null;
+  category: string;
+  tags: string[];
 }
 
 export interface CollectionStyle {
@@ -169,6 +197,15 @@ export interface CollectionElement extends BaseElement {
   search?: CollectionSearchBehaviour;
 
   /**
+   * Owner-authored collection filter chips. Values are matched against
+   * materializer-written entryMetadata, not inferred from rendered text.
+   */
+  filterChips?: CollectionFilterBehaviour;
+
+  /** Materializer-written metadata aligned by index with entries. */
+  entryMetadata?: CollectionEntryMetadata[];
+
+  /**
    * Per-entry instances written by the materializer (ADR 0063 dec 6).
    * The materializer is the only writer; downstream renderers
    * (`canvas/render.ts`, `interactive/inject.ts`) iterate the matrix to
@@ -242,6 +279,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
   const sortAttr = readSortString(el);
   const gallery = readGalleryBehaviour(el);
   const search = readSearchBehaviour(el);
+  const filter = readFilterBehaviour(el);
   const galleryAttrs = gallery
     ?
       ` data-opencanvas-collection-gallery="${escapeAttr(gallery.mode)}"` +
@@ -259,6 +297,14 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
     ?
       ` data-opencanvas-collection-search="true"` +
       ` data-opencanvas-collection-search-reduced-motion="${escapeAttr(search.reducedMotion)}"`
+    : '';
+  const filterAttrs = filter
+    ?
+      ` data-opencanvas-collection-filter="${escapeAttr(filter.field)}"` +
+      ` data-opencanvas-collection-filter-reduced-motion="${escapeAttr(filter.reducedMotion)}"` +
+      (filter.defaultValue !== undefined
+        ? ` data-opencanvas-collection-filter-default="${escapeAttr(filter.defaultValue)}"`
+        : '')
     : '';
   const effectiveFrameStyle =
     gallery?.mode === 'drag-slider'
@@ -279,6 +325,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
   const entriesHtml = renderCollectionEntries(el, ctx, gallery);
   const progressHtml = renderCollectionGalleryProgress(el, gallery);
   const searchHtml = renderCollectionSearchControls(search);
+  const filterHtml = renderCollectionFilterControls(filter);
   const keyboardAttrs = gallery?.mode === 'drag-slider' ? ` tabindex="0"` : '';
   return (
     `<div class="opencanvas-collection" data-opencanvas-interactive="collection"` +
@@ -287,10 +334,33 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
     ` data-collection-slug="${slugAttr}"` +
     ` data-collection-folder="${folderAttr}"` +
     searchAttrs +
+    filterAttrs +
     galleryAttrs +
     keyboardAttrs +
-    ` style="${escapeAttr(effectiveFrameStyle)}">${searchHtml}${entriesHtml}${progressHtml}</div>`
+    ` style="${escapeAttr(effectiveFrameStyle)}">${filterHtml}${searchHtml}${entriesHtml}${progressHtml}</div>`
   );
+}
+
+function renderCollectionFilterControls(filter: CollectionFilterBehaviour | null): string {
+  if (filter === null) return '';
+  const allActive = filter.defaultValue === undefined;
+  const allButton =
+    `<button type="button" class="opencanvas-collection-filter-chip"` +
+    ` data-opencanvas-collection-filter-option="__all__"` +
+    ` data-opencanvas-collection-filter-active="${String(allActive)}"` +
+    ` aria-pressed="${String(allActive)}">All</button>`;
+  const optionButtons = filter.options
+    .map((option) => {
+      const active = option.value === filter.defaultValue;
+      return (
+        `<button type="button" class="opencanvas-collection-filter-chip"` +
+        ` data-opencanvas-collection-filter-option="${escapeAttr(option.value)}"` +
+        ` data-opencanvas-collection-filter-active="${String(active)}"` +
+        ` aria-pressed="${String(active)}">${escapeAttr(option.label)}</button>`
+      );
+    })
+    .join('');
+  return `<div class="opencanvas-collection-filter" data-opencanvas-collection-filter-controls>${allButton}${optionButtons}</div>`;
 }
 
 function renderCollectionSearchControls(search: CollectionSearchBehaviour | null): string {
@@ -347,6 +417,7 @@ function renderCollectionEntries(
   return entries
     .map((entry, idx) => {
       const bounds = entryBounds(entry);
+      const metadata = el.entryMetadata?.[idx] ?? null;
       const entryStyle = styleFromEntries([
         ['position', 'relative'],
         ['width', `${String(bounds.w)}px`],
@@ -361,14 +432,29 @@ function renderCollectionEntries(
           ` data-opencanvas-collection-entry-active="${idx === 0 ? 'true' : 'false'}"` +
           ` role="button" tabindex="0" aria-expanded="${idx === 0 ? 'true' : 'false'}"`
         : '';
+      const metadataAttrs = renderEntryMetadataAttrs(metadata);
       return (
         `<div class="opencanvas-collection-entry"` +
         ` data-opencanvas-collection-entry="${String(idx)}"` +
+        metadataAttrs +
         galleryAttrs +
         ` style="${escapeAttr(entryStyle)}">${childrenHtml}</div>`
       );
     })
     .join('');
+}
+
+function renderEntryMetadataAttrs(metadata: CollectionEntryMetadata | null): string {
+  if (metadata === null) return '';
+  return (
+    ` data-opencanvas-collection-entry-slug="${escapeAttr(metadata.slug)}"` +
+    ` data-opencanvas-collection-entry-title="${escapeAttr(metadata.title)}"` +
+    (metadata.folder !== null
+      ? ` data-opencanvas-collection-entry-folder="${escapeAttr(metadata.folder)}"`
+      : '') +
+    ` data-opencanvas-collection-entry-category="${escapeAttr(metadata.category)}"` +
+    ` data-opencanvas-collection-entry-tags="${escapeAttr(JSON.stringify(metadata.tags))}"`
+  );
 }
 
 function withGalleryVideoHover(
@@ -505,6 +591,56 @@ function readSearchBehaviour(el: CollectionElement): CollectionSearchBehaviour |
     }
   }
   return el.search;
+}
+
+function readFilterBehaviour(el: CollectionElement): CollectionFilterBehaviour | null {
+  if (el.filterChips === undefined) return null;
+  if (el.filterChips.enabled !== true) {
+    throw new Error(
+      `Collection element ${el.id}: filterChips.enabled must be true when filterChips is present.`,
+    );
+  }
+  if (!(COLLECTION_FILTER_FIELDS as readonly string[]).includes(el.filterChips.field)) {
+    throw new Error(
+      `Collection element ${el.id}: filterChips.field has malformed value ${JSON.stringify(
+        el.filterChips.field,
+      )}; expected one of ${COLLECTION_FILTER_FIELDS.join(' | ')}.`,
+    );
+  }
+  if (
+    !(COLLECTION_FILTER_REDUCED_MOTION_MODES as readonly string[]).includes(
+      el.filterChips.reducedMotion,
+    )
+  ) {
+    throw new Error(
+      `Collection element ${el.id}: filterChips.reducedMotion has malformed value ${JSON.stringify(
+        el.filterChips.reducedMotion,
+      )}; expected one of ${COLLECTION_FILTER_REDUCED_MOTION_MODES.join(' | ')}.`,
+    );
+  }
+  if (!Array.isArray(el.filterChips.options) || el.filterChips.options.length === 0) {
+    throw new Error(`Collection element ${el.id}: filterChips.options must contain at least one option.`);
+  }
+  const values = new Set<string>();
+  for (const option of el.filterChips.options) {
+    if (option.label.length === 0 || option.value.length === 0) {
+      throw new Error(
+        `Collection element ${el.id}: filterChips.options labels and values must be non-empty.`,
+      );
+    }
+    if (values.has(option.value)) {
+      throw new Error(
+        `Collection element ${el.id}: filterChips.options value "${option.value}" is duplicated.`,
+      );
+    }
+    values.add(option.value);
+  }
+  if (el.filterChips.defaultValue !== undefined && !values.has(el.filterChips.defaultValue)) {
+    throw new Error(
+      `Collection element ${el.id}: filterChips.defaultValue must match one of filterChips.options[].value.`,
+    );
+  }
+  return el.filterChips;
 }
 
 function readSortString(el: CollectionElement): CollectionSort {

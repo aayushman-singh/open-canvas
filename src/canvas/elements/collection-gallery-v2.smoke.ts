@@ -157,6 +157,29 @@ assert(
   searchValidation.valid ? 'valid collection search should pass' : searchValidation.errors.join('; '),
 );
 
+const filterCollection = makeCollection({
+  filterChips: {
+    enabled: true,
+    field: 'category',
+    reducedMotion: 'instant',
+    options: [
+      { label: 'Road', value: 'road' },
+      { label: 'Wet', value: 'wet' },
+    ],
+    defaultValue: 'road',
+  },
+  entryMetadata: [
+    { slug: 'first', title: 'First reveal', folder: 'helmets', category: 'road', tags: ['aero', 'race'] },
+    { slug: 'second', title: 'Second reveal', folder: 'garage', category: 'wet', tags: ['rain'] },
+  ],
+});
+const filterState = makeSite(filterCollection);
+const filterValidation = validateEditableSite(filterState);
+assert(
+  filterValidation.valid,
+  filterValidation.valid ? 'valid collection filter chips should pass' : filterValidation.errors.join('; '),
+);
+
 const invalidSearch = makeSite(
   makeCollection({
     search: {
@@ -176,6 +199,32 @@ assert(
 assert(
   invalidSearchResult.errors.some((error) => error.includes('search.placeholder')),
   `validation error must name search.placeholder; got ${invalidSearchResult.valid ? 'valid' : invalidSearchResult.errors.join(' | ')}`,
+);
+
+const invalidFilter = makeSite(
+  makeCollection({
+    filterChips: {
+      enabled: true,
+      field: 'driver',
+      reducedMotion: 'fade',
+      options: [],
+      defaultValue: 'missing',
+    },
+  } as unknown as Partial<CollectionElement>),
+);
+const invalidFilterResult = validateEditableSite(invalidFilter);
+assert(!invalidFilterResult.valid, 'invalid collection filter chip config must fail validation');
+assert(
+  invalidFilterResult.errors.some((error) => error.includes('filterChips.field')),
+  `validation error must name filterChips.field; got ${invalidFilterResult.valid ? 'valid' : invalidFilterResult.errors.join(' | ')}`,
+);
+assert(
+  invalidFilterResult.errors.some((error) => error.includes('filterChips.options')),
+  `validation error must name filterChips.options; got ${invalidFilterResult.valid ? 'valid' : invalidFilterResult.errors.join(' | ')}`,
+);
+assert(
+  invalidFilterResult.errors.some((error) => error.includes('filterChips.defaultValue')),
+  `validation error must name filterChips.defaultValue; got ${invalidFilterResult.valid ? 'valid' : invalidFilterResult.errors.join(' | ')}`,
 );
 
 const invalidDragSlider = makeSite(
@@ -284,6 +333,36 @@ assert(
   'renderer must emit owner-authored search empty-state copy',
 );
 
+const filterHtml = renderCollection(filterCollection, {
+  styleKit: 'charcoal',
+  assetBasePath: '/assets',
+  renderChild: (child) => `<span data-opencanvas-element="${child.id}"></span>`,
+});
+assert(
+  filterHtml.includes('data-opencanvas-collection-filter="category"'),
+  'renderer must emit collection filter field metadata',
+);
+assert(
+  filterHtml.includes('data-opencanvas-collection-filter-reduced-motion="instant"'),
+  'renderer must emit collection filter reduced-motion metadata',
+);
+assert(
+  filterHtml.includes('data-opencanvas-collection-filter-option="road"'),
+  'renderer must emit owner-authored filter option buttons',
+);
+assert(
+  filterHtml.includes('data-opencanvas-collection-filter-active="true"'),
+  'renderer must mark the default filter option active',
+);
+assert(
+  filterHtml.includes('data-opencanvas-collection-entry-category="road"'),
+  'renderer must emit per-entry category metadata',
+);
+assert(
+  filterHtml.includes('data-opencanvas-collection-entry-tags="[&quot;aero&quot;,&quot;race&quot;]"'),
+  'renderer must emit per-entry tags metadata',
+);
+
 const videoHoverCollection = makeCollection({
   gallery: {
     mode: 'hover-reveal-detail',
@@ -361,6 +440,16 @@ assert(
     decodedSearch.search.reducedMotion === 'instant',
   'Yjs projection must preserve collection search policy',
 );
+const decodedFilter = decodeYDoc(encodeYDoc(filterState)).pages[0]!.sections[0]!
+  .elements[0]! as CollectionElement;
+assert(
+  decodedFilter.filterChips?.enabled === true &&
+    decodedFilter.filterChips.field === 'category' &&
+    decodedFilter.filterChips.options.length === 2 &&
+    decodedFilter.filterChips.defaultValue === 'road' &&
+    decodedFilter.entryMetadata?.[0]?.tags.join('|') === 'aero|race',
+  'Yjs projection must preserve collection filter chip policy and entry metadata',
+);
 
 const snapshot: PublishedSnapshot = {
   ...state,
@@ -392,6 +481,15 @@ const searchSnapshot: PublishedSnapshot = {
 assert(
   snapshotNeedsInteractiveRuntime(searchSnapshot),
   'search-enabled Collection must require the visitor interactive runtime',
+);
+const filterSnapshot: PublishedSnapshot = {
+  ...filterState,
+  version: 1,
+  publishedAt: '2026-06-19T00:00:00.000Z',
+};
+assert(
+  snapshotNeedsInteractiveRuntime(filterSnapshot),
+  'filter-enabled Collection must require the visitor interactive runtime',
 );
 
 interface StubNode {
@@ -566,6 +664,52 @@ function stubHidden(node: StubNode): boolean {
     'empty collection search must restore all entries',
   );
 }
+{
+  const firstEntry = makeStubNode({
+    'data-opencanvas-collection-entry': '0',
+    'data-opencanvas-collection-entry-category': 'road',
+    'data-opencanvas-collection-entry-filter-match': 'true',
+  }, 100, 'First Helmet Aero');
+  const secondEntry = makeStubNode({
+    'data-opencanvas-collection-entry': '1',
+    'data-opencanvas-collection-entry-category': 'wet',
+    'data-opencanvas-collection-entry-filter-match': 'true',
+  }, 100, 'Second Helmet Rain');
+  const allButton = makeStubNode({ 'data-opencanvas-collection-filter-option': '__all__' });
+  const roadButton = makeStubNode({
+    'data-opencanvas-collection-filter-option': 'road',
+    'data-opencanvas-collection-filter-active': 'true',
+  });
+  const wetButton = makeStubNode({
+    'data-opencanvas-collection-filter-option': 'wet',
+    'data-opencanvas-collection-filter-active': 'false',
+  });
+  const root = makeStubNode({
+    'data-opencanvas-collection-filter': 'category',
+    'data-opencanvas-collection-filter-reduced-motion': 'instant',
+    'data-opencanvas-collection-filter-default': 'road',
+  });
+  root.querySelectorAll = (selector: string): StubNode[] => {
+    if (selector === '[data-opencanvas-collection-gallery],[data-opencanvas-collection-search="true"],[data-opencanvas-collection-filter]') return [];
+    if (selector === '[data-opencanvas-collection-entry]') return [firstEntry, secondEntry];
+    if (selector === '[data-opencanvas-collection-filter-option]') return [allButton, roadButton, wetButton];
+    return [];
+  };
+  hydrateCollectionGalleries(root);
+  assert((roadButton.listeners.click?.length ?? 0) === 1, 'collection filter runtime must wire option clicks');
+  assert(stubHidden(firstEntry) === false, 'default collection filter must keep matching entries visible');
+  assert(stubHidden(secondEntry) === true, 'default collection filter must hide non-matching entries');
+  assert(
+    secondEntry.attrs['data-opencanvas-collection-entry-filter-match'] === 'false',
+    'collection filter must publish unmatched entry state',
+  );
+  wetButton.listeners.click![0]!({ preventDefault(): void {} });
+  assert(stubHidden(firstEntry) === true, 'filter click must hide previous category entries');
+  assert(stubHidden(secondEntry) === false, 'filter click must show selected category entries');
+  assert(wetButton.attrs['data-opencanvas-collection-filter-active'] === 'true', 'filter click must activate selected chip');
+  allButton.listeners.click![0]!({ preventDefault(): void {} });
+  assert(stubHidden(firstEntry) === false && stubHidden(secondEntry) === false, 'all filter chip must restore every entry');
+}
 
 const inspectorSource = readFileSync(join(repoSrcDir, 'editor-client', 'element-inspector.ts'), 'utf8');
 assert(inspectorSource.includes('Collection gallery'), 'inspector must expose collection gallery controls');
@@ -584,6 +728,9 @@ assert(inspectorSource.includes('Collection search'), 'inspector must expose col
 assert(inspectorSource.includes('Search placeholder'), 'inspector must expose collection search placeholder copy');
 assert(inspectorSource.includes('Search empty message'), 'inspector must expose collection search empty-state copy');
 assert(inspectorSource.includes('search?.enabled'), 'inspector must read collection search enabled state');
+assert(inspectorSource.includes('Collection filter chips'), 'inspector must expose collection filter chip controls');
+assert(inspectorSource.includes('Filter options'), 'inspector must expose filter option editing');
+assert(inspectorSource.includes('filterChips?.enabled'), 'inspector must read collection filter enabled state');
 
 const publicStyles = readFileSync(join(repoSrcDir, 'canvas', 'public-styles.ts'), 'utf8');
 assert(
@@ -601,6 +748,10 @@ assert(
 assert(
   publicStyles.includes('data-opencanvas-collection-search-controls'),
   'public styles must include collection search controls',
+);
+assert(
+  publicStyles.includes('data-opencanvas-collection-filter-controls'),
+  'public styles must include collection filter controls',
 );
 
 const packageJson = JSON.parse(readFileSync(join(repoSrcDir, '..', 'package.json'), 'utf8')) as {

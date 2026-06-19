@@ -541,12 +541,17 @@ Current state:
   enable search on a Collection, author placeholder/empty-state copy, choose
   explicit reduced-motion behaviour, preview filtering in the editor, and
   publish runtime-owned entry visibility without custom scripts.
+- **June 2026 update:** Collection filter chips are now schema-owned. The
+  materializer writes ordered entry metadata, owners can configure chip
+  field/options/default/reduced-motion policy, renderer/editor preview emit
+  filter buttons and entry metadata, and the Runtime Hydrator combines filter
+  and search visibility.
 
 User-visible miss:
 
 - Basic published collection cards, custom templates, gallery reveal/slider
-  states, and text search are real, but premium CMS experiences still lack
-  taxonomy filter chips, editorial states, drafts, scheduling, and full
+  states, text search, and taxonomy filter chips are real, but premium CMS
+  experiences still lack editorial states, drafts, scheduling, and full
   detail/list workflow.
 
 Needed primitive:
@@ -894,9 +899,9 @@ Intentional deferral: richer nested overlay-canvas editing affordances, overlay-
 
 ### 18. Collection Gallery v2 Hover Reveal Detail
 
-Status: addressed for the schema-owned Collection gallery v2 slice. A Collection can now opt into `gallery.mode = hover-reveal-detail` with explicit inline detail and reduced-motion policies, or `gallery.mode = drag-slider` with owner-authored axis, inertia, and progress-dot policy. Collection Search adds an owner-authored search relation with placeholder/empty-state copy and explicit reduced-motion policy. The renderer emits collection/entry/search metadata, the Runtime Hydrator owns active-entry, progress-dot, drag-slider offset, and search visibility state, the inspector exposes owner controls, Yjs preserves the gallery/search policy, and invalid gallery, slider, or search relations fail validation.
+Status: addressed for the schema-owned Collection gallery v2 slice. A Collection can now opt into `gallery.mode = hover-reveal-detail` with explicit inline detail and reduced-motion policies, or `gallery.mode = drag-slider` with owner-authored axis, inertia, and progress-dot policy. Collection Search adds an owner-authored search relation with placeholder/empty-state copy and explicit reduced-motion policy. Collection filter chips add owner-authored field/options/default policy backed by materialized entry metadata. The renderer emits collection/entry/search/filter metadata, the Runtime Hydrator owns active-entry, progress-dot, drag-slider offset, search visibility, and filter visibility state, the inspector exposes owner controls, Yjs preserves the gallery/search/filter policy, and invalid gallery, slider, search, or filter relations fail validation.
 
-Intentional deferral: this does not add a 3D helmet viewer, taxonomy filter chips, or marketplace media inventory; gallery entries continue to be materialized Collection content and can compose existing media/text/card primitives.
+Intentional deferral: this does not add a 3D helmet viewer, editorial workflow manager, drafts/scheduling UI, or marketplace media inventory; gallery entries continue to be materialized Collection content and can compose existing media/text/card primitives.
 
 ### 19. Iframe Drill-in Overlay
 

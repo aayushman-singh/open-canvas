@@ -83,6 +83,7 @@ export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): bo
     if (element.type === 'collection') {
       if (element.gallery?.mode === 'hover-reveal-detail' || element.gallery?.mode === 'drag-slider') return true;
       if (element.search?.enabled === true) return true;
+      if (element.filterChips?.enabled === true) return true;
       // ADR 0063 dec 6 — `entries` is the materializer's per-entry output;
       // walked so nested interactive elements (e.g. tabs inside a card)
       // still trigger runtime injection.

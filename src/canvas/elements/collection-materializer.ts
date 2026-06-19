@@ -56,7 +56,11 @@ import type {
   TabsElement,
   TextElement,
 } from '../schema.js';
-import type { CollectionElement, CollectionSort } from './collection.js';
+import type {
+  CollectionElement,
+  CollectionEntryMetadata,
+  CollectionSort,
+} from './collection.js';
 import {
   DEFAULT_CARD_SIBLINGS,
   DEFAULT_CARD_TEMPLATE,
@@ -473,6 +477,16 @@ function buildImageOnlyEntryInstance(
   return [container, image];
 }
 
+function metadataForEntry(entry: MaterializerEntry): CollectionEntryMetadata {
+  return {
+    slug: entry.slug,
+    title: entry.title,
+    folder: entry.folder ?? null,
+    category: entry.category,
+    tags: [...entry.tags],
+  };
+}
+
 function readSortMode(el: CollectionElement): CollectionSort {
   return el.sort ?? 'date-desc';
 }
@@ -575,6 +589,7 @@ function hydrateCollectionElement(
         `Collection element ${el.id} display='custom' but customTemplate is not set.`,
       );
       el.entries = [];
+      el.entryMetadata = [];
       return;
     }
     if (el.customTemplate.length === 0) {
@@ -582,6 +597,7 @@ function hydrateCollectionElement(
         `Collection element ${el.id} display='custom' but customTemplate has zero elements.`,
       );
       el.entries = [];
+      el.entryMetadata = [];
       return;
     }
     customTemplate = el.customTemplate;
@@ -597,6 +613,7 @@ function hydrateCollectionElement(
     return buildCardEntryInstance(entry, collectionSlug);
   });
   el.entries = built;
+  el.entryMetadata = ordered.map(metadataForEntry);
 }
 
 function hydrateCollectionsInSection(

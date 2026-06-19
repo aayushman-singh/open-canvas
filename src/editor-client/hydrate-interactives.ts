@@ -165,6 +165,24 @@ function normaliseCollectionSearchText(value: string | null | undefined): string
   return (value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
+function updateCollectionQueryVisibility(
+  root: Element,
+  entries: NodeListOf<HTMLElement>,
+  empty: HTMLElement | null,
+): void {
+  let visible = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]!;
+    const matched =
+      entry.getAttribute('data-opencanvas-collection-entry-search-match') !== 'false' &&
+      entry.getAttribute('data-opencanvas-collection-entry-filter-match') !== 'false';
+    entry.hidden = !matched;
+    if (matched) visible += 1;
+  }
+  root.setAttribute('data-opencanvas-collection-visible-count', String(visible));
+  if (empty !== null) empty.hidden = visible !== 0;
+}
+
 function isCollectionSearchRoot(value: ParentNode): value is Element {
   const candidate = value as { getAttribute?: unknown };
   return typeof candidate.getAttribute === 'function';
@@ -172,58 +190,169 @@ function isCollectionSearchRoot(value: ParentNode): value is Element {
 
 function hydrateCollectionSearches(root: ParentNode, options: HydrateOptions): void {
   const nodes: Element[] = [];
-  if (isCollectionSearchRoot(root) && root.getAttribute('data-opencanvas-collection-search') === 'true') {
+  if (
+    isCollectionSearchRoot(root) &&
+    (root.getAttribute('data-opencanvas-collection-search') === 'true' ||
+      root.getAttribute('data-opencanvas-collection-filter') !== null)
+  ) {
     nodes.push(root);
   }
-  const found = root.querySelectorAll('[data-opencanvas-collection-search="true"]');
-  for (let i = 0; i < found.length; i++) nodes.push(found[i]!);
+  const searchNodes = root.querySelectorAll('[data-opencanvas-collection-search="true"]');
+  for (let i = 0; i < searchNodes.length; i++) nodes.push(searchNodes[i]!);
+  const filterNodes = root.querySelectorAll('[data-opencanvas-collection-filter]');
+  for (let i = 0; i < filterNodes.length; i++) nodes.push(filterNodes[i]!);
   for (const node of nodes) {
-    if (node.getAttribute('data-opencanvas-collection-search-hydrated') === 'true') continue;
-    const reducedMotion = node.getAttribute('data-opencanvas-collection-search-reduced-motion');
-    if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
-      emitCollectionSearchFailure(
-        node,
-        'invalid-reduced-motion',
-        'Collection search reduced-motion mode must be instant or allow',
-        reducedMotion,
-      );
-    }
-    const input = node.querySelector<HTMLInputElement>('[data-opencanvas-collection-search-input]');
-    if (input === null) {
-      emitCollectionSearchFailure(
-        node,
-        'missing-search-input',
-        'Collection search requires a rendered search input',
-        null,
-      );
-    }
     const entries = node.querySelectorAll<HTMLElement>('[data-opencanvas-collection-entry]');
     const empty = node.querySelector<HTMLElement>('[data-opencanvas-collection-search-empty]');
-    if (prefersReducedMotion(options) && reducedMotion === 'instant') {
-      node.setAttribute('data-opencanvas-collection-search-reduced', 'instant');
+    if (
+      node.getAttribute('data-opencanvas-collection-search') === 'true' &&
+      node.getAttribute('data-opencanvas-collection-search-hydrated') !== 'true'
+    ) {
+      hydrateCollectionSearch(node, entries, empty, options);
     }
-    const applySearch = (): void => {
-      const query = normaliseCollectionSearchText(input.value);
-      let visible = 0;
-      for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i]!;
-        const matched =
-          query.length === 0 ||
-          normaliseCollectionSearchText(entry.textContent).indexOf(query) !== -1;
-        entry.hidden = !matched;
-        entry.setAttribute('data-opencanvas-collection-entry-search-match', matched ? 'true' : 'false');
-        if (matched) visible += 1;
-      }
-      node.setAttribute('data-opencanvas-collection-search-query', query);
-      node.setAttribute('data-opencanvas-collection-search-visible-count', String(visible));
-      if (empty !== null) empty.hidden = visible !== 0;
-    };
-    input.addEventListener('input', applySearch);
-    input.addEventListener('mousedown', (ev) => ev.stopPropagation());
-    input.addEventListener('click', (ev) => ev.stopPropagation());
-    applySearch();
-    node.setAttribute('data-opencanvas-collection-search-hydrated', 'true');
+    if (
+      node.getAttribute('data-opencanvas-collection-filter') !== null &&
+      node.getAttribute('data-opencanvas-collection-filter-hydrated') !== 'true'
+    ) {
+      hydrateCollectionFilter(node, entries, empty, options);
+    }
   }
+}
+
+function hydrateCollectionSearch(
+  node: Element,
+  entries: NodeListOf<HTMLElement>,
+  empty: HTMLElement | null,
+  options: HydrateOptions,
+): void {
+  const reducedMotion = node.getAttribute('data-opencanvas-collection-search-reduced-motion');
+  if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
+    emitCollectionSearchFailure(
+      node,
+      'invalid-reduced-motion',
+      'Collection search reduced-motion mode must be instant or allow',
+      reducedMotion,
+    );
+  }
+  const input = node.querySelector<HTMLInputElement>('[data-opencanvas-collection-search-input]');
+  if (input === null) {
+    emitCollectionSearchFailure(
+      node,
+      'missing-search-input',
+      'Collection search requires a rendered search input',
+      null,
+    );
+  }
+  if (prefersReducedMotion(options) && reducedMotion === 'instant') {
+    node.setAttribute('data-opencanvas-collection-search-reduced', 'instant');
+  }
+  const applySearch = (): void => {
+    const query = normaliseCollectionSearchText(input.value);
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i]!;
+      const matched =
+        query.length === 0 ||
+        normaliseCollectionSearchText(entry.textContent).indexOf(query) !== -1;
+      entry.setAttribute('data-opencanvas-collection-entry-search-match', matched ? 'true' : 'false');
+    }
+    node.setAttribute('data-opencanvas-collection-search-query', query);
+    updateCollectionQueryVisibility(node, entries, empty);
+  };
+  input.addEventListener('input', applySearch);
+  input.addEventListener('mousedown', (ev) => ev.stopPropagation());
+  input.addEventListener('click', (ev) => ev.stopPropagation());
+  applySearch();
+  node.setAttribute('data-opencanvas-collection-search-hydrated', 'true');
+}
+
+function collectionEntryMatchesFilter(
+  node: Element,
+  entry: HTMLElement,
+  field: string,
+  value: string,
+): boolean {
+  if (value === '__all__') return true;
+  if (field === 'folder') {
+    return entry.getAttribute('data-opencanvas-collection-entry-folder') === value;
+  }
+  if (field === 'category') {
+    return entry.getAttribute('data-opencanvas-collection-entry-category') === value;
+  }
+  if (field === 'tag') {
+    try {
+      const parsed = JSON.parse(entry.getAttribute('data-opencanvas-collection-entry-tags') ?? '[]') as unknown;
+      if (!Array.isArray(parsed)) return false;
+      return parsed.includes(value);
+    } catch (err: unknown) {
+      emitCollectionSearchFailure(
+        node,
+        'invalid-filter-tags',
+        'Collection filter tag metadata must be valid JSON',
+        err,
+      );
+    }
+  }
+  return false;
+}
+
+function hydrateCollectionFilter(
+  node: Element,
+  entries: NodeListOf<HTMLElement>,
+  empty: HTMLElement | null,
+  options: HydrateOptions,
+): void {
+  const field = node.getAttribute('data-opencanvas-collection-filter');
+  const reducedMotion = node.getAttribute('data-opencanvas-collection-filter-reduced-motion');
+  if (field !== 'folder' && field !== 'category' && field !== 'tag') {
+    emitCollectionSearchFailure(node, 'invalid-filter-field', 'Collection filter field must be folder, category, or tag', field);
+  }
+  if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
+    emitCollectionSearchFailure(
+      node,
+      'invalid-filter-reduced-motion',
+      'Collection filter reduced-motion mode must be instant or allow',
+      reducedMotion,
+    );
+  }
+  const buttons = node.querySelectorAll<HTMLElement>('[data-opencanvas-collection-filter-option]');
+  if (buttons.length === 0) {
+    emitCollectionSearchFailure(node, 'missing-filter-options', 'Collection filter requires rendered option buttons', null);
+  }
+  if (prefersReducedMotion(options) && reducedMotion === 'instant') {
+    node.setAttribute('data-opencanvas-collection-filter-reduced', 'instant');
+  }
+  const setActive = (value: string): void => {
+    let matchedButton = false;
+    for (let i = 0; i < buttons.length; i++) {
+      const button = buttons[i]!;
+      const buttonValue = button.getAttribute('data-opencanvas-collection-filter-option') ?? '__all__';
+      const active = buttonValue === value;
+      button.setAttribute('data-opencanvas-collection-filter-active', String(active));
+      button.setAttribute('aria-pressed', String(active));
+      if (active) matchedButton = true;
+    }
+    if (!matchedButton) {
+      emitCollectionSearchFailure(node, 'missing-default-filter', 'Collection filter default must match a rendered option', value);
+    }
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i]!;
+      const matched = collectionEntryMatchesFilter(node, entry, field, value);
+      entry.setAttribute('data-opencanvas-collection-entry-filter-match', matched ? 'true' : 'false');
+    }
+    node.setAttribute('data-opencanvas-collection-filter-active-value', value);
+    updateCollectionQueryVisibility(node, entries, empty);
+  };
+  for (let i = 0; i < buttons.length; i++) {
+    const button = buttons[i]!;
+    button.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      setActive(button.getAttribute('data-opencanvas-collection-filter-option') ?? '__all__');
+    });
+    button.addEventListener('mousedown', (ev) => ev.stopPropagation());
+  }
+  setActive(node.getAttribute('data-opencanvas-collection-filter-default') ?? '__all__');
+  node.setAttribute('data-opencanvas-collection-filter-hydrated', 'true');
 }
 
 // ---------------------------------------------------------------------------
