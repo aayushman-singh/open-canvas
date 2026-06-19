@@ -1750,22 +1750,59 @@ function renderMotionSequenceTimeline(card: HTMLElement, sequence: MotionSequenc
   const track = document.createElement('div');
   track.className = 'opencanvas-motion-timeline-track';
   const scheduled = motionSequenceTimelineItems(sequence);
+  for (const snapPercent of [0, 25, 50, 75, 100]) {
+    const snap = document.createElement('span');
+    snap.className = 'opencanvas-motion-timeline-snap';
+    snap.style.left = String(snapPercent) + '%';
+    snap.title = 'Snap ' + String(snapPercent) + '%';
+    snap.setAttribute('aria-hidden', 'true');
+    track.appendChild(snap);
+  }
+  const laneOrder: string[] = [];
+  const laneItems = new Map<string, MotionSequenceTimelineItem[]>();
   for (const item of scheduled) {
-    const bar = document.createElement('div');
-    bar.className = 'opencanvas-motion-timeline-bar';
-    bar.style.left = item.leftPercent.toFixed(2) + '%';
-    bar.style.width = item.widthPercent.toFixed(2) + '%';
-    bar.textContent = item.label;
-    bar.title = item.title;
-    track.appendChild(bar);
+    if (!laneItems.has(item.laneKey)) {
+      laneOrder.push(item.laneKey);
+      laneItems.set(item.laneKey, []);
+    }
+    laneItems.get(item.laneKey)!.push(item);
+  }
+  for (const laneKey of laneOrder) {
+    const items = laneItems.get(laneKey) ?? [];
+    const lane = document.createElement('div');
+    lane.className = 'opencanvas-motion-timeline-lane';
+    lane.dataset.opencanvasMotionTimelineLane = laneKey;
+    const laneLabel = document.createElement('span');
+    laneLabel.className = 'opencanvas-motion-timeline-lane-label';
+    laneLabel.textContent = items[0]?.laneLabel ?? laneKey;
+    lane.appendChild(laneLabel);
+    for (const item of items) {
+      const bar = document.createElement('div');
+      bar.className = 'opencanvas-motion-timeline-bar';
+      bar.style.left = item.leftPercent.toFixed(2) + '%';
+      bar.style.width = item.widthPercent.toFixed(2) + '%';
+      bar.textContent = item.label;
+      bar.title = item.title;
+      lane.appendChild(bar);
+    }
+    track.appendChild(lane);
   }
   wrap.appendChild(track);
   card.appendChild(wrap);
 }
 
+interface MotionSequenceTimelineItem {
+  leftPercent: number;
+  widthPercent: number;
+  label: string;
+  title: string;
+  laneKey: string;
+  laneLabel: string;
+}
+
 function motionSequenceTimelineItems(
   sequence: MotionSequence,
-): Array<{ leftPercent: number; widthPercent: number; label: string; title: string }> {
+): MotionSequenceTimelineItem[] {
   let cursorMs = 0;
   const raw = sequence.steps.map((step, index) => {
     const base = sequence.trigger.type === 'scroll-scene' ? cursorMs : step.startAtMs ?? cursorMs;
@@ -1778,6 +1815,8 @@ function motionSequenceTimelineItems(
       start,
       duration,
       label: String(index + 1),
+      laneKey: motionSequenceTimelineLaneKey(step),
+      laneLabel: motionSequenceTimelineLaneLabel(step),
       title:
         'Step ' +
         String(index + 1) +
@@ -1799,7 +1838,29 @@ function motionSequenceTimelineItems(
     widthPercent: Math.max(2, Math.min(100, (item.duration / total) * 100)),
     label: item.label,
     title: item.title,
+    laneKey: item.laneKey,
+    laneLabel: item.laneLabel,
   }));
+}
+
+function motionSequenceTimelineLaneKey(step: MotionSequenceStep): string {
+  const target = step.target;
+  if (target.type === 'site') return 'site';
+  if (target.type === 'page') return 'page:' + target.pageId;
+  if (target.type === 'section') return 'section:' + target.sectionId;
+  if (target.type === 'element') return 'element:' + target.elementId;
+  if (target.type === 'text-split') return 'text-split:' + target.elementId + ':' + target.unit;
+  return (target as { type: string }).type;
+}
+
+function motionSequenceTimelineLaneLabel(step: MotionSequenceStep): string {
+  const target = step.target;
+  if (target.type === 'site') return 'site';
+  if (target.type === 'page') return 'page ' + target.pageId;
+  if (target.type === 'section') return 'section ' + target.sectionId;
+  if (target.type === 'element') return 'element ' + target.elementId;
+  if (target.type === 'text-split') return 'text ' + target.unit + ' ' + target.elementId;
+  return (target as { type: string }).type;
 }
 
 function renderMotionSequenceTriggerDetail(

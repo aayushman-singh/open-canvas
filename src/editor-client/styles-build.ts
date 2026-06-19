@@ -1546,16 +1546,64 @@ body[data-placement-active="true"] .opencanvas-section-slot {
 }
 .opencanvas-motion-timeline-track {
   position: relative;
+  display: grid;
+  gap: 5px;
   min-height: 30px;
   overflow: hidden;
+  padding: 15px 6px 6px;
   border: 1px solid var(--opencanvas-hairline);
-  border-radius: 999px;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--opencanvas-bg-muted) 78%, transparent);
+}
+.opencanvas-motion-timeline-snap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 1px;
+  background: color-mix(in srgb, var(--opencanvas-fg-muted) 22%, transparent);
+  pointer-events: none;
+}
+.opencanvas-motion-timeline-snap::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--opencanvas-fg-muted) 40%, transparent);
+}
+.opencanvas-motion-timeline-lane {
+  position: relative;
+  z-index: 2;
+  min-height: 28px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--opencanvas-bg) 70%, transparent);
+}
+.opencanvas-motion-timeline-lane-label {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  z-index: 1;
+  max-width: 44%;
+  overflow: hidden;
+  color: var(--opencanvas-fg-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  pointer-events: none;
 }
 .opencanvas-motion-timeline-bar {
   position: absolute;
   top: 5px;
   bottom: 5px;
+  z-index: 3;
   display: grid;
   min-width: 18px;
   place-items: center;

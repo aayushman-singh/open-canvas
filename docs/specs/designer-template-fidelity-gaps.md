@@ -214,11 +214,14 @@ Current state:
 - **June 2026 update:** Full Motion Sequence cards now render a styled
   Timeline overview that maps step start/duration into visible bars, giving
   owners choreography-level inspection before editing individual step fields.
+- **June 2026 update:** The Timeline overview now groups steps into target
+  lanes and shows explicit snap handles, so overlapping element/text/section
+  choreography is readable before field-level edits.
 
 User-visible miss:
 
-- Cannot yet edit multi-step choreography by dragging bars on a full visual
-  timeline canvas with lanes and snap handles.
+- Cannot yet edit multi-step choreography by dragging bars on the visual
+  timeline canvas.
 
 Needed primitive:
 
@@ -226,8 +229,8 @@ Needed primitive:
   properties, duration, easing, delay, stagger, and completion behaviour.
 - Validation must reject unsupported targets/properties instead of silently
   dropping steps.
-- Remaining next wave: draggable timeline bars, lane visualization, snap
-  handles, and richer property affordances beyond the current form controls.
+- Remaining next wave: draggable timeline bars and richer property affordances
+  beyond the current form controls.
 
 ### 2. Scroll Motion Is Triggered, Not Scrubbed
 
@@ -677,13 +680,14 @@ Current state:
 - Section inspector exposes Entrance Preset and Popup Trigger.
 - The Interactions sidebar tab exposes Load Experience, Route Transition,
   Overlays, and Motion Sequence Lite step lists.
-- Full Motion Sequence cards include a Timeline overview with visual bars for
-  step start/duration. Step editing remains form-based.
+- Full Motion Sequence cards include a Timeline overview with visual bars,
+  target lanes, and snap handles for step start/duration. Step editing remains
+  form-based.
 
 User-visible miss:
 
-- Template authors can inspect choreography as a timeline, but cannot yet drag
-  bars, manage lanes, or scrub preview from the timeline overview.
+- Template authors can inspect choreography as a lane-based timeline, but
+  cannot yet drag bars or scrub preview from the timeline overview.
 - Long sequences still require field-level editing for detailed timing changes.
 
 Needed primitive:

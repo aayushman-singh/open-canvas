@@ -200,6 +200,8 @@ assert(panelSrc.includes('Motion Sequence step'), 'panel must render editable Mo
 assert(panelSrc.includes('renderMotionSequenceTimeline'), 'panel must render a Motion Sequence timeline overview');
 assert(panelSrc.includes('Timeline overview'), 'panel must label the Motion Sequence timeline overview');
 assert(panelSrc.includes('opencanvas-motion-timeline'), 'panel must use timeline-specific DOM classes');
+assert(panelSrc.includes('opencanvas-motion-timeline-lane'), 'panel must render timeline lanes');
+assert(panelSrc.includes('opencanvas-motion-timeline-snap'), 'panel must render timeline snap handles');
 assert(panelSrc.includes('renderLayoutTransitionControls'), 'panel must render layout transition controls');
 assert(panelSrc.includes('renderSmoothScrollControls'), 'panel must render Smooth Scroll controls');
 assert(panelSrc.includes('Smooth Scroll'), 'panel must label Smooth Scroll controls');
@@ -245,6 +247,8 @@ for (const [label, src] of [
 ] as const) {
   assert(src.includes('.opencanvas-motion-timeline'), label + ' must style the Motion Sequence timeline overview');
   assert(src.includes('.opencanvas-motion-timeline-bar'), label + ' must style Motion Sequence timeline bars');
+  assert(src.includes('.opencanvas-motion-timeline-lane'), label + ' must style Motion Sequence timeline lanes');
+  assert(src.includes('.opencanvas-motion-timeline-snap'), label + ' must style Motion Sequence timeline snap handles');
 }
 
 console.log('[interactions-panel:smoke] OK');
