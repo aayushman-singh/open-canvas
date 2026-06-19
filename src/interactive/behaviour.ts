@@ -428,7 +428,34 @@ function behaviourSceneProgress(scene, section) {
   var scrolled = window.scrollY - sectionTop + scene.startOffsetPx;
   var range = scene.endOffsetPx - scene.startOffsetPx;
   if (!(range > 0)) return 0;
-  return Math.max(0, Math.min(1, scrolled / range));
+  var progress = Math.max(0, Math.min(1, scrolled / range));
+  return behaviourSnapSceneProgress(scene, progress);
+}
+
+function behaviourSnapSceneProgress(scene, progress) {
+  if (scene.snapPoints === undefined) return progress;
+  if (!Array.isArray(scene.snapPoints) || scene.snapPoints.length === 0) {
+    behaviourFailure('scroll-scene-snap-points', { scrollSceneId: scene.id }, new Error('snapPoints must be a non-empty array'));
+  }
+  var best = null;
+  var bestDistance = Infinity;
+  var previous = -Infinity;
+  for (var i = 0; i < scene.snapPoints.length; i++) {
+    var point = Number(scene.snapPoints[i]);
+    if (!isFinite(point) || point < 0 || point > 1) {
+      behaviourFailure('scroll-scene-snap-point', { scrollSceneId: scene.id, index: i, point: scene.snapPoints[i] }, new Error('snap point must be between 0 and 1'));
+    }
+    if (point <= previous) {
+      behaviourFailure('scroll-scene-snap-point-order', { scrollSceneId: scene.id, index: i, point: point }, new Error('snap points must be strictly increasing'));
+    }
+    previous = point;
+    var distance = Math.abs(progress - point);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = point;
+    }
+  }
+  return best === null ? progress : best;
 }
 
 function behaviourApplyPin(pinEl, scene, section, progress) {

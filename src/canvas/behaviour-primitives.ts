@@ -93,6 +93,7 @@ export interface ScrollScene {
   pinTarget: { type: 'section'; sectionId: string } | { type: 'element'; elementId: string };
   startOffsetPx: number;
   endOffsetPx: number;
+  snapPoints?: number[];
 }
 
 export interface ImageSequenceRichMotionAsset {

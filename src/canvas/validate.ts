@@ -3433,6 +3433,26 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           errors,
           true,
         );
+        if (scene.snapPoints !== undefined) {
+          if (!Array.isArray(scene.snapPoints)) {
+            errors.push(`${scenePath}.snapPoints must be an array when present`);
+          } else if (scene.snapPoints.length === 0) {
+            errors.push(`${scenePath}.snapPoints must contain at least one point when present`);
+          } else {
+            let previous = -Infinity;
+            scene.snapPoints.forEach((point, pointIdx) => {
+              const pointPath = `${scenePath}.snapPoints[${String(pointIdx)}]`;
+              if (!isFiniteNumber(point) || point < 0 || point > 1) {
+                errors.push(`${pointPath} must be a finite number between 0 and 1 (got ${describe(point)})`);
+                return;
+              }
+              if (point <= previous) {
+                errors.push(`${pointPath} must be greater than the previous snap point`);
+              }
+              previous = point;
+            });
+          }
+        }
       });
     }
   }

@@ -232,5 +232,6 @@ assert(panelSrc.includes('OVERLAY_TRIGGER_TYPES'), 'panel must use overlay trigg
 assert(panelSrc.includes('MOTION_SEQUENCE_LITE_EFFECTS'), 'panel must use motion effects');
 assert(panelSrc.includes('MOTION_SEQUENCE_LITE_TARGET_TYPES'), 'panel must use motion targets');
 assert(panelSrc.includes('renderSequenceLiteEditor'), 'panel must render sequence editor');
+assert(panelSrc.includes('Snap points'), 'panel must expose Scroll Scene snap point controls');
 
 console.log('[interactions-panel:smoke] OK');

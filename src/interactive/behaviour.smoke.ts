@@ -502,6 +502,7 @@ function baseSnapshot(): PublishedSnapshot {
         pinTarget: { type: 'section', sectionId: 'section-story' },
         startOffsetPx: 0,
         endOffsetPx: 800,
+        snapPoints: [0, 0.5, 1],
       },
     ],
     richMotionAssets: [
@@ -797,6 +798,7 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
         pinTarget: { type: 'section', sectionId: 'section-story' },
         startOffsetPx: 0,
         endOffsetPx: 800,
+        snapPoints: [0, 0.5, 1],
       },
     ],
     richMotionAssets: [],
@@ -815,11 +817,11 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
     height: 800,
   });
   runBehaviour(doc, win, StubImage);
-  win.scrollY = 500;
+  win.scrollY = 380;
   win.dispatchScroll();
   assert(
     track.style.transform.includes('-200px'),
-    'scroll scene must apply interpolated transform at mid progress',
+    'scroll scene must snap progress to the nearest authored stop',
   );
 }
 

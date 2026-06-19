@@ -238,17 +238,21 @@ Current state:
   the Interactions panel for creating/editing a pinned scene, its trigger
   section, pin target, range, reduced-motion policy, and linked Motion Sequence
   first target. This closes the "template JSON only" authoring gap for the
-  first scroll-story relation, but horizontal storytelling, snap points,
-  multi-step timeline editing, and unified timeline canvas remain open.
+  first scroll-story relation, but horizontal storytelling, multi-step timeline
+  editing, and unified timeline canvas remain open.
+- **June 2026 update:** Scroll Scene now supports schema-owned `snapPoints`
+  as increasing progress stops from `0..1`. The Interactions panel exposes a
+  Snap points control, validation rejects malformed stops, and the Runtime
+  Hydrator quantizes shared scroll progress before Motion Sequence, Rich Motion
+  image-sequence, or Rive scroll-progress consumers read it.
 
 User-visible miss:
 
-- Cannot reproduce scroll stories where scroll position drives animation
-  progress.
-- Cannot pin a section while animating child layers through a multi-step
-  sequence.
-- Cannot build horizontal-scroll storytelling sections, image sequence scrubs,
-  before/after reveals, or scroll-progress typography.
+- Scroll position can now drive pinned Motion Sequence progress with authored
+  stops.
+- Still missing: horizontal-scroll storytelling layout presets, image sequence
+  scrub controls in the editor, before/after reveal controls, and richer
+  scroll-progress typography authoring.
 
 Needed primitive:
 

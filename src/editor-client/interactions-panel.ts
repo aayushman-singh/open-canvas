@@ -1356,6 +1356,10 @@ function renderScrollSceneCard(
   end.addEventListener('change', () => updateScrollSceneNumber(ctx, scene, index, 'endOffsetPx', end));
   card.appendChild(field('End offset (px)', end));
 
+  const snapPoints = textInput((scene.snapPoints ?? []).join(', '), '0, 0.5, 1');
+  snapPoints.addEventListener('change', () => updateScrollSceneSnapPoints(ctx, scene, index, snapPoints));
+  card.appendChild(field('Snap points', snapPoints));
+
   renderScrollSequenceControls(ctx, card, scene);
 
   host.appendChild(card);
@@ -1377,6 +1381,38 @@ function updateScrollSceneNumber(
   mutate(ctx, () => {
     const scenes = ctx.state!.scrollScenes ?? [];
     scenes[index] = { ...scene, [key]: next };
+  });
+}
+
+function updateScrollSceneSnapPoints(
+  ctx: InteractionsPanelContext,
+  scene: ScrollScene,
+  index: number,
+  input: HTMLInputElement,
+): void {
+  const raw = input.value.trim();
+  if (raw.length === 0) {
+    mutate(ctx, () => {
+      const scenes = ctx.state!.scrollScenes ?? [];
+      const next = { ...scene };
+      delete next.snapPoints;
+      scenes[index] = next;
+    });
+    return;
+  }
+  const points = raw.split(',').map((part) => Number(part.trim()));
+  let previous = -Infinity;
+  for (const point of points) {
+    if (!Number.isFinite(point) || point < 0 || point > 1 || point <= previous) {
+      ctx.setStatus('Scroll scene snap points must be increasing numbers from 0 to 1', 'error');
+      input.value = (scene.snapPoints ?? []).join(', ');
+      return;
+    }
+    previous = point;
+  }
+  mutate(ctx, () => {
+    const scenes = ctx.state!.scrollScenes ?? [];
+    scenes[index] = { ...scene, snapPoints: points };
   });
 }
 
