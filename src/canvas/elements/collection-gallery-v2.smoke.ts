@@ -132,6 +132,7 @@ const dragSliderCollection = makeCollection({
     reducedMotion: 'allow',
     sliderAxis: 'x',
     sliderInertia: true,
+    showProgress: true,
   },
 });
 const dragSliderState = makeSite(dragSliderCollection);
@@ -149,6 +150,7 @@ const invalidDragSlider = makeSite(
       reducedMotion: 'allow',
       sliderAxis: 'diagonal',
       sliderInertia: 'yes',
+      showProgress: 'yes',
     } as unknown as NonNullable<CollectionElement['gallery']>,
   }),
 );
@@ -161,6 +163,10 @@ assert(
 assert(
   invalidDragSliderResult.errors.some((error) => error.includes('gallery.sliderInertia')),
   `validation error must name gallery.sliderInertia; got ${invalidDragSliderResult.valid ? 'valid' : invalidDragSliderResult.errors.join(' | ')}`,
+);
+assert(
+  invalidDragSliderResult.errors.some((error) => error.includes('gallery.showProgress')),
+  `validation error must name gallery.showProgress; got ${invalidDragSliderResult.valid ? 'valid' : invalidDragSliderResult.errors.join(' | ')}`,
 );
 
 const html = renderCollection(collection, {
@@ -202,6 +208,14 @@ assert(
 assert(
   dragSliderHtml.includes('data-opencanvas-collection-gallery-slider-inertia="true"'),
   'renderer must emit drag-slider inertia metadata',
+);
+assert(
+  dragSliderHtml.includes('data-opencanvas-collection-gallery-progress="true"'),
+  'renderer must emit drag-slider progress metadata',
+);
+assert(
+  dragSliderHtml.includes('data-opencanvas-collection-gallery-progress-dot="1"'),
+  'renderer must emit one progress dot per materialized entry',
 );
 
 const videoHoverCollection = makeCollection({
@@ -266,9 +280,10 @@ assert(
 const decodedDragSlider = decodeYDoc(encodeYDoc(dragSliderState)).pages[0]!.sections[0]!
   .elements[0]! as CollectionElement;
 assert(
-  decodedDragSlider.gallery?.mode === 'drag-slider' &&
+    decodedDragSlider.gallery?.mode === 'drag-slider' &&
     decodedDragSlider.gallery?.sliderAxis === 'x' &&
-    decodedDragSlider.gallery?.sliderInertia === true,
+    decodedDragSlider.gallery?.sliderInertia === true &&
+    decodedDragSlider.gallery?.showProgress === true,
   'Yjs projection must preserve collection gallery drag-slider policy',
 );
 
@@ -349,16 +364,28 @@ const hydrateCollectionGalleries = makeHydrateCollectionGalleries();
     'data-opencanvas-collection-entry-active': 'false',
     'aria-expanded': 'false',
   });
+  const firstDot = makeStubNode({
+    'data-opencanvas-collection-gallery-progress-dot': '0',
+    'data-opencanvas-collection-gallery-progress-active': 'true',
+    'aria-current': 'true',
+  });
+  const secondDot = makeStubNode({
+    'data-opencanvas-collection-gallery-progress-dot': '1',
+    'data-opencanvas-collection-gallery-progress-active': 'false',
+    'aria-current': 'false',
+  });
   const root = makeStubNode({
     'data-opencanvas-collection-gallery': 'drag-slider',
     'data-opencanvas-collection-gallery-detail': 'inline-panel',
     'data-opencanvas-collection-gallery-reduced-motion': 'allow',
     'data-opencanvas-collection-gallery-slider-axis': 'x',
     'data-opencanvas-collection-gallery-slider-inertia': 'false',
+    'data-opencanvas-collection-gallery-progress': 'true',
   });
   root.querySelectorAll = (selector: string): StubNode[] => {
     if (selector === '[data-opencanvas-collection-gallery]') return [];
     if (selector === '[data-opencanvas-collection-entry]') return [firstEntry, secondEntry];
+    if (selector === '[data-opencanvas-collection-gallery-progress-dot]') return [firstDot, secondDot];
     return [];
   };
   hydrateCollectionGalleries(root);
@@ -374,6 +401,8 @@ const hydrateCollectionGalleries = makeHydrateCollectionGalleries();
   );
   assert(secondEntry.attrs['data-opencanvas-collection-entry-active'] === 'true', 'drag-slider must activate nearest entry');
   assert(root.attrs['data-opencanvas-collection-active-entry'] === '1', 'drag-slider must publish active entry index');
+  assert(secondDot.attrs['data-opencanvas-collection-gallery-progress-active'] === 'true', 'drag-slider must activate nearest progress dot');
+  assert(secondDot.attrs['aria-current'] === 'true', 'drag-slider progress dot must expose aria-current');
 }
 
 const inspectorSource = readFileSync(join(repoSrcDir, 'editor-client', 'element-inspector.ts'), 'utf8');
@@ -387,6 +416,8 @@ assert(inspectorSource.includes('Slider axis'), 'inspector must expose drag-slid
 assert(inspectorSource.includes('sliderAxis'), 'inspector must write drag-slider axis config');
 assert(inspectorSource.includes('Slider inertia'), 'inspector must expose drag-slider inertia control');
 assert(inspectorSource.includes('sliderInertia'), 'inspector must write drag-slider inertia config');
+assert(inspectorSource.includes('Show progress'), 'inspector must expose drag-slider progress controls');
+assert(inspectorSource.includes('showProgress'), 'inspector must write drag-slider progress config');
 
 const publicStyles = readFileSync(join(repoSrcDir, 'canvas', 'public-styles.ts'), 'utf8');
 assert(
@@ -396,6 +427,10 @@ assert(
 assert(
   publicStyles.includes('data-opencanvas-collection-gallery="drag-slider"'),
   'public styles must include gallery drag-slider selectors',
+);
+assert(
+  publicStyles.includes('data-opencanvas-collection-gallery-progress-dot'),
+  'public styles must include gallery progress dot selectors',
 );
 
 const packageJson = JSON.parse(readFileSync(join(repoSrcDir, '..', 'package.json'), 'utf8')) as {

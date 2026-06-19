@@ -77,6 +77,7 @@ export interface CollectionGalleryBehaviour {
   videoHover?: VideoHoverPlayback;
   sliderAxis?: CollectionGalleryAxis;
   sliderInertia?: boolean;
+  showProgress?: boolean;
 }
 
 export interface CollectionStyle {
@@ -219,7 +220,10 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
       ` data-opencanvas-collection-gallery-reduced-motion="${escapeAttr(gallery.reducedMotion)}"` +
       (gallery.mode === 'drag-slider'
         ? ` data-opencanvas-collection-gallery-slider-axis="${escapeAttr(gallery.sliderAxis ?? 'x')}"` +
-          ` data-opencanvas-collection-gallery-slider-inertia="${escapeAttr(String(gallery.sliderInertia !== false))}"`
+          ` data-opencanvas-collection-gallery-slider-inertia="${escapeAttr(String(gallery.sliderInertia !== false))}"` +
+          (gallery.showProgress === true
+            ? ` data-opencanvas-collection-gallery-progress="true"`
+            : '')
         : '')
     : '';
   const effectiveFrameStyle =
@@ -239,6 +243,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
         ])
       : frameStyle;
   const entriesHtml = renderCollectionEntries(el, ctx, gallery);
+  const progressHtml = renderCollectionGalleryProgress(el, gallery);
   return (
     `<div class="opencanvas-collection" data-opencanvas-interactive="collection"` +
     ` data-collection-display="${escapeAttr(displayAttr)}"` +
@@ -246,8 +251,29 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
     ` data-collection-slug="${slugAttr}"` +
     ` data-collection-folder="${folderAttr}"` +
     galleryAttrs +
-    ` style="${escapeAttr(effectiveFrameStyle)}">${entriesHtml}</div>`
+    ` style="${escapeAttr(effectiveFrameStyle)}">${entriesHtml}${progressHtml}</div>`
   );
+}
+
+function renderCollectionGalleryProgress(
+  el: CollectionElement,
+  gallery: CollectionGalleryBehaviour | null,
+): string {
+  const entries = el.entries ?? [];
+  if (gallery?.mode !== 'drag-slider' || gallery.showProgress !== true || entries.length < 2) return '';
+  const dots = entries
+    .map((_, idx) => {
+      const active = idx === 0;
+      return (
+        `<button type="button" class="opencanvas-collection-gallery-progress-dot"` +
+        ` data-opencanvas-collection-gallery-progress-dot="${String(idx)}"` +
+        ` data-opencanvas-collection-gallery-progress-active="${String(active)}"` +
+        ` aria-current="${String(active)}"` +
+        ` aria-label="Show collection item ${String(idx + 1)}"></button>`
+      );
+    })
+    .join('');
+  return `<div class="opencanvas-collection-gallery-progress" data-opencanvas-collection-gallery-progress-dots>${dots}</div>`;
 }
 
 function renderCollectionEntries(
@@ -361,6 +387,11 @@ function readGalleryBehaviour(el: CollectionElement): CollectionGalleryBehaviour
         `Collection element ${el.id}: gallery.sliderInertia must be a boolean when present.`,
       );
     }
+    if (el.gallery.showProgress !== undefined && typeof el.gallery.showProgress !== 'boolean') {
+      throw new Error(
+        `Collection element ${el.id}: gallery.showProgress must be a boolean when present.`,
+      );
+    }
   } else {
     if (el.gallery.sliderAxis !== undefined) {
       throw new Error(
@@ -370,6 +401,11 @@ function readGalleryBehaviour(el: CollectionElement): CollectionGalleryBehaviour
     if (el.gallery.sliderInertia !== undefined) {
       throw new Error(
         `Collection element ${el.id}: gallery.sliderInertia is only supported when gallery.mode is drag-slider.`,
+      );
+    }
+    if (el.gallery.showProgress !== undefined) {
+      throw new Error(
+        `Collection element ${el.id}: gallery.showProgress is only supported when gallery.mode is drag-slider.`,
       );
     }
   }

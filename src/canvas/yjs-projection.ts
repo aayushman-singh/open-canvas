@@ -829,6 +829,9 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
     if (el.gallery.sliderInertia !== undefined) {
       gallery.set('sliderInertia', el.gallery.sliderInertia);
     }
+    if (el.gallery.showProgress !== undefined) {
+      gallery.set('showProgress', el.gallery.showProgress);
+    }
     if (el.gallery.videoHover !== undefined) {
       const videoHover = new Y.Map<unknown>();
       videoHover.set('enabled', el.gallery.videoHover.enabled);
@@ -1688,6 +1691,9 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
     }
     if (rawGallery.has('sliderInertia')) {
       el.gallery.sliderInertia = rawGallery.get('sliderInertia') as boolean;
+    }
+    if (rawGallery.has('showProgress')) {
+      el.gallery.showProgress = rawGallery.get('showProgress') as boolean;
     }
     if (rawGallery.has('videoHover')) {
       const rawVideoHover: unknown = rawGallery.get('videoHover');

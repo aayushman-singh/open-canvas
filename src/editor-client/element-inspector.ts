@@ -2124,6 +2124,7 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
           ? {
               sliderAxis: collection.gallery?.sliderAxis ?? 'x',
               sliderInertia: collection.gallery?.sliderInertia ?? true,
+              showProgress: collection.gallery?.showProgress ?? false,
             }
           : {}),
       };
@@ -2154,6 +2155,7 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
           ? {
               sliderAxis: collection.gallery.sliderAxis ?? 'x',
               sliderInertia: collection.gallery.sliderInertia ?? true,
+              showProgress: collection.gallery.showProgress ?? false,
             }
           : {}),
       };
@@ -2183,6 +2185,17 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
         ctx.scheduleSave();
       });
       inspector.appendChild(field('Slider inertia', sliderInertia));
+
+      const showProgress = document.createElement('input');
+      showProgress.type = 'checkbox';
+      showProgress.checked = collection.gallery.showProgress === true;
+      showProgress.addEventListener('change', () => {
+        ctx.captureForUndo();
+        collection.gallery!.showProgress = showProgress.checked;
+        ctx.rebuildElement(collection.id);
+        ctx.scheduleSave();
+      });
+      inspector.appendChild(field('Show progress', showProgress));
     }
 
     const galleryVideoHover = document.createElement('input');

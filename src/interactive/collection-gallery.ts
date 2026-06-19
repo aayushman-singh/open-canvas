@@ -109,6 +109,7 @@ function hydrateCollectionGalleries(scope) {
       var reducedMotion = galleryRoot.getAttribute('data-opencanvas-collection-gallery-reduced-motion');
       var sliderAxis = galleryRoot.getAttribute('data-opencanvas-collection-gallery-slider-axis') || 'x';
       var sliderInertia = galleryRoot.getAttribute('data-opencanvas-collection-gallery-slider-inertia') || 'true';
+      var progressAttr = galleryRoot.getAttribute('data-opencanvas-collection-gallery-progress');
       if (mode !== 'hover-reveal-detail' && mode !== 'drag-slider') {
         emitCollectionGalleryFailure(galleryRoot, 'invalid-mode', 'Collection gallery mode must be hover-reveal-detail or drag-slider', mode);
       }
@@ -125,9 +126,13 @@ function hydrateCollectionGalleries(scope) {
         if (sliderInertia !== 'true' && sliderInertia !== 'false') {
           emitCollectionGalleryFailure(galleryRoot, 'invalid-slider-inertia', 'Collection gallery slider inertia must be true or false', sliderInertia);
         }
+        if (progressAttr !== null && progressAttr !== 'true') {
+          emitCollectionGalleryFailure(galleryRoot, 'invalid-progress', 'Collection gallery progress metadata must be true when present', progressAttr);
+        }
       } else if (
         galleryRoot.getAttribute('data-opencanvas-collection-gallery-slider-axis') !== null ||
-        galleryRoot.getAttribute('data-opencanvas-collection-gallery-slider-inertia') !== null
+        galleryRoot.getAttribute('data-opencanvas-collection-gallery-slider-inertia') !== null ||
+        progressAttr !== null
       ) {
         emitCollectionGalleryFailure(galleryRoot, 'unsupported-slider-relation', 'Collection gallery slider metadata is only supported for drag-slider', mode);
       }
@@ -135,12 +140,21 @@ function hydrateCollectionGalleries(scope) {
       if (reduce && reducedMotion === 'instant') galleryRoot.setAttribute('data-opencanvas-collection-gallery-reduced', 'instant');
       galleryRoot.setAttribute('data-opencanvas-collection-gallery-hydrated', 'true');
       var entries = galleryRoot.querySelectorAll('[data-opencanvas-collection-entry]');
+      var progressDots = galleryRoot.querySelectorAll('[data-opencanvas-collection-gallery-progress-dot]');
+      if (progressAttr === 'true' && entries.length > 1 && progressDots.length !== entries.length) {
+        emitCollectionGalleryFailure(galleryRoot, 'invalid-progress-dot-count', 'Collection gallery progress dots must match entry count', progressDots.length);
+      }
       function activate(entry) {
         var activeIndex = entry.getAttribute('data-opencanvas-collection-entry') || '0';
         for (var i = 0; i < entries.length; i++) {
           var isActive = entries[i] === entry;
           entries[i].setAttribute('data-opencanvas-collection-entry-active', isActive ? 'true' : 'false');
           entries[i].setAttribute('aria-expanded', isActive ? 'true' : 'false');
+        }
+        for (var d = 0; d < progressDots.length; d++) {
+          var dotActive = progressDots[d].getAttribute('data-opencanvas-collection-gallery-progress-dot') === activeIndex;
+          progressDots[d].setAttribute('data-opencanvas-collection-gallery-progress-active', dotActive ? 'true' : 'false');
+          progressDots[d].setAttribute('aria-current', dotActive ? 'true' : 'false');
         }
         galleryRoot.setAttribute('data-opencanvas-collection-active-entry', activeIndex);
       }

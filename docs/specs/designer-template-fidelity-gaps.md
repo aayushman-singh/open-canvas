@@ -410,7 +410,7 @@ Current state:
 User-visible miss:
 
 - Richer collection slider controls such as snap presets, keyboard paging, and
-  visible progress indicators remain deferred beyond the drag-slider primitive.
+  gallery navigation presets remain deferred beyond the drag-slider primitive.
 
 June 2026 update: Marquee can now bind to a same-section Collection element as
 a schema-owned ticker source (`title`, `excerpt`, or `all-text`) instead of
@@ -421,6 +421,11 @@ June 2026 update: Collection Gallery v2 can now batch-apply Video Stream Hover
 to materialized video entries through `gallery.videoHover`; explicit per-entry
 video hover still wins, renderer emits the existing video-hover metadata, and
 Yjs preserves the gallery-level policy.
+
+June 2026 update: Collection Gallery drag-slider can now show schema-owned
+progress dots. The renderer emits progress metadata and one dot per entry, the
+Runtime Hydrator keeps dots in sync with active-entry state, the inspector
+exposes a Show progress toggle, and validation/Yjs preserve the policy.
 
 Needed primitive:
 
@@ -801,7 +806,7 @@ Intentional deferral: richer nested overlay-canvas editing affordances, overlay-
 
 ### 18. Collection Gallery v2 Hover Reveal Detail
 
-Status: addressed for the schema-owned Collection gallery v2 slice. A Collection can now opt into `gallery.mode = hover-reveal-detail` with explicit inline detail and reduced-motion policies, or `gallery.mode = drag-slider` with owner-authored axis and inertia policy. The renderer emits collection/entry metadata, the Runtime Hydrator owns active-entry and drag-slider offset state, the inspector exposes owner controls, Yjs preserves the gallery policy, and invalid gallery modes or slider relations fail validation.
+Status: addressed for the schema-owned Collection gallery v2 slice. A Collection can now opt into `gallery.mode = hover-reveal-detail` with explicit inline detail and reduced-motion policies, or `gallery.mode = drag-slider` with owner-authored axis, inertia, and progress-dot policy. The renderer emits collection/entry metadata, the Runtime Hydrator owns active-entry, progress-dot, and drag-slider offset state, the inspector exposes owner controls, Yjs preserves the gallery policy, and invalid gallery modes or slider relations fail validation.
 
 Intentional deferral: this does not add a 3D helmet viewer or marketplace media inventory; gallery entries continue to be materialized Collection content and can compose existing media/text/card primitives.
 

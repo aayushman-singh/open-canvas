@@ -1942,12 +1942,21 @@ function validateElement(
             ) {
               errors.push(`${basePath}.gallery.sliderInertia must be a boolean when present`);
             }
+            if (
+              element.gallery.showProgress !== undefined &&
+              typeof element.gallery.showProgress !== 'boolean'
+            ) {
+              errors.push(`${basePath}.gallery.showProgress must be a boolean when present`);
+            }
           } else {
             if (element.gallery.sliderAxis !== undefined) {
               errors.push(`${basePath}.gallery.sliderAxis is only supported when gallery.mode is drag-slider`);
             }
             if (element.gallery.sliderInertia !== undefined) {
               errors.push(`${basePath}.gallery.sliderInertia is only supported when gallery.mode is drag-slider`);
+            }
+            if (element.gallery.showProgress !== undefined) {
+              errors.push(`${basePath}.gallery.showProgress is only supported when gallery.mode is drag-slider`);
             }
           }
         }
