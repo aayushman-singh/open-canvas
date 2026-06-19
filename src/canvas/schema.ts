@@ -181,7 +181,7 @@ export type MarqueeDirection = (typeof MARQUEE_DIRECTIONS)[number];
 export const MARQUEE_REDUCED_MOTION_MODES = ['static', 'slow'] as const;
 export type MarqueeReducedMotionMode = (typeof MARQUEE_REDUCED_MOTION_MODES)[number];
 
-export const POINTER_FX_PRIMITIVES = ['spotlight', 'tilt', 'magnetic'] as const;
+export const POINTER_FX_PRIMITIVES = ['spotlight', 'tilt', 'magnetic', 'cursor-follow'] as const;
 export type PointerFxPrimitive = (typeof POINTER_FX_PRIMITIVES)[number];
 
 export const POINTER_FX_REDUCED_MOTION_MODES = ['disabled', 'allow'] as const;

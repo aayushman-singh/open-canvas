@@ -45,6 +45,17 @@ function makeSite(): EditableSite {
                   reducedMotion: 'disabled',
                 },
               },
+              {
+                id: 'cursor-follow-card',
+                type: 'container',
+                variant: 'glass',
+                box: { x: 760, y: 160, w: 180, h: 64, z: 3 },
+                pointerFx: {
+                  enabled: true,
+                  primitive: 'cursor-follow',
+                  reducedMotion: 'disabled',
+                },
+              },
             ],
           },
         ],
@@ -66,6 +77,10 @@ assert(
   decoded.pages[0]?.sections[0]?.elements[1]?.pointerFx?.primitive === 'magnetic',
   'Yjs projection must preserve magnetic pointerFx config',
 );
+assert(
+  decoded.pages[0]?.sections[0]?.elements[2]?.pointerFx?.primitive === 'cursor-follow',
+  'Yjs projection must preserve cursor-follow pointerFx config',
+);
 
 const snapshot: PublishedSnapshot = {
   ...site,
@@ -82,6 +97,10 @@ assert(
 assert(
   html.includes('data-opencanvas-pointer-fx="magnetic"'),
   'renderer must emit magnetic pointer-fx primitive',
+);
+assert(
+  html.includes('data-opencanvas-pointer-fx="cursor-follow"'),
+  'renderer must emit cursor-follow pointer-fx primitive',
 );
 assert(
   html.includes('data-opencanvas-pointer-fx-reduced-motion="disabled"'),

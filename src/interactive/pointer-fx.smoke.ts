@@ -168,6 +168,24 @@ const hydratePointerFx = makeHydratePointerFx();
   assert(el.props['--opencanvas-magnetic-y'] === '0px', 'pointerleave recentres magnetic-y to 0px');
 }
 
+// -- 2d. cursor-follow publishes --opencanvas-cursor-follow-x/y ---------------
+{
+  const el = makeStub('cursor-follow', { left: 0, top: 0, width: 200, height: 100 });
+  hydratePointerFx({ querySelectorAll: () => [el] });
+  el.listeners['pointermove']![0]!({ clientX: 200, clientY: 100 }); // bottom-right
+  assert(
+    el.props['--opencanvas-cursor-follow-x'] === '48.00px',
+    `cursor-follow-x right edge should be 48px; got ${el.props['--opencanvas-cursor-follow-x']}`,
+  );
+  assert(
+    el.props['--opencanvas-cursor-follow-y'] === '48.00px',
+    `cursor-follow-y bottom edge should be 48px; got ${el.props['--opencanvas-cursor-follow-y']}`,
+  );
+  el.listeners['pointerleave']![0]!({ clientX: 0, clientY: 0 });
+  assert(el.props['--opencanvas-cursor-follow-x'] === '0px', 'pointerleave recentres cursor-follow-x to 0px');
+  assert(el.props['--opencanvas-cursor-follow-y'] === '0px', 'pointerleave recentres cursor-follow-y to 0px');
+}
+
 // -- 3. idempotence: re-run does not double-wire -----------------------------
 {
   const el = makeStub('spotlight', { left: 0, top: 0, width: 200, height: 100 });

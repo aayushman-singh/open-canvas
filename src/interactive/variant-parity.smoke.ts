@@ -35,11 +35,14 @@ const POINTER_FX_TOKENS = [
   '--opencanvas-tilt-y',
   '--opencanvas-magnetic-x',
   '--opencanvas-magnetic-y',
+  '--opencanvas-cursor-follow-x',
+  '--opencanvas-cursor-follow-y',
   'data-opencanvas-pointer-fx',
   'data-opencanvas-pfx-hydrated',
   'spotlight',
   'tilt',
   'magnetic',
+  'cursor-follow',
 ];
 
 for (const token of POINTER_FX_TOKENS) {
@@ -75,6 +78,13 @@ assert(
 assert(
   visitorPointerFx.includes('* 24') && editorMirror.includes('* 24'),
   'magnetic attraction factor (24) must match between visitor fragment and editor mirror',
+);
+
+// Cursor-follow intentionally has a stronger bounded attraction than magnetic;
+// the constant still must match between editor preview and published runtime.
+assert(
+  visitorPointerFx.includes('* 96') && editorMirror.includes('* 96'),
+  'cursor-follow attraction factor (96) must match between visitor fragment and editor mirror',
 );
 
 console.log('[variant-parity:smoke] OK');

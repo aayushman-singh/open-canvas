@@ -19,6 +19,9 @@
 //   - `magnetic` — publishes `--opencanvas-magnetic-x` /
 //     `--opencanvas-magnetic-y` as small px translations from centre. CSS owns
 //     the transform; the runtime only publishes pointer state.
+//   - `cursor-follow` — publishes `--opencanvas-cursor-follow-x` /
+//     `--opencanvas-cursor-follow-y` as stronger bounded px translations from
+//     centre. CSS owns the transform; the runtime only publishes pointer state.
 //
 // Scroll / entrance motion is deliberately NOT here — that stays with the
 // existing `motion.preset` + `data-scroll-trigger` system (ADR dec 4).
@@ -108,8 +111,21 @@ function hydratePointerFx(scope, options) {
           el.style.setProperty('--opencanvas-magnetic-x', '0px');
           el.style.setProperty('--opencanvas-magnetic-y', '0px');
         });
+      } else if (primitive === 'cursor-follow') {
+        el.addEventListener('pointermove', function (ev) {
+          var r = el.getBoundingClientRect();
+          if (!(r.width > 0) || !(r.height > 0)) return;
+          var nx = (ev.clientX - r.left) / r.width - 0.5;
+          var ny = (ev.clientY - r.top) / r.height - 0.5;
+          el.style.setProperty('--opencanvas-cursor-follow-x', (nx * 96).toFixed(2) + 'px');
+          el.style.setProperty('--opencanvas-cursor-follow-y', (ny * 96).toFixed(2) + 'px');
+        });
+        el.addEventListener('pointerleave', function () {
+          el.style.setProperty('--opencanvas-cursor-follow-x', '0px');
+          el.style.setProperty('--opencanvas-cursor-follow-y', '0px');
+        });
       } else {
-        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, or magnetic', primitive);
+        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, or cursor-follow', primitive);
       }
     })(nodes[i]);
   }
