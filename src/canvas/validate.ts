@@ -3430,6 +3430,30 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
             `${scenePath}.pinTarget.type must be "section" or "element" (got ${describe(scene.pinTarget.type)})`,
           );
         }
+        if (scene.horizontalTrack !== undefined) {
+          if (!isRecord(scene.horizontalTrack)) {
+            errors.push(`${scenePath}.horizontalTrack must be an object when present`);
+          } else {
+            resolveIndexedId(
+              targetIndex.elementIds,
+              scene.horizontalTrack.elementId,
+              `${scenePath}.horizontalTrack.elementId`,
+              'element',
+              errors,
+            );
+            if (scene.horizontalTrack.distancePx !== undefined) {
+              if (
+                !isFiniteNumber(scene.horizontalTrack.distancePx) ||
+                scene.horizontalTrack.distancePx <= 0 ||
+                scene.horizontalTrack.distancePx > 50000
+              ) {
+                errors.push(
+                  `${scenePath}.horizontalTrack.distancePx must be a finite number greater than 0 and <= 50000 when present`,
+                );
+              }
+            }
+          }
+        }
         validateNonNegativeFiniteNumber(
           scene.startOffsetPx,
           `${scenePath}.startOffsetPx`,

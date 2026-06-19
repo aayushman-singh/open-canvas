@@ -1348,6 +1348,72 @@ function renderScrollSceneCard(
     card.appendChild(field('Pin element id', pinElement));
   }
 
+  const horizontal = scene.horizontalTrack;
+  const horizontalEnabled = document.createElement('input');
+  horizontalEnabled.type = 'checkbox';
+  horizontalEnabled.checked = horizontal !== undefined;
+  horizontalEnabled.addEventListener('change', () => {
+    mutate(ctx, () => {
+      const scenes = ctx.state!.scrollScenes ?? [];
+      if (horizontalEnabled.checked) {
+        const elementId = ctx.selectedElementId ?? elementIdsForActivePage(ctx)[0] ?? '';
+        if (elementId.length === 0) {
+          ctx.setStatus('Select an element before enabling a Scroll Scene horizontal track', 'error');
+          horizontalEnabled.checked = false;
+          return;
+        }
+        scenes[index] = { ...scene, horizontalTrack: { elementId } };
+      } else {
+        const next = { ...scene };
+        delete next.horizontalTrack;
+        scenes[index] = next;
+      }
+    });
+  });
+  card.appendChild(field('Horizontal track', horizontalEnabled));
+
+  if (horizontal) {
+    const horizontalElement = textInput(horizontal.elementId, 'Element id to translate');
+    horizontalElement.addEventListener('change', () => {
+      const value = horizontalElement.value.trim();
+      if (value.length === 0) {
+        ctx.setStatus('Scroll Scene horizontal track element cannot be empty', 'error');
+        horizontalElement.value = horizontal.elementId;
+        return;
+      }
+      mutate(ctx, () => {
+        const scenes = ctx.state!.scrollScenes ?? [];
+        scenes[index] = { ...scene, horizontalTrack: { ...horizontal, elementId: value } };
+      });
+    });
+    card.appendChild(field('Horizontal element id', horizontalElement));
+
+    const distance = optionalNumberInput(horizontal.distancePx, 1, 50000, 10);
+    distance.addEventListener('change', () => {
+      const value = distance.value.trim();
+      if (value.length === 0) {
+        mutate(ctx, () => {
+          const scenes = ctx.state!.scrollScenes ?? [];
+          const nextTrack = { ...horizontal };
+          delete nextTrack.distancePx;
+          scenes[index] = { ...scene, horizontalTrack: nextTrack };
+        });
+        return;
+      }
+      const next = validNumber(distance, 1, 50000);
+      if (next === null) {
+        ctx.setStatus('Scroll Scene horizontal track distance must be 1-50000px', 'error');
+        distance.value = String(horizontal.distancePx ?? '');
+        return;
+      }
+      mutate(ctx, () => {
+        const scenes = ctx.state!.scrollScenes ?? [];
+        scenes[index] = { ...scene, horizontalTrack: { ...horizontal, distancePx: next } };
+      });
+    });
+    card.appendChild(field('Horizontal distance (px)', distance));
+  }
+
   const start = numberInput(scene.startOffsetPx, 0, 20000, 10);
   start.addEventListener('change', () => updateScrollSceneNumber(ctx, scene, index, 'startOffsetPx', start));
   card.appendChild(field('Start offset (px)', start));

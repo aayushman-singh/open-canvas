@@ -371,9 +371,9 @@ export const velocityAthleteTemplate: TemplateSeed = {
       steps: [
         {
           id: 'story-track-x',
-          target: { type: 'element', elementId: 'velocity-story-track' },
-          from: { translateX: 0 },
-          to: { translateX: -940 },
+          target: { type: 'element', elementId: 'velocity-story-meta' },
+          from: { opacity: 0.55 },
+          to: { opacity: 1 },
           durationMs: 1,
         },
       ],
@@ -385,6 +385,7 @@ export const velocityAthleteTemplate: TemplateSeed = {
       sectionId: 'velocity-story',
       sequenceId: 'velocity-story-scrub',
       pinTarget: { type: 'section', sectionId: 'velocity-story' },
+      horizontalTrack: { elementId: 'velocity-story-track', distancePx: 940 },
       startOffsetPx: 0,
       endOffsetPx: 1800,
     },

@@ -91,6 +91,10 @@ export interface ScrollScene {
   sectionId: string;
   sequenceId: string;
   pinTarget: { type: 'section'; sectionId: string } | { type: 'element'; elementId: string };
+  horizontalTrack?: {
+    elementId: string;
+    distancePx?: number;
+  };
   startOffsetPx: number;
   endOffsetPx: number;
   snapPoints?: number[];

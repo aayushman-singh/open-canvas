@@ -171,6 +171,8 @@ assert(panelSrc.includes('renderScrollSceneControls'), 'panel must render scroll
 assert(panelSrc.includes('ctx.state!.scrollScenes'), 'panel must mutate scroll scenes');
 assert(panelSrc.includes('ctx.state!.motionSequences'), 'panel must mutate linked motion sequences');
 assert(panelSrc.includes('Validation blocks publish'), 'panel must fail loudly for missing linked sequence');
+assert(panelSrc.includes('Horizontal track'), 'panel must expose Scroll Scene horizontal track controls');
+assert(panelSrc.includes('horizontalTrack'), 'panel must mutate Scroll Scene horizontal track state');
 assert(panelSrc.includes('renderMotionSequenceControls'), 'panel must render full Motion Sequence controls');
 assert(panelSrc.includes('renderRichMotionAssetControls'), 'panel must render Rich Motion Asset controls');
 assert(panelSrc.includes('Add Rive asset'), 'panel must create Rive asset metadata');

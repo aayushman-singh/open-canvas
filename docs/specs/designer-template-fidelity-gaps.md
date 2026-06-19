@@ -263,20 +263,25 @@ Current state:
   Snap points control, validation rejects malformed stops, and the Runtime
   Hydrator quantizes shared scroll progress before Motion Sequence, Rich Motion
   image-sequence, or Rive scroll-progress consumers read it.
+- **June 2026 update:** Scroll Scene now supports a schema-owned
+  `horizontalTrack` relation. Owners can bind an element track from the
+  Interactions panel, optionally author a fixed travel distance, and the
+  Runtime Hydrator translates it from scene progress with named failures for
+  unresolved or unmeasurable tracks. Velocity Athlete uses this instead of a
+  template-only transform to prove horizontal storytelling is owner-editable.
 
 User-visible miss:
 
 - Scroll position can now drive pinned Motion Sequence progress with authored
   stops.
-- Still missing: horizontal-scroll storytelling layout presets, image sequence
-  scrub controls in the editor, before/after reveal controls, and richer
-  scroll-progress typography authoring.
+- Still missing: image sequence scrub controls in the editor, before/after
+  reveal controls, and richer scroll-progress typography authoring.
 
 Needed primitive:
 
 - A Scroll Scene: trigger section, start/end bounds, optional pinning, scrubbed
-  progress, snap points, and a Motion Sequence bound to progress rather than
-  time.
+  progress, snap points, optional horizontal track, and a Motion Sequence bound
+  to progress rather than time.
 
 ### 3. Load Experience V1 Exists, Full Preloader Authoring Does Not
 

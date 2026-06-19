@@ -892,7 +892,68 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(spans[2]!.style.opacity === '0', 'third split word must not start before its stagger window');
 }
 
-// (6) image sequence refuses an empty frame list
+// (6) scroll scene horizontal track translates with scene progress
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'horizontal-scroll',
+        trigger: { type: 'scroll-scene', scrollSceneId: 'horizontal-scene' },
+        steps: [
+          {
+            id: 'horizontal-noop',
+            target: { type: 'section', sectionId: 'section-story' },
+            to: { opacity: 1 },
+            durationMs: 1,
+          },
+        ],
+      },
+    ],
+    scrollScenes: [
+      {
+        id: 'horizontal-scene',
+        sectionId: 'section-story',
+        sequenceId: 'horizontal-scroll',
+        pinTarget: { type: 'section', sectionId: 'section-story' },
+        horizontalTrack: { elementId: 'story-track', distancePx: 600 },
+        startOffsetPx: 0,
+        endOffsetPx: 800,
+      },
+    ],
+    richMotionAssets: [],
+  });
+  doc.body.appendChild(script);
+  const section = new StubElement('section');
+  section.setAttribute('data-opencanvas-section', 'section-story');
+  const track = new StubElement('div');
+  track.setAttribute('data-opencanvas-element', 'story-track');
+  section.appendChild(track);
+  doc.body.appendChild(section);
+  section.getBoundingClientRect = (): { top: number; left: number; width: number; height: number } => ({
+    top: 100 - win.scrollY,
+    left: 0,
+    width: 1200,
+    height: 800,
+  });
+  runBehaviour(doc, win, StubImage);
+  win.scrollY = 500;
+  win.dispatchScroll();
+  assert(
+    track.getAttribute('data-opencanvas-scroll-horizontal-track') === 'true',
+    'scroll scene horizontal track must mark the hydrated track',
+  );
+  assert(
+    track.style.transform.includes('-300px'),
+    'scroll scene horizontal track must translate by authored distance and progress',
+  );
+}
+
+// (7) image sequence refuses an empty frame list
 {
   const doc = new StubDocument();
   const win = new StubWindow();

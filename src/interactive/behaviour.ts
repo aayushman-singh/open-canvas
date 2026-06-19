@@ -475,6 +475,55 @@ function behaviourApplyPin(pinEl, scene, section, progress) {
   pinEl.style.zIndex = '20';
 }
 
+function behaviourFindHorizontalTrack(scene, root) {
+  if (scene.horizontalTrack === undefined) return null;
+  if (!scene.horizontalTrack || typeof scene.horizontalTrack !== 'object') {
+    behaviourFailure('scroll-scene-horizontal-track', { scrollSceneId: scene.id }, new Error('horizontalTrack must be an object'));
+  }
+  if (!scene.horizontalTrack.elementId) {
+    behaviourFailure('scroll-scene-horizontal-track-element', { scrollSceneId: scene.id }, new Error('horizontalTrack.elementId is required'));
+  }
+  var track = root.querySelector('[data-opencanvas-element="' + scene.horizontalTrack.elementId + '"]');
+  if (!track) {
+    behaviourFailure('scroll-scene-horizontal-track-missing', { scrollSceneId: scene.id, elementId: scene.horizontalTrack.elementId }, new Error('horizontal track element not found'));
+  }
+  return track;
+}
+
+function behaviourHorizontalTrackDistance(scene, track, section) {
+  if (scene.horizontalTrack && scene.horizontalTrack.distancePx !== undefined) {
+    var authored = Number(scene.horizontalTrack.distancePx);
+    if (!isFinite(authored) || authored <= 0) {
+      behaviourFailure('scroll-scene-horizontal-track-distance', { scrollSceneId: scene.id, distancePx: scene.horizontalTrack.distancePx }, new Error('horizontal track distance must be greater than 0'));
+    }
+    return authored;
+  }
+  if (!track || !section || typeof section.getBoundingClientRect !== 'function') {
+    behaviourFailure('scroll-scene-horizontal-track-measurement', { scrollSceneId: scene.id }, new Error('horizontal track cannot be measured'));
+  }
+  var rect = section.getBoundingClientRect();
+  var trackWidth = Number(track.scrollWidth || track.clientWidth || 0);
+  var viewportWidth = Number(rect && rect.width);
+  var distance = trackWidth - viewportWidth;
+  if (!isFinite(distance) || distance <= 0) {
+    behaviourFailure('scroll-scene-horizontal-track-measurement', {
+      scrollSceneId: scene.id,
+      trackWidth: trackWidth,
+      viewportWidth: viewportWidth
+    }, new Error('horizontal track distance could not be derived'));
+  }
+  return distance;
+}
+
+function behaviourApplyHorizontalTrack(track, scene, section, progress) {
+  var distance = behaviourHorizontalTrackDistance(scene, track, section);
+  var x = -distance * Math.max(0, Math.min(1, progress));
+  track.style.transform = 'translate3d(' + x + 'px,0,0)';
+  track.style.willChange = 'transform';
+  track.setAttribute('data-opencanvas-scroll-horizontal-track', 'true');
+  track.setAttribute('data-opencanvas-scroll-horizontal-progress', String(Math.max(0, Math.min(1, progress)).toFixed(3)));
+}
+
 function behaviourSetupScrollScene(scene, sequence, root) {
   if (sequence.repeat) {
     behaviourFailure('motion-sequence-repeat-scroll-scene', { sequenceId: sequence.id, scrollSceneId: scene.id }, new Error('scroll-scene Motion Sequences cannot repeat'));
@@ -489,6 +538,7 @@ function behaviourSetupScrollScene(scene, sequence, root) {
   if (!pinEl) {
     behaviourFailure('behaviour-target-missing', { scrollSceneId: scene.id, pinTarget: scene.pinTarget }, new Error('scroll scene pin target not found'));
   }
+  var horizontalTrack = behaviourFindHorizontalTrack(scene, root);
   var reducedMode = behaviourPrefersReducedMotion() ? (sequence.reducedMotion || 'skip') : null;
   var ticking = false;
   function update() {
@@ -496,6 +546,7 @@ function behaviourSetupScrollScene(scene, sequence, root) {
     var progress = behaviourSceneProgress(scene, section);
     if (reducedMode !== 'skip') {
       behaviourApplyPin(pinEl, scene, section, progress);
+      if (horizontalTrack) behaviourApplyHorizontalTrack(horizontalTrack, scene, section, progress);
       behaviourRunSequence(sequence, root, reducedMode, progress);
     }
   }

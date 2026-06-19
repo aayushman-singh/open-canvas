@@ -129,6 +129,7 @@ function buildValidState(): EditableSite & Record<string, unknown> {
         sectionId: 'section-hero',
         sequenceId: 'sequence-scroll',
         pinTarget: { type: 'element', elementId: 'tab-copy' },
+        horizontalTrack: { elementId: 'tab-copy', distancePx: 480 },
         startOffsetPx: 0,
         endOffsetPx: 720,
         snapPoints: [0, 0.5, 1],
@@ -193,6 +194,17 @@ const invalidScrollSnapPoints = structuredClone(validState);
 ];
 expectInvalid(invalidScrollSnapPoints, 'scrollScenes[0].snapPoints[2]', 'scroll snap order');
 expectInvalid(invalidScrollSnapPoints, 'scrollScenes[0].snapPoints[3]', 'scroll snap range');
+
+const missingHorizontalTrack = structuredClone(validState);
+(
+  (missingHorizontalTrack.scrollScenes as { horizontalTrack: { elementId: string } }[])[0]!
+    .horizontalTrack
+).elementId = 'missing-element';
+expectInvalid(
+  missingHorizontalTrack,
+  'scrollScenes[0].horizontalTrack.elementId',
+  'scroll scene missing horizontal track element',
+);
 
 const emptyRichMotionFrames = structuredClone(validState);
 (emptyRichMotionFrames.richMotionAssets as { frameAssetIds: string[] }[])[0]!.frameAssetIds = [];
