@@ -30,6 +30,8 @@
 //     CSS owns the transform; the runtime only publishes pointer state.
 //   - `cursor-trail` — appends short-lived `opencanvas-pointer-trail` spans at
 //     pointer coordinates. CSS owns trail rendering and lifetime animation.
+//   - `image-follow` — appends one preview image from schema-owned asset
+//     metadata and positions it at pointer coordinates.
 //
 // Scroll / entrance motion is deliberately NOT here — that stays with the
 // existing `motion.preset` + `data-scroll-trigger` system (ADR dec 4).
@@ -82,6 +84,31 @@ function appendPointerTrail(el, ev) {
     if (trail && typeof trail.remove === 'function') trail.remove();
     else if (trail && trail.parentNode && typeof trail.parentNode.removeChild === 'function') trail.parentNode.removeChild(trail);
   }, 560);
+}
+function appendPointerImageFollow(el, previewSrc) {
+  if (!previewSrc) {
+    emitPointerFxFailure(el, 'image-follow-src-missing', 'Pointer FX image-follow requires preview asset metadata', previewSrc);
+  }
+  var doc = el.ownerDocument || (typeof document !== 'undefined' ? document : null);
+  if (!doc || typeof doc.createElement !== 'function' || typeof el.appendChild !== 'function') {
+    emitPointerFxFailure(el, 'image-follow-dom-missing', 'Pointer FX image-follow requires DOM append support', null);
+  }
+  var img = doc.createElement('img');
+  img.className = 'opencanvas-pointer-image-follow';
+  img.setAttribute('src', previewSrc);
+  img.setAttribute('alt', '');
+  img.setAttribute('aria-hidden', 'true');
+  el.appendChild(img);
+  return img;
+}
+function positionPointerImageFollow(el, img, ev) {
+  var r = el.getBoundingClientRect();
+  if (!(r.width > 0) || !(r.height > 0)) return;
+  var px = ((ev.clientX - r.left) / r.width) * 100;
+  var py = ((ev.clientY - r.top) / r.height) * 100;
+  img.style.left = px.toFixed(2) + '%';
+  img.style.top = py.toFixed(2) + '%';
+  img.setAttribute('data-opencanvas-pointer-image-follow-active', 'true');
 }
 function hydratePointerFx(scope, options) {
   var nodes = (scope || document).querySelectorAll('[data-opencanvas-pointer-fx]');
@@ -182,8 +209,16 @@ function hydratePointerFx(scope, options) {
         el.addEventListener('pointermove', function (ev) {
           appendPointerTrail(el, ev);
         });
+      } else if (primitive === 'image-follow') {
+        var img = appendPointerImageFollow(el, el.getAttribute('data-opencanvas-pointer-fx-preview-src'));
+        el.addEventListener('pointermove', function (ev) {
+          positionPointerImageFollow(el, img, ev);
+        });
+        el.addEventListener('pointerleave', function () {
+          img.setAttribute('data-opencanvas-pointer-image-follow-active', 'false');
+        });
       } else {
-        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, pointer-parallax, or cursor-trail', primitive);
+        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, pointer-parallax, cursor-trail, or image-follow', primitive);
       }
     })(nodes[i]);
   }

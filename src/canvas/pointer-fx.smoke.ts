@@ -89,6 +89,18 @@ function makeSite(): EditableSite {
                   reducedMotion: 'disabled',
                 },
               },
+              {
+                id: 'image-follow-card',
+                type: 'container',
+                variant: 'glass',
+                box: { x: 560, y: 300, w: 180, h: 64, z: 7 },
+                pointerFx: {
+                  enabled: true,
+                  primitive: 'image-follow',
+                  previewAssetId: 'cursor-preview.webp',
+                  reducedMotion: 'disabled',
+                },
+              },
             ],
           },
         ],
@@ -126,6 +138,11 @@ assert(
   decoded.pages[0]?.sections[0]?.elements[5]?.pointerFx?.primitive === 'cursor-trail',
   'Yjs projection must preserve cursor-trail pointerFx config',
 );
+assert(
+  decoded.pages[0]?.sections[0]?.elements[6]?.pointerFx?.primitive === 'image-follow' &&
+    decoded.pages[0]?.sections[0]?.elements[6]?.pointerFx?.previewAssetId === 'cursor-preview.webp',
+  'Yjs projection must preserve image-follow pointerFx config',
+);
 
 const snapshot: PublishedSnapshot = {
   ...site,
@@ -160,6 +177,14 @@ assert(
   'renderer must emit cursor-trail pointer-fx primitive',
 );
 assert(
+  html.includes('data-opencanvas-pointer-fx="image-follow"'),
+  'renderer must emit image-follow pointer-fx primitive',
+);
+assert(
+  html.includes('data-opencanvas-pointer-fx-preview-src="/assets/cursor-preview.webp"'),
+  'renderer must emit image-follow preview asset src',
+);
+assert(
   html.includes('data-opencanvas-pointer-fx-reduced-motion="disabled"'),
   'renderer must emit pointer-fx reduced-motion mode',
 );
@@ -187,6 +212,27 @@ assert(
 assert(
   invalidResult.errors.some((error) => error.includes('.pointerFx.reducedMotion')),
   'invalid reduced-motion mode must be named',
+);
+
+const invalidImageFollow = makeSite() as unknown as Record<string, unknown>;
+const imageFollowElement = (
+  (
+    (((invalidImageFollow.pages as unknown[])[0] as Record<string, unknown>).sections as unknown[])[0] as Record<
+      string,
+      unknown
+    >
+  ).elements as Record<string, unknown>[]
+)[0]!;
+imageFollowElement.pointerFx = {
+  enabled: true,
+  primitive: 'image-follow',
+  reducedMotion: 'disabled',
+};
+const invalidImageFollowResult = validateEditableSite(invalidImageFollow);
+assert(!invalidImageFollowResult.valid, 'image-follow without preview asset must fail validation');
+assert(
+  invalidImageFollowResult.errors.some((error) => error.includes('.pointerFx.previewAssetId')),
+  'missing image-follow preview asset must be named',
 );
 
 console.log('[canvas-pointer-fx:smoke] OK');

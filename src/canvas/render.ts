@@ -305,7 +305,7 @@ function applyContainerTint(
   };
 }
 
-function buildElementCommonAttrs(element: CanvasElement, tintAttr: string): string {
+function buildElementCommonAttrs(element: CanvasElement, tintAttr: string, assetBasePath: string): string {
   const motionAttrs =
     element.motion !== undefined
       ? ` data-motion-preset="${escapeAttr(element.motion.preset)}" data-motion-delay-ms="${escapeAttr(String(element.motion.delayMs ?? 0))}"`
@@ -316,7 +316,7 @@ function buildElementCommonAttrs(element: CanvasElement, tintAttr: string): stri
       : '';
   const pointerFxAttrs =
     element.pointerFx?.enabled === true
-      ? ` data-opencanvas-pointer-fx="${escapeAttr(element.pointerFx.primitive)}" data-opencanvas-pointer-fx-reduced-motion="${escapeAttr(element.pointerFx.reducedMotion)}"`
+      ? ` data-opencanvas-pointer-fx="${escapeAttr(element.pointerFx.primitive)}"${element.pointerFx.primitive === 'image-follow' && element.pointerFx.previewAssetId ? ` data-opencanvas-pointer-fx-preview-src="${escapeAttr(`${assetBasePath}/${element.pointerFx.previewAssetId}`)}"` : ''} data-opencanvas-pointer-fx-reduced-motion="${escapeAttr(element.pointerFx.reducedMotion)}"`
       : '';
   const ariaAttrs = buildAriaWrapperAttrs(element);
   const variant = variantAttr(element);
@@ -335,7 +335,7 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
   let wrapperStyle = buildElementWrapperStyle(element, ctx.assetBasePath);
   const tinted = applyContainerTint(element, ctx, wrapperStyle);
   wrapperStyle = tinted.wrapperStyle;
-  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr);
+  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr, ctx.assetBasePath);
 
   // ADR 0051 dec 5 — container with linkHref emits the outer wrapper as
   // <a href="…"> instead of <div>. Every other attribute, the inner body
@@ -357,7 +357,7 @@ function renderHostedElement(element: CanvasElement, ctx: ElementRenderCtx): str
   let wrapperStyle = buildHostedElementWrapperStyle(element, ctx.assetBasePath);
   const tinted = applyContainerTint(element, ctx, wrapperStyle);
   wrapperStyle = tinted.wrapperStyle;
-  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr);
+  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr, ctx.assetBasePath);
 
   if (element.type === 'container' && element.linkHref !== undefined) {
     const resolved = resolveActionHref(element.linkHref, ctx.pages);

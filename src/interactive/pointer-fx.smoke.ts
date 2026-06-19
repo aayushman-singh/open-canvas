@@ -82,10 +82,11 @@ interface Rect {
 }
 type Listener = (ev: { clientX: number; clientY: number }) => void;
 
-function makeStub(primitive: string, rect: Rect) {
+function makeStub(primitive: string, rect: Rect, extraAttrs: Record<string, string> = {}) {
   const attrs: Record<string, string> = {
     'data-opencanvas-pointer-fx': primitive,
     'data-opencanvas-pointer-fx-reduced-motion': 'allow',
+    ...extraAttrs,
   };
   const props: Record<string, string> = {};
   const listeners: Record<string, Listener[]> = {};
@@ -94,16 +95,18 @@ function makeStub(primitive: string, rect: Rect) {
     className: string;
     removed: boolean;
     style: Record<string, string>;
+    tagName: string;
     remove(): void;
     setAttribute(k: string, v: string): void;
   }> = [];
   const ownerDocument = {
-    createElement(): (typeof children)[number] {
+    createElement(tagName = 'span'): (typeof children)[number] {
       const child = {
         attrs: {} as Record<string, string>,
         className: '',
         removed: false,
         style: {} as Record<string, string>,
+        tagName,
         remove(): void {
           child.removed = true;
         },
@@ -265,6 +268,27 @@ const hydratePointerFx = makeHydratePointerFx();
   );
   assert(el.children[0]!.style.left === '25.00%', `trail left should be 25%; got ${el.children[0]!.style.left}`);
   assert(el.children[0]!.style.top === '25.00%', `trail top should be 25%; got ${el.children[0]!.style.top}`);
+}
+
+// -- 2h. image-follow appends a positioned preview image ----------------------
+{
+  const el = makeStub('image-follow', { left: 0, top: 0, width: 200, height: 100 }, {
+    'data-opencanvas-pointer-fx-preview-src': '/assets/cursor-preview.webp',
+  });
+  hydratePointerFx({ querySelectorAll: () => [el] });
+  assert(el.children.length === 1, 'image-follow hydrate must append one preview image');
+  assert(el.children[0]!.tagName === 'img', `image-follow node tag drifted: ${el.children[0]!.tagName}`);
+  assert(
+    el.children[0]!.className === 'opencanvas-pointer-image-follow',
+    `image-follow class drifted: ${el.children[0]!.className}`,
+  );
+  assert(
+    el.children[0]!.attrs.src === '/assets/cursor-preview.webp',
+    `image-follow src drifted: ${el.children[0]!.attrs.src}`,
+  );
+  el.listeners['pointermove']![0]!({ clientX: 50, clientY: 25 });
+  assert(el.children[0]!.style.left === '25.00%', `image-follow left should be 25%; got ${el.children[0]!.style.left}`);
+  assert(el.children[0]!.style.top === '25.00%', `image-follow top should be 25%; got ${el.children[0]!.style.top}`);
 }
 
 // -- 3. idempotence: re-run does not double-wire -----------------------------

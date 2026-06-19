@@ -1127,7 +1127,8 @@ const variantCss = String.raw`
    cursor-follow publishes --opencanvas-cursor-follow-x/y, applied here;
    reveal-mask publishes --opencanvas-reveal-x/y, applied here;
    pointer-parallax publishes --opencanvas-parallax-x/y, applied here;
-   cursor-trail appends .opencanvas-pointer-trail spans rendered here. */
+   cursor-trail appends .opencanvas-pointer-trail spans rendered here;
+   image-follow appends .opencanvas-pointer-image-follow rendered here. */
 .opencanvas-element[data-opencanvas-pointer-fx="spotlight"]::before {
   content: "";
   position: absolute;
@@ -1201,6 +1202,30 @@ const variantCss = String.raw`
   background: color-mix(in oklab, var(--opencanvas-kit-accent, currentColor) 42%, transparent);
   transform: translate(-50%, -50%) scale(0.65);
   animation: opencanvas-pointer-trail 560ms ease-out forwards;
+}
+
+.opencanvas-pointer-image-follow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(180px, 42%);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 18px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.92);
+  transition:
+    opacity 140ms ease-out,
+    transform 140ms ease-out,
+    left 90ms linear,
+    top 90ms linear;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.opencanvas-pointer-image-follow[data-opencanvas-pointer-image-follow-active="true"] {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 @keyframes opencanvas-pointer-trail {

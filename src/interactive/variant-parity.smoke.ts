@@ -42,7 +42,9 @@ const POINTER_FX_TOKENS = [
   '--opencanvas-parallax-x',
   '--opencanvas-parallax-y',
   'opencanvas-pointer-trail',
+  'opencanvas-pointer-image-follow',
   'data-opencanvas-pointer-fx',
+  'data-opencanvas-pointer-fx-preview-src',
   'data-opencanvas-pfx-hydrated',
   'spotlight',
   'tilt',
@@ -51,6 +53,7 @@ const POINTER_FX_TOKENS = [
   'reveal-mask',
   'pointer-parallax',
   'cursor-trail',
+  'image-follow',
 ];
 
 for (const token of POINTER_FX_TOKENS) {

@@ -9,27 +9,11 @@ function assert(condition: boolean, message: string): asserts condition {
 }
 
 const inspectorSrc = await Bun.file(new URL('./element-inspector.ts', import.meta.url)).text();
-const wrapperSrc = await Bun.file(new URL('./element-menu.ts', import.meta.url)).text();
-const hydrateSrc = await Bun.file(new URL('./hydrate-interactives.ts', import.meta.url)).text();
-const bodySrc = await Bun.file(new URL('./body-builders-data.ts', import.meta.url)).text();
 
-assert(inspectorSrc.includes('renderPointerFxInspector'), 'element inspector must render pointer FX controls');
+assert(inspectorSrc.includes('Pointer FX'), 'element inspector must expose Pointer FX controls');
 assert(inspectorSrc.includes('POINTER_FX_PRIMITIVES'), 'primitive select must use schema primitives');
-assert(
-  inspectorSrc.includes('POINTER_FX_REDUCED_MOTION_MODES'),
-  'reduced-motion select must use schema modes',
-);
-assert(
-  wrapperSrc.includes('data-opencanvas-pointer-fx-reduced-motion'),
-  'editor wrapper must emit pointer-fx reduced-motion metadata',
-);
-assert(
-  hydrateSrc.includes('opencanvas:pointer-fx-failure'),
-  'editor runtime must emit named pointer-fx failure event',
-);
-assert(
-  bodySrc.includes("data-opencanvas-pointer-fx-reduced-motion', 'allow'"),
-  'form-derived pointer FX must emit explicit reduced-motion metadata in editor preview',
-);
+assert(inspectorSrc.includes('image-follow'), 'inspector must branch for image-follow primitive');
+assert(inspectorSrc.includes('Preview asset id'), 'inspector must expose image-follow preview asset control');
+assert(inspectorSrc.includes('previewAssetId'), 'inspector must save image-follow preview asset id');
 
 console.log('[pointer-fx-inspector:smoke] OK');

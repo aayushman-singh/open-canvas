@@ -22,8 +22,8 @@ Observable success:
 - Hover video previews are authored on video media elements and execute via
   the same Runtime Hydrator in editor preview and published pages.
 - Pointer-reactive spotlight, tilt, magnetic, cursor-follow, reveal-mask, and
-  pointer-parallax effects plus cursor trails are selectable on arbitrary
-  elements with explicit reduced-motion behaviour.
+  pointer-parallax effects plus cursor trails and image-follow cursors are
+  selectable on arbitrary elements with explicit reduced-motion behaviour.
 - Rich Motion Assets can represent Rive files as schema-owned assets with
   artboard/state-machine metadata and a bounded runtime adapter.
 - Rich Motion Assets can represent Lottie JSON files as schema-owned assets
@@ -69,8 +69,9 @@ Open Canvas has real motion and interaction primitives already:
   pointer-fx in one inline IIFE (`src/interactive/*`).
 - ADR 0066 added Variant presets for forms, carousels, accordions, and tabs;
   the shipped pointer-fx primitives are `spotlight`, `tilt`, `magnetic`,
-  `cursor-follow`, `reveal-mask`, `pointer-parallax`, and `cursor-trail`, but
-  only Form `spotlight` is attached to a catalogued variant.
+  `cursor-follow`, `reveal-mask`, `pointer-parallax`, `cursor-trail`, and
+  `image-follow`, but only Form `spotlight` is attached to a catalogued
+  variant.
 - Carousel has `paginate` and `scroll-snap` modes, plus style variants such as
   `coverflow`, `ken-burns`, and `editorial`.
 - Legacy sections with `exit-intent`, `delay`, or `scroll` popup triggers are
@@ -103,9 +104,9 @@ Open Canvas has real motion and interaction primitives already:
 - **June 2026 update:** Pointer FX is now owner-facing beyond Form
   `spotlight`. Element wrappers can store `pointerFx` with `spotlight`, `tilt`,
   `magnetic`, `cursor-follow`, `reveal-mask`, `pointer-parallax`, or
-  `cursor-trail`, explicit reduced-motion mode, validator/Yjs persistence,
-  renderer metadata, editor inspector controls, and named runtime failure
-  events.
+  `cursor-trail`, or `image-follow`, explicit reduced-motion mode,
+  validator/Yjs persistence, renderer metadata, editor inspector controls, and
+  named runtime failure events.
 - **June 2026 update:** Rich Motion Assets now include a `rive` kind. The
   schema stores the Rive asset id, artboard, state machine, autoplay, alt text,
   and explicit reduced-motion policy; renderer/editor emit fit metadata; the
@@ -347,7 +348,8 @@ Needed primitive:
 Current state:
 
 - Pointer-fx exists as a runtime concept with `spotlight`, `tilt`, `magnetic`,
-  `cursor-follow`, `reveal-mask`, `pointer-parallax`, and `cursor-trail`.
+  `cursor-follow`, `reveal-mask`, `pointer-parallax`, `cursor-trail`, and
+  `image-follow`.
 - Only Form `spotlight` is attached to a shipped variant.
 - Hover states are mostly fixed CSS inside component/style-kit selectors.
 - **June 2026 update:** Marquee is no longer template-JSON-only. Any element
@@ -360,14 +362,14 @@ Current state:
   instead of silently ignoring rejected playback.
 - **June 2026 update:** Pointer FX now has an element-level inspector catalog.
   Owners can apply `spotlight`, `tilt`, `magnetic`, `cursor-follow`,
-  `reveal-mask`, `pointer-parallax`, or `cursor-trail` to arbitrary elements;
-  Form `spotlight` also emits explicit reduced-motion metadata; malformed
-  runtime attributes fail through `opencanvas:pointer-fx-failure`.
+  `reveal-mask`, `pointer-parallax`, `cursor-trail`, or `image-follow` to
+  arbitrary elements; Form `spotlight` also emits explicit reduced-motion
+  metadata; malformed runtime attributes fail through
+  `opencanvas:pointer-fx-failure`.
 
 User-visible miss:
 
-- Cannot reproduce image-follow cursors, drag/inertia sliders, or
-  hover-to-preview grids.
+- Cannot reproduce drag/inertia sliders or hover-to-preview grids.
 - Cannot author touch-specific equivalents for mobile.
 - Marquee does not yet include multi-row staggering or collection-driven ticker
   sources.

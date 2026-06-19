@@ -189,6 +189,7 @@ export const POINTER_FX_PRIMITIVES = [
   'reveal-mask',
   'pointer-parallax',
   'cursor-trail',
+  'image-follow',
 ] as const;
 export type PointerFxPrimitive = (typeof POINTER_FX_PRIMITIVES)[number];
 
@@ -220,6 +221,7 @@ export interface MarqueeBehaviour {
 export interface PointerFxBehaviour {
   enabled: boolean;
   primitive: PointerFxPrimitive;
+  previewAssetId?: string;
   reducedMotion: PointerFxReducedMotionMode;
 }
 

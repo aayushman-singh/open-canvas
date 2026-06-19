@@ -654,6 +654,13 @@ function validatePointerFx(value: unknown, basePath: string, errors: string[]): 
   }
   if (value.enabled !== true) return;
   assertOneOf<PointerFxPrimitive>(value.primitive, POINTER_FX_PRIMITIVES, `${p}.primitive`, errors);
+  if (value.primitive === 'image-follow') {
+    if (typeof value.previewAssetId !== 'string' || value.previewAssetId.trim().length === 0) {
+      errors.push(`${p}.previewAssetId is required when primitive is image-follow`);
+    }
+  } else if (value.previewAssetId !== undefined) {
+    errors.push(`${p}.previewAssetId is only supported when primitive is image-follow`);
+  }
   assertOneOf<PointerFxReducedMotionMode>(
     value.reducedMotion,
     POINTER_FX_REDUCED_MOTION_MODES,

@@ -663,10 +663,30 @@ function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): v
   primitive.addEventListener('change', () => {
     ctx.captureForUndo();
     element.pointerFx!.primitive = primitive.value as PointerFxPrimitive;
+    if (element.pointerFx!.primitive === 'image-follow') {
+      element.pointerFx!.previewAssetId = element.pointerFx!.previewAssetId ?? '';
+    } else {
+      delete element.pointerFx!.previewAssetId;
+    }
     ctx.rebuildElement(element.id);
+    renderInspector(ctx);
     ctx.scheduleSave();
   });
   ctx.inspector.appendChild(field('Primitive', primitive));
+
+  if (element.pointerFx.primitive === 'image-follow') {
+    const previewAsset = document.createElement('input');
+    previewAsset.type = 'text';
+    previewAsset.placeholder = 'cursor-preview.webp';
+    previewAsset.value = element.pointerFx.previewAssetId ?? '';
+    previewAsset.addEventListener('change', () => {
+      ctx.captureForUndo();
+      element.pointerFx!.previewAssetId = previewAsset.value.trim();
+      ctx.rebuildElement(element.id);
+      ctx.scheduleSave();
+    });
+    ctx.inspector.appendChild(field('Preview asset id', previewAsset));
+  }
 
   const reducedMotion = selectInput(
     POINTER_FX_REDUCED_MOTION_MODES,

@@ -584,15 +584,51 @@ function hydratePointerFx(scope: ParentNode, options: HydrateOptions = {}): void
       el.addEventListener('pointermove', (ev: PointerEvent): void => {
         appendPointerTrail(el, ev);
       });
+    } else if (primitive === 'image-follow') {
+      const img = appendPointerImageFollow(el, el.getAttribute('data-opencanvas-pointer-fx-preview-src'));
+      el.addEventListener('pointermove', (ev: PointerEvent): void => {
+        positionPointerImageFollow(el, img, ev);
+      });
+      el.addEventListener('pointerleave', (): void => {
+        img.setAttribute('data-opencanvas-pointer-image-follow-active', 'false');
+      });
     } else {
       failPointerFx(
         el,
         'invalid-primitive',
-        'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, pointer-parallax, or cursor-trail',
+        'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, pointer-parallax, cursor-trail, or image-follow',
         primitive,
       );
     }
   }
+}
+
+function appendPointerImageFollow(el: HTMLElement, previewSrc: string | null): HTMLImageElement {
+  if (!previewSrc) {
+    failPointerFx(
+      el,
+      'image-follow-src-missing',
+      'Pointer FX image-follow requires preview asset metadata',
+      previewSrc,
+    );
+  }
+  const img = el.ownerDocument.createElement('img');
+  img.className = 'opencanvas-pointer-image-follow';
+  img.setAttribute('src', previewSrc);
+  img.setAttribute('alt', '');
+  img.setAttribute('aria-hidden', 'true');
+  el.appendChild(img);
+  return img;
+}
+
+function positionPointerImageFollow(el: HTMLElement, img: HTMLImageElement, ev: PointerEvent): void {
+  const r = el.getBoundingClientRect();
+  if (!(r.width > 0) || !(r.height > 0)) return;
+  const px = ((ev.clientX - r.left) / r.width) * 100;
+  const py = ((ev.clientY - r.top) / r.height) * 100;
+  img.style.left = px.toFixed(2) + '%';
+  img.style.top = py.toFixed(2) + '%';
+  img.setAttribute('data-opencanvas-pointer-image-follow-active', 'true');
 }
 
 function appendPointerTrail(el: HTMLElement, ev: PointerEvent): void {
