@@ -2,7 +2,7 @@
 //
 // Behaviour runtime fragment. Parses the authored behaviour payload, hydrates
 // load experience chrome, text-split targets, motion sequences, scroll scenes,
-// and image-sequence rich motion assets. Emits `opencanvas:behaviour-failure`
+// layout transitions, and rich motion assets. Emits `opencanvas:behaviour-failure`
 // and throws on any unresolved target, asset, or adapter mismatch.
 
 export const BEHAVIOUR_RUNTIME_SRC = String.raw`
@@ -630,6 +630,98 @@ function behaviourHydrateLoadExperience(load, payload, root) {
   }
 }
 
+function behaviourAttrValue(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function behaviourFindLayoutElement(root, transition, elementId, role) {
+  var node = root.querySelector('[data-opencanvas-element="' + behaviourAttrValue(elementId) + '"]');
+  if (!node) {
+    behaviourFailure('layout-transition-target-missing', {
+      layoutTransitionId: transition.id,
+      role: role,
+      elementId: elementId
+    }, new Error('layout transition ' + role + ' element not found'));
+  }
+  return node;
+}
+
+function behaviourSetLayoutState(transition, source, target, state) {
+  var sourceActive = state === 'source';
+  source.hidden = !sourceActive;
+  target.hidden = sourceActive;
+  if (sourceActive) {
+    source.setAttribute('data-opencanvas-layout-transition-state', 'active');
+    target.removeAttribute('data-opencanvas-layout-transition-state');
+    target.setAttribute('aria-hidden', 'true');
+    source.removeAttribute('aria-hidden');
+  } else {
+    target.setAttribute('data-opencanvas-layout-transition-state', 'active');
+    source.removeAttribute('data-opencanvas-layout-transition-state');
+    source.setAttribute('aria-hidden', 'true');
+    target.removeAttribute('aria-hidden');
+  }
+}
+
+function behaviourClearLayoutViewTransitionName(source, target) {
+  source.style.viewTransitionName = '';
+  target.style.viewTransitionName = '';
+}
+
+function behaviourHydrateLayoutTransition(transition, root) {
+  var trigger = behaviourFindLayoutElement(root, transition, transition.triggerElementId, 'trigger');
+  var source = behaviourFindLayoutElement(root, transition, transition.sourceElementId, 'source');
+  var target = behaviourFindLayoutElement(root, transition, transition.targetElementId, 'target');
+  if (trigger.getAttribute('data-opencanvas-layout-transition-hydrated') === transition.id) return;
+  trigger.setAttribute('data-opencanvas-layout-transition-hydrated', transition.id);
+  var currentState = transition.initialState === 'target' ? 'target' : 'source';
+  behaviourSetLayoutState(transition, source, target, currentState);
+  trigger.addEventListener('click', function(event) {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    var nextState = currentState === 'source' ? 'target' : 'source';
+    var reduce = behaviourPrefersReducedMotion() && transition.reducedMotion === 'instant';
+    if (reduce) {
+      behaviourSetLayoutState(transition, source, target, nextState);
+      currentState = nextState;
+      return;
+    }
+    if (!document.startViewTransition || typeof document.startViewTransition !== 'function') {
+      behaviourFailure('layout-transition-api-missing', {
+        layoutTransitionId: transition.id,
+        viewTransitionName: transition.viewTransitionName
+      }, new Error('View Transition API unavailable'));
+    }
+    source.style.viewTransitionName = transition.viewTransitionName;
+    target.style.viewTransitionName = transition.viewTransitionName;
+    var transitionRun;
+    try {
+      transitionRun = document.startViewTransition(function() {
+        behaviourSetLayoutState(transition, source, target, nextState);
+        currentState = nextState;
+      });
+    } catch (err) {
+      behaviourClearLayoutViewTransitionName(source, target);
+      behaviourFailure('layout-transition-run-failed', {
+        layoutTransitionId: transition.id,
+        viewTransitionName: transition.viewTransitionName
+      }, err || new Error('layout transition failed'));
+    }
+    if (transitionRun && transitionRun.finished && typeof transitionRun.finished.then === 'function') {
+      transitionRun.finished.then(function() {
+        behaviourClearLayoutViewTransitionName(source, target);
+      }).catch(function(err) {
+        behaviourClearLayoutViewTransitionName(source, target);
+        behaviourFailure('layout-transition-finished-failed', {
+          layoutTransitionId: transition.id,
+          viewTransitionName: transition.viewTransitionName
+        }, err || new Error('layout transition finish failed'));
+      });
+    } else {
+      behaviourClearLayoutViewTransitionName(source, target);
+    }
+  });
+}
+
 function hydrateBehaviour(scope) {
   var root = scope || document;
   if (root === document && document.documentElement.getAttribute('data-opencanvas-behaviour-hydrated') === 'true') return;
@@ -658,6 +750,10 @@ function hydrateBehaviour(scope) {
       behaviourFailure('behaviour-scroll-scene-sequence', { scrollSceneId: scene.id, sequenceId: scene.sequenceId }, new Error('scroll scene sequence trigger mismatch'));
     }
     behaviourSetupScrollScene(scene, linked, root);
+  }
+  var layoutTransitions = payload.layoutTransitions || [];
+  for (var l = 0; l < layoutTransitions.length; l++) {
+    behaviourHydrateLayoutTransition(layoutTransitions[l], root);
   }
   var assets = payload.richMotionAssets || [];
   for (var a = 0; a < assets.length; a++) {

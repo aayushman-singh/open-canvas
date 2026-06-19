@@ -15,6 +15,8 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'filter',
 ] as const;
 export const RICH_MOTION_KINDS = ['image-sequence', 'rive', 'lottie', 'model-3d'] as const;
+export const LAYOUT_TRANSITION_INITIAL_STATES = ['source', 'target'] as const;
+export const LAYOUT_TRANSITION_REDUCED_MOTION_MODES = ['instant', 'allow'] as const;
 
 export type BehaviourTarget =
   | { type: 'site' }
@@ -113,4 +115,15 @@ export interface LoadExperience {
   background: string;
   foreground: string;
   sequenceId: string;
+}
+
+export interface LayoutTransition {
+  id: string;
+  name: string;
+  triggerElementId: string;
+  sourceElementId: string;
+  targetElementId: string;
+  viewTransitionName: string;
+  initialState: (typeof LAYOUT_TRANSITION_INITIAL_STATES)[number];
+  reducedMotion: (typeof LAYOUT_TRANSITION_REDUCED_MOTION_MODES)[number];
 }

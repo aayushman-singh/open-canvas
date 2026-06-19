@@ -2,6 +2,7 @@ export {};
 
 import {
   defaultLoadExperience,
+  defaultLayoutTransition,
   defaultOverlay,
   defaultRouteTransition,
   defaultScrollScene,
@@ -77,6 +78,15 @@ equal(route.mode, 'fade', 'route mode');
 equal(route.durationMs, 220, 'route duration');
 equal(route.easing, 'ease-in-out', 'route easing');
 
+const layout = defaultLayoutTransition('layout-a', 'Layout A', 'card-a', 'detail-a');
+equal(layout.id, 'layout-a', 'layout id');
+equal(layout.name, 'Layout A', 'layout name');
+equal(layout.triggerElementId, 'card-a', 'layout trigger');
+equal(layout.sourceElementId, 'card-a', 'layout source');
+equal(layout.targetElementId, 'detail-a', 'layout target');
+equal(layout.initialState, 'source', 'layout initial state');
+equal(layout.reducedMotion, 'instant', 'layout reduced motion');
+
 const scroll = defaultScrollScene('scene-a', 'section-a', 'element-a');
 equal(scroll.scene.id, 'scene-a', 'scroll scene id');
 equal(scroll.scene.sectionId, 'section-a', 'scroll scene section id');
@@ -106,7 +116,25 @@ assert(panelSrc.includes('Validation blocks publish'), 'panel must fail loudly f
 assert(panelSrc.includes('renderMotionSequenceControls'), 'panel must render full Motion Sequence controls');
 assert(panelSrc.includes('Add motion sequence'), 'panel must create full Motion Sequences');
 assert(panelSrc.includes('Motion Sequence step'), 'panel must render editable Motion Sequence steps');
+assert(panelSrc.includes('renderLayoutTransitionControls'), 'panel must render layout transition controls');
+assert(panelSrc.includes('Add layout transition'), 'panel must create layout transitions');
+assert(
+  panelSrc.includes('Select a trigger/source element before adding a layout transition.'),
+  'panel must block layout transitions without a selected element',
+);
+assert(
+  panelSrc.includes('Add another element on the active page before adding a layout transition.'),
+  'panel must block layout transitions without a target element',
+);
 assert(panelSrc.includes('MOTION_SEQUENCE_TRIGGER_TYPES'), 'panel must use schema trigger types');
+assert(
+  panelSrc.includes('LAYOUT_TRANSITION_INITIAL_STATES'),
+  'panel must use layout transition initial state schema values',
+);
+assert(
+  panelSrc.includes('LAYOUT_TRANSITION_REDUCED_MOTION_MODES'),
+  'panel must use layout transition reduced-motion schema values',
+);
 assert(panelSrc.includes('TEXT_SPLIT_UNITS'), 'panel must edit text split units');
 assert(panelSrc.includes('LOAD_EXPERIENCE_PRESETS'), 'panel must use load presets');
 assert(panelSrc.includes('ROUTE_TRANSITION_MODES'), 'panel must use route modes');

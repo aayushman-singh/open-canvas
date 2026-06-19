@@ -8,13 +8,14 @@
 // the visitor-facing site.
 
 import type {
+  LayoutTransition,
   LoadExperience as BehaviourLoadExperience,
   MotionSequence,
   RichMotionAsset,
   ScrollScene,
 } from './behaviour-primitives.js';
 
-export type { BehaviourLoadExperience };
+export type { BehaviourLoadExperience, LayoutTransition };
 
 /**
  * The four deterministic built-in kits. Iterating over presets — emitting
@@ -760,6 +761,8 @@ export interface EditableSiteBase {
   scrollScenes?: ScrollScene[];
   /** Rich-motion asset declarations referenced by later render/runtime tasks. */
   richMotionAssets?: RichMotionAsset[];
+  /** Same-page shared-layout transitions owned by the Runtime Hydrator. */
+  layoutTransitions?: LayoutTransition[];
   /**
    * Default locale for pages with no explicit `locale`. Optional everywhere;
    * `'en'` when absent.

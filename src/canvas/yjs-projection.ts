@@ -1052,6 +1052,9 @@ export function encodeYDoc(state: EditableSite): Y.Doc {
     if (state.scrollScenes !== undefined) {
       root.set('scrollScenes', encodeJsonValue(state.scrollScenes));
     }
+    if (state.layoutTransitions !== undefined) {
+      root.set('layoutTransitions', encodeJsonValue(state.layoutTransitions));
+    }
 
     const pages = new Y.Array<Y.Map<unknown>>();
     for (const page of state.pages) pages.push([encodePage(page)]);
@@ -1919,6 +1922,11 @@ export function decodeYDoc(doc: Y.Doc): EditableSite {
     state.scrollScenes = decodeJsonValue(
       root.get('scrollScenes'),
     ) as NonNullable<EditableSite['scrollScenes']>;
+  }
+  if (root.has('layoutTransitions')) {
+    state.layoutTransitions = decodeJsonValue(
+      root.get('layoutTransitions'),
+    ) as NonNullable<EditableSite['layoutTransitions']>;
   }
   if (root.has('header')) {
     state.header = decodeSection(root.get('header') as Y.Map<unknown>);

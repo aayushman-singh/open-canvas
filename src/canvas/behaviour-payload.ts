@@ -1,4 +1,5 @@
 import type {
+  LayoutTransition,
   LoadExperience,
   MotionSequence,
   RichMotionAsset,
@@ -9,6 +10,7 @@ export interface BehaviourPayload {
   loadExperience?: LoadExperience;
   motionSequences: MotionSequence[];
   scrollScenes: ScrollScene[];
+  layoutTransitions?: LayoutTransition[];
   richMotionAssets: Array<RichMotionAsset & { frameUrls?: string[]; posterUrl?: string; srcUrl?: string }>;
 }
 
@@ -16,11 +18,13 @@ export function snapshotHasBehaviourPrimitives(snapshot: {
   loadExperience?: LoadExperience | { enabled?: boolean };
   motionSequences?: MotionSequence[];
   scrollScenes?: ScrollScene[];
+  layoutTransitions?: LayoutTransition[];
   richMotionAssets?: RichMotionAsset[];
 }): boolean {
   if (snapshot.loadExperience !== undefined && 'label' in snapshot.loadExperience) return true;
   if ((snapshot.motionSequences ?? []).length > 0) return true;
   if ((snapshot.scrollScenes ?? []).length > 0) return true;
+  if ((snapshot.layoutTransitions ?? []).length > 0) return true;
   if ((snapshot.richMotionAssets ?? []).length > 0) return true;
   return false;
 }
@@ -30,6 +34,7 @@ export function buildBehaviourPayload(
     loadExperience?: LoadExperience | { enabled?: boolean };
     motionSequences?: MotionSequence[];
     scrollScenes?: ScrollScene[];
+    layoutTransitions?: LayoutTransition[];
     richMotionAssets?: RichMotionAsset[];
   },
   assetBasePath: string,
@@ -70,6 +75,7 @@ export function buildBehaviourPayload(
   const payload: BehaviourPayload = {
     motionSequences: snapshot.motionSequences ?? [],
     scrollScenes: snapshot.scrollScenes ?? [],
+    layoutTransitions: snapshot.layoutTransitions ?? [],
     richMotionAssets,
   };
   if (snapshot.loadExperience !== undefined && 'label' in snapshot.loadExperience) {

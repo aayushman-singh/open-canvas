@@ -42,6 +42,8 @@ import {
 } from './elements/component-style.js';
 import {
   BEHAVIOUR_TARGET_TYPES,
+  LAYOUT_TRANSITION_INITIAL_STATES,
+  LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
   MOTION_SEQUENCE_PROPERTIES,
   MOTION_SEQUENCE_TRIGGER_TYPES,
   RICH_MOTION_KINDS,
@@ -121,6 +123,7 @@ const PAGE_WIDTH_MAX = 1920;
 const SECTION_HEIGHT_MIN = 240;
 const PINNED_SECTION_HEIGHT_MIN = 48;
 const SECTION_HEIGHT_MAX = 1400;
+const VIEW_TRANSITION_NAME_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
 const POPUP_TRIGGER_TYPES = ['exit-intent', 'delay', 'scroll'] as const;
 const RICH_MOTION_PLACEHOLDER_ASSET_REF_ID = '__placeholder__';
@@ -2703,6 +2706,8 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
   const knownScrollSceneIds = new Set<string>();
   const knownRichMotionAssetIds = new Set<string>();
   const knownStepIds = new Set<string>();
+  const knownLayoutTransitionIds = new Set<string>();
+  const knownLayoutViewTransitionNames = new Set<string>();
 
   if (state.loadExperience !== undefined) {
     if (!isRecord(state.loadExperience)) {
@@ -2872,6 +2877,87 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           `${scenePath}.endOffsetPx`,
           errors,
           true,
+        );
+      });
+    }
+  }
+
+  if (state.layoutTransitions !== undefined) {
+    if (!Array.isArray(state.layoutTransitions)) {
+      errors.push(
+        `layoutTransitions must be an array when present (got ${describe(state.layoutTransitions)})`,
+      );
+    } else {
+      state.layoutTransitions.forEach((transition, transitionIdx) => {
+        const transitionPath = `layoutTransitions[${String(transitionIdx)}]`;
+        if (!isRecord(transition)) {
+          errors.push(`${transitionPath} must be an object`);
+          return;
+        }
+        if (assertNonEmptyString(transition.id, `${transitionPath}.id`, errors)) {
+          assertUnique(
+            transition.id,
+            knownLayoutTransitionIds,
+            `${transitionPath}.id`,
+            'across layoutTransitions',
+            errors,
+          );
+        }
+        assertNonEmptyString(transition.name, `${transitionPath}.name`, errors);
+        resolveIndexedId(
+          targetIndex.elementIds,
+          transition.triggerElementId,
+          `${transitionPath}.triggerElementId`,
+          'element',
+          errors,
+        );
+        resolveIndexedId(
+          targetIndex.elementIds,
+          transition.sourceElementId,
+          `${transitionPath}.sourceElementId`,
+          'element',
+          errors,
+        );
+        resolveIndexedId(
+          targetIndex.elementIds,
+          transition.targetElementId,
+          `${transitionPath}.targetElementId`,
+          'element',
+          errors,
+        );
+        if (
+          typeof transition.sourceElementId === 'string' &&
+          typeof transition.targetElementId === 'string' &&
+          transition.sourceElementId === transition.targetElementId
+        ) {
+          errors.push(`${transitionPath}.targetElementId must differ from sourceElementId`);
+        }
+        if (assertNonEmptyString(transition.viewTransitionName, `${transitionPath}.viewTransitionName`, errors)) {
+          if (!VIEW_TRANSITION_NAME_RE.test(transition.viewTransitionName)) {
+            errors.push(
+              `${transitionPath}.viewTransitionName must match /^[A-Za-z_][A-Za-z0-9_-]*$/`,
+            );
+          } else {
+            assertUnique(
+              transition.viewTransitionName,
+              knownLayoutViewTransitionNames,
+              `${transitionPath}.viewTransitionName`,
+              'across layoutTransitions',
+              errors,
+            );
+          }
+        }
+        assertOneOf(
+          transition.initialState,
+          LAYOUT_TRANSITION_INITIAL_STATES,
+          `${transitionPath}.initialState`,
+          errors,
+        );
+        assertOneOf(
+          transition.reducedMotion,
+          LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
+          `${transitionPath}.reducedMotion`,
+          errors,
         );
       });
     }
@@ -3130,6 +3216,7 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
   motionSequences: () => {},
   scrollScenes: () => {},
   richMotionAssets: () => {},
+  layoutTransitions: () => {},
   defaultLocale: ({ state, errors }) => {
     // Locale uses the same "non-empty string when present" shape as the
     // helper but carries an extra "BCP-47" hint in the error prose;

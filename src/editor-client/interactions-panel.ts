@@ -28,11 +28,14 @@ import type {
 } from '../canvas/schema.js';
 import type {
   BehaviourTarget,
+  LayoutTransition,
   MotionSequence,
   MotionSequenceStep,
   ScrollScene,
 } from '../canvas/behaviour-primitives.js';
 import {
+  LAYOUT_TRANSITION_INITIAL_STATES,
+  LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
   MOTION_SEQUENCE_TRIGGER_TYPES,
   TEXT_SPLIT_UNITS,
 } from '../canvas/behaviour-primitives.js';
@@ -118,6 +121,24 @@ export function defaultRouteTransition(): RouteTransition {
   };
 }
 
+export function defaultLayoutTransition(
+  id: string,
+  name: string,
+  triggerElementId: string,
+  targetElementId: string,
+): LayoutTransition {
+  return {
+    id,
+    name,
+    triggerElementId,
+    sourceElementId: triggerElementId,
+    targetElementId,
+    viewTransitionName: 'layout' + String(Date.now()),
+    initialState: 'source',
+    reducedMotion: 'instant',
+  };
+}
+
 export function renderInteractionsPanel(ctx: InteractionsPanelContext): void {
   const host = document.getElementById('opencanvas-interactions-panel');
   if (!host || !ctx.state) return;
@@ -125,6 +146,7 @@ export function renderInteractionsPanel(ctx: InteractionsPanelContext): void {
   host.className = 'opencanvas-interactions-panel';
   renderScrollSceneControls(ctx, host);
   renderMotionSequenceControls(ctx, host);
+  renderLayoutTransitionControls(ctx, host);
   renderLoadControls(ctx, host);
   renderRouteControls(ctx, host);
   renderOverlayControls(ctx, host);
@@ -1324,6 +1346,162 @@ function renderSharedRouteElements(
   for (const mapping of route.sharedElements ?? []) {
     renderSharedRouteElement(ctx, wrap, route, mapping);
   }
+}
+
+function activePageElementIds(ctx: InteractionsPanelContext): string[] {
+  const ids: string[] = [];
+  for (const section of activePageSections(ctx)) {
+    for (const element of section.elements) {
+      ids.push(element.id);
+    }
+  }
+  return ids;
+}
+
+function renderLayoutTransitionControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
+  if (!ctx.state) return;
+  const wrap = section('Layout Transitions');
+  const transitions = ctx.state.layoutTransitions ?? [];
+  const add = actionButton(
+    'Add layout transition',
+    'Morph one same-page element state into another through the Runtime Hydrator',
+  );
+  add.addEventListener('click', () => {
+    if (!ctx.selectedElementId) {
+      ctx.setStatus('Select a trigger/source element before adding a layout transition.', 'error');
+      return;
+    }
+    const elementIds = activePageElementIds(ctx);
+    const targetElementId = elementIds.find((id) => id !== ctx.selectedElementId);
+    if (!targetElementId) {
+      ctx.setStatus('Add another element on the active page before adding a layout transition.', 'error');
+      return;
+    }
+    const triggerElementId = ctx.selectedElementId;
+    mutate(ctx, () => {
+      const next = [...(ctx.state!.layoutTransitions ?? [])];
+      const index = next.length + 1;
+      next.push(
+        defaultLayoutTransition(
+          'layout-transition-' + String(Date.now()),
+          'Layout transition ' + String(index),
+          triggerElementId,
+          targetElementId,
+        ),
+      );
+      ctx.state!.layoutTransitions = next;
+    });
+    ctx.setStatus('Layout transition added', 'ok');
+  });
+  wrap.appendChild(add);
+  if (transitions.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'opencanvas-section-picker-empty';
+    empty.textContent = 'No layout transitions yet.';
+    wrap.appendChild(empty);
+  }
+  for (const transition of transitions) {
+    renderLayoutTransitionCard(ctx, wrap, transition);
+  }
+  host.appendChild(wrap);
+}
+
+function renderLayoutTransitionCard(
+  ctx: InteractionsPanelContext,
+  host: HTMLElement,
+  transition: LayoutTransition,
+): void {
+  const card = document.createElement('div');
+  card.className = 'opencanvas-interactions-card';
+  const header = row('opencanvas-interactions-card-header');
+  const title = document.createElement('strong');
+  title.textContent = transition.name;
+  header.appendChild(title);
+  const remove = compactButton('Remove', 'Remove this layout transition');
+  remove.addEventListener('click', () => {
+    mutate(ctx, () => {
+      ctx.state!.layoutTransitions = (ctx.state!.layoutTransitions ?? []).filter(
+        (item) => item.id !== transition.id,
+      );
+    });
+  });
+  header.appendChild(remove);
+  card.appendChild(header);
+
+  const name = textInput(transition.name, 'Card detail');
+  name.addEventListener('change', () =>
+    updateLayoutTransition(ctx, transition.id, { name: name.value.trim() }),
+  );
+  card.appendChild(field('Name', name));
+
+  const trigger = textInput(transition.triggerElementId, 'Trigger element id');
+  trigger.addEventListener('change', () =>
+    updateLayoutTransition(ctx, transition.id, { triggerElementId: trigger.value.trim() }),
+  );
+  card.appendChild(field('Trigger element', trigger));
+
+  const source = textInput(transition.sourceElementId, 'Source element id');
+  source.addEventListener('change', () =>
+    updateLayoutTransition(ctx, transition.id, { sourceElementId: source.value.trim() }),
+  );
+  card.appendChild(field('Source element', source));
+
+  const target = textInput(transition.targetElementId, 'Target element id');
+  target.addEventListener('change', () =>
+    updateLayoutTransition(ctx, transition.id, { targetElementId: target.value.trim() }),
+  );
+  card.appendChild(field('Target element', target));
+
+  const viewName = textInput(transition.viewTransitionName, 'cardDetail');
+  viewName.addEventListener('change', () =>
+    updateLayoutTransition(ctx, transition.id, { viewTransitionName: viewName.value.trim() }),
+  );
+  card.appendChild(field('View transition name', viewName));
+
+  const initialState = selectInput(LAYOUT_TRANSITION_INITIAL_STATES, transition.initialState);
+  initialState.addEventListener('change', () =>
+    updateLayoutTransition(ctx, transition.id, {
+      initialState: initialState.value as LayoutTransition['initialState'],
+    }),
+  );
+  card.appendChild(field('Initial state', initialState));
+
+  const reducedMotion = selectInput(
+    LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
+    transition.reducedMotion,
+  );
+  reducedMotion.addEventListener('change', () =>
+    updateLayoutTransition(ctx, transition.id, {
+      reducedMotion: reducedMotion.value as LayoutTransition['reducedMotion'],
+    }),
+  );
+  card.appendChild(field('Reduced motion', reducedMotion));
+
+  host.appendChild(card);
+}
+
+function updateLayoutTransition(
+  ctx: InteractionsPanelContext,
+  transitionId: string,
+  patch: Partial<LayoutTransition>,
+): void {
+  if (Object.values(patch).some((value) => typeof value === 'string' && value.length === 0)) {
+    ctx.setStatus('Layout transition fields cannot be empty', 'error');
+    renderInteractionsPanel(ctx);
+    return;
+  }
+  mutate(ctx, () => {
+    const transitions = ctx.state!.layoutTransitions ?? [];
+    ctx.state!.layoutTransitions = transitions.map((transition) => {
+      if (transition.id !== transitionId) return transition;
+      const next = { ...transition, ...patch };
+      if (next.sourceElementId === next.targetElementId) {
+        ctx.setStatus('Layout transition source and target must be different elements', 'error');
+        return transition;
+      }
+      return next;
+    });
+  });
 }
 
 function renderSharedRouteElement(

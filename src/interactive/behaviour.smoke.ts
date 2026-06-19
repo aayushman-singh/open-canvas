@@ -38,6 +38,7 @@ class StubStyle {
   left = '';
   width = '';
   zIndex = '';
+  viewTransitionName = '';
 
   setProperty(key: string, value: string): void {
     this.values.set(key, value);
@@ -57,6 +58,7 @@ class StubElement {
   parent: StubElement | null = null;
   listeners = new Map<string, Listener[]>();
   textContent = '';
+  hidden = false;
   style = new StubStyle();
   clientWidth = 320;
   clientHeight = 240;
@@ -166,6 +168,7 @@ class StubDocument {
   body: StubElement;
   domContentLoadedListeners: Listener[] = [];
   customEventListeners: Listener[] = [];
+  viewTransitionCalls = 0;
 
   constructor() {
     this.root = this.documentElement;
@@ -202,6 +205,11 @@ class StubDocument {
   }
   createElement(tag: string): StubElement {
     return new StubElement(tag);
+  }
+  startViewTransition(update: () => void): { finished: Promise<void> } {
+    this.viewTransitionCalls += 1;
+    update();
+    return { finished: Promise.resolve() };
   }
 }
 
@@ -703,6 +711,49 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
       typeof failureDetail === 'object' &&
       (failureDetail as { code?: string }).code === 'rich-motion-empty-frames',
     'empty image sequence must emit rich-motion-empty-frames failure',
+  );
+}
+
+// (6) layout transition toggles same-page source/detail elements through View Transition API
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [],
+    scrollScenes: [],
+    richMotionAssets: [],
+    layoutTransitions: [
+      {
+        id: 'layout-card-detail',
+        name: 'Card to detail',
+        triggerElementId: 'card-trigger',
+        sourceElementId: 'card-trigger',
+        targetElementId: 'detail-panel',
+        viewTransitionName: 'cardDetail',
+        initialState: 'source',
+        reducedMotion: 'instant',
+      },
+    ],
+  });
+  doc.body.appendChild(script);
+  const source = new StubElement('button');
+  source.setAttribute('data-opencanvas-element', 'card-trigger');
+  const target = new StubElement('article');
+  target.setAttribute('data-opencanvas-element', 'detail-panel');
+  doc.body.appendChild(source);
+  doc.body.appendChild(target);
+  runBehaviour(doc, win, StubImage);
+  assert(target.hidden === true, 'layout transition hydration must hide the inactive target');
+  source.dispatchEvent(makeEvent('click'));
+  assert(doc.viewTransitionCalls === 1, 'layout transition must call document.startViewTransition');
+  assert(source.hidden === true, 'layout transition must hide source after click');
+  assert(Boolean(target.hidden) === false, 'layout transition must reveal target after click');
+  assert(
+    target.getAttribute('data-opencanvas-layout-transition-state') === 'active',
+    'layout transition must mark the active target',
   );
 }
 

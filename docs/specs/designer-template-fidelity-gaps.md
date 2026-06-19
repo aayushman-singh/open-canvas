@@ -425,20 +425,28 @@ Current state:
   an opt-in alternate positioning regime.
 - Tabs panels have inline full-width sizing; ADR 0066 dropped `vertical-rail`
   tabs because CSS alone cannot reflow that layout.
-- There is no FLIP/shared-layout transition model.
+- **June 2026 update:** `layoutTransitions` now stores schema-owned same-page
+  trigger/source/target element relations. The behaviour payload hydrates them
+  through the Runtime Hydrator, uses native View Transition API continuity for
+  the mapped pair, and emits `opencanvas:behaviour-failure` with
+  layout-specific codes when the trigger/source/target relation or API is
+  unavailable. Reduced-motion `instant` is explicit owner-authored behaviour,
+  not silent degradation.
 
 User-visible miss:
 
-- Cannot animate cards rearranging into a modal/detail state.
+- Same-page card/detail expansion no longer has to be template-only when both
+  states are represented by elements and a trigger exists.
 - Cannot animate grid/list view switches.
-- Cannot morph one element into another across tabs, filters, page routes, or
-  overlays.
+- Cannot yet morph one element into another across tabs, filters, or overlays
+  without a richer FLIP/layout-state model. Page routes use the separate
+  shared-element Route Transition relation.
 
 Needed primitive:
 
-- A Layout Transition relation: named source target, named destination target,
-  state-change trigger, geometry capture, transform inversion, and published
-  runtime support.
+- Next wave: layout-state groups, reverse triggers/close affordances, FLIP
+  geometry capture for non-View-Transition surfaces, and collection-driven
+  detail states.
 
 ### 10. Text Animation Is Not First-Class
 
