@@ -772,6 +772,7 @@ function renderLoadExperienceChrome(load: BehaviourLoadExperience): string {
   const progressAttrs = load.progress
     ? ` data-opencanvas-load-progress-display="${escapeAttr(load.progress.display)}" data-opencanvas-load-progress-duration-ms="${escapeAttr(String(load.progress.durationMs))}"`
     : '';
+  const runPolicy = load.runPolicy ?? 'every-visit';
   const style = styleFromEntries([
     ['position', 'fixed'],
     ['inset', '0'],
@@ -783,7 +784,7 @@ function renderLoadExperienceChrome(load: BehaviourLoadExperience): string {
     ['background', background],
     ['color', foreground],
   ]);
-  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}"${progressAttrs} style="${style}"><div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div>${renderBehaviourLoadProgress(load)}<button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
+  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}" data-opencanvas-load-run-policy="${escapeAttr(runPolicy)}"${progressAttrs} style="${style}"><div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div>${renderBehaviourLoadProgress(load)}<button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
 }
 
 function renderBehaviourLoadProgress(load: BehaviourLoadExperience): string {

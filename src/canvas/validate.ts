@@ -53,6 +53,7 @@ import {
 } from './elements/component-style.js';
 import {
   BEHAVIOUR_TARGET_TYPES,
+  BEHAVIOUR_LOAD_RUN_POLICIES,
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
   LOAD_PROGRESS_DISPLAY_MODES,
@@ -2926,6 +2927,14 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
       assertNonEmptyString(state.loadExperience.background, 'loadExperience.background', errors);
       assertNonEmptyString(state.loadExperience.foreground, 'loadExperience.foreground', errors);
       assertNonEmptyString(state.loadExperience.sequenceId, 'loadExperience.sequenceId', errors);
+      if (state.loadExperience.runPolicy !== undefined) {
+        assertOneOf(
+          state.loadExperience.runPolicy,
+          BEHAVIOUR_LOAD_RUN_POLICIES,
+          'loadExperience.runPolicy',
+          errors,
+        );
+      }
       if (state.loadExperience.progress !== undefined) {
         if (!isRecord(state.loadExperience.progress)) {
           errors.push('loadExperience.progress must be an object when present');

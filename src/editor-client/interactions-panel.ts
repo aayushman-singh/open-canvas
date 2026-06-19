@@ -49,6 +49,7 @@ import type {
 import {
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
+  BEHAVIOUR_LOAD_RUN_POLICIES,
   LOAD_PROGRESS_DISPLAY_MODES,
   MOTION_SEQUENCE_PLAYBACK_DIRECTIONS,
   MOTION_SEQUENCE_REPEAT_MODES,
@@ -114,6 +115,7 @@ type RiveInputType = (typeof RIVE_INPUT_TYPES)[number];
 type RiveInputEvent = (typeof RIVE_INPUT_EVENTS)[number];
 type MotionSequenceRepeatMode = (typeof MOTION_SEQUENCE_REPEAT_MODES)[number];
 type MotionSequencePlaybackDirection = (typeof MOTION_SEQUENCE_PLAYBACK_DIRECTIONS)[number];
+type BehaviourLoadRunPolicy = (typeof BEHAVIOUR_LOAD_RUN_POLICIES)[number];
 type LoadProgressDisplayMode = (typeof LOAD_PROGRESS_DISPLAY_MODES)[number];
 type ShaderScenePreset = (typeof SHADER_SCENE_PRESETS)[number];
 type ShaderSceneReducedMotionMode = (typeof SHADER_SCENE_REDUCED_MOTION_MODES)[number];
@@ -398,6 +400,7 @@ function defaultBehaviourLoadExperience(ctx: InteractionsPanelContext): Behaviou
     enterLabel: 'Enter site',
     background: '#050505',
     foreground: '#ffffff',
+    runPolicy: 'once-per-session',
     progress: {
       display: 'bar-number',
       durationMs: 1200,
@@ -2136,6 +2139,17 @@ function renderBehaviourLoadControls(
     updateBehaviourLoadText(ctx, load, 'foreground', foreground),
   );
   wrap.appendChild(field('Foreground', foreground));
+
+  const runPolicy = selectInput([...BEHAVIOUR_LOAD_RUN_POLICIES], load.runPolicy ?? 'every-visit');
+  runPolicy.addEventListener('change', () => {
+    mutate(ctx, () => {
+      ctx.state!.loadExperience = {
+        ...load,
+        runPolicy: runPolicy.value as BehaviourLoadRunPolicy,
+      };
+    });
+  });
+  wrap.appendChild(field('Behaviour run policy', runPolicy));
 
   const progressDisplay = selectInput(
     [...LOAD_PROGRESS_DISPLAY_MODES],

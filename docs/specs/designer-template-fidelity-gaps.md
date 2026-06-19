@@ -269,13 +269,17 @@ Current state:
   emits explicit progress metadata/nodes, the Behaviour runtime drives the
   counter and bar, and the Interactions panel exposes display, duration, and
   label controls.
+- **June 2026 update:** Behaviour Load Experience now has owner-authored run
+  policy for `every-visit` or `once-per-session`. The runtime uses
+  `sessionStorage` only for the session policy and fails loudly when storage is
+  unavailable instead of silently replaying or skipping.
 
 User-visible miss:
 
 - Cannot reproduce branded preloaders, progress numbers, logo draws, mask
   openings, media-readiness gates, or first-load page reveals.
-- Cannot yet author logo draws, media-readiness maps, or run policy for the
-  Behaviour Load Experience model.
+- Cannot yet author logo draws or media-readiness maps for the Behaviour Load
+  Experience model.
 
 Needed primitive:
 

@@ -70,6 +70,7 @@ function buildValidState(): EditableSite & Record<string, unknown> {
       enterLabel: 'Enter site',
       background: '#050505',
       foreground: '#f5f5f5',
+      runPolicy: 'once-per-session',
       progress: {
         display: 'bar-number',
         durationMs: 900,
@@ -193,6 +194,10 @@ const invalidLoadProgress = structuredClone(validState);
 expectInvalid(invalidLoadProgress, 'loadExperience.progress.display', 'load progress display');
 expectInvalid(invalidLoadProgress, 'loadExperience.progress.durationMs', 'load progress duration');
 expectInvalid(invalidLoadProgress, 'loadExperience.progress.label', 'load progress label');
+
+const invalidLoadRunPolicy = structuredClone(validState);
+(invalidLoadRunPolicy.loadExperience as { runPolicy: string }).runPolicy = 'sometimes';
+expectInvalid(invalidLoadRunPolicy, 'loadExperience.runPolicy', 'load run policy');
 
 const unsupportedProperty = structuredClone(validState);
 (

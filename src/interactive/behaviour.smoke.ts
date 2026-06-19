@@ -215,10 +215,23 @@ class StubDocument {
   }
 }
 
+class StubSessionStorage {
+  private values = new Map<string, string>();
+
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null;
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+}
+
 class StubWindow {
   scrollY = 0;
   innerHeight = 900;
   scrollToCalls = 0;
+  sessionStorage = new StubSessionStorage();
   listeners = new Map<string, Listener[]>();
   rafQueue: Array<() => void> = [];
   intervals: Array<() => void> = [];
@@ -407,6 +420,7 @@ function baseSnapshot(): PublishedSnapshot {
       enterLabel: 'Enter',
       background: '#111112',
       foreground: '#C8FF1A',
+      runPolicy: 'once-per-session',
       progress: {
         display: 'bar-number',
         durationMs: 900,
@@ -542,6 +556,10 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
     'rendered load experience must emit progress display metadata',
   );
   assert(
+    html.includes('data-opencanvas-load-run-policy="once-per-session"'),
+    'rendered load experience must emit behaviour load run policy',
+  );
+  assert(
     html.includes('data-opencanvas-load-progress-number'),
     'rendered load experience must include progress number node',
   );
@@ -552,6 +570,10 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(
     BEHAVIOUR_RUNTIME_SRC.includes('load-progress-number-missing'),
     'behaviour runtime must fail loudly when progress number node is missing',
+  );
+  assert(
+    BEHAVIOUR_RUNTIME_SRC.includes('load-run-policy-storage-unavailable'),
+    'behaviour runtime must fail loudly when once-per-session storage is unavailable',
   );
   mountRenderedHtml(doc, html);
   runBehaviour(doc, win, StubImage);
@@ -566,6 +588,11 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
       'data-opencanvas-load-progress-hydrated',
     ) === 'true',
     'load progress choreography must be marked hydrated',
+  );
+  load.querySelector('[data-opencanvas-load-enter]')?.dispatchEvent(makeEvent('click'));
+  assert(
+    win.sessionStorage.getItem('opencanvas:load-experience:load-main') === 'seen',
+    'once-per-session load experience must mark the enter moment as seen',
   );
 }
 

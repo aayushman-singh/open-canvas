@@ -1104,10 +1104,18 @@ function behaviourHydrateLoadExperience(load, payload, root) {
   }
   if (node.getAttribute('data-opencanvas-load-hydrated') === 'true') return;
   node.setAttribute('data-opencanvas-load-hydrated', 'true');
+  if (behaviourShouldSkipLoadExperience(load)) {
+    node.setAttribute('data-opencanvas-load-skipped', 'true');
+    node.setAttribute('data-opencanvas-load-hidden', 'true');
+    node.style.pointerEvents = 'none';
+    node.style.opacity = '0';
+    return;
+  }
   var enter = node.querySelector('[data-opencanvas-load-enter]');
   var sequence = behaviourFindSequence(payload, load.sequenceId);
   var finishProgress = behaviourHydrateLoadProgress(node, load);
   function dismiss() {
+    behaviourMarkLoadExperienceSeen(load);
     finishProgress();
     node.setAttribute('data-opencanvas-load-hidden', 'true');
     node.style.pointerEvents = 'none';
@@ -1120,6 +1128,51 @@ function behaviourHydrateLoadExperience(load, payload, root) {
       event.preventDefault();
       dismiss();
     });
+  }
+}
+
+function behaviourLoadRunPolicy(load) {
+  var policy = load.runPolicy || 'every-visit';
+  if (policy !== 'every-visit' && policy !== 'once-per-session') {
+    behaviourFailure('load-run-policy-invalid', { loadExperienceId: load.id, runPolicy: policy }, new Error('unsupported load run policy'));
+  }
+  return policy;
+}
+
+function behaviourLoadStorage(load, phase) {
+  try {
+    if (typeof window === 'undefined' || !window.sessionStorage) {
+      behaviourFailure('load-run-policy-storage-unavailable', { loadExperienceId: load.id, phase: phase }, new Error('sessionStorage unavailable'));
+    }
+    return window.sessionStorage;
+  } catch (err) {
+    behaviourFailure('load-run-policy-storage-unavailable', { loadExperienceId: load.id, phase: phase }, err);
+  }
+}
+
+function behaviourLoadStorageKey(load) {
+  return 'opencanvas:load-experience:' + load.id;
+}
+
+function behaviourShouldSkipLoadExperience(load) {
+  var policy = behaviourLoadRunPolicy(load);
+  if (policy === 'every-visit') return false;
+  var storage = behaviourLoadStorage(load, 'read');
+  try {
+    return storage.getItem(behaviourLoadStorageKey(load)) === 'seen';
+  } catch (err) {
+    behaviourFailure('load-run-policy-storage-read', { loadExperienceId: load.id }, err);
+  }
+}
+
+function behaviourMarkLoadExperienceSeen(load) {
+  var policy = behaviourLoadRunPolicy(load);
+  if (policy === 'every-visit') return;
+  var storage = behaviourLoadStorage(load, 'write');
+  try {
+    storage.setItem(behaviourLoadStorageKey(load), 'seen');
+  } catch (err) {
+    behaviourFailure('load-run-policy-storage-write', { loadExperienceId: load.id }, err);
   }
 }
 
