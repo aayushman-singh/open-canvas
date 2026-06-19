@@ -200,6 +200,7 @@ assert(panelSrc.includes('beforeAfterReveal'), 'panel must mutate Scroll Scene b
 assert(panelSrc.includes('Reveal before element id'), 'panel must expose before reveal element binding');
 assert(panelSrc.includes('Reveal after element id'), 'panel must expose after reveal element binding');
 assert(panelSrc.includes('Reveal reduced motion'), 'panel must expose explicit before-after reduced-motion policy');
+assert(panelSrc.includes('Reverse trigger element id'), 'panel must expose layout transition reverse trigger control');
 assert(panelSrc.includes('renderMotionSequenceControls'), 'panel must render full Motion Sequence controls');
 assert(panelSrc.includes('renderRichMotionAssetControls'), 'panel must render Rich Motion Asset controls');
 assert(panelSrc.includes('Add image sequence asset'), 'panel must create image-sequence asset metadata');

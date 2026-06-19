@@ -3739,6 +3739,17 @@ function renderLayoutTransitionCard(
   );
   card.appendChild(field('Trigger element', trigger));
 
+  const reverseTrigger = textInput(transition.reverseTriggerElementId ?? '', 'Close trigger element id');
+  reverseTrigger.addEventListener('change', () => {
+    const value = reverseTrigger.value.trim();
+    if (value.length > 0) {
+      updateLayoutTransition(ctx, transition.id, { reverseTriggerElementId: value });
+      return;
+    }
+    clearLayoutTransitionReverseTrigger(ctx, transition.id);
+  });
+  card.appendChild(field('Reverse trigger element id', reverseTrigger));
+
   const source = textInput(transition.sourceElementId, 'Source element id');
   source.addEventListener('change', () =>
     updateLayoutTransition(ctx, transition.id, { sourceElementId: source.value.trim() }),
@@ -3798,6 +3809,19 @@ function updateLayoutTransition(
         ctx.setStatus('Layout transition source and target must be different elements', 'error');
         return transition;
       }
+      return next;
+    });
+  });
+}
+
+function clearLayoutTransitionReverseTrigger(ctx: InteractionsPanelContext, transitionId: string): void {
+  if (!ctx.state) return;
+  mutate(ctx, () => {
+    const transitions = ctx.state!.layoutTransitions ?? [];
+    ctx.state!.layoutTransitions = transitions.map((transition) => {
+      if (transition.id !== transitionId) return transition;
+      const next = { ...transition };
+      delete next.reverseTriggerElementId;
       return next;
     });
   });

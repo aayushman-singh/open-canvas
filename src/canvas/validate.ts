@@ -3622,6 +3622,15 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           'element',
           errors,
         );
+        if (transition.reverseTriggerElementId !== undefined) {
+          resolveIndexedId(
+            targetIndex.elementIds,
+            transition.reverseTriggerElementId,
+            `${transitionPath}.reverseTriggerElementId`,
+            'element',
+            errors,
+          );
+        }
         resolveIndexedId(
           targetIndex.elementIds,
           transition.sourceElementId,

@@ -551,11 +551,17 @@ Current state:
   layout-specific codes when the trigger/source/target relation or API is
   unavailable. Reduced-motion `instant` is explicit owner-authored behaviour,
   not silent degradation.
+- **June 2026 update:** Layout Transitions now support an optional
+  `reverseTriggerElementId` relation for target-state close affordances. The
+  validator gates the reverse trigger reference, Yjs/payload preserve it, the
+  Runtime Hydrator hides/reveals the close trigger with the target state and
+  drives the reverse transition, and the Interactions panel exposes the
+  relation.
 
 User-visible miss:
 
 - Same-page card/detail expansion no longer has to be template-only when both
-  states are represented by elements and a trigger exists.
+  states are represented by elements and open/close triggers exist.
 - Cannot animate grid/list view switches.
 - Cannot yet morph one element into another across tabs, filters, or overlays
   without a richer FLIP/layout-state model. Page routes use the separate
@@ -563,9 +569,8 @@ User-visible miss:
 
 Needed primitive:
 
-- Next wave: layout-state groups, reverse triggers/close affordances, FLIP
-  geometry capture for non-View-Transition surfaces, and collection-driven
-  detail states.
+- Next wave: layout-state groups, FLIP geometry capture for non-View-Transition
+  surfaces, and collection-driven detail states.
 
 ### 10. Text Animation Is Not First-Class
 

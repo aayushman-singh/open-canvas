@@ -255,6 +255,7 @@ export interface LayoutTransition {
   id: string;
   name: string;
   triggerElementId: string;
+  reverseTriggerElementId?: string;
   sourceElementId: string;
   targetElementId: string;
   viewTransitionName: string;

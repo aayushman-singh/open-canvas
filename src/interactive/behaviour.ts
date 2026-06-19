@@ -1698,10 +1698,20 @@ function behaviourFindLayoutElement(root, transition, elementId, role) {
   return node;
 }
 
-function behaviourSetLayoutState(transition, source, target, state) {
+function behaviourSetLayoutState(transition, source, target, state, reverseTrigger) {
   var sourceActive = state === 'source';
   source.hidden = !sourceActive;
   target.hidden = sourceActive;
+  if (reverseTrigger && reverseTrigger !== source && reverseTrigger !== target) {
+    reverseTrigger.hidden = sourceActive;
+    if (sourceActive) {
+      reverseTrigger.setAttribute('aria-hidden', 'true');
+      reverseTrigger.removeAttribute('data-opencanvas-layout-transition-state');
+    } else {
+      reverseTrigger.removeAttribute('aria-hidden');
+      reverseTrigger.setAttribute('data-opencanvas-layout-transition-state', 'active');
+    }
+  }
   if (sourceActive) {
     source.setAttribute('data-opencanvas-layout-transition-state', 'active');
     target.removeAttribute('data-opencanvas-layout-transition-state');
@@ -1722,18 +1732,22 @@ function behaviourClearLayoutViewTransitionName(source, target) {
 
 function behaviourHydrateLayoutTransition(transition, root) {
   var trigger = behaviourFindLayoutElement(root, transition, transition.triggerElementId, 'trigger');
+  var reverseTrigger = transition.reverseTriggerElementId
+    ? behaviourFindLayoutElement(root, transition, transition.reverseTriggerElementId, 'reverse-trigger')
+    : null;
   var source = behaviourFindLayoutElement(root, transition, transition.sourceElementId, 'source');
   var target = behaviourFindLayoutElement(root, transition, transition.targetElementId, 'target');
   if (trigger.getAttribute('data-opencanvas-layout-transition-hydrated') === transition.id) return;
   trigger.setAttribute('data-opencanvas-layout-transition-hydrated', transition.id);
+  if (reverseTrigger) reverseTrigger.setAttribute('data-opencanvas-layout-transition-reverse-hydrated', transition.id);
   var currentState = transition.initialState === 'target' ? 'target' : 'source';
-  behaviourSetLayoutState(transition, source, target, currentState);
-  trigger.addEventListener('click', function(event) {
+  behaviourSetLayoutState(transition, source, target, currentState, reverseTrigger);
+  function runLayoutTransition(nextState, event) {
     if (event && typeof event.preventDefault === 'function') event.preventDefault();
-    var nextState = currentState === 'source' ? 'target' : 'source';
+    if (nextState === currentState) return;
     var reduce = behaviourPrefersReducedMotion() && transition.reducedMotion === 'instant';
     if (reduce) {
-      behaviourSetLayoutState(transition, source, target, nextState);
+      behaviourSetLayoutState(transition, source, target, nextState, reverseTrigger);
       currentState = nextState;
       return;
     }
@@ -1748,7 +1762,7 @@ function behaviourHydrateLayoutTransition(transition, root) {
     var transitionRun;
     try {
       transitionRun = document.startViewTransition(function() {
-        behaviourSetLayoutState(transition, source, target, nextState);
+        behaviourSetLayoutState(transition, source, target, nextState, reverseTrigger);
         currentState = nextState;
       });
     } catch (err) {
@@ -1771,7 +1785,15 @@ function behaviourHydrateLayoutTransition(transition, root) {
     } else {
       behaviourClearLayoutViewTransitionName(source, target);
     }
+  }
+  trigger.addEventListener('click', function(event) {
+    runLayoutTransition(currentState === 'source' ? 'target' : 'source', event);
   });
+  if (reverseTrigger) {
+    reverseTrigger.addEventListener('click', function(event) {
+      runLayoutTransition('source', event);
+    });
+  }
 }
 
 function behaviourHydrateSmoothScroll(payload, root) {
