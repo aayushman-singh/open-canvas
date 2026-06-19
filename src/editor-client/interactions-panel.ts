@@ -2217,6 +2217,7 @@ function renderMotionSequenceTimeline(
   }
   wrap.appendChild(track);
   renderMotionSequenceScrubPreview(ctx, wrap, sequence, playhead);
+  renderMotionSequenceTimelinePropertyEditor(ctx, wrap, sequence);
   card.appendChild(wrap);
 }
 
@@ -2331,6 +2332,78 @@ function renderMotionSequenceScrubPreview(
   controls.appendChild(value);
   controls.appendChild(clear);
   wrap.appendChild(field('Scrub preview', controls));
+}
+
+function renderMotionSequenceTimelinePropertyEditor(
+  ctx: InteractionsPanelContext,
+  wrap: HTMLElement,
+  sequence: MotionSequence,
+): void {
+  const panel = document.createElement('div');
+  panel.className = 'opencanvas-motion-timeline-property-editor';
+  panel.setAttribute('data-opencanvas-motion-timeline-property-editor', sequence.id);
+  const title = document.createElement('div');
+  title.className = 'opencanvas-motion-timeline-label';
+  title.textContent = 'Timeline quick properties';
+  panel.appendChild(title);
+
+  for (let index = 0; index < sequence.steps.length; index++) {
+    const step = sequence.steps[index]!;
+    const stepPanel = document.createElement('div');
+    stepPanel.className = 'opencanvas-motion-timeline-property-step';
+    stepPanel.dataset.opencanvasMotionTimelinePropertyStep = step.id;
+    const stepTitle = document.createElement('strong');
+    stepTitle.textContent = 'Step ' + String(index + 1) + ' · ' + motionSequenceTimelineLaneLabel(step);
+    stepPanel.appendChild(stepTitle);
+
+    const grid = document.createElement('div');
+    grid.className = 'opencanvas-motion-timeline-property-grid';
+
+    const fromOpacity = optionalNumberInput(motionNumberValue(step.from, 'opacity'), 0, 1, 0.05);
+    fromOpacity.addEventListener('change', () =>
+      updateMotionStepProperty(ctx, sequence.id, step, 'from', 'opacity', fromOpacity, 0, 1),
+    );
+    grid.appendChild(field('Quick from opacity', fromOpacity));
+
+    const toOpacity = optionalNumberInput(motionNumberValue(step.to, 'opacity'), 0, 1, 0.05);
+    toOpacity.addEventListener('change', () =>
+      updateMotionStepProperty(ctx, sequence.id, step, 'to', 'opacity', toOpacity, 0, 1),
+    );
+    grid.appendChild(field('Quick to opacity', toOpacity));
+
+    for (const key of ['translateX', 'translateY', 'scale', 'rotate'] as const) {
+      const spec = MOTION_NUMBER_FIELDS.find((item) => item.key === key);
+      if (!spec) continue;
+      const fromInput = optionalNumberInput(motionNumberValue(step.from, key), spec.min, spec.max, spec.step);
+      fromInput.addEventListener('change', () =>
+        updateMotionStepProperty(ctx, sequence.id, step, 'from', key, fromInput, spec.min, spec.max),
+      );
+      grid.appendChild(field('Quick from ' + spec.label.toLowerCase(), fromInput));
+
+      const toInput = optionalNumberInput(motionNumberValue(step.to, key), spec.min, spec.max, spec.step);
+      toInput.addEventListener('change', () =>
+        updateMotionStepProperty(ctx, sequence.id, step, 'to', key, toInput, spec.min, spec.max),
+      );
+      grid.appendChild(field('Quick to ' + spec.label.toLowerCase(), toInput));
+    }
+
+    const fromFilter = optionalMotionTextInput(motionTextValue(step.from, 'filter'), 'blur(8px)');
+    fromFilter.addEventListener('change', () =>
+      updateMotionStepTextProperty(ctx, sequence.id, step, 'from', 'filter', fromFilter),
+    );
+    grid.appendChild(field('Quick from filter', fromFilter));
+
+    const toFilter = optionalMotionTextInput(motionTextValue(step.to, 'filter'), 'blur(0px)');
+    toFilter.addEventListener('change', () =>
+      updateMotionStepTextProperty(ctx, sequence.id, step, 'to', 'filter', toFilter),
+    );
+    grid.appendChild(field('Quick to filter', toFilter));
+
+    stepPanel.appendChild(grid);
+    panel.appendChild(stepPanel);
+  }
+
+  wrap.appendChild(panel);
 }
 
 function wireMotionSequenceTimelineDrag(

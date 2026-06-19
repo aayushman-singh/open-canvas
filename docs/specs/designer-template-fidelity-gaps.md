@@ -742,15 +742,16 @@ Current state:
 - The Interactions sidebar tab exposes Load Experience, Route Transition,
   Overlays, and Motion Sequence Lite step lists.
 - Full Motion Sequence cards include a Timeline overview with visual bars,
-  target lanes, snap handles, scrub preview, and draggable start-time bars for
-  step start/duration. Property editing remains form-based.
+  target lanes, snap handles, scrub preview, draggable start-time bars for step
+  start/duration, and timeline-adjacent quick property controls for opacity,
+  transform, and filter values.
 
 User-visible miss:
 
-- Template authors can inspect, scrub, and reposition time-based choreography as
-  a lane-based timeline, but cannot yet edit transform/opacity/filter values
-  directly from the timeline overview.
-- Long sequences still require field-level editing for detailed timing changes.
+- Template authors can inspect, scrub, reposition, resize, and edit common
+  transform/opacity/filter properties directly beside the timeline overview.
+- Long sequences still require field-level editing for advanced properties,
+  target binding, easing, repeat, and detailed timing changes.
 
 Needed primitive:
 

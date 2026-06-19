@@ -1996,6 +1996,37 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   font-weight: 700;
   text-align: right;
 }
+.opencanvas-motion-timeline-property-editor {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--opencanvas-hairline);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--opencanvas-bg) 82%, transparent);
+}
+.opencanvas-motion-timeline-property-step {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--opencanvas-bg-muted) 68%, transparent);
+}
+.opencanvas-motion-timeline-property-step > strong {
+  color: var(--opencanvas-fg);
+  font-size: 11px;
+  font-weight: 800;
+}
+.opencanvas-motion-timeline-property-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+@media (max-width: 720px) {
+  .opencanvas-motion-timeline-property-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 .opencanvas-sidebar-command-grid,
 .opencanvas-sidebar-kit-grid {

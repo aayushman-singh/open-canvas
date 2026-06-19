@@ -240,6 +240,20 @@ assert(panelSrc.includes('opencanvas-motion-timeline-snap'), 'panel must render 
 assert(panelSrc.includes('renderMotionSequenceScrubPreview'), 'panel must render Motion Sequence scrub preview controls');
 assert(panelSrc.includes('Scrub preview'), 'panel must label Motion Sequence scrub preview controls');
 assert(
+  panelSrc.includes('renderMotionSequenceTimelinePropertyEditor'),
+  'panel must render timeline-adjacent Motion Sequence property controls',
+);
+assert(
+  panelSrc.includes('Timeline quick properties'),
+  'panel must label timeline quick property controls',
+);
+assert(
+  panelSrc.includes('data-opencanvas-motion-timeline-property-editor'),
+  'panel must expose timeline property editor metadata',
+);
+assert(panelSrc.includes('Quick from opacity'), 'panel must edit from opacity from the timeline');
+assert(panelSrc.includes('Quick to filter'), 'panel must edit to filter from the timeline');
+assert(
   panelSrc.includes('data-opencanvas-motion-preview-progress'),
   'panel must publish Motion Sequence preview progress metadata',
 );
@@ -313,6 +327,14 @@ for (const [label, src] of [
   assert(src.includes('.opencanvas-motion-timeline-bar--draggable'), label + ' must style draggable Motion Sequence timeline bars');
   assert(src.includes('.opencanvas-motion-timeline-bar--resizable'), label + ' must style resizable Motion Sequence timeline bars');
   assert(src.includes('.opencanvas-motion-timeline-bar-handle'), label + ' must style Motion Sequence timeline bar handles');
+  assert(
+    src.includes('.opencanvas-motion-timeline-property-editor'),
+    label + ' must style Motion Sequence timeline property editor',
+  );
+  assert(
+    src.includes('.opencanvas-motion-timeline-property-grid'),
+    label + ' must style Motion Sequence timeline property editor grid',
+  );
 }
 
 console.log('[interactions-panel:smoke] OK');
