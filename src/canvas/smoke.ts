@@ -95,10 +95,16 @@ const pageMotionLayoutHtml = renderCanvasSnapshot(
   { turnstileSiteKey: TURNSTILE_TEST_KEY },
 );
 assert(
-  pageMotionLayoutHtml.includes(
-    'data-opencanvas-page="page-motion-layout" data-motion-preset="fade-up" data-scroll-trigger="on-load"',
-  ),
-  'expected on-load page entrance animation to reuse data-motion-preset so style-kit motion CSS runs',
+  pageMotionLayoutHtml.includes('data-opencanvas-behaviour-payload'),
+  'expected page entrance animation to compile into the behaviour payload',
+);
+assert(
+  pageMotionLayoutHtml.includes('preset-compiled-load-enter-page-motion-layout'),
+  'expected on-load page entrance animation to compile into a deterministic load-enter sequence',
+);
+assert(
+  !pageMotionLayoutHtml.includes('data-motion-preset="fade-up"'),
+  'compiled page entrance must not keep legacy data-motion-preset attrs',
 );
 assert(
   pageMotionLayoutHtml.includes(

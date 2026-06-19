@@ -73,6 +73,7 @@ import {
   VIDEO_STREAM_REDUCED_MOTION_MODES,
   VIDEO_STREAM_TRIGGERS,
 } from './behaviour-primitives.js';
+import { motionPresetSequenceUnsupportedReason } from './compile-motion-presets.js';
 
 // Re-export the canonical href allowlist so existing consumers (agent
 // parsers, etc.) that import from './canvas/validate.js' keep working. The
@@ -391,8 +392,18 @@ function validateMotion(motion: unknown, basePath: string, errors: string[]): vo
     errors.push(`${basePath}.motion must be an object when present`);
     return;
   }
-  assertOneOf<MotionPreset>(motion.preset, MOTION_PRESETS, `${basePath}.motion.preset`, errors);
+  if (assertOneOf<MotionPreset>(motion.preset, MOTION_PRESETS, `${basePath}.motion.preset`, errors)) {
+    validateCompiledMotionPreset(motion.preset, `${basePath}.motion.preset`, errors);
+  }
   assertOptionalFiniteNumber(motion.delayMs, `${basePath}.motion.delayMs`, errors);
+}
+
+function validateCompiledMotionPreset(preset: MotionPreset, path: string, errors: string[]): void {
+  const unsupportedReason = motionPresetSequenceUnsupportedReason(preset);
+  if (unsupportedReason === null) return;
+  errors.push(
+    `${path} "${preset}" cannot compile to Motion Sequence: ${unsupportedReason} (ADR 0069 dec 2)`,
+  );
 }
 
 // Keys must be plain CSS property names (ASCII letters + hyphen). Anything
@@ -967,12 +978,18 @@ function validatePageMotionLayout(
   errors: string[],
 ): void {
   if (page.entranceAnimation !== undefined) {
-    assertOneOf<MotionPreset>(
+    if (assertOneOf<MotionPreset>(
       page.entranceAnimation,
       MOTION_PRESETS,
       `${basePath}.entranceAnimation`,
       errors,
-    );
+    )) {
+      validateCompiledMotionPreset(
+        page.entranceAnimation,
+        `${basePath}.entranceAnimation`,
+        errors,
+      );
+    }
   }
   if (page.scrollTriggerMode !== undefined) {
     assertOneOf<ScrollTriggerMode>(
@@ -2282,7 +2299,9 @@ function validateSection(
   }
   validateAccentBorder(section.accentBorder, pathJoin(basePath, 'accentBorder'), errors);
   if (section.entrance !== undefined) {
-    assertOneOf<MotionPreset>(section.entrance, MOTION_PRESETS, `${basePath}.entrance`, errors);
+    if (assertOneOf<MotionPreset>(section.entrance, MOTION_PRESETS, `${basePath}.entrance`, errors)) {
+      validateCompiledMotionPreset(section.entrance, `${basePath}.entrance`, errors);
+    }
   }
   validateSectionTrigger(section.trigger, pathJoin(basePath, 'trigger'), errors);
   validateBackgroundVideo(
@@ -2480,6 +2499,75 @@ function validateInteractionTrigger(trigger: unknown, basePath: string, errors: 
   }
 }
 
+function validateOverlayContentNoAnchorIds(content: unknown, basePath: string, errors: string[]): void {
+  const forbidAnchor = (anchor: unknown, path: string): void => {
+    if (anchor !== undefined) {
+      errors.push(
+        `${path}.anchorId must be absent on overlay content; overlay surfaces do not participate in page anchor ids (ADR 0070 dec 2)`,
+      );
+    }
+  };
+  const visitElementTree = (el: unknown, elementPath: string): void => {
+    if (!isRecord(el)) return;
+    forbidAnchor(el.anchorId, elementPath);
+    if (el.type === 'tabs' && Array.isArray(el.tabs)) {
+      el.tabs.forEach((tab, tabIdx) => {
+        if (!isRecord(tab) || !Array.isArray(tab.elements)) return;
+        tab.elements.forEach((child, childIdx) => {
+          visitElementTree(
+            child,
+            pathJoin(
+              pathJoin(pathJoin(pathJoin(elementPath, 'tabs'), tabIdx), 'elements'),
+              childIdx,
+            ),
+          );
+        });
+      });
+      return;
+    }
+    if (el.type === 'collection' && Array.isArray(el.customTemplate)) {
+      el.customTemplate.forEach((child, childIdx) => {
+        visitElementTree(child, pathJoin(pathJoin(elementPath, 'customTemplate'), childIdx));
+      });
+      return;
+    }
+    if (el.type === 'flow-container' && Array.isArray(el.items)) {
+      el.items.forEach((item, itemIdx) => {
+        if (!isRecord(item)) return;
+        visitElementTree(
+          item.element,
+          pathJoin(pathJoin(pathJoin(elementPath, 'items'), itemIdx), 'element'),
+        );
+      });
+    }
+  };
+  if (!isRecord(content)) return;
+  forbidAnchor(content.anchorId, basePath);
+  if (!Array.isArray(content.elements)) return;
+  content.elements.forEach((el, eIdx) => {
+    visitElementTree(el, pathJoin(pathJoin(basePath, 'elements'), eIdx));
+  });
+}
+
+function validateOverlayTriggerTargets(
+  state: Record<string, unknown>,
+  errors: string[],
+  targetIndex: BehaviourTargetIndex,
+): void {
+  if (!Array.isArray(state.overlays)) return;
+  state.overlays.forEach((overlay, index) => {
+    if (!isRecord(overlay) || !isRecord(overlay.trigger)) return;
+    if (overlay.trigger.type !== 'element-click') return;
+    resolveIndexedId(
+      targetIndex.elementIds,
+      overlay.trigger.targetElementId,
+      `overlays[${String(index)}].trigger.targetElementId`,
+      'element',
+      errors,
+    );
+  });
+}
+
 function validateOverlays(site: Record<string, unknown>, errors: string[]): void {
   if (site.overlays === undefined) return;
   if (!Array.isArray(site.overlays)) {
@@ -2566,6 +2654,7 @@ function validateOverlays(site: Record<string, unknown>, errors: string[]): void
         }
       }
     }
+    validateOverlayContentNoAnchorIds(overlay.content, `${basePath}.content`, errors);
     const dismissal = overlay.dismissal;
     if (!isRecord(dismissal)) {
       errors.push(`${basePath}.dismissal must be an object`);
@@ -3294,6 +3383,20 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
               'section',
               errors,
             );
+          }
+          if (sequence.trigger.type === 'page-enter') {
+            if (
+              assertNonEmptyString(
+                sequence.trigger.pageId,
+                `${sequencePath}.trigger.pageId`,
+                errors,
+              ) &&
+              !targetIndex.pageIds.has(sequence.trigger.pageId)
+            ) {
+              errors.push(
+                `${sequencePath}.trigger.pageId "${sequence.trigger.pageId}" must reference an existing page`,
+              );
+            }
           }
           if (sequence.trigger.type === 'scroll-scene') {
             assertNonEmptyString(
@@ -4030,6 +4133,8 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
       }
     });
   }
+
+  validateOverlayTriggerTargets(state, errors, targetIndex);
 }
 
 const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } = {

@@ -165,4 +165,134 @@ const invalidSharedElement = validateEditableSite({
 assert.equal(invalidSharedElement.valid, false);
 assert.ok(invalidSharedElement.errors.some((error) => error.includes('routeTransition.sharedElements')));
 
+const overlayDismissal = {
+  closeButton: true,
+  escape: true,
+  backdropClick: true,
+  bodyScrollLock: true,
+  focusTrap: true,
+  returnFocus: true,
+} as const;
+
+const overlayContent = {
+  id: 'overlay-newsletter-content',
+  recipeId: 'custom' as const,
+  name: 'Newsletter content',
+  height: 420,
+  elements: [],
+};
+
+const siteWithTriggerElement = {
+  ...baseSite,
+  pages: [
+    {
+      ...baseSite.pages[0]!,
+      sections: [
+        {
+          ...baseSite.pages[0]!.sections[0]!,
+          elements: [
+            {
+              id: 'cta-open-overlay',
+              type: 'shape' as const,
+              box: { x: 0, y: 0, w: 120, h: 48, z: 1 },
+              variant: 'rect' as const,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const missingTriggerTarget = validateEditableSite({
+  ...siteWithTriggerElement,
+  overlays: [
+    {
+      id: 'overlay-missing-target',
+      name: 'Missing target',
+      scope: { type: 'site' as const },
+      trigger: { type: 'element-click' as const, targetElementId: 'missing' },
+      content: overlayContent,
+      dismissal: overlayDismissal,
+    },
+  ],
+});
+assert.equal(missingTriggerTarget.valid, false);
+assert.ok(
+  missingTriggerTarget.errors.some(
+    (error) =>
+      error.includes('overlays[0].trigger.targetElementId') && error.includes('missing'),
+  ),
+  missingTriggerTarget.errors.join('\n'),
+);
+
+const validElementClickTrigger = validateEditableSite({
+  ...siteWithTriggerElement,
+  overlays: [
+    {
+      id: 'overlay-valid-target',
+      name: 'Valid target',
+      scope: { type: 'site' as const },
+      trigger: { type: 'element-click' as const, targetElementId: 'cta-open-overlay' },
+      content: overlayContent,
+      dismissal: overlayDismissal,
+    },
+  ],
+});
+assert.equal(
+  validElementClickTrigger.valid,
+  true,
+  validElementClickTrigger.valid ? undefined : validElementClickTrigger.errors.join('\n'),
+);
+
+const overlaySectionAnchor = validateEditableSite({
+  ...premiumSite,
+  overlays: [
+    {
+      ...premiumSite.overlays![0]!,
+      content: {
+        ...overlayContent,
+        anchorId: 'modal-panel',
+      },
+    },
+  ],
+});
+assert.equal(overlaySectionAnchor.valid, false);
+assert.ok(
+  overlaySectionAnchor.errors.some((error) => error.includes('overlays[0].content.anchorId')),
+  overlaySectionAnchor.errors.join('\n'),
+);
+
+const overlayElementAnchor = validateEditableSite({
+  ...premiumSite,
+  overlays: [
+    {
+      ...premiumSite.overlays![0]!,
+      content: {
+        ...overlayContent,
+        elements: [
+          {
+            id: 'overlay-copy',
+            type: 'text' as const,
+            box: { x: 0, y: 0, w: 320, h: 80, z: 1 },
+            content: [{ text: 'Subscribe' }],
+            role: 'body' as const,
+            fontSize: 18,
+            fontWeight: 400,
+            align: 'left' as const,
+            anchorId: 'subscribe-copy',
+          },
+        ],
+      },
+    },
+  ],
+});
+assert.equal(overlayElementAnchor.valid, false);
+assert.ok(
+  overlayElementAnchor.errors.some((error) =>
+    error.includes('overlays[0].content.elements[0].anchorId'),
+  ),
+  overlayElementAnchor.errors.join('\n'),
+);
+
 console.log('[premium-interactions:smoke] OK');

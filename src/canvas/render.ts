@@ -17,6 +17,7 @@ import {
   buildBehaviourPayload,
   serializeBehaviourPayload,
   snapshotHasBehaviourPrimitives,
+  snapshotHasMotionPresetFields,
 } from './behaviour-payload.js';
 import type {
   BehaviourLoadExperience,
@@ -305,9 +306,9 @@ function applyContainerTint(
   };
 }
 
-function buildElementCommonAttrs(element: CanvasElement, tintAttr: string, assetBasePath: string): string {
+function buildElementCommonAttrs(element: CanvasElement, tintAttr: string, ctx: ElementRenderCtx): string {
   const motionAttrs =
-    element.motion !== undefined
+    !ctx.motionPresetsCompiled && element.motion !== undefined
       ? ` data-motion-preset="${escapeAttr(element.motion.preset)}" data-motion-delay-ms="${escapeAttr(String(element.motion.delayMs ?? 0))}"`
       : '';
   const marqueeAttrs =
@@ -316,7 +317,7 @@ function buildElementCommonAttrs(element: CanvasElement, tintAttr: string, asset
       : '';
   const pointerFxAttrs =
     element.pointerFx?.enabled === true
-      ? ` data-opencanvas-pointer-fx="${escapeAttr(element.pointerFx.primitive)}"${element.pointerFx.primitive === 'image-follow' && element.pointerFx.previewAssetId ? ` data-opencanvas-pointer-fx-preview-src="${escapeAttr(`${assetBasePath}/${element.pointerFx.previewAssetId}`)}"` : ''}${element.pointerFx.primitive === 'drag-inertia' ? ` data-opencanvas-pointer-fx-drag-axis="${escapeAttr(element.pointerFx.dragAxis ?? 'both')}" data-opencanvas-pointer-fx-inertia="${escapeAttr(String(element.pointerFx.inertia !== false))}"` : ''} data-opencanvas-pointer-fx-reduced-motion="${escapeAttr(element.pointerFx.reducedMotion)}" data-opencanvas-pointer-fx-touch="${escapeAttr(element.pointerFx.touchActivation ?? 'none')}"`
+      ? ` data-opencanvas-pointer-fx="${escapeAttr(element.pointerFx.primitive)}"${element.pointerFx.primitive === 'image-follow' && element.pointerFx.previewAssetId ? ` data-opencanvas-pointer-fx-preview-src="${escapeAttr(`${ctx.assetBasePath}/${element.pointerFx.previewAssetId}`)}"` : ''}${element.pointerFx.primitive === 'drag-inertia' ? ` data-opencanvas-pointer-fx-drag-axis="${escapeAttr(element.pointerFx.dragAxis ?? 'both')}" data-opencanvas-pointer-fx-inertia="${escapeAttr(String(element.pointerFx.inertia !== false))}"` : ''} data-opencanvas-pointer-fx-reduced-motion="${escapeAttr(element.pointerFx.reducedMotion)}" data-opencanvas-pointer-fx-touch="${escapeAttr(element.pointerFx.touchActivation ?? 'none')}"`
       : '';
   const ariaAttrs = buildAriaWrapperAttrs(element);
   const variant = variantAttr(element);
@@ -335,7 +336,7 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
   let wrapperStyle = buildElementWrapperStyle(element, ctx.assetBasePath);
   const tinted = applyContainerTint(element, ctx, wrapperStyle);
   wrapperStyle = tinted.wrapperStyle;
-  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr, ctx.assetBasePath);
+  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr, ctx);
 
   // ADR 0051 dec 5 — container with linkHref emits the outer wrapper as
   // <a href="…"> instead of <div>. Every other attribute, the inner body
@@ -418,7 +419,7 @@ function renderHostedElement(element: CanvasElement, ctx: ElementRenderCtx): str
   let wrapperStyle = buildHostedElementWrapperStyle(element, ctx.assetBasePath);
   const tinted = applyContainerTint(element, ctx, wrapperStyle);
   wrapperStyle = tinted.wrapperStyle;
-  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr, ctx.assetBasePath);
+  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr, ctx);
 
   if (element.type === 'container' && element.linkHref !== undefined) {
     const resolved = resolveActionHref(element.linkHref, ctx.pages);
@@ -433,7 +434,10 @@ function renderHostedElement(element: CanvasElement, ctx: ElementRenderCtx): str
 
 function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRenderCtx): string {
   const bgEffect = section.backgroundEffect ?? 'none';
-  const entrance = section.entrance ?? 'none';
+  const entrance =
+    ctx.motionPresetsCompiled && (section.entrance ?? 'none') !== 'none'
+      ? 'none'
+      : (section.entrance ?? 'none');
   const styleEntries: Array<[string, string]> = [
     ['position', 'relative'],
     ['width', `${String(pageWidth)}px`],
@@ -551,15 +555,17 @@ function renderPage(
     footer && page.suppressFooter !== true ? renderSection(footer, renderWidth, pageCtx) : '';
   const hasEntrance = page.entranceAnimation !== undefined && page.entranceAnimation !== 'none';
   const triggerMode = page.scrollTriggerMode ?? 'on-load';
+  const compiledPageEntrance = ctx.motionPresetsCompiled === true && hasEntrance;
   const motionAttr =
-    hasEntrance && triggerMode === 'on-load'
+    hasEntrance && !compiledPageEntrance && triggerMode === 'on-load'
       ? ` data-motion-preset="${escapeAttr(page.entranceAnimation as string)}"`
       : '';
   const entranceAttr =
-    hasEntrance && triggerMode === 'on-scroll'
+    hasEntrance && !compiledPageEntrance && triggerMode === 'on-scroll'
       ? ` data-entrance-animation="${escapeAttr(page.entranceAnimation as string)}"`
       : '';
-  const triggerAttr = hasEntrance ? ` data-scroll-trigger="${escapeAttr(triggerMode)}"` : '';
+  const triggerAttr =
+    hasEntrance && !compiledPageEntrance ? ` data-scroll-trigger="${escapeAttr(triggerMode)}"` : '';
   return `<article class="opencanvas-page" data-opencanvas-page="${escapeAttr(page.id)}"${motionAttr}${entranceAttr}${triggerAttr} style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
 }
 
@@ -597,6 +603,9 @@ function renderOverlays(
       const contentHtml = renderSection(overlay.content, renderWidth, {
         ...ctx,
         pageSlug: renderPage.slug,
+        // Overlay content is not compiled by compileMotionPresetSequences yet;
+        // keep legacy data-motion-preset attrs on overlay elements.
+        motionPresetsCompiled: false,
       });
       const trigger = overlay.trigger;
       const triggerAttrs =
@@ -694,6 +703,7 @@ export function renderCanvasSnapshot(
     siteId,
     pages: snapshot.pages,
     turnstileSiteKey: opts.turnstileSiteKey,
+    motionPresetsCompiled: snapshotHasMotionPresetFields(snapshot),
     renderElement,
     renderHostedElement,
   };

@@ -9,10 +9,13 @@
 //   - `src/index.ts` exports `scheduled` from this module on the worker
 //     default export.
 //
-// Cadence: every 5 minutes. CF rate-limits Custom Hostname GETs per zone;
-// with 5-minute cadence the steady-state cost is bounded even with hundreds
-// of pending hostnames. The 30-minute pending-to-failed flip works out to
-// six poll attempts before a row is given up on.
+// Cadence: every 5 minutes. Only `pending` / `verifying` rows are polled —
+// active hostnames are refreshed on dashboard read instead, so steady-state
+// cron does not keep Neon compute warm for already-verified domains. CF
+// rate-limits Custom Hostname GETs per zone; with 5-minute cadence the cost
+// is bounded even with hundreds of in-flight hostnames. The 30-minute
+// pending-to-failed flip works out to six poll attempts before a row is
+// given up on.
 //
 // Failure mode: a scheduled handler that throws marks the run failed in the
 // CF dashboard. We swallow nothing — `pollAllPending` already isolates

@@ -1,15 +1,16 @@
 // src/custom-domain/poll.ts
 //
-// Polls Cloudflare for each non-terminal customDomain row and updates the
-// persisted `status` + `certIssuedAt` columns from the CF API response.
+// Polls Cloudflare for in-flight customDomain rows and updates the persisted
+// `status` + `certIssuedAt` columns from the CF API response.
 //
 // Trigger sources:
 //   - The Workers Cron Trigger handler in `cron.ts` calls
-//     `pollAllPending(env)` every 5 minutes (cadence documented in
-//     SUBSYSTEM.md).
-//   - The dashboard GET handler can call `pollOne(deps, row)` for a single
-//     row on read to surface fresh state without waiting for cron — lazy
-//     refresh hybrid per the plan's open question.
+//     `pollAllPending(env)` every 5 minutes. Cron only polls rows still
+//     in-flight (`pending` / `verifying`) so active hostnames do not keep
+//     Neon awake on a steady 5-minute cadence.
+//   - The dashboard GET handler can call `pollOneById(deps, row)` for a
+//     single row on read to surface fresh state without waiting for cron —
+//     including `active` rows when the Owner opens the domains panel.
 //
 // Auto-failure rule (per the brief):
 //   Rows in `pending` or `verifying` for more than 30 minutes since
@@ -87,8 +88,9 @@ export async function pollOne(
     };
   }
 
-  // Terminal states: 'active' rows still get polled (CF may revoke or move),
-  // but 'failed' rows do not — they're sticky until the Owner deletes.
+  // `pollOne` still refreshes `active` rows when invoked (dashboard lazy
+  // refresh). Cron uses `pollAllPending`, which skips them. `failed` rows
+  // are terminal until the Owner deletes and re-registers.
   if (row.status === 'failed') {
     return {
       rowId: row.id,
@@ -181,11 +183,12 @@ export async function pollOne(
 }
 
 /**
- * Cron entry point: pull every row that is NOT in a terminal-failure state,
- * poll each, and return the per-row outcomes for logging.
+ * Cron entry point: poll rows still moving through CF verification.
  *
- * Rows in `failed` are skipped — they're terminal and the Owner has to
- * DELETE + re-register to clear them.
+ * Only `pending` and `verifying` rows are included. Once a hostname is
+ * `active`, cron stops touching it — the dashboard lazy-refresh path calls
+ * `pollOneById` when the Owner opens the domains panel. Rows in `failed` are
+ * skipped; the Owner must DELETE + re-register to clear them.
  *
  * The poller is intentionally serial. CF rate-limits Custom Hostname GETs
  * per zone; firing N concurrent GETs from a single cron tick risks 429s.
@@ -197,7 +200,7 @@ export async function pollAllPending(
   const rows = await deps.db
     .select()
     .from(customDomain)
-    .where(inArray(customDomain.status, ['pending', 'verifying', 'active']));
+    .where(inArray(customDomain.status, ['pending', 'verifying']));
   const outcomes: PollOutcome[] = [];
   for (const row of rows) {
     try {

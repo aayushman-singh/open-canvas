@@ -10,7 +10,7 @@
     "recipeId": "custom",
     "name": "ROI metrics",
     "height": 640,
-    "entrance": "flip-in",
+    "entrance": "rotate-in",
     "elements": [
       {
         "id": "wf-roi-kicker",

@@ -150,6 +150,8 @@ export interface ElementRenderCtx {
   siteId: string;
   /** Slug of the page currently being rendered. */
   pageSlug: string;
+  /** When true, MotionPreset fields compile into behaviour payload sequences. */
+  motionPresetsCompiled?: boolean;
   /** All pages in the snapshot — needed by action element to resolve page links. */
   pages: CanvasPage[];
   /**

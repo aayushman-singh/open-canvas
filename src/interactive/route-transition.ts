@@ -66,7 +66,10 @@ function hydrateRouteTransition(scope, options) {
           targetElementId: mapping.targetElementId
         });
         for (var c = 0; c < applied.length; c++) applied[c].style.viewTransitionName = '';
-        throw new Error('shared route element mapping could not be resolved');
+        var resolveErr = new Error('shared route element mapping could not be resolved');
+        resolveErr.phase = 'shared-elements-resolve';
+        resolveErr.reported = true;
+        throw resolveErr;
       }
       source.style.viewTransitionName = mapping.viewTransitionName;
       target.style.viewTransitionName = mapping.viewTransitionName;
@@ -109,38 +112,121 @@ function hydrateRouteTransition(scope, options) {
       busy = false;
       return;
     }
+    var routeAttrs = ['data-opencanvas-route-transition','data-opencanvas-route-mode','data-opencanvas-route-duration-ms','data-opencanvas-route-easing','data-opencanvas-route-shared-elements','data-opencanvas-route-outgoing-sequence','data-opencanvas-route-incoming-sequence'];
     var outgoingSequence = container.getAttribute('data-opencanvas-route-outgoing-sequence');
+    var swapped = false;
+    var prevHtml = '';
+    var prevAttrs = {};
+    function captureSwapState() {
+      prevHtml = container.innerHTML;
+      for (var i = 0; i < routeAttrs.length; i++) {
+        prevAttrs[routeAttrs[i]] = container.getAttribute(routeAttrs[i]);
+      }
+    }
+    function restoreSwap() {
+      if (!swapped) return;
+      container.innerHTML = prevHtml;
+      for (var j = 0; j < routeAttrs.length; j++) {
+        var attrName = routeAttrs[j];
+        var attrValue = prevAttrs[attrName];
+        if (attrValue === null) container.removeAttribute(attrName);
+        else container.setAttribute(attrName, attrValue);
+      }
+      swapped = false;
+    }
+    function failTransition(phase, err) {
+      restoreSwap();
+      container.removeAttribute('data-opencanvas-route-state');
+      busy = false;
+      if (!err || err.reported !== true) {
+        routeFailure(id, phase, { href: url.href, error: String(err && err.message ? err.message : err) });
+      }
+    }
+    function applyNext(next) {
+      captureSwapState();
+      try {
+        container.innerHTML = next.innerHTML;
+        copyRouteAttrs(next);
+      } catch (swapErr) {
+        var taggedSwapErr = swapErr || new Error('swap failed');
+        if (!taggedSwapErr.phase) taggedSwapErr.phase = 'swap';
+        throw taggedSwapErr;
+      }
+      swapped = true;
+      try {
+        if (typeof window.__opencanvasHydrate === 'function') {
+          window.__opencanvasHydrate(container, { reason: 'route-transition' });
+        } else {
+          throw new Error('Runtime Hydrator missing');
+        }
+      } catch (hydrateRuntimeErr) {
+        var taggedHydrateErr = hydrateRuntimeErr || new Error('hydrate failed');
+        if (!taggedHydrateErr.phase) taggedHydrateErr.phase = 'hydrate';
+        throw taggedHydrateErr;
+      }
+      var incomingSequence = container.getAttribute('data-opencanvas-route-incoming-sequence');
+      if (incomingSequence && typeof runMotionSequenceLite === 'function') {
+        try {
+          runMotionSequenceLite(container, incomingSequence);
+        } catch (animErr) {
+          var taggedAnimErr = animErr || new Error('animate failed');
+          if (!taggedAnimErr.phase) taggedAnimErr.phase = 'animate';
+          throw taggedAnimErr;
+        }
+      }
+      if (historyMode === 'replace') history.replaceState({}, '', url.href);
+      else history.pushState({}, '', url.href);
+      container.removeAttribute('data-opencanvas-route-state');
+      container.setAttribute('tabindex', '-1');
+      if (typeof container.focus === 'function') container.focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+      swapped = false;
+    }
     if (!shared.length) {
-      if (outgoingSequence && typeof runMotionSequenceLite === 'function') runMotionSequenceLite(container, outgoingSequence);
+      if (outgoingSequence && typeof runMotionSequenceLite === 'function') {
+        try {
+          runMotionSequenceLite(container, outgoingSequence);
+        } catch (animErr) {
+          failTransition('animate', animErr);
+          return;
+        }
+      }
       container.style.transition = 'opacity ' + duration + 'ms ' + easing + ', transform ' + duration + 'ms ' + easing + ', clip-path ' + duration + 'ms ' + easing;
       container.setAttribute('data-opencanvas-route-state', 'outgoing');
     }
     (shared.length ? Promise.resolve() : wait(duration)).then(function(){
       return fetch(url.href, { credentials: 'same-origin' });
     }).then(function(resp){
-      if (!resp.ok) throw new Error('fetch failed ' + String(resp.status));
+      if (!resp.ok) {
+        var fetchErr = new Error('fetch failed ' + String(resp.status));
+        fetchErr.phase = 'fetch';
+        throw fetchErr;
+      }
       return resp.text();
     }).then(function(html){
       var doc = new DOMParser().parseFromString(html, 'text/html');
       var next = doc.querySelector('[data-opencanvas-route-container]');
-      if (!next) throw new Error('next route container missing');
+      if (!next) {
+        var parseErr = new Error('next route container missing');
+        parseErr.phase = 'parse';
+        throw parseErr;
+      }
       if (shared.length) {
         if (!document.startViewTransition) {
-          routeFailure(id, 'shared-elements-api', { href: url.href });
-          throw new Error('View Transition API unavailable for shared route elements');
+          var apiErr = new Error('View Transition API unavailable for shared route elements');
+          apiErr.phase = 'shared-elements-api';
+          throw apiErr;
         }
         var applied = applySharedElements(shared, next);
-        var transition = document.startViewTransition(function(){ swapContainerTo(next, url, historyMode); });
+        var transition = document.startViewTransition(function(){ applyNext(next); });
         return transition.finished.then(function(){ busy = false; }).catch(function(err){ throw err; }).finally(function(){
           for (var a = 0; a < applied.length; a++) applied[a].style.viewTransitionName = '';
         });
       }
-      swapContainerTo(next, url, historyMode);
+      applyNext(next);
       busy = false;
     }).catch(function(err){
-      container.removeAttribute('data-opencanvas-route-state');
-      busy = false;
-      routeFailure(id, 'navigate', { href: url.href, error: String(err && err.message ? err.message : err) });
+      failTransition(err && err.phase ? err.phase : 'navigate', err);
     });
   }
   document.addEventListener('click', function(ev) {

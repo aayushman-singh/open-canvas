@@ -2,6 +2,7 @@ export const BEHAVIOUR_TARGET_TYPES = ['site', 'page', 'section', 'element', 'te
 export const TEXT_SPLIT_UNITS = ['word', 'line', 'char'] as const;
 export const MOTION_SEQUENCE_TRIGGER_TYPES = [
   'load-enter',
+  'page-enter',
   'section-enter',
   'scroll-scene',
 ] as const;
@@ -79,6 +80,7 @@ export interface MotionSequence {
   id: string;
   trigger:
     | { type: 'load-enter' }
+    | { type: 'page-enter'; pageId: string }
     | { type: 'section-enter'; sectionId: string }
     | { type: 'scroll-scene'; scrollSceneId: string };
   steps: MotionSequenceStep[];

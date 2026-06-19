@@ -405,7 +405,7 @@
           "background": "rgba(181, 70, 47, 0.08)"
         },
         "motion": {
-          "preset": "slow-drift"
+          "preset": "parallax-soft"
         }
       }
     ]

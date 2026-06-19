@@ -11,7 +11,7 @@
     "name": "Customer reel",
     "height": 480,
     "backgroundEffect": "glass",
-    "entrance": "bounce-in",
+    "entrance": "scale-in",
     "elements": [
       {
         "id": "wf-cust-reel-heading",

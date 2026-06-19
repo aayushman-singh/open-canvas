@@ -1062,7 +1062,7 @@
                 "background": "rgba(181, 70, 47, 0.08)"
               },
               "motion": {
-                "preset": "slow-drift"
+                "preset": "parallax-soft"
               }
             }
           ]
@@ -5568,7 +5568,7 @@
           "recipeId": "custom",
           "name": "ROI metrics",
           "height": 640,
-          "entrance": "flip-in",
+          "entrance": "rotate-in",
           "elements": [
             {
               "id": "wf-roi-kicker",
@@ -5936,7 +5936,7 @@
               "alt": "Enterprise team collaboration",
               "fit": "cover",
               "motion": {
-                "preset": "slow-drift"
+                "preset": "parallax-soft"
               }
             },
             {
@@ -6469,7 +6469,7 @@
           "name": "Customer reel",
           "height": 480,
           "backgroundEffect": "glass",
-          "entrance": "bounce-in",
+          "entrance": "scale-in",
           "elements": [
             {
               "id": "wf-cust-reel-heading",
@@ -7294,7 +7294,7 @@
                 "background": "rgba(181, 70, 47, 0.18)"
               },
               "motion": {
-                "preset": "slow-drift"
+                "preset": "parallax-soft"
               }
             },
             {

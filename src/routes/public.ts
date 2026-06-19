@@ -35,6 +35,7 @@ import { editorPageJsx, type EditorPageOptions } from '../editor/route';
 import { siteCollaborator } from '../db/schema';
 import { canvasPublishedStyles } from '../canvas/public-styles';
 import { renderCanvasSnapshot } from '../canvas/render';
+import { snapshotHasMotionPresetFields } from '../canvas/behaviour-payload';
 import { requireTurnstileSiteKey } from '../canvas/elements/form';
 import type { PublishedSnapshot } from '../canvas/schema';
 import { buildStyleKitCss } from '../canvas/style-kits';
@@ -1237,6 +1238,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
 
   const addonScripts = await emitAddonHeadScripts(db(c.env), siteRow.id);
   const addonBodyScripts = await emitAddonBodyScripts(db(c.env), siteRow.id);
+  const usesCompiledMotionPresets = snapshotHasMotionPresetFields(renderSnapshot);
 
   return c.html(
     html`<!doctype html>
@@ -1255,7 +1257,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
             ${raw(canvasPublishedStyles)}${raw(customKitCss)}${raw(
               fontFaceCss ? `\n${fontFaceCss}` : '',
             )}${themeEmitsCss ? `\n${dualModeCss}` : ''}
-            ${raw(ENTRANCE_ANIMATION_CSS)}
+            ${usesCompiledMotionPresets ? '' : raw(ENTRANCE_ANIMATION_CSS)}
           </style>
           ${addonScripts ? raw(addonScripts) : ''}
         </head>
@@ -1267,7 +1269,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
             ${raw(visitorScript)};
           </script>
           <script>
-            ${raw(ENTRANCE_OBSERVER_SCRIPT)};
+            ${usesCompiledMotionPresets ? '' : raw(ENTRANCE_OBSERVER_SCRIPT)};
           </script>
           ${addonBodyScripts ? raw(addonBodyScripts) : ''}
         </body>

@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-06-16
 **Author:** Aayushman Singh
+**Superseded (V1 only) by:** ADR 0081
 
 ## Context
 

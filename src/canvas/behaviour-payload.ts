@@ -5,7 +5,20 @@ import type {
   RichMotionAsset,
   ScrollScene,
 } from './behaviour-primitives.js';
-import type { CanvasElement, CanvasSection, NavThemeReducedMotionMode, NavThemeTarget } from './schema.js';
+import {
+  compileMotionPresetSequences,
+  snapshotHasMotionPresetFields,
+} from './compile-motion-presets.js';
+import type {
+  CanvasElement,
+  CanvasSection,
+  EditableSite,
+  NavThemeReducedMotionMode,
+  NavThemeTarget,
+  PublishedSnapshot,
+} from './schema.js';
+
+export type BehaviourSnapshotSource = EditableSite | PublishedSnapshot;
 
 export interface NavThemeRuntime {
   navElementId: string;
@@ -46,6 +59,7 @@ interface SnapshotWithBehaviour {
   pages?: Array<{ sections?: CanvasSection[] }>;
   header?: CanvasSection;
   footer?: CanvasSection;
+  styleKit?: PublishedSnapshot['styleKit'];
 }
 
 function collectNavThemeRuntimes(snapshot: SnapshotWithBehaviour): NavThemeRuntime[] {
@@ -117,11 +131,32 @@ export function snapshotHasBehaviourPrimitives(snapshot: SnapshotWithBehaviour):
   if ((snapshot.richMotionAssets ?? []).length > 0) return true;
   if (collectSmoothScrollRuntime(snapshot) !== null) return true;
   if (collectNavThemeRuntimes(snapshot).length > 0) return true;
+  if (
+    snapshot.pages !== undefined &&
+    snapshot.styleKit !== undefined &&
+    snapshotHasMotionPresetFields(snapshot as BehaviourSnapshotSource)
+  ) {
+    return true;
+  }
   return false;
 }
 
+function mergedMotionSequences(snapshot: BehaviourSnapshotSource): MotionSequence[] {
+  const authored = snapshot.motionSequences ?? [];
+  const compiled = compileMotionPresetSequences(snapshot);
+  if (compiled.length === 0) return authored;
+  const merged = [...authored];
+  const seen = new Set(authored.map((sequence) => sequence.id));
+  for (const sequence of compiled) {
+    if (seen.has(sequence.id)) continue;
+    merged.push(sequence);
+    seen.add(sequence.id);
+  }
+  return merged;
+}
+
 export function buildBehaviourPayload(
-  snapshot: SnapshotWithBehaviour,
+  snapshot: BehaviourSnapshotSource,
   assetBasePath: string,
 ): BehaviourPayload | null {
   if (!snapshotHasBehaviourPrimitives(snapshot)) return null;
@@ -173,7 +208,7 @@ export function buildBehaviourPayload(
   const navThemes = collectNavThemeRuntimes(snapshot);
   const smoothScroll = collectSmoothScrollRuntime(snapshot);
   const payload: BehaviourPayload = {
-    motionSequences: snapshot.motionSequences ?? [],
+    motionSequences: mergedMotionSequences(snapshot),
     scrollScenes: snapshot.scrollScenes ?? [],
     layoutTransitions: snapshot.layoutTransitions ?? [],
     richMotionAssets,
@@ -189,3 +224,5 @@ export function buildBehaviourPayload(
 export function serializeBehaviourPayload(payload: BehaviourPayload): string {
   return JSON.stringify(payload).replace(/</g, '\\u003c');
 }
+
+export { compileMotionPresetSequences, snapshotHasMotionPresetFields } from './compile-motion-presets.js';

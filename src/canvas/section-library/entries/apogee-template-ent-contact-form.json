@@ -116,7 +116,7 @@
         "alt": "Enterprise team collaboration",
         "fit": "cover",
         "motion": {
-          "preset": "slow-drift"
+          "preset": "parallax-soft"
         }
       },
       {

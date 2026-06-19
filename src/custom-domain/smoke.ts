@@ -175,8 +175,8 @@ function makeShim(state: ShimState): {
     currentSiteId: string | null;
     currentCustomerId: string | null;
     currentRowId: string | null;
-    // For pollAllPending — return ALL non-failed rows.
-    selectMode: 'one-by-hostname' | 'one-by-siteid' | 'one-by-id' | 'all-non-failed' | 'by-siteid';
+    // For pollAllPending — return only in-flight rows (pending / verifying).
+    selectMode: 'one-by-hostname' | 'one-by-siteid' | 'one-by-id' | 'pending-or-verifying' | 'by-siteid';
   };
 } {
   const context = {
@@ -188,7 +188,7 @@ function makeShim(state: ShimState): {
       | 'one-by-hostname'
       | 'one-by-siteid'
       | 'one-by-id'
-      | 'all-non-failed'
+      | 'pending-or-verifying'
       | 'by-siteid',
   };
 
@@ -210,8 +210,8 @@ function makeShim(state: ShimState): {
         return context.currentSiteId
           ? state.domains.filter((d) => d.siteId === context.currentSiteId)
           : [];
-      case 'all-non-failed':
-        return state.domains.filter((d) => d.status !== 'failed');
+      case 'pending-or-verifying':
+        return state.domains.filter((d) => d.status === 'pending' || d.status === 'verifying');
     }
   }
 
@@ -357,6 +357,22 @@ function runValidation(): void {
   const ok = validateCustomHostname(SMOKE_HOST_ENV, '  WWW.Acme.COM  ');
   assert(ok.ok, 'expected www.acme.com (mixed case) to be accepted');
   assert(ok.ok && ok.hostname === 'www.acme.com', 'expected hostname to be normalised lowercased');
+}
+
+async function runPollAllPendingRegressionChecks(): Promise<void> {
+  const pollResponse = await fetch(new URL('./poll.ts', import.meta.url));
+  const pollSource = await pollResponse.text();
+  const pollAllStart = pollSource.indexOf('export async function pollAllPending');
+  assert(pollAllStart !== -1, 'expected poll.ts to export pollAllPending');
+  const pollAllBody = pollSource.slice(pollAllStart, pollAllStart + 600);
+  assert(
+    pollAllBody.includes("inArray(customDomain.status, ['pending', 'verifying'])"),
+    'expected cron pollAllPending to only query pending/verifying rows',
+  );
+  assert(
+    !pollAllBody.includes("'active'"),
+    'expected cron pollAllPending to skip active rows',
+  );
 }
 
 async function runRouteRegressionChecks(): Promise<void> {
@@ -647,6 +663,7 @@ async function runStuckPendingFlip(): Promise<void> {
 
 async function main(): Promise<void> {
   runValidation();
+  await runPollAllPendingRegressionChecks();
   await runRouteRegressionChecks();
   const { shim, state, cf, hostname, siteId, customerId } = await runRegisterAndActivate();
   await runRegisterRollbackFailure();

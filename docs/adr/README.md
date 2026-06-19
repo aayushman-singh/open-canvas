@@ -80,7 +80,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0069 | Motion Sequence and Scroll Scene | Accepted | [`docs/adr/0069-motion-sequence-and-scroll-scene.md`](0069-motion-sequence-and-scroll-scene.md) |
 | 0070 | Overlay as first-class behaviour | Accepted | [`docs/adr/0070-overlay-as-first-class-behaviour.md`](0070-overlay-as-first-class-behaviour.md) |
 | 0071 | Load Experience and Route Transition | Accepted | [`docs/adr/0071-load-experience-and-route-transition.md`](0071-load-experience-and-route-transition.md) |
-| 0072 | Rich Motion Asset runtimes | Accepted | [`docs/adr/0072-rich-motion-asset-runtimes.md`](0072-rich-motion-asset-runtimes.md) |
+| 0072 | Rich Motion Asset runtimes | Accepted (V1 narrowed by 0081) | [`docs/adr/0072-rich-motion-asset-runtimes.md`](0072-rich-motion-asset-runtimes.md) |
 | 0073 | Owner-chosen Growth Signals | Proposed | [`docs/adr/0073-owner-chosen-growth-signals.md`](0073-owner-chosen-growth-signals.md) |
 | 0074 | Experiments use Alternatives | Proposed | [`docs/adr/0074-experiments-use-alternatives.md`](0074-experiments-use-alternatives.md) |
 | 0075 | Personalization uses Visitor Segments | Proposed | [`docs/adr/0075-personalization-uses-visitor-segments.md`](0075-personalization-uses-visitor-segments.md) |
@@ -89,6 +89,10 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0078 | Flow Container is a Compound Element inside Canvas Sections | Accepted | [`docs/adr/0078-flow-container-is-a-compound-element-inside-canvas-sections.md`](0078-flow-container-is-a-compound-element-inside-canvas-sections.md) |
 | 0079 | Flow Layout grammar v1 | Accepted | [`docs/adr/0079-flow-layout-grammar-v1.md`](0079-flow-layout-grammar-v1.md) |
 | 0080 | Flow Items own placement; Content Elements own behaviour | Accepted | [`docs/adr/0080-flow-items-own-placement-content-elements-own-behaviour.md`](0080-flow-items-own-placement-content-elements-own-behaviour.md) |
+| 0081 | Rich Motion Asset V1 scope correction | Accepted | [`docs/adr/0081-rich-motion-v1-scope-correction.md`](0081-rich-motion-v1-scope-correction.md) |
+| 0082 | Vector Animation Rich Motion adapter | Proposed | [`docs/adr/0082-vector-animation-rich-motion-adapter.md`](0082-vector-animation-rich-motion-adapter.md) |
+| 0083 | Interactive Vector Rich Motion adapter | Proposed | [`docs/adr/0083-interactive-vector-rich-motion-adapter.md`](0083-interactive-vector-rich-motion-adapter.md) |
+| 0084 | Bounded 3D Rich Motion adapter | Proposed | [`docs/adr/0084-bounded-3d-rich-motion-adapter.md`](0084-bounded-3d-rich-motion-adapter.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

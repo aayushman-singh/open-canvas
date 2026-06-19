@@ -409,12 +409,25 @@ function behaviourRunSequence(sequence, root, reducedMode, progress) {
   }
 }
 
+function behaviourApplyStepFromStates(sequence, root) {
+  var steps = sequence.steps || [];
+  for (var i = 0; i < steps.length; i++) {
+    var step = steps[i];
+    var targets = behaviourResolveTarget(step.target, root);
+    var from = step.from || {};
+    for (var j = 0; j < targets.length; j++) {
+      behaviourApplyProps(targets[j], from);
+    }
+  }
+}
+
 function behaviourSetupSectionEnter(sequence, root) {
   if (sequence.trigger.type !== 'section-enter') return;
   var section = root.querySelector('[data-opencanvas-section="' + sequence.trigger.sectionId + '"]');
   if (!section) {
     behaviourFailure('behaviour-target-missing', { sequenceId: sequence.id, sectionId: sequence.trigger.sectionId }, new Error('section-enter section not found'));
   }
+  behaviourApplyStepFromStates(sequence, root);
   var reducedMode = behaviourPrefersReducedMotion() ? (sequence.reducedMotion || 'skip') : null;
   if (typeof IntersectionObserver !== 'function') {
     behaviourFailure('behaviour-intersection-observer-missing', { sequenceId: sequence.id }, new Error('IntersectionObserver unavailable'));
@@ -430,6 +443,30 @@ function behaviourSetupSectionEnter(sequence, root) {
     }
   }, { threshold: 0.12 });
   observer.observe(section);
+}
+
+function behaviourSetupPageEnter(sequence, root) {
+  if (sequence.trigger.type !== 'page-enter') return;
+  var page = root.querySelector('[data-opencanvas-page="' + sequence.trigger.pageId + '"]');
+  if (!page) {
+    behaviourFailure('behaviour-target-missing', { sequenceId: sequence.id, pageId: sequence.trigger.pageId }, new Error('page-enter page not found'));
+  }
+  behaviourApplyStepFromStates(sequence, root);
+  var reducedMode = behaviourPrefersReducedMotion() ? (sequence.reducedMotion || 'skip') : null;
+  if (typeof IntersectionObserver !== 'function') {
+    behaviourFailure('behaviour-intersection-observer-missing', { sequenceId: sequence.id }, new Error('IntersectionObserver unavailable'));
+  }
+  var fired = false;
+  var observer = new IntersectionObserver(function (entries) {
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].isIntersecting && !fired) {
+        fired = true;
+        behaviourRunSequence(sequence, root, reducedMode);
+        observer.disconnect();
+      }
+    }
+  }, { threshold: 0.12 });
+  observer.observe(page);
 }
 
 function behaviourSceneProgress(scene, section) {
@@ -1991,11 +2028,14 @@ function hydrateBehaviour(scope, options) {
     var sequence = sequences[i];
     if (sequence.trigger.type === 'load-enter') {
       if (!payload.loadExperience) {
+        behaviourApplyStepFromStates(sequence, root);
         var reducedLoad = behaviourPrefersReducedMotion() ? (sequence.reducedMotion || 'skip') : null;
         behaviourRunSequence(sequence, root, reducedLoad);
       }
     } else if (sequence.trigger.type === 'section-enter') {
       behaviourSetupSectionEnter(sequence, root);
+    } else if (sequence.trigger.type === 'page-enter') {
+      behaviourSetupPageEnter(sequence, root);
     }
   }
   var scenes = payload.scrollScenes || [];
