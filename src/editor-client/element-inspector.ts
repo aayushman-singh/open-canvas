@@ -40,12 +40,14 @@ import {
   MOTION_PRESETS,
   POINTER_FX_PRIMITIVES,
   POINTER_FX_REDUCED_MOTION_MODES,
+  POINTER_FX_TOUCH_ACTIVATION_MODES,
   type MarqueeCollectionField,
   type MarqueeDirection,
   type MarqueeReducedMotionMode,
   type MotionPreset,
   type PointerFxPrimitive,
   type PointerFxReducedMotionMode,
+  type PointerFxTouchActivationMode,
 } from '../canvas/schema.js';
 import {
   TEXT_SPLIT_UNITS,
@@ -656,6 +658,7 @@ function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): v
         enabled: true,
         primitive: 'tilt',
         reducedMotion: 'disabled',
+        touchActivation: 'none',
       };
     } else {
       delete element.pointerFx;
@@ -696,6 +699,18 @@ function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): v
     });
     ctx.inspector.appendChild(field('Preview asset id', previewAsset));
   }
+
+  const touchActivation = selectInput(
+    POINTER_FX_TOUCH_ACTIVATION_MODES,
+    element.pointerFx.touchActivation ?? 'none',
+  );
+  touchActivation.addEventListener('change', () => {
+    ctx.captureForUndo();
+    element.pointerFx!.touchActivation = touchActivation.value as PointerFxTouchActivationMode;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Touch activation', touchActivation));
 
   const reducedMotion = selectInput(
     POINTER_FX_REDUCED_MOTION_MODES,

@@ -32,6 +32,7 @@ function makeSite(): EditableSite {
                   enabled: true,
                   primitive: 'tilt',
                   reducedMotion: 'disabled',
+                  touchActivation: 'tap',
                 },
               },
               {
@@ -99,6 +100,7 @@ function makeSite(): EditableSite {
                   primitive: 'image-follow',
                   previewAssetId: 'cursor-preview.webp',
                   reducedMotion: 'disabled',
+                  touchActivation: 'toggle',
                 },
               },
             ],
@@ -117,6 +119,10 @@ const decoded = decodeYDoc(encodeYDoc(site));
 assert(
   decoded.pages[0]?.sections[0]?.elements[0]?.pointerFx?.primitive === 'tilt',
   'Yjs projection must preserve tilt pointerFx config',
+);
+assert(
+  decoded.pages[0]?.sections[0]?.elements[0]?.pointerFx?.touchActivation === 'tap',
+  'Yjs projection must preserve touchActivation on pointerFx config',
 );
 assert(
   decoded.pages[0]?.sections[0]?.elements[1]?.pointerFx?.primitive === 'magnetic',
@@ -140,7 +146,8 @@ assert(
 );
 assert(
   decoded.pages[0]?.sections[0]?.elements[6]?.pointerFx?.primitive === 'image-follow' &&
-    decoded.pages[0]?.sections[0]?.elements[6]?.pointerFx?.previewAssetId === 'cursor-preview.webp',
+    decoded.pages[0]?.sections[0]?.elements[6]?.pointerFx?.previewAssetId === 'cursor-preview.webp' &&
+    decoded.pages[0]?.sections[0]?.elements[6]?.pointerFx?.touchActivation === 'toggle',
   'Yjs projection must preserve image-follow pointerFx config',
 );
 
@@ -188,6 +195,14 @@ assert(
   html.includes('data-opencanvas-pointer-fx-reduced-motion="disabled"'),
   'renderer must emit pointer-fx reduced-motion mode',
 );
+assert(
+  html.includes('data-opencanvas-pointer-fx-touch="tap"'),
+  'renderer must emit tap touch activation metadata',
+);
+assert(
+  html.includes('data-opencanvas-pointer-fx-touch="toggle"'),
+  'renderer must emit toggle touch activation metadata',
+);
 
 const invalid = makeSite() as unknown as Record<string, unknown>;
 const invalidElement = (
@@ -202,6 +217,7 @@ invalidElement.pointerFx = {
   enabled: true,
   primitive: 'magnet',
   reducedMotion: 'maybe',
+  touchActivation: 'swipe',
 };
 const invalidResult = validateEditableSite(invalid);
 assert(!invalidResult.valid, 'invalid pointerFx config must fail validation');
@@ -212,6 +228,10 @@ assert(
 assert(
   invalidResult.errors.some((error) => error.includes('.pointerFx.reducedMotion')),
   'invalid reduced-motion mode must be named',
+);
+assert(
+  invalidResult.errors.some((error) => error.includes('.pointerFx.touchActivation')),
+  'invalid touch activation mode must be named',
 );
 
 const invalidImageFollow = makeSite() as unknown as Record<string, unknown>;

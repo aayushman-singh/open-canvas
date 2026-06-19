@@ -23,7 +23,8 @@ Observable success:
   the same Runtime Hydrator in editor preview and published pages.
 - Pointer-reactive spotlight, tilt, magnetic, cursor-follow, reveal-mask, and
   pointer-parallax effects plus cursor trails and image-follow cursors are
-  selectable on arbitrary elements with explicit reduced-motion behaviour.
+  selectable on arbitrary elements with explicit reduced-motion behaviour and
+  tap/toggle touch activation.
 - Rich Motion Assets can represent Rive files as schema-owned assets with
   artboard/state-machine metadata and a bounded runtime adapter.
 - Rich Motion Assets can represent Lottie JSON files as schema-owned assets
@@ -105,8 +106,8 @@ Open Canvas has real motion and interaction primitives already:
   `spotlight`. Element wrappers can store `pointerFx` with `spotlight`, `tilt`,
   `magnetic`, `cursor-follow`, `reveal-mask`, `pointer-parallax`, or
   `cursor-trail`, or `image-follow`, explicit reduced-motion mode,
-  validator/Yjs persistence, renderer metadata, editor inspector controls, and
-  named runtime failure events.
+  tap/toggle touch activation, validator/Yjs persistence, renderer metadata,
+  editor inspector controls, and named runtime failure events.
 - **June 2026 update:** Rich Motion Assets now include a `rive` kind. The
   schema stores the Rive asset id, artboard, state machine, autoplay, alt text,
   and explicit reduced-motion policy; renderer/editor emit fit metadata; the
@@ -385,13 +386,16 @@ Current state:
   arbitrary elements; Form `spotlight` also emits explicit reduced-motion
   metadata; malformed runtime attributes fail through
   `opencanvas:pointer-fx-failure`.
+- **June 2026 update:** Pointer FX now has schema-owned touch activation.
+  Owners can choose `none`, `tap`, or `toggle`; the renderer emits
+  `data-opencanvas-pointer-fx-touch`, Yjs preserves it, the inspector exposes
+  it, and the Runtime Hydrator maps touch `pointerdown` to the same CSS
+  variables used by pointer movement.
 
 User-visible miss:
 
 - Cannot reproduce drag/inertia sliders or hover-to-preview grids.
-- Cannot author touch-specific equivalents for mobile.
-- Pointer FX does not yet include drag/inertia or touch-specific alternate
-  gestures.
+- Pointer FX does not yet include drag/inertia gestures.
 
 June 2026 update: Marquee can now bind to a same-section Collection element as
 a schema-owned ticker source (`title`, `excerpt`, or `all-text`) instead of
@@ -406,9 +410,9 @@ Yjs preserves the gallery-level policy.
 Needed primitive:
 
 - Pointer FX and Hover State as schema-owned presets with component-neutral
-  targets, mobile alternatives, and inspector controls. `tilt` should either
-  become a real catalogued option or remain internal; unused primitives should
-  not be presented as capability.
+  targets, drag/inertia alternatives, and inspector controls. `tilt` should
+  either become a real catalogued option or remain internal; unused primitives
+  should not be presented as capability.
 
 ### 7. Component Styling Still Stops Short Of Template Fidelity
 

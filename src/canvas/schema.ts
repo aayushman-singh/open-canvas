@@ -210,6 +210,9 @@ export type PointerFxPrimitive = (typeof POINTER_FX_PRIMITIVES)[number];
 export const POINTER_FX_REDUCED_MOTION_MODES = ['disabled', 'allow'] as const;
 export type PointerFxReducedMotionMode = (typeof POINTER_FX_REDUCED_MOTION_MODES)[number];
 
+export const POINTER_FX_TOUCH_ACTIVATION_MODES = ['none', 'tap', 'toggle'] as const;
+export type PointerFxTouchActivationMode = (typeof POINTER_FX_TOUCH_ACTIVATION_MODES)[number];
+
 export const NAV_THEME_TARGETS = ['transparent', 'light', 'dark', 'solid'] as const;
 export type NavThemeTarget = (typeof NAV_THEME_TARGETS)[number];
 
@@ -241,6 +244,7 @@ export interface PointerFxBehaviour {
   primitive: PointerFxPrimitive;
   previewAssetId?: string;
   reducedMotion: PointerFxReducedMotionMode;
+  touchActivation?: PointerFxTouchActivationMode;
 }
 
 export const SCROLL_TRIGGER_MODES = ['on-load', 'on-scroll'] as const;

@@ -15,5 +15,7 @@ assert(inspectorSrc.includes('POINTER_FX_PRIMITIVES'), 'primitive select must us
 assert(inspectorSrc.includes('image-follow'), 'inspector must branch for image-follow primitive');
 assert(inspectorSrc.includes('Preview asset id'), 'inspector must expose image-follow preview asset control');
 assert(inspectorSrc.includes('previewAssetId'), 'inspector must save image-follow preview asset id');
+assert(inspectorSrc.includes('Touch activation'), 'inspector must expose touch activation control');
+assert(inspectorSrc.includes('touchActivation'), 'inspector must persist pointer-fx touch activation');
 
 console.log('[pointer-fx-inspector:smoke] OK');

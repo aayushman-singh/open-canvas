@@ -111,6 +111,7 @@ import {
   OVERFLOW_VALUES,
   POINTER_FX_PRIMITIVES,
   POINTER_FX_REDUCED_MOTION_MODES,
+  POINTER_FX_TOUCH_ACTIVATION_MODES,
   ROUTE_TRANSITION_MODES,
   SCROLL_TRIGGER_MODES,
   SECTION_RECIPE_IDS,
@@ -143,6 +144,7 @@ import {
   type OverflowValue,
   type PointerFxPrimitive,
   type PointerFxReducedMotionMode,
+  type PointerFxTouchActivationMode,
   type RouteTransitionMode,
   type ScrollTriggerMode,
   type SectionRecipeId,
@@ -831,6 +833,14 @@ function validatePointerFx(value: unknown, basePath: string, errors: string[]): 
     `${p}.reducedMotion`,
     errors,
   );
+  if (value.touchActivation !== undefined) {
+    assertOneOf<PointerFxTouchActivationMode>(
+      value.touchActivation,
+      POINTER_FX_TOUCH_ACTIVATION_MODES,
+      `${p}.touchActivation`,
+      errors,
+    );
+  }
 }
 
 function validateNavThemeOnScroll(value: unknown, basePath: string, errors: string[]): void {

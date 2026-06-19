@@ -80,7 +80,7 @@ interface Rect {
   width: number;
   height: number;
 }
-type Listener = (ev: { clientX: number; clientY: number }) => void;
+type Listener = (ev: { clientX: number; clientY: number; pointerType?: string }) => void;
 
 function makeStub(primitive: string, rect: Rect, extraAttrs: Record<string, string> = {}) {
   const attrs: Record<string, string> = {
@@ -291,6 +291,34 @@ const hydratePointerFx = makeHydratePointerFx();
   assert(el.children[0]!.style.top === '25.00%', `image-follow top should be 25%; got ${el.children[0]!.style.top}`);
 }
 
+// -- 2i. touch tap publishes the same positional state ------------------------
+{
+  const el = makeStub('spotlight', { left: 0, top: 0, width: 200, height: 100 }, {
+    'data-opencanvas-pointer-fx-touch': 'tap',
+  });
+  hydratePointerFx({ querySelectorAll: () => [el] });
+  assert((el.listeners['pointerdown']?.length ?? 0) === 1, 'tap touch activation must wire pointerdown');
+  el.listeners['pointerdown']![0]!({ clientX: 40, clientY: 25, pointerType: 'touch' });
+  assert(el.props['--opencanvas-ptr-x'] === '20.00%', `touch tap ptr-x should be 20%; got ${el.props['--opencanvas-ptr-x']}`);
+  assert(el.props['--opencanvas-ptr-y'] === '25.00%', `touch tap ptr-y should be 25%; got ${el.props['--opencanvas-ptr-y']}`);
+  assert(el.attrs['data-opencanvas-pointer-fx-touch-active'] === 'true', 'touch tap must mark touch-active state');
+}
+
+// -- 2j. touch toggle resets on the second tap --------------------------------
+{
+  const el = makeStub('magnetic', { left: 0, top: 0, width: 200, height: 100 }, {
+    'data-opencanvas-pointer-fx-touch': 'toggle',
+  });
+  hydratePointerFx({ querySelectorAll: () => [el] });
+  assert((el.listeners['pointerdown']?.length ?? 0) === 1, 'toggle touch activation must wire pointerdown');
+  el.listeners['pointerdown']![0]!({ clientX: 200, clientY: 100, pointerType: 'touch' });
+  assert(el.props['--opencanvas-magnetic-x'] === '12.00px', `touch toggle magnetic-x should be 12px; got ${el.props['--opencanvas-magnetic-x']}`);
+  assert(el.attrs['data-opencanvas-pointer-fx-touch-active'] === 'true', 'first touch toggle must mark touch-active state');
+  el.listeners['pointerdown']![0]!({ clientX: 200, clientY: 100, pointerType: 'touch' });
+  assert(el.props['--opencanvas-magnetic-x'] === '0px', 'second touch toggle must reset magnetic-x');
+  assert(el.attrs['data-opencanvas-pointer-fx-touch-active'] === 'false', 'second touch toggle must clear touch-active state');
+}
+
 // -- 3. idempotence: re-run does not double-wire -----------------------------
 {
   const el = makeStub('spotlight', { left: 0, top: 0, width: 200, height: 100 });
@@ -313,6 +341,10 @@ const hydratePointerFx = makeHydratePointerFx();
   assert(
     POINTER_FX_RUNTIME_SRC.includes('data-opencanvas-pointer-fx-reduced-motion'),
     'pointer-fx runtime must read explicit reduced-motion metadata',
+  );
+  assert(
+    POINTER_FX_RUNTIME_SRC.includes('data-opencanvas-pointer-fx-touch'),
+    'pointer-fx runtime must read explicit touch activation metadata',
   );
 }
 

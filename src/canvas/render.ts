@@ -316,7 +316,7 @@ function buildElementCommonAttrs(element: CanvasElement, tintAttr: string, asset
       : '';
   const pointerFxAttrs =
     element.pointerFx?.enabled === true
-      ? ` data-opencanvas-pointer-fx="${escapeAttr(element.pointerFx.primitive)}"${element.pointerFx.primitive === 'image-follow' && element.pointerFx.previewAssetId ? ` data-opencanvas-pointer-fx-preview-src="${escapeAttr(`${assetBasePath}/${element.pointerFx.previewAssetId}`)}"` : ''} data-opencanvas-pointer-fx-reduced-motion="${escapeAttr(element.pointerFx.reducedMotion)}"`
+      ? ` data-opencanvas-pointer-fx="${escapeAttr(element.pointerFx.primitive)}"${element.pointerFx.primitive === 'image-follow' && element.pointerFx.previewAssetId ? ` data-opencanvas-pointer-fx-preview-src="${escapeAttr(`${assetBasePath}/${element.pointerFx.previewAssetId}`)}"` : ''} data-opencanvas-pointer-fx-reduced-motion="${escapeAttr(element.pointerFx.reducedMotion)}" data-opencanvas-pointer-fx-touch="${escapeAttr(element.pointerFx.touchActivation ?? 'none')}"`
       : '';
   const ariaAttrs = buildAriaWrapperAttrs(element);
   const variant = variantAttr(element);
