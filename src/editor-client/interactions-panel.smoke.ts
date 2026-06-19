@@ -188,6 +188,11 @@ assert(panelSrc.includes('ctx.state!.motionSequences'), 'panel must mutate linke
 assert(panelSrc.includes('Validation blocks publish'), 'panel must fail loudly for missing linked sequence');
 assert(panelSrc.includes('Horizontal track'), 'panel must expose Scroll Scene horizontal track controls');
 assert(panelSrc.includes('horizontalTrack'), 'panel must mutate Scroll Scene horizontal track state');
+assert(panelSrc.includes('Before/after reveal'), 'panel must expose Scroll Scene before-after reveal controls');
+assert(panelSrc.includes('beforeAfterReveal'), 'panel must mutate Scroll Scene before-after reveal state');
+assert(panelSrc.includes('Reveal before element id'), 'panel must expose before reveal element binding');
+assert(panelSrc.includes('Reveal after element id'), 'panel must expose after reveal element binding');
+assert(panelSrc.includes('Reveal reduced motion'), 'panel must expose explicit before-after reduced-motion policy');
 assert(panelSrc.includes('renderMotionSequenceControls'), 'panel must render full Motion Sequence controls');
 assert(panelSrc.includes('renderRichMotionAssetControls'), 'panel must render Rich Motion Asset controls');
 assert(panelSrc.includes('Add image sequence asset'), 'panel must create image-sequence asset metadata');

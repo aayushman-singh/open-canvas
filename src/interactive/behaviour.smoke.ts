@@ -953,7 +953,82 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   );
 }
 
-// (7) image sequence refuses an empty frame list
+// (7) scroll scene before/after reveal clips the after element from scene progress
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'reveal-scroll',
+        trigger: { type: 'scroll-scene', scrollSceneId: 'reveal-scene' },
+        steps: [
+          {
+            id: 'reveal-noop',
+            target: { type: 'section', sectionId: 'section-story' },
+            to: { opacity: 1 },
+            durationMs: 1,
+          },
+        ],
+      },
+    ],
+    scrollScenes: [
+      {
+        id: 'reveal-scene',
+        sectionId: 'section-story',
+        sequenceId: 'reveal-scroll',
+        pinTarget: { type: 'section', sectionId: 'section-story' },
+        beforeAfterReveal: {
+          beforeElementId: 'story-before',
+          afterElementId: 'story-after',
+          axis: 'x',
+          startProgress: 0,
+          endProgress: 1,
+          reducedMotion: 'end',
+        },
+        startOffsetPx: 0,
+        endOffsetPx: 800,
+      },
+    ],
+    richMotionAssets: [],
+  });
+  doc.body.appendChild(script);
+  const section = new StubElement('section');
+  section.setAttribute('data-opencanvas-section', 'section-story');
+  const before = new StubElement('div');
+  before.setAttribute('data-opencanvas-element', 'story-before');
+  const after = new StubElement('div');
+  after.setAttribute('data-opencanvas-element', 'story-after');
+  section.appendChild(before);
+  section.appendChild(after);
+  doc.body.appendChild(section);
+  section.getBoundingClientRect = (): { top: number; left: number; width: number; height: number } => ({
+    top: 100 - win.scrollY,
+    left: 0,
+    width: 1200,
+    height: 800,
+  });
+  runBehaviour(doc, win, StubImage);
+  win.scrollY = 500;
+  win.dispatchScroll();
+  assert(
+    before.getAttribute('data-opencanvas-scroll-reveal-before') === 'true',
+    'scroll scene reveal must mark the before element',
+  );
+  assert(
+    after.getAttribute('data-opencanvas-scroll-reveal-after') === 'true',
+    'scroll scene reveal must mark the after element',
+  );
+  assert(
+    after.style.clipPath.includes('50%'),
+    'scroll scene reveal must clip the after element from authored progress',
+  );
+}
+
+// (8) image sequence refuses an empty frame list
 {
   const doc = new StubDocument();
   const win = new StubWindow();

@@ -1605,6 +1605,143 @@ function renderScrollSceneCard(
     card.appendChild(field('Horizontal distance (px)', distance));
   }
 
+  const reveal = scene.beforeAfterReveal;
+  const revealEnabled = document.createElement('input');
+  revealEnabled.type = 'checkbox';
+  revealEnabled.checked = reveal !== undefined;
+  revealEnabled.addEventListener('change', () => {
+    mutate(ctx, () => {
+      const scenes = ctx.state!.scrollScenes ?? [];
+      if (revealEnabled.checked) {
+        const elementIds = elementIdsForActivePage(ctx);
+        const beforeElementId = ctx.selectedElementId ?? elementIds[0] ?? '';
+        const afterElementId = elementIds.find((elementId) => elementId !== beforeElementId) ?? '';
+        if (!beforeElementId || !afterElementId) {
+          ctx.setStatus('Add at least two elements before enabling a Scroll Scene before/after reveal', 'error');
+          revealEnabled.checked = false;
+          return;
+        }
+        scenes[index] = {
+          ...scene,
+          beforeAfterReveal: {
+            beforeElementId,
+            afterElementId,
+            axis: 'x',
+            startProgress: 0,
+            endProgress: 1,
+            reducedMotion: 'end',
+          },
+        };
+      } else {
+        const next = { ...scene };
+        delete next.beforeAfterReveal;
+        scenes[index] = next;
+      }
+    });
+  });
+  card.appendChild(field('Before/after reveal', revealEnabled));
+
+  if (reveal) {
+    const beforeElement = textInput(reveal.beforeElementId, 'Element id shown first');
+    beforeElement.addEventListener('change', () => {
+      const value = beforeElement.value.trim();
+      if (value.length === 0) {
+        ctx.setStatus('Scroll Scene reveal before element cannot be empty', 'error');
+        beforeElement.value = reveal.beforeElementId;
+        return;
+      }
+      if (value === reveal.afterElementId) {
+        ctx.setStatus('Scroll Scene reveal before and after elements must differ', 'error');
+        beforeElement.value = reveal.beforeElementId;
+        return;
+      }
+      mutate(ctx, () => {
+        const scenes = ctx.state!.scrollScenes ?? [];
+        scenes[index] = { ...scene, beforeAfterReveal: { ...reveal, beforeElementId: value } };
+      });
+    });
+    card.appendChild(field('Reveal before element id', beforeElement));
+
+    const afterElement = textInput(reveal.afterElementId, 'Element id revealed by scroll');
+    afterElement.addEventListener('change', () => {
+      const value = afterElement.value.trim();
+      if (value.length === 0) {
+        ctx.setStatus('Scroll Scene reveal after element cannot be empty', 'error');
+        afterElement.value = reveal.afterElementId;
+        return;
+      }
+      if (value === reveal.beforeElementId) {
+        ctx.setStatus('Scroll Scene reveal before and after elements must differ', 'error');
+        afterElement.value = reveal.afterElementId;
+        return;
+      }
+      mutate(ctx, () => {
+        const scenes = ctx.state!.scrollScenes ?? [];
+        scenes[index] = { ...scene, beforeAfterReveal: { ...reveal, afterElementId: value } };
+      });
+    });
+    card.appendChild(field('Reveal after element id', afterElement));
+
+    const axis = selectInput(['x', 'y'], reveal.axis ?? 'x');
+    axis.addEventListener('change', () => {
+      mutate(ctx, () => {
+        const scenes = ctx.state!.scrollScenes ?? [];
+        scenes[index] = {
+          ...scene,
+          beforeAfterReveal: { ...reveal, axis: axis.value === 'y' ? 'y' : 'x' },
+        };
+      });
+    });
+    card.appendChild(field('Reveal axis', axis));
+
+    const startProgress = numberInput(reveal.startProgress ?? 0, 0, 1, 0.01);
+    startProgress.addEventListener('change', () => {
+      const next = validNumber(startProgress, 0, 1);
+      const endProgress = reveal.endProgress ?? 1;
+      if (next === null || next >= endProgress) {
+        ctx.setStatus('Scroll Scene reveal start progress must be 0-1 and below end progress', 'error');
+        startProgress.value = String(reveal.startProgress ?? 0);
+        return;
+      }
+      mutate(ctx, () => {
+        const scenes = ctx.state!.scrollScenes ?? [];
+        scenes[index] = { ...scene, beforeAfterReveal: { ...reveal, startProgress: next } };
+      });
+    });
+    card.appendChild(field('Reveal start progress', startProgress));
+
+    const endProgressInput = numberInput(reveal.endProgress ?? 1, 0, 1, 0.01);
+    endProgressInput.addEventListener('change', () => {
+      const next = validNumber(endProgressInput, 0, 1);
+      const currentStart = reveal.startProgress ?? 0;
+      if (next === null || next <= currentStart) {
+        ctx.setStatus('Scroll Scene reveal end progress must be 0-1 and above start progress', 'error');
+        endProgressInput.value = String(reveal.endProgress ?? 1);
+        return;
+      }
+      mutate(ctx, () => {
+        const scenes = ctx.state!.scrollScenes ?? [];
+        scenes[index] = { ...scene, beforeAfterReveal: { ...reveal, endProgress: next } };
+      });
+    });
+    card.appendChild(field('Reveal end progress', endProgressInput));
+
+    const reducedMotion = selectInput(['start', 'end'], reveal.reducedMotion ?? 'end');
+    reducedMotion.addEventListener('change', () => {
+      mutate(ctx, () => {
+        const scenes = ctx.state!.scrollScenes ?? [];
+        scenes[index] = {
+          ...scene,
+          beforeAfterReveal: {
+            ...reveal,
+            reducedMotion: reducedMotion.value === 'start' ? 'start' : 'end',
+          },
+        };
+      });
+    });
+    card.appendChild(field('Reveal reduced motion', reducedMotion));
+  }
+
   const start = numberInput(scene.startOffsetPx, 0, 20000, 10);
   start.addEventListener('change', () => updateScrollSceneNumber(ctx, scene, index, 'startOffsetPx', start));
   card.appendChild(field('Start offset (px)', start));

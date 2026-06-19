@@ -3454,6 +3454,86 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
             }
           }
         }
+        if (scene.beforeAfterReveal !== undefined) {
+          if (!isRecord(scene.beforeAfterReveal)) {
+            errors.push(`${scenePath}.beforeAfterReveal must be an object when present`);
+          } else {
+            resolveIndexedId(
+              targetIndex.elementIds,
+              scene.beforeAfterReveal.beforeElementId,
+              `${scenePath}.beforeAfterReveal.beforeElementId`,
+              'element',
+              errors,
+            );
+            resolveIndexedId(
+              targetIndex.elementIds,
+              scene.beforeAfterReveal.afterElementId,
+              `${scenePath}.beforeAfterReveal.afterElementId`,
+              'element',
+              errors,
+            );
+            if (
+              typeof scene.beforeAfterReveal.beforeElementId === 'string' &&
+              typeof scene.beforeAfterReveal.afterElementId === 'string' &&
+              scene.beforeAfterReveal.beforeElementId === scene.beforeAfterReveal.afterElementId
+            ) {
+              errors.push(
+                `${scenePath}.beforeAfterReveal.afterElementId must differ from beforeElementId`,
+              );
+            }
+            if (
+              scene.beforeAfterReveal.axis !== undefined &&
+              scene.beforeAfterReveal.axis !== 'x' &&
+              scene.beforeAfterReveal.axis !== 'y'
+            ) {
+              errors.push(
+                `${scenePath}.beforeAfterReveal.axis must be "x" or "y" when present (got ${describe(scene.beforeAfterReveal.axis)})`,
+              );
+            }
+            let normalizedStartProgress: number | null = null;
+            let normalizedEndProgress: number | null = null;
+            const startProgress =
+              scene.beforeAfterReveal.startProgress === undefined
+                ? 0
+                : scene.beforeAfterReveal.startProgress;
+            const endProgress =
+              scene.beforeAfterReveal.endProgress === undefined
+                ? 1
+                : scene.beforeAfterReveal.endProgress;
+            if (!isFiniteNumber(startProgress) || startProgress < 0 || startProgress > 1) {
+              errors.push(
+                `${scenePath}.beforeAfterReveal.startProgress must be a finite number between 0 and 1 when present`,
+              );
+            } else {
+              normalizedStartProgress = startProgress;
+            }
+            if (!isFiniteNumber(endProgress) || endProgress < 0 || endProgress > 1) {
+              errors.push(
+                `${scenePath}.beforeAfterReveal.endProgress must be a finite number between 0 and 1 when present`,
+              );
+            } else {
+              normalizedEndProgress = endProgress;
+            }
+            if (
+              normalizedStartProgress !== null &&
+              normalizedEndProgress !== null &&
+              normalizedEndProgress <= normalizedStartProgress
+            ) {
+              errors.push(
+                `${scenePath}.beforeAfterReveal.endProgress must be greater than startProgress`,
+              );
+            }
+            if (
+              scene.beforeAfterReveal.reducedMotion !== undefined &&
+              scene.beforeAfterReveal.reducedMotion !== 'start' &&
+              scene.beforeAfterReveal.reducedMotion !== 'end'
+            ) {
+              errors.push(
+                `${scenePath}.beforeAfterReveal.reducedMotion must be "start" or "end" when present (got ${describe(scene.beforeAfterReveal.reducedMotion)})`,
+              );
+            }
+          }
+        }
         validateNonNegativeFiniteNumber(
           scene.startOffsetPx,
           `${scenePath}.startOffsetPx`,

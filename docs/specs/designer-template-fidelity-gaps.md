@@ -273,19 +273,23 @@ Current state:
   to a Scroll Scene from the Interactions panel. Owners can choose load playback
   with FPS/loop controls or scroll-scrub playback against a named Scroll Scene;
   missing scene relations are surfaced in the editor and blocked by validation.
+- **June 2026 update:** Scroll Scene now supports a schema-owned
+  `beforeAfterReveal` relation. Owners can bind before/after element IDs,
+  choose horizontal or vertical clipping, author the active progress window,
+  and set an explicit reduced-motion endpoint; the Runtime Hydrator clips the
+  after element from scene progress and fails loudly for malformed relations.
 
 User-visible miss:
 
 - Scroll position can now drive pinned Motion Sequence progress with authored
   stops.
-- Still missing: before/after reveal controls and richer scroll-progress
-  typography authoring.
+- Still missing: richer scroll-progress typography authoring.
 
 Needed primitive:
 
 - A Scroll Scene: trigger section, start/end bounds, optional pinning, scrubbed
-  progress, snap points, optional horizontal track, and a Motion Sequence bound
-  to progress rather than time.
+  progress, snap points, optional horizontal track, optional before/after
+  reveal, and a Motion Sequence bound to progress rather than time.
 
 ### 3. Load Experience V1 Exists, Full Preloader Authoring Does Not
 

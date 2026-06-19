@@ -130,6 +130,14 @@ function buildValidState(): EditableSite & Record<string, unknown> {
         sequenceId: 'sequence-scroll',
         pinTarget: { type: 'element', elementId: 'tab-copy' },
         horizontalTrack: { elementId: 'tab-copy', distancePx: 480 },
+        beforeAfterReveal: {
+          beforeElementId: 'tabs-hero',
+          afterElementId: 'tab-copy',
+          axis: 'x',
+          startProgress: 0.1,
+          endProgress: 0.9,
+          reducedMotion: 'end',
+        },
         startOffsetPx: 0,
         endOffsetPx: 720,
         snapPoints: [0, 0.5, 1],
@@ -204,6 +212,45 @@ expectInvalid(
   missingHorizontalTrack,
   'scrollScenes[0].horizontalTrack.elementId',
   'scroll scene missing horizontal track element',
+);
+
+const missingRevealElement = structuredClone(validState);
+(
+  (missingRevealElement.scrollScenes as { beforeAfterReveal: { afterElementId: string } }[])[0]!
+    .beforeAfterReveal
+).afterElementId = 'missing-element';
+expectInvalid(
+  missingRevealElement,
+  'scrollScenes[0].beforeAfterReveal.afterElementId',
+  'scroll scene missing before-after reveal element',
+);
+
+const duplicateRevealElement = structuredClone(validState);
+(
+  (duplicateRevealElement.scrollScenes as { beforeAfterReveal: { afterElementId: string } }[])[0]!
+    .beforeAfterReveal
+).afterElementId = 'tabs-hero';
+expectInvalid(
+  duplicateRevealElement,
+  'scrollScenes[0].beforeAfterReveal.afterElementId must differ',
+  'scroll scene duplicate before-after reveal elements',
+);
+
+const invalidRevealProgress = structuredClone(validState);
+(
+  (invalidRevealProgress.scrollScenes as {
+    beforeAfterReveal: { startProgress: number; endProgress: number };
+  }[])[0]!.beforeAfterReveal
+).startProgress = 0.8;
+(
+  (invalidRevealProgress.scrollScenes as {
+    beforeAfterReveal: { startProgress: number; endProgress: number };
+  }[])[0]!.beforeAfterReveal
+).endProgress = 0.2;
+expectInvalid(
+  invalidRevealProgress,
+  'scrollScenes[0].beforeAfterReveal.endProgress',
+  'scroll scene invalid before-after reveal progress window',
 );
 
 const emptyRichMotionFrames = structuredClone(validState);

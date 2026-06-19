@@ -524,6 +524,71 @@ function behaviourApplyHorizontalTrack(track, scene, section, progress) {
   track.setAttribute('data-opencanvas-scroll-horizontal-progress', String(Math.max(0, Math.min(1, progress)).toFixed(3)));
 }
 
+function behaviourFindBeforeAfterReveal(scene, root) {
+  if (scene.beforeAfterReveal === undefined) return null;
+  if (!scene.beforeAfterReveal || typeof scene.beforeAfterReveal !== 'object') {
+    behaviourFailure('scroll-scene-before-after-reveal', { scrollSceneId: scene.id }, new Error('beforeAfterReveal must be an object'));
+  }
+  if (!scene.beforeAfterReveal.beforeElementId) {
+    behaviourFailure('scroll-scene-before-after-reveal-before', { scrollSceneId: scene.id }, new Error('beforeAfterReveal.beforeElementId is required'));
+  }
+  if (!scene.beforeAfterReveal.afterElementId) {
+    behaviourFailure('scroll-scene-before-after-reveal-after', { scrollSceneId: scene.id }, new Error('beforeAfterReveal.afterElementId is required'));
+  }
+  if (scene.beforeAfterReveal.beforeElementId === scene.beforeAfterReveal.afterElementId) {
+    behaviourFailure('scroll-scene-before-after-reveal-distinct', { scrollSceneId: scene.id, elementId: scene.beforeAfterReveal.beforeElementId }, new Error('beforeAfterReveal elements must differ'));
+  }
+  var beforeEl = root.querySelector('[data-opencanvas-element="' + scene.beforeAfterReveal.beforeElementId + '"]');
+  if (!beforeEl) {
+    behaviourFailure('scroll-scene-before-after-reveal-before-missing', { scrollSceneId: scene.id, elementId: scene.beforeAfterReveal.beforeElementId }, new Error('before reveal element not found'));
+  }
+  var afterEl = root.querySelector('[data-opencanvas-element="' + scene.beforeAfterReveal.afterElementId + '"]');
+  if (!afterEl) {
+    behaviourFailure('scroll-scene-before-after-reveal-after-missing', { scrollSceneId: scene.id, elementId: scene.beforeAfterReveal.afterElementId }, new Error('after reveal element not found'));
+  }
+  return { beforeEl: beforeEl, afterEl: afterEl };
+}
+
+function behaviourBeforeAfterRevealProgress(scene, progress) {
+  var reveal = scene.beforeAfterReveal;
+  var axis = reveal.axis || 'x';
+  if (axis !== 'x' && axis !== 'y') {
+    behaviourFailure('scroll-scene-before-after-reveal-axis', { scrollSceneId: scene.id, axis: reveal.axis }, new Error('beforeAfterReveal.axis must be x or y'));
+  }
+  var start = reveal.startProgress === undefined ? 0 : Number(reveal.startProgress);
+  var end = reveal.endProgress === undefined ? 1 : Number(reveal.endProgress);
+  if (!isFinite(start) || start < 0 || start > 1) {
+    behaviourFailure('scroll-scene-before-after-reveal-start', { scrollSceneId: scene.id, startProgress: reveal.startProgress }, new Error('beforeAfterReveal.startProgress must be between 0 and 1'));
+  }
+  if (!isFinite(end) || end < 0 || end > 1 || end <= start) {
+    behaviourFailure('scroll-scene-before-after-reveal-end', { scrollSceneId: scene.id, endProgress: reveal.endProgress, startProgress: start }, new Error('beforeAfterReveal.endProgress must be greater than startProgress and <= 1'));
+  }
+  var effectiveProgress = progress;
+  if (behaviourPrefersReducedMotion()) {
+    if (reveal.reducedMotion && reveal.reducedMotion !== 'start' && reveal.reducedMotion !== 'end') {
+      behaviourFailure('scroll-scene-before-after-reveal-reduced-motion', { scrollSceneId: scene.id, reducedMotion: reveal.reducedMotion }, new Error('beforeAfterReveal.reducedMotion must be start or end'));
+    }
+    effectiveProgress = reveal.reducedMotion === 'start' ? 0 : 1;
+  }
+  return Math.max(0, Math.min(1, (effectiveProgress - start) / (end - start)));
+}
+
+function behaviourApplyBeforeAfterReveal(revealNodes, scene, progress) {
+  var reveal = scene.beforeAfterReveal;
+  var axis = reveal.axis || 'x';
+  var revealProgress = behaviourBeforeAfterRevealProgress(scene, progress);
+  var remaining = Math.max(0, Math.min(100, (1 - revealProgress) * 100));
+  var remainingText = String(Math.round(remaining * 1000) / 1000);
+  var clip = axis === 'y'
+    ? 'inset(0 0 ' + remainingText + '% 0)'
+    : 'inset(0 ' + remainingText + '% 0 0)';
+  revealNodes.beforeEl.setAttribute('data-opencanvas-scroll-reveal-before', 'true');
+  revealNodes.afterEl.setAttribute('data-opencanvas-scroll-reveal-after', 'true');
+  revealNodes.afterEl.setAttribute('data-opencanvas-scroll-reveal-progress', revealProgress.toFixed(3));
+  revealNodes.afterEl.style.clipPath = clip;
+  revealNodes.afterEl.style.willChange = 'clip-path';
+}
+
 function behaviourSetupScrollScene(scene, sequence, root) {
   if (sequence.repeat) {
     behaviourFailure('motion-sequence-repeat-scroll-scene', { sequenceId: sequence.id, scrollSceneId: scene.id }, new Error('scroll-scene Motion Sequences cannot repeat'));
@@ -539,11 +604,13 @@ function behaviourSetupScrollScene(scene, sequence, root) {
     behaviourFailure('behaviour-target-missing', { scrollSceneId: scene.id, pinTarget: scene.pinTarget }, new Error('scroll scene pin target not found'));
   }
   var horizontalTrack = behaviourFindHorizontalTrack(scene, root);
+  var beforeAfterReveal = behaviourFindBeforeAfterReveal(scene, root);
   var reducedMode = behaviourPrefersReducedMotion() ? (sequence.reducedMotion || 'skip') : null;
   var ticking = false;
   function update() {
     ticking = false;
     var progress = behaviourSceneProgress(scene, section);
+    if (beforeAfterReveal) behaviourApplyBeforeAfterReveal(beforeAfterReveal, scene, progress);
     if (reducedMode !== 'skip') {
       behaviourApplyPin(pinEl, scene, section, progress);
       if (horizontalTrack) behaviourApplyHorizontalTrack(horizontalTrack, scene, section, progress);

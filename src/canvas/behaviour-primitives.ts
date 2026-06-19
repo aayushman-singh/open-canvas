@@ -95,6 +95,14 @@ export interface ScrollScene {
     elementId: string;
     distancePx?: number;
   };
+  beforeAfterReveal?: {
+    beforeElementId: string;
+    afterElementId: string;
+    axis?: 'x' | 'y';
+    startProgress?: number;
+    endProgress?: number;
+    reducedMotion?: 'start' | 'end';
+  };
   startOffsetPx: number;
   endOffsetPx: number;
   snapPoints?: number[];
