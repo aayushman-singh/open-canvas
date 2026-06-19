@@ -1614,14 +1614,35 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   top: 5px;
   bottom: 5px;
   z-index: 3;
-  display: grid;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
   min-width: 18px;
-  place-items: center;
   border-radius: 999px;
   background: var(--opencanvas-accent);
   color: var(--opencanvas-bg);
   font-size: 10px;
   font-weight: 800;
+}
+.opencanvas-motion-timeline-bar--draggable {
+  cursor: grab;
+  touch-action: none;
+}
+.opencanvas-motion-timeline-bar--draggable:focus-visible {
+  outline: 2px solid var(--opencanvas-fg);
+  outline-offset: 2px;
+}
+.opencanvas-motion-timeline-bar[data-opencanvas-motion-timeline-dragging="true"] {
+  cursor: grabbing;
+  filter: brightness(1.08);
+}
+.opencanvas-motion-timeline-bar-handle {
+  width: 3px;
+  height: 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 66%, transparent);
+  box-shadow: 5px 0 0 color-mix(in srgb, currentColor 46%, transparent);
 }
 .opencanvas-motion-timeline-scrub {
   display: grid;

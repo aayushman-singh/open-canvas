@@ -208,6 +208,15 @@ assert(
   panelSrc.includes('data-opencanvas-motion-preview-progress'),
   'panel must publish Motion Sequence preview progress metadata',
 );
+assert(panelSrc.includes('wireMotionSequenceTimelineDrag'), 'panel must wire draggable Motion Sequence timeline bars');
+assert(
+  panelSrc.includes('opencanvas-motion-timeline-bar--draggable'),
+  'panel must mark draggable Motion Sequence timeline bars',
+);
+assert(
+  panelSrc.includes('Drag timeline bars'),
+  'panel must describe timeline drag editing affordances',
+);
 assert(panelSrc.includes('renderLayoutTransitionControls'), 'panel must render layout transition controls');
 assert(panelSrc.includes('renderSmoothScrollControls'), 'panel must render Smooth Scroll controls');
 assert(panelSrc.includes('Smooth Scroll'), 'panel must label Smooth Scroll controls');
@@ -257,6 +266,8 @@ for (const [label, src] of [
   assert(src.includes('.opencanvas-motion-timeline-snap'), label + ' must style Motion Sequence timeline snap handles');
   assert(src.includes('.opencanvas-motion-timeline-scrub'), label + ' must style Motion Sequence scrub preview controls');
   assert(src.includes('.opencanvas-motion-timeline-playhead'), label + ' must style Motion Sequence scrub playhead');
+  assert(src.includes('.opencanvas-motion-timeline-bar--draggable'), label + ' must style draggable Motion Sequence timeline bars');
+  assert(src.includes('.opencanvas-motion-timeline-bar-handle'), label + ' must style Motion Sequence timeline bar handles');
 }
 
 console.log('[interactions-panel:smoke] OK');

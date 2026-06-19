@@ -1789,10 +1789,26 @@ function renderMotionSequenceTimeline(
     for (const item of items) {
       const bar = document.createElement('div');
       bar.className = 'opencanvas-motion-timeline-bar';
+      bar.dataset.opencanvasMotionTimelineStep = item.step.id;
       bar.style.left = item.leftPercent.toFixed(2) + '%';
       bar.style.width = item.widthPercent.toFixed(2) + '%';
-      bar.textContent = item.label;
       bar.title = item.title;
+      const barLabel = document.createElement('span');
+      barLabel.textContent = item.label;
+      bar.appendChild(barLabel);
+      const handle = document.createElement('span');
+      handle.className = 'opencanvas-motion-timeline-bar-handle';
+      handle.setAttribute('aria-hidden', 'true');
+      bar.appendChild(handle);
+      if (sequence.trigger.type === 'scroll-scene') {
+        bar.setAttribute('aria-disabled', 'true');
+        bar.title = item.title + ' · Drag timeline bars is disabled because scroll progress owns this sequence.';
+      } else {
+        bar.classList.add('opencanvas-motion-timeline-bar--draggable');
+        bar.tabIndex = 0;
+        bar.title = item.title + ' · Drag timeline bars to edit start time.';
+        wireMotionSequenceTimelineDrag(ctx, sequence, item, bar, track);
+      }
       lane.appendChild(bar);
     }
     track.appendChild(lane);
@@ -1913,6 +1929,66 @@ function renderMotionSequenceScrubPreview(
   controls.appendChild(value);
   controls.appendChild(clear);
   wrap.appendChild(field('Scrub preview', controls));
+}
+
+function wireMotionSequenceTimelineDrag(
+  ctx: InteractionsPanelContext,
+  sequence: MotionSequence,
+  item: MotionSequenceTimelineItem,
+  bar: HTMLElement,
+  track: HTMLElement,
+): void {
+  bar.addEventListener('pointerdown', (event) => {
+    if (sequence.trigger.type === 'scroll-scene') {
+      ctx.setStatus('Drag timeline bars is disabled for scroll-scene sequences', 'error');
+      return;
+    }
+    const totalMs = Math.max(1, ...motionSequenceTimelineItems(sequence).map((entry) => entry.endMs));
+    const rect = track.getBoundingClientRect();
+    if (!Number.isFinite(rect.width) || rect.width <= 0) {
+      ctx.setStatus('Motion Sequence timeline width is invalid', 'error');
+      return;
+    }
+    event.preventDefault();
+    bar.setPointerCapture(event.pointerId);
+    bar.setAttribute('data-opencanvas-motion-timeline-dragging', 'true');
+    const startX = event.clientX;
+    const originalStart = item.startMs;
+    const applyDrag = (clientX: number, commit: boolean) => {
+      const deltaPercent = ((clientX - startX) / rect.width) * 100;
+      const nextStart = Math.max(0, Math.round(originalStart + (deltaPercent / 100) * totalMs));
+      const nextLeftPercent = Math.max(0, Math.min(100, (nextStart / totalMs) * 100));
+      bar.style.left = nextLeftPercent.toFixed(2) + '%';
+      bar.title = 'Step ' + item.label + ' · start ' + String(nextStart) + 'ms · duration ' + String(item.durationMs) + 'ms';
+      if (commit) {
+        mutate(ctx, () => {
+          updateScrollSequenceStep(ctx, sequence.id, item.step.id, { startAtMs: nextStart });
+        });
+        ctx.setStatus('Motion Sequence step start updated to ' + String(nextStart) + 'ms', 'ok');
+      }
+    };
+    const move = (moveEvent: PointerEvent) => applyDrag(moveEvent.clientX, false);
+    const finish = (upEvent: PointerEvent) => {
+      bar.releasePointerCapture(upEvent.pointerId);
+      bar.removeAttribute('data-opencanvas-motion-timeline-dragging');
+      bar.removeEventListener('pointermove', move);
+      bar.removeEventListener('pointerup', finish);
+      bar.removeEventListener('pointercancel', cancel);
+      applyDrag(upEvent.clientX, true);
+    };
+    const cancel = (cancelEvent: PointerEvent) => {
+      bar.releasePointerCapture(cancelEvent.pointerId);
+      bar.removeAttribute('data-opencanvas-motion-timeline-dragging');
+      bar.style.left = item.leftPercent.toFixed(2) + '%';
+      bar.removeEventListener('pointermove', move);
+      bar.removeEventListener('pointerup', finish);
+      bar.removeEventListener('pointercancel', cancel);
+      ctx.setStatus('Motion Sequence timeline drag cancelled', 'error');
+    };
+    bar.addEventListener('pointermove', move);
+    bar.addEventListener('pointerup', finish);
+    bar.addEventListener('pointercancel', cancel);
+  });
 }
 
 const MOTION_PREVIEW_STYLE_PROPS = [

@@ -222,11 +222,14 @@ Current state:
   Sequence styles to the same editor canvas targets selected by the schema
   target relation; missing targets surface an editor error instead of silently
   doing nothing.
+- **June 2026 update:** Time-based Motion Sequence bars can now be dragged in
+  the timeline to set `startAtMs` directly. Scroll-scene sequences keep drag
+  editing disabled because scroll progress, not absolute time, owns their
+  replay relation.
 
 User-visible miss:
 
-- Cannot yet edit multi-step choreography by dragging bars on the visual
-  timeline canvas.
+- Cannot yet resize durations directly from the visual timeline canvas.
 
 Needed primitive:
 
@@ -234,7 +237,7 @@ Needed primitive:
   properties, duration, easing, delay, stagger, and completion behaviour.
 - Validation must reject unsupported targets/properties instead of silently
   dropping steps.
-- Remaining next wave: draggable timeline bars and richer property affordances
+- Remaining next wave: timeline resize handles and richer property affordances
   beyond the current form controls.
 
 ### 2. Scroll Motion Is Triggered, Not Scrubbed
@@ -686,13 +689,14 @@ Current state:
 - The Interactions sidebar tab exposes Load Experience, Route Transition,
   Overlays, and Motion Sequence Lite step lists.
 - Full Motion Sequence cards include a Timeline overview with visual bars,
-  target lanes, snap handles, and scrub preview for step start/duration. Step
-  editing remains form-based.
+  target lanes, snap handles, scrub preview, and draggable start-time bars for
+  step start/duration. Duration and property editing remain form-based.
 
 User-visible miss:
 
-- Template authors can inspect and scrub choreography as a lane-based timeline,
-  but cannot yet drag bars from the timeline overview.
+- Template authors can inspect, scrub, and reposition time-based choreography as
+  a lane-based timeline, but cannot yet resize durations from the timeline
+  overview.
 - Long sequences still require field-level editing for detailed timing changes.
 
 Needed primitive:
