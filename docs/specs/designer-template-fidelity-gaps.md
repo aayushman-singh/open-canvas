@@ -28,6 +28,8 @@ Observable success:
 - Rich Motion Assets can represent Lottie JSON files as schema-owned assets
   with renderer/autoplay/loop/reduced-motion metadata and a bounded runtime
   adapter.
+- Rich Motion Assets can represent bounded 3D GLB-style scenes as schema-owned
+  `model-3d` assets backed by a pinned `<model-viewer>` runtime adapter.
 - Modal and overlay behaviour matches the reference: trigger, backdrop,
   entrance, exit, close affordance, focus handling, and body scroll behaviour.
 - Page navigation can preserve visual continuity through page/state
@@ -108,6 +110,11 @@ Open Canvas has real motion and interaction primitives already:
   schema stores the Lottie JSON asset id, renderer, autoplay, loop, alt text,
   and explicit reduced-motion policy; the Behaviour runtime loads pinned
   `lottie-web` and emits named failures for runtime loading or initialization.
+- **June 2026 update:** Rich Motion Assets now include a `model-3d` kind for
+  bounded GLB/USDZ-class scenes. The schema stores model asset id, optional
+  poster, camera controls, auto-rotate, alt text, and explicit reduced-motion
+  policy; the Behaviour runtime loads pinned `<model-viewer>` and emits named
+  failures for runtime loading, initialization, and model load errors.
 
 That baseline is useful, and Premium Interaction v1 closes the first typed
 slice of the modal/preload/route gap. It is still not enough for 1:1
@@ -459,16 +466,19 @@ Current state:
 - Sections support background video assets.
 - Embeds are iframe-based and CSP-gated.
 - Charts render static SVG.
-- Rich Motion supports image sequences, Rive `.riv` assets, and Lottie JSON
-  assets. Rive/Lottie support is schema-owned and runtime-owned: no owner JS
-  blobs, with explicit runtime loading/init failures and reduced-motion
-  pause/play policy.
+- Rich Motion supports image sequences, Rive `.riv` assets, Lottie JSON assets,
+  and bounded `model-3d` GLB scenes. Rive/Lottie/3D support is schema-owned
+  and runtime-owned: no owner JS blobs, with explicit runtime loading/init
+  failures and reduced-motion policy.
 
 User-visible miss:
 
 - Cannot reproduce common designer-site surfaces such as Lottie/Rive
-- Cannot yet reproduce WebGL/Three.js scenes, shader distortion, Spline-like
-  embeds as editable first-class media, or canvas-based particle fields.
+- Cannot yet reproduce arbitrary WebGL/Three.js scenes, shader distortion,
+  Spline-like embeds as editable first-class media, or canvas-based particle
+  fields.
+- `model-3d` covers bounded GLB-style product/helmet scenes, not custom shader
+  pipelines or owner-authored Three.js code.
 - Rive state-machine inputs are not yet editable; v1 can choose artboard and
   state-machine name, autoplay, and reduced-motion policy.
 
@@ -477,9 +487,9 @@ Needed primitive:
 - A deliberate media-extension decision. Do not add arbitrary "animation file"
   blobs without defining asset type, playback controls, CSP, editor preview,
   reduced-motion handling, and publish-time failure behaviour.
-- Remaining next wave: Rive input bindings, Rive/Lottie event routing, WebGL
-  bounded scene kind, CSP policy hardening, and editor asset picker support for
-  uploading/managing rich motion assets.
+- Remaining next wave: Rive input bindings, Rive/Lottie/model events, custom
+  shader/WebGL scene kind, CSP policy hardening, and editor asset picker
+  support for uploading/managing rich motion assets.
 
 ### 12. Import Collapses Source Motion Too Aggressively
 

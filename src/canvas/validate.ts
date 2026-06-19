@@ -2931,26 +2931,51 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           }
           return;
         }
+        if (asset.kind === 'lottie') {
+          if (!isAssetIdLike(asset.assetId)) {
+            errors.push(
+              `${assetPath}.assetId must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(asset.assetId)})`,
+            );
+          }
+          assertNonEmptyString(asset.alt, `${assetPath}.alt`, errors);
+          if (asset.renderer !== 'svg' && asset.renderer !== 'canvas') {
+            errors.push(
+              `${assetPath}.renderer must be "svg" or "canvas" (got ${describe(asset.renderer)})`,
+            );
+          }
+          if (asset.loop !== undefined && typeof asset.loop !== 'boolean') {
+            errors.push(`${assetPath}.loop must be a boolean when present`);
+          }
+          if (asset.autoplay !== undefined && typeof asset.autoplay !== 'boolean') {
+            errors.push(`${assetPath}.autoplay must be a boolean when present`);
+          }
+          if (asset.reducedMotion !== 'pause' && asset.reducedMotion !== 'play') {
+            errors.push(
+              `${assetPath}.reducedMotion must be "pause" or "play" (got ${describe(asset.reducedMotion)})`,
+            );
+          }
+          return;
+        }
         if (!isAssetIdLike(asset.assetId)) {
           errors.push(
             `${assetPath}.assetId must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(asset.assetId)})`,
           );
         }
         assertNonEmptyString(asset.alt, `${assetPath}.alt`, errors);
-        if (asset.renderer !== 'svg' && asset.renderer !== 'canvas') {
+        if (asset.posterAssetId !== undefined && !isAssetIdLike(asset.posterAssetId)) {
           errors.push(
-            `${assetPath}.renderer must be "svg" or "canvas" (got ${describe(asset.renderer)})`,
+            `${assetPath}.posterAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(asset.posterAssetId)})`,
           );
         }
-        if (asset.loop !== undefined && typeof asset.loop !== 'boolean') {
-          errors.push(`${assetPath}.loop must be a boolean when present`);
+        if (typeof asset.cameraControls !== 'boolean') {
+          errors.push(`${assetPath}.cameraControls must be a boolean`);
         }
-        if (asset.autoplay !== undefined && typeof asset.autoplay !== 'boolean') {
-          errors.push(`${assetPath}.autoplay must be a boolean when present`);
+        if (asset.autoRotate !== undefined && typeof asset.autoRotate !== 'boolean') {
+          errors.push(`${assetPath}.autoRotate must be a boolean when present`);
         }
-        if (asset.reducedMotion !== 'pause' && asset.reducedMotion !== 'play') {
+        if (asset.reducedMotion !== 'static' && asset.reducedMotion !== 'allow') {
           errors.push(
-            `${assetPath}.reducedMotion must be "pause" or "play" (got ${describe(asset.reducedMotion)})`,
+            `${assetPath}.reducedMotion must be "static" or "allow" (got ${describe(asset.reducedMotion)})`,
           );
         }
       });
@@ -3375,7 +3400,12 @@ function validatePublishedRichMotionReferencesInElement(
       );
       return;
     }
-    if (asset.kind !== 'image-sequence' && asset.kind !== 'rive' && asset.kind !== 'lottie') {
+    if (
+      asset.kind !== 'image-sequence' &&
+      asset.kind !== 'rive' &&
+      asset.kind !== 'lottie' &&
+      asset.kind !== 'model-3d'
+    ) {
       errors.push(
         `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: ${asset.path}.kind ${JSON.stringify(asset.kind)} is not supported for published rich-motion elements`,
       );

@@ -343,6 +343,8 @@ var behaviourRiveRuntimePromise = null;
 var behaviourRiveRuntimeUrl = 'https://unpkg.com/@rive-app/canvas@2.38.1/rive.js';
 var behaviourLottieRuntimePromise = null;
 var behaviourLottieRuntimeUrl = 'https://cdn.jsdelivr.net/npm/lottie-web@5.13.0/build/player/lottie.min.js';
+var behaviourModelViewerRuntimePromise = null;
+var behaviourModelViewerRuntimeUrl = 'https://cdn.jsdelivr.net/npm/@google/model-viewer@4.3.1/dist/model-viewer.min.js';
 function behaviourLoadRiveRuntime() {
   if (typeof window !== 'undefined' && window.rive && typeof window.rive.Rive === 'function') {
     return Promise.resolve(window.rive);
@@ -391,6 +393,30 @@ function behaviourLoadLottieRuntime() {
   return behaviourLottieRuntimePromise;
 }
 
+function behaviourLoadModelViewerRuntime() {
+  if (typeof window !== 'undefined' && window.customElements && window.customElements.get('model-viewer')) {
+    return Promise.resolve();
+  }
+  if (behaviourModelViewerRuntimePromise) return behaviourModelViewerRuntimePromise;
+  behaviourModelViewerRuntimePromise = new Promise(function (resolve, reject) {
+    var script = document.createElement('script');
+    script.type = 'module';
+    script.src = behaviourModelViewerRuntimeUrl;
+    script.onload = function () {
+      if (!window.customElements) {
+        reject(new Error('customElements unavailable for model-viewer'));
+        return;
+      }
+      window.customElements.whenDefined('model-viewer').then(resolve).catch(reject);
+    };
+    script.onerror = function () {
+      reject(new Error('model-viewer runtime failed to load'));
+    };
+    document.head.appendChild(script);
+  });
+  return behaviourModelViewerRuntimePromise;
+}
+
 function behaviourHydrateRive(asset, root) {
   if (!asset.srcUrl) {
     behaviourFailure('rich-motion-rive-src-missing', { assetId: asset.id }, new Error('Rive asset srcUrl missing'));
@@ -423,6 +449,47 @@ function behaviourHydrateRive(asset, root) {
     }
   }).catch(function (err) {
     behaviourFailure('rich-motion-rive-runtime', { assetId: asset.id, runtimeUrl: behaviourRiveRuntimeUrl }, err || new Error('Rive runtime unavailable'));
+  });
+}
+
+function behaviourHydrateModel3D(asset, root) {
+  if (!asset.srcUrl) {
+    behaviourFailure('rich-motion-model-3d-src-missing', { assetId: asset.id }, new Error('model-3d asset srcUrl missing'));
+  }
+  var nodes = behaviourFindRichMotionNodes(root, asset.id);
+  if (!nodes.length) {
+    behaviourFailure('rich-motion-node-missing', { assetId: asset.id }, new Error('rich motion element not found'));
+  }
+  behaviourLoadModelViewerRuntime().then(function () {
+    for (var n = 0; n < nodes.length; n++) {
+      var node = nodes[n];
+      if (node.getAttribute('data-opencanvas-model-3d-hydrated') === 'true') continue;
+      try {
+        var canvas = node.querySelector('[data-opencanvas-rich-motion-canvas]');
+        if (canvas) canvas.setAttribute('hidden', '');
+        var viewer = document.createElement('model-viewer');
+        viewer.setAttribute('src', asset.srcUrl);
+        viewer.setAttribute('alt', asset.alt || '');
+        viewer.setAttribute('data-opencanvas-model-3d-viewer', asset.id);
+        viewer.style.width = '100%';
+        viewer.style.height = '100%';
+        viewer.style.display = 'block';
+        if (asset.posterUrl) viewer.setAttribute('poster', asset.posterUrl);
+        if (asset.cameraControls === true) viewer.setAttribute('camera-controls', '');
+        var reduce = behaviourPrefersReducedMotion() && asset.reducedMotion === 'static';
+        if (asset.autoRotate === true && !reduce) viewer.setAttribute('auto-rotate', '');
+        if (reduce) node.setAttribute('data-opencanvas-model-3d-reduced', 'static');
+        viewer.addEventListener('error', function (event) {
+          behaviourFailure('rich-motion-model-3d-load', { assetId: asset.id }, event && event.error ? event.error : new Error('model-viewer load failed'));
+        });
+        node.appendChild(viewer);
+        node.setAttribute('data-opencanvas-model-3d-hydrated', 'true');
+      } catch (err) {
+        behaviourFailure('rich-motion-model-3d-init', { assetId: asset.id }, err || new Error('model-3d init failed'));
+      }
+    }
+  }).catch(function (err) {
+    behaviourFailure('rich-motion-model-3d-runtime', { assetId: asset.id, runtimeUrl: behaviourModelViewerRuntimeUrl }, err || new Error('model-viewer runtime unavailable'));
   });
 }
 
@@ -600,6 +667,8 @@ function hydrateBehaviour(scope) {
       behaviourHydrateRive(assets[a], root);
     } else if (assets[a].kind === 'lottie') {
       behaviourHydrateLottie(assets[a], root);
+    } else if (assets[a].kind === 'model-3d') {
+      behaviourHydrateModel3D(assets[a], root);
     } else {
       behaviourFailure('rich-motion-unsupported-kind', { assetId: assets[a].id, kind: assets[a].kind }, new Error('unsupported rich motion kind'));
     }

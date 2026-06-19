@@ -14,7 +14,7 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'clipPath',
   'filter',
 ] as const;
-export const RICH_MOTION_KINDS = ['image-sequence', 'rive', 'lottie'] as const;
+export const RICH_MOTION_KINDS = ['image-sequence', 'rive', 'lottie', 'model-3d'] as const;
 
 export type BehaviourTarget =
   | { type: 'site' }
@@ -89,10 +89,22 @@ export interface LottieRichMotionAsset {
   reducedMotion: 'pause' | 'play';
 }
 
+export interface Model3DRichMotionAsset {
+  id: string;
+  kind: 'model-3d';
+  assetId: string;
+  alt: string;
+  posterAssetId?: string;
+  cameraControls: boolean;
+  autoRotate?: boolean;
+  reducedMotion: 'static' | 'allow';
+}
+
 export type RichMotionAsset =
   | ImageSequenceRichMotionAsset
   | RiveRichMotionAsset
-  | LottieRichMotionAsset;
+  | LottieRichMotionAsset
+  | Model3DRichMotionAsset;
 
 export interface LoadExperience {
   id: string;

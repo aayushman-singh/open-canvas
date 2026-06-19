@@ -55,6 +55,16 @@ export function buildBehaviourPayload(
         srcUrl: `${assetBasePath}/${asset.assetId}`,
       };
     }
+    if (asset.kind === 'model-3d') {
+      const modelAsset = {
+        ...asset,
+        srcUrl: `${assetBasePath}/${asset.assetId}`,
+      };
+      if (asset.posterAssetId !== undefined) {
+        return { ...modelAsset, posterUrl: `${assetBasePath}/${asset.posterAssetId}` };
+      }
+      return modelAsset;
+    }
     return asset;
   });
   const payload: BehaviourPayload = {

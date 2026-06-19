@@ -180,6 +180,29 @@ assert(
   `lottie rich-motion snapshot must publish: ${lottieValidation.valid ? '' : lottieValidation.errors.join('; ')}`,
 );
 
+const model3dState = structuredClone(goodSnapshot);
+model3dState.pages[0]!.sections[0]!.elements[0] = {
+  ...model3dState.pages[0]!.sections[0]!.elements[0],
+  assetRefId: 'motion-model-helmet',
+} as unknown as typeof richMotionElement;
+(model3dState as { richMotionAssets: unknown[] }).richMotionAssets = [
+  {
+    id: 'motion-model-helmet',
+    kind: 'model-3d',
+    assetId: 'helmet.glb',
+    posterAssetId: 'helmet-poster.webp',
+    alt: 'Interactive helmet model',
+    cameraControls: true,
+    autoRotate: true,
+    reducedMotion: 'static',
+  },
+];
+const model3dValidation = validatePublishedSnapshot(model3dState);
+assert(
+  model3dValidation.valid,
+  `model-3d rich-motion snapshot must publish: ${model3dValidation.valid ? '' : model3dValidation.errors.join('; ')}`,
+);
+
 assert(
   typeof (RENDER_DISPATCH as Record<string, unknown>)['rich-motion'] === 'function',
   'RENDER_DISPATCH must register rich-motion',
