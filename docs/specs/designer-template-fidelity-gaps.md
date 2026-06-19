@@ -701,6 +701,10 @@ Current state:
   consumes the same entrypoint and that editor hydration fails loudly if the
   boundary is missing. The underlying visitor string fragments and TS editor
   adapters are still separate implementation nodes.
+- **June 2026 update:** shared editor/visitor hydration surfaces are now listed
+  in `RUNTIME_HYDRATOR_SURFACES`, and the parity smoke checks every manifest
+  entry against both dispatchers. Adding a shared surface without both runtime
+  paths now fails CI instead of relying on reviewer memory.
 
 User-visible miss:
 
@@ -712,10 +716,9 @@ User-visible miss:
 Needed primitive:
 
 - One interaction runtime source that can be consumed by both visitor output
-  and editor preview, or a stricter code-generation/parity boundary that makes
-  drift impossible to miss.
+  and editor preview.
 - Remaining next wave: move individual runtime adapters behind generated or
-  shared modules so parity is structural, not only boundary-pinned.
+  shared modules so parity is implementation-shared, not only manifest-gated.
 
 ### 14. Motion Authoring UX Is Too Thin
 

@@ -1,5 +1,7 @@
 export {};
 
+import { RUNTIME_HYDRATOR_SURFACES } from '../interactive/runtime-hydrator-surfaces.js';
+
 declare const Bun: {
   file(input: URL): { text(): Promise<string> };
 };
@@ -14,6 +16,19 @@ const visitorRuntimeSrc = await Bun.file(new URL('../interactive/runtime.ts', im
 const publicRouteSrc = await Bun.file(new URL('../routes/public.ts', import.meta.url)).text();
 const routeTransitionSrc = await Bun.file(new URL('../interactive/route-transition.ts', import.meta.url)).text();
 const packageSrc = await Bun.file(new URL('../../package.json', import.meta.url)).text();
+
+assert(RUNTIME_HYDRATOR_SURFACES.length >= 6, 'Runtime Hydrator surface manifest must list visitor/editor surfaces');
+
+for (const surface of RUNTIME_HYDRATOR_SURFACES) {
+  assert(
+    visitorRuntimeSrc.includes(surface.visitorCall),
+    `visitor runtime must dispatch manifest surface ${surface.id} via ${surface.visitorCall}`,
+  );
+  assert(
+    editorHydrateSrc.includes(surface.editorCall),
+    `editor hydrator must dispatch manifest surface ${surface.id} via ${surface.editorCall}`,
+  );
+}
 
 assert(
   visitorRuntimeSrc.includes('window.__opencanvasHydrate = hydrateAll'),
