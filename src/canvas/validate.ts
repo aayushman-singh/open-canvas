@@ -627,6 +627,12 @@ function validateMarquee(value: unknown, basePath: string, errors: string[]): vo
   if (value.edgeFade !== undefined && typeof value.edgeFade !== 'boolean') {
     errors.push(`${p}.edgeFade must be a boolean when present`);
   }
+  if (value.hoverReverse !== undefined && typeof value.hoverReverse !== 'boolean') {
+    errors.push(`${p}.hoverReverse must be a boolean when present`);
+  }
+  if (value.pauseOnHover === true && value.hoverReverse === true) {
+    errors.push(`${p}.hoverReverse cannot be true when pauseOnHover is true`);
+  }
   assertOneOf<MarqueeReducedMotionMode>(
     value.reducedMotion,
     MARQUEE_REDUCED_MOTION_MODES,

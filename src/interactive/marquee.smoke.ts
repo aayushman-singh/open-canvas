@@ -39,6 +39,7 @@ const snapshot: PublishedSnapshot = {
                 direction: 'right',
                 speedPxPerSecond: 120,
                 pauseOnHover: false,
+                hoverReverse: true,
                 reducedMotion: 'slow',
               },
             },
@@ -59,6 +60,11 @@ assert(
   'runtime must build marquee belt',
 );
 assert(
+  MARQUEE_RUNTIME_SRC.includes('data-opencanvas-marquee-hover-reverse'),
+  'runtime must read hover-reverse metadata',
+);
+assert(MARQUEE_RUNTIME_SRC.includes('playbackRate'), 'runtime must reverse marquee playback on hover');
+assert(
   MARQUEE_RUNTIME_SRC.includes("window.matchMedia('(prefers-reduced-motion: reduce)')"),
   'runtime must branch on reduced-motion explicitly',
 );
@@ -71,6 +77,10 @@ assert(
 const html = renderCanvasSnapshot(snapshot, '/assets', 'site-marquee', {
   turnstileSiteKey: 'test-turnstile-key',
 });
+assert(
+  html.includes('data-opencanvas-marquee-hover-reverse="true"'),
+  'renderer must emit hover-reverse metadata for runtime',
+);
 const withRuntime = injectInteractiveRuntime(html, snapshot);
 assert(
   withRuntime.includes('data-opencanvas-interactive-runtime'),

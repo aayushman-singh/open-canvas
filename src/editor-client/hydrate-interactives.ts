@@ -272,6 +272,7 @@ function readMarqueeConfig(el: HTMLElement): {
   direction: 'left' | 'right';
   speed: number;
   pauseOnHover: boolean;
+  hoverReverse: boolean;
   reducedMotion: 'static' | 'slow';
 } {
   const direction = el.getAttribute('data-opencanvas-marquee-direction');
@@ -292,12 +293,46 @@ function readMarqueeConfig(el: HTMLElement): {
       reducedMotion,
     );
   }
+  const pauseOnHover = el.getAttribute('data-opencanvas-marquee-pause') === 'true';
+  const hoverReverse = el.getAttribute('data-opencanvas-marquee-hover-reverse') === 'true';
+  if (pauseOnHover && hoverReverse) {
+    failMarquee(
+      el,
+      'hover-mode-conflict',
+      'Marquee cannot pause and reverse on hover at the same time',
+      null,
+    );
+  }
   return {
     direction,
     speed,
-    pauseOnHover: el.getAttribute('data-opencanvas-marquee-pause') === 'true',
+    pauseOnHover,
+    hoverReverse,
     reducedMotion,
   };
+}
+
+function wireMarqueeHover(
+  node: HTMLElement,
+  animation: Animation,
+  config: { pauseOnHover: boolean; hoverReverse: boolean },
+): void {
+  if (config.pauseOnHover) {
+    node.addEventListener('mouseenter', () => {
+      animation.pause();
+    });
+    node.addEventListener('mouseleave', () => {
+      animation.play();
+    });
+  } else if (config.hoverReverse) {
+    const normalPlaybackRate = animation.playbackRate || 1;
+    node.addEventListener('mouseenter', () => {
+      animation.playbackRate = -Math.abs(normalPlaybackRate);
+    });
+    node.addEventListener('mouseleave', () => {
+      animation.playbackRate = Math.abs(normalPlaybackRate);
+    });
+  }
 }
 
 function isMarqueeEditorChrome(node: ChildNode): boolean {
@@ -397,14 +432,7 @@ function hydrateMarquees(scope: ParentNode, options: HydrateOptions = {}): void 
       iterations: Infinity,
       easing: 'linear',
     });
-    if (config.pauseOnHover) {
-      node.addEventListener('mouseenter', () => {
-        animation.pause();
-      });
-      node.addEventListener('mouseleave', () => {
-        animation.play();
-      });
-    }
+    wireMarqueeHover(node, animation, config);
     node.setAttribute('data-opencanvas-marquee-hydrated', 'true');
   }
 }

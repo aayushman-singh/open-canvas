@@ -41,12 +41,28 @@ function readMarqueeConfig(el) {
   if (reducedMotion !== 'static' && reducedMotion !== 'slow') {
     emitMarqueeFailure(el, 'invalid-reduced-motion', 'Marquee reduced-motion mode must be static or slow', reducedMotion);
   }
+  var pauseOnHover = el.getAttribute('data-opencanvas-marquee-pause') === 'true';
+  var hoverReverse = el.getAttribute('data-opencanvas-marquee-hover-reverse') === 'true';
+  if (pauseOnHover && hoverReverse) {
+    emitMarqueeFailure(el, 'hover-mode-conflict', 'Marquee cannot pause and reverse on hover at the same time', null);
+  }
   return {
     direction: direction,
     speed: speed,
-    pauseOnHover: el.getAttribute('data-opencanvas-marquee-pause') === 'true',
+    pauseOnHover: pauseOnHover,
+    hoverReverse: hoverReverse,
     reducedMotion: reducedMotion
   };
+}
+function wireMarqueeHover(el, animation, config) {
+  if (config.pauseOnHover) {
+    el.addEventListener('mouseenter', function(){ animation.pause(); });
+    el.addEventListener('mouseleave', function(){ animation.play(); });
+  } else if (config.hoverReverse) {
+    var normalPlaybackRate = animation.playbackRate || 1;
+    el.addEventListener('mouseenter', function(){ animation.playbackRate = -Math.abs(normalPlaybackRate); });
+    el.addEventListener('mouseleave', function(){ animation.playbackRate = Math.abs(normalPlaybackRate); });
+  }
 }
 function isMarqueeEditorChrome(node) {
   if (!node || node.nodeType !== 1) return false;
@@ -135,10 +151,7 @@ function hydrateMarquees(scope, options) {
       ? [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-' + width + 'px,0,0)' }]
       : [{ transform: 'translate3d(-' + width + 'px,0,0)' }, { transform: 'translate3d(0,0,0)' }];
     var animation = belt.animate(frames, { duration: duration, iterations: Infinity, easing: 'linear' });
-    if (config.pauseOnHover) {
-      el.addEventListener('mouseenter', function(){ animation.pause(); });
-      el.addEventListener('mouseleave', function(){ animation.play(); });
-    }
+    wireMarqueeHover(el, animation, config);
     el.setAttribute('data-opencanvas-marquee-hydrated', 'true');
   }
 }

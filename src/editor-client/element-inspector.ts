@@ -700,6 +700,7 @@ function renderMarqueeInspector(ctx: EditorContext, element: CanvasElement): voi
         speedPxPerSecond: 80,
         pauseOnHover: true,
         edgeFade: false,
+        hoverReverse: false,
         reducedMotion: 'static',
       };
     } else {
@@ -748,10 +749,25 @@ function renderMarqueeInspector(ctx: EditorContext, element: CanvasElement): voi
   pause.addEventListener('change', () => {
     ctx.captureForUndo();
     element.marquee!.pauseOnHover = pause.checked;
+    if (pause.checked) element.marquee!.hoverReverse = false;
     ctx.rebuildElement(element.id);
+    renderInspector(ctx);
     ctx.scheduleSave();
   });
   ctx.inspector.appendChild(field('Pause on hover', pause));
+
+  const hoverReverse = document.createElement('input');
+  hoverReverse.type = 'checkbox';
+  hoverReverse.checked = element.marquee.hoverReverse === true;
+  hoverReverse.addEventListener('change', () => {
+    ctx.captureForUndo();
+    element.marquee!.hoverReverse = hoverReverse.checked;
+    if (hoverReverse.checked) element.marquee!.pauseOnHover = false;
+    ctx.rebuildElement(element.id);
+    renderInspector(ctx);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Reverse on hover', hoverReverse));
 
   const edgeFade = document.createElement('input');
   edgeFade.type = 'checkbox';

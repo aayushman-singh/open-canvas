@@ -205,6 +205,7 @@ export interface MarqueeBehaviour {
   speedPxPerSecond: number;
   pauseOnHover?: boolean;
   edgeFade?: boolean;
+  hoverReverse?: boolean;
   reducedMotion: MarqueeReducedMotionMode;
 }
 

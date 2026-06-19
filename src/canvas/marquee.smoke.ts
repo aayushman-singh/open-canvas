@@ -50,6 +50,8 @@ function makeSite(): EditableSite {
 
 const site = makeSite();
 site.pages[0]!.sections[0]!.elements[0]!.marquee!.edgeFade = true;
+site.pages[0]!.sections[0]!.elements[0]!.marquee!.pauseOnHover = false;
+site.pages[0]!.sections[0]!.elements[0]!.marquee!.hoverReverse = true;
 const validation = validateEditableSite(site);
 assert(validation.valid, validation.valid ? 'valid marquee site should pass' : validation.errors.join('\n'));
 
@@ -61,6 +63,10 @@ assert(
 assert(
   decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.edgeFade === true,
   'Yjs projection must preserve marquee edge fade config',
+);
+assert(
+  decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.hoverReverse === true,
+  'Yjs projection must preserve marquee hover reverse config',
 );
 
 const snapshot: PublishedSnapshot = {
@@ -88,6 +94,10 @@ assert(
   html.includes('data-opencanvas-marquee-edge-fade="true"'),
   'renderer must emit marquee edge fade metadata',
 );
+assert(
+  html.includes('data-opencanvas-marquee-hover-reverse="true"'),
+  'renderer must emit marquee hover reverse metadata',
+);
 
 const invalidDirection = makeSite() as unknown as Record<string, unknown>;
 (
@@ -109,6 +119,7 @@ const invalidDirection = makeSite() as unknown as Record<string, unknown>;
       direction: 'diagonal',
       speedPxPerSecond: 0,
       edgeFade: 'yes',
+      hoverReverse: 'yes',
       reducedMotion: 'maybe',
     },
   },
@@ -130,6 +141,28 @@ assert(
 assert(
   invalid.errors.some((error) => error.includes('.marquee.edgeFade')),
   'invalid edge fade flag must be named',
+);
+assert(
+  invalid.errors.some((error) => error.includes('.marquee.hoverReverse')),
+  'invalid hover reverse flag must be named',
+);
+
+const conflicting = makeSite() as unknown as Record<string, unknown>;
+const conflictingMarquee = (
+  (
+    (((conflicting.pages as unknown[])[0] as Record<string, unknown>).sections as unknown[])[0] as Record<
+      string,
+      unknown
+    >
+  ).elements as Record<string, unknown>[]
+)[0]!.marquee as Record<string, unknown>;
+conflictingMarquee.pauseOnHover = true;
+conflictingMarquee.hoverReverse = true;
+const conflict = validateEditableSite(conflicting);
+assert(!conflict.valid, 'pause-on-hover plus hover-reverse marquee must fail validation');
+assert(
+  conflict.errors.some((error) => error.includes('.marquee.hoverReverse')),
+  'hover reverse conflict must be named',
 );
 
 console.log('[marquee:smoke] OK');
