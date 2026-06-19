@@ -56,6 +56,17 @@ function makeSite(): EditableSite {
                   reducedMotion: 'disabled',
                 },
               },
+              {
+                id: 'reveal-mask-card',
+                type: 'container',
+                variant: 'glass',
+                box: { x: 980, y: 160, w: 180, h: 64, z: 4 },
+                pointerFx: {
+                  enabled: true,
+                  primitive: 'reveal-mask',
+                  reducedMotion: 'disabled',
+                },
+              },
             ],
           },
         ],
@@ -81,6 +92,10 @@ assert(
   decoded.pages[0]?.sections[0]?.elements[2]?.pointerFx?.primitive === 'cursor-follow',
   'Yjs projection must preserve cursor-follow pointerFx config',
 );
+assert(
+  decoded.pages[0]?.sections[0]?.elements[3]?.pointerFx?.primitive === 'reveal-mask',
+  'Yjs projection must preserve reveal-mask pointerFx config',
+);
 
 const snapshot: PublishedSnapshot = {
   ...site,
@@ -101,6 +116,10 @@ assert(
 assert(
   html.includes('data-opencanvas-pointer-fx="cursor-follow"'),
   'renderer must emit cursor-follow pointer-fx primitive',
+);
+assert(
+  html.includes('data-opencanvas-pointer-fx="reveal-mask"'),
+  'renderer must emit reveal-mask pointer-fx primitive',
 );
 assert(
   html.includes('data-opencanvas-pointer-fx-reduced-motion="disabled"'),

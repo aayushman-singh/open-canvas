@@ -22,6 +22,9 @@
 //   - `cursor-follow` — publishes `--opencanvas-cursor-follow-x` /
 //     `--opencanvas-cursor-follow-y` as stronger bounded px translations from
 //     centre. CSS owns the transform; the runtime only publishes pointer state.
+//   - `reveal-mask` — publishes `--opencanvas-reveal-x` /
+//     `--opencanvas-reveal-y` as percentages of the element box. CSS owns the
+//     clip-path reveal; the runtime only publishes pointer state.
 //
 // Scroll / entrance motion is deliberately NOT here — that stays with the
 // existing `motion.preset` + `data-scroll-trigger` system (ADR dec 4).
@@ -85,6 +88,19 @@ function hydratePointerFx(scope, options) {
           el.style.setProperty('--opencanvas-ptr-x', '50%');
           el.style.setProperty('--opencanvas-ptr-y', '50%');
         });
+      } else if (primitive === 'reveal-mask') {
+        el.addEventListener('pointermove', function (ev) {
+          var r = el.getBoundingClientRect();
+          if (!(r.width > 0) || !(r.height > 0)) return;
+          var px = ((ev.clientX - r.left) / r.width) * 100;
+          var py = ((ev.clientY - r.top) / r.height) * 100;
+          el.style.setProperty('--opencanvas-reveal-x', px.toFixed(2) + '%');
+          el.style.setProperty('--opencanvas-reveal-y', py.toFixed(2) + '%');
+        });
+        el.addEventListener('pointerleave', function () {
+          el.style.setProperty('--opencanvas-reveal-x', '50%');
+          el.style.setProperty('--opencanvas-reveal-y', '50%');
+        });
       } else if (primitive === 'tilt') {
         el.addEventListener('pointermove', function (ev) {
           var r = el.getBoundingClientRect();
@@ -125,7 +141,7 @@ function hydratePointerFx(scope, options) {
           el.style.setProperty('--opencanvas-cursor-follow-y', '0px');
         });
       } else {
-        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, or cursor-follow', primitive);
+        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, or reveal-mask', primitive);
       }
     })(nodes[i]);
   }

@@ -1119,7 +1119,8 @@ const variantCss = String.raw`
    spotlight publishes --opencanvas-ptr-x/y (consumed per-variant above);
    tilt publishes --opencanvas-tilt-x/y, applied generically here;
    magnetic publishes --opencanvas-magnetic-x/y, applied generically here;
-   cursor-follow publishes --opencanvas-cursor-follow-x/y, applied here. */
+   cursor-follow publishes --opencanvas-cursor-follow-x/y, applied here;
+   reveal-mask publishes --opencanvas-reveal-x/y, applied here. */
 .opencanvas-element[data-opencanvas-pointer-fx="spotlight"]::before {
   content: "";
   position: absolute;
@@ -1133,6 +1134,13 @@ const variantCss = String.raw`
       transparent 70%
     );
   opacity: 0.7;
+}
+
+[data-opencanvas-pointer-fx="reveal-mask"] {
+  clip-path: circle(180px at var(--opencanvas-reveal-x, 50%) var(--opencanvas-reveal-y, 50%));
+  overflow: hidden;
+  transition: clip-path 120ms ease-out;
+  will-change: clip-path;
 }
 
 [data-opencanvas-pointer-fx="tilt"] {

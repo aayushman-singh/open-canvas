@@ -186,6 +186,24 @@ const hydratePointerFx = makeHydratePointerFx();
   assert(el.props['--opencanvas-cursor-follow-y'] === '0px', 'pointerleave recentres cursor-follow-y to 0px');
 }
 
+// -- 2e. reveal-mask publishes --opencanvas-reveal-x/y ------------------------
+{
+  const el = makeStub('reveal-mask', { left: 0, top: 0, width: 200, height: 100 });
+  hydratePointerFx({ querySelectorAll: () => [el] });
+  el.listeners['pointermove']![0]!({ clientX: 40, clientY: 75 });
+  assert(
+    el.props['--opencanvas-reveal-x'] === '20.00%',
+    `reveal-mask x should be 20%; got ${el.props['--opencanvas-reveal-x']}`,
+  );
+  assert(
+    el.props['--opencanvas-reveal-y'] === '75.00%',
+    `reveal-mask y should be 75%; got ${el.props['--opencanvas-reveal-y']}`,
+  );
+  el.listeners['pointerleave']![0]!({ clientX: 0, clientY: 0 });
+  assert(el.props['--opencanvas-reveal-x'] === '50%', 'pointerleave recentres reveal-mask x to 50%');
+  assert(el.props['--opencanvas-reveal-y'] === '50%', 'pointerleave recentres reveal-mask y to 50%');
+}
+
 // -- 3. idempotence: re-run does not double-wire -----------------------------
 {
   const el = makeStub('spotlight', { left: 0, top: 0, width: 200, height: 100 });

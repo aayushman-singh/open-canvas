@@ -37,12 +37,15 @@ const POINTER_FX_TOKENS = [
   '--opencanvas-magnetic-y',
   '--opencanvas-cursor-follow-x',
   '--opencanvas-cursor-follow-y',
+  '--opencanvas-reveal-x',
+  '--opencanvas-reveal-y',
   'data-opencanvas-pointer-fx',
   'data-opencanvas-pfx-hydrated',
   'spotlight',
   'tilt',
   'magnetic',
   'cursor-follow',
+  'reveal-mask',
 ];
 
 for (const token of POINTER_FX_TOKENS) {

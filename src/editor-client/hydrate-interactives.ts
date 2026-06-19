@@ -452,6 +452,19 @@ function hydratePointerFx(scope: ParentNode, options: HydrateOptions = {}): void
         el.style.setProperty('--opencanvas-ptr-x', '50%');
         el.style.setProperty('--opencanvas-ptr-y', '50%');
       });
+    } else if (primitive === 'reveal-mask') {
+      el.addEventListener('pointermove', (ev: PointerEvent): void => {
+        const r = el.getBoundingClientRect();
+        if (!(r.width > 0) || !(r.height > 0)) return;
+        const px = ((ev.clientX - r.left) / r.width) * 100;
+        const py = ((ev.clientY - r.top) / r.height) * 100;
+        el.style.setProperty('--opencanvas-reveal-x', px.toFixed(2) + '%');
+        el.style.setProperty('--opencanvas-reveal-y', py.toFixed(2) + '%');
+      });
+      el.addEventListener('pointerleave', (): void => {
+        el.style.setProperty('--opencanvas-reveal-x', '50%');
+        el.style.setProperty('--opencanvas-reveal-y', '50%');
+      });
     } else if (primitive === 'tilt') {
       el.addEventListener('pointermove', (ev: PointerEvent): void => {
         const r = el.getBoundingClientRect();
@@ -495,7 +508,7 @@ function hydratePointerFx(scope: ParentNode, options: HydrateOptions = {}): void
       failPointerFx(
         el,
         'invalid-primitive',
-        'Pointer FX primitive must be spotlight, tilt, magnetic, or cursor-follow',
+        'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, or reveal-mask',
         primitive,
       );
     }
