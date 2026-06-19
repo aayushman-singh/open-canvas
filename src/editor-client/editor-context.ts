@@ -273,6 +273,11 @@ export interface EditorContext {
    *  boot. Null before boot wires it; the page inspector and replay path
    *  are no-ops while null so the module never has to assert a live root. */
   root: HTMLElement | null;
+  /** Editor-only authoring preview for the visitor reduced-motion contract.
+   *  This is not persisted into site state: it controls the editor Runtime
+   *  Hydrator options so Owners can inspect reduced-motion behaviour before
+   *  publishing without changing visitor defaults. */
+  reducedMotionPreview: 'no-preference' | 'reduce';
   /** Active artboard id. Drives currentPage()'s selection — null falls
    *  back to state.pages[0]. Mutated externally by setActivePage; the
    *  page inspector reads it through ctx during replayAnimations so the

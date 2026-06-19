@@ -78,7 +78,7 @@ assert(
   'injection must append runtime script for video hover',
 );
 assert(
-  withRuntime.includes('hydrateVideoHoverStreams(rootScope)'),
+  withRuntime.includes('hydrateVideoHoverStreams(rootScope, options || {})'),
   'entrypoint must hydrate video hover streams',
 );
 

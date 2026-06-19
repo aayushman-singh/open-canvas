@@ -80,6 +80,7 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
   };
   const ctx: EditorContext = {
     state: null,
+    reducedMotionPreview: 'no-preference',
     mainEl: null,
     selectedElementId: null,
     ghostSections: [],

@@ -289,7 +289,12 @@ export type MountViewportContext = Pick<DomContext, 'root' | 'viewport'> &
   FitToPageContext &
   Pick<
     EditorContext,
-    'zoomToolbar' | 'interactionMode' | 'setInteractionMode' | 'clearTemporaryPanState'
+    | 'zoomToolbar'
+    | 'interactionMode'
+    | 'setInteractionMode'
+    | 'clearTemporaryPanState'
+    | 'reducedMotionPreview'
+    | 'renderAll'
   >;
 
 // ADR 0064 — `resolveElementWrapperAtPoint` walks the rendered DOM under
@@ -1834,6 +1839,21 @@ export function mountViewportImpl(ctx: MountViewportContext): void {
   ctx.zoomReadout.className = 'zoom-readout';
   ctx.zoomReadout.textContent = '100%';
   ctx.zoomToolbar.appendChild(ctx.zoomReadout);
+  const reducedMotionSep = document.createElement('span');
+  reducedMotionSep.className = 'zoom-toolbar-sep';
+  ctx.zoomToolbar.appendChild(reducedMotionSep);
+  const reducedMotionButton = document.createElement('button');
+  reducedMotionButton.type = 'button';
+  reducedMotionButton.textContent = 'Reduce';
+  reducedMotionButton.title = 'Preview reduced-motion visitor behavior';
+  reducedMotionButton.className = 'opencanvas-reduced-motion-preview-toggle';
+  reducedMotionButton.setAttribute('aria-label', 'Preview reduced-motion visitor behavior');
+  reducedMotionButton.setAttribute('data-opencanvas-reduced-motion-preview', 'toggle');
+  reducedMotionButton.setAttribute(
+    'aria-pressed',
+    ctx.reducedMotionPreview === 'reduce' ? 'true' : 'false',
+  );
+  ctx.zoomToolbar.appendChild(reducedMotionButton);
   document.body.appendChild(ctx.zoomToolbar);
   ctx.zoomToolbar.addEventListener('click', (ev) => {
     const modeTarget =
@@ -1844,6 +1864,23 @@ export function mountViewportImpl(ctx: MountViewportContext): void {
         ctx.clearTemporaryPanState();
         ctx.setInteractionMode(mode);
       }
+      return;
+    }
+    const reducedMotionTarget =
+      ev.target instanceof Element
+        ? ev.target.closest('button[data-opencanvas-reduced-motion-preview]')
+        : null;
+    if (reducedMotionTarget) {
+      ctx.reducedMotionPreview =
+        ctx.reducedMotionPreview === 'reduce' ? 'no-preference' : 'reduce';
+      reducedMotionTarget.setAttribute(
+        'aria-pressed',
+        ctx.reducedMotionPreview === 'reduce' ? 'true' : 'false',
+      );
+      if (ctx.root) {
+        ctx.root.setAttribute('data-opencanvas-reduced-motion-preview', ctx.reducedMotionPreview);
+      }
+      ctx.renderAll();
       return;
     }
     const target =

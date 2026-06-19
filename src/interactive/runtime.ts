@@ -17,7 +17,7 @@
 export const RUNTIME_ENTRY_SRC = String.raw`
 function hydratePremiumInteractions(scope, options) {
   var root = scope || document;
-  hydratePointerFx(root);
+  hydratePointerFx(root, options || {});
   if (typeof window === 'undefined') return;
   if (typeof hydrateOverlays === 'function') hydrateOverlays(root, options || {});
   if (typeof hydrateLoadExperience === 'function') hydrateLoadExperience(root, options || {});
@@ -45,9 +45,9 @@ function hydrateAll(scope, options) {
   hydratePremiumInteractions(rootScope, options || {});
   hydrateCollectionGalleries(rootScope);
   hydrateEmbedDrillIns(rootScope);
-  hydrateBehaviour(rootScope);
-  hydrateMarquees(rootScope);
-  hydrateVideoHoverStreams(rootScope);
+  hydrateBehaviour(rootScope, options || {});
+  hydrateMarquees(rootScope, options || {});
+  hydrateVideoHoverStreams(rootScope, options || {});
 }
 if (typeof window !== 'undefined') window.__opencanvasHydrate = hydrateAll;
 if (document.readyState === 'loading') {

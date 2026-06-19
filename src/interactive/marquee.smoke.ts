@@ -76,6 +76,6 @@ assert(
   withRuntime.includes('data-opencanvas-interactive-runtime'),
   'injection must append runtime script for marquee',
 );
-assert(withRuntime.includes('hydrateMarquees(rootScope)'), 'entrypoint must hydrate marquees');
+assert(withRuntime.includes('hydrateMarquees(rootScope, options || {})'), 'entrypoint must hydrate marquees');
 
 console.log('[marquee-runtime:smoke] OK');

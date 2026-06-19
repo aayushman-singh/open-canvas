@@ -393,6 +393,7 @@ export type RenderAllContext = ComputePagePositionsContext &
     | 'renderReel'
     | 'pendingImport'
     | 'renderPlacementSlots'
+    | 'reducedMotionPreview'
     | 'siteBase'
   >;
 
@@ -467,6 +468,7 @@ export function renderAllImpl(ctx: RenderAllContext): void {
   }
 
   ctx.root!.replaceChildren(fragment);
+  ctx.root!.setAttribute('data-opencanvas-reduced-motion-preview', ctx.reducedMotionPreview);
 
   if (ctx.mainEl && ctx.state.styleKit) {
     ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
@@ -502,6 +504,7 @@ export function renderAllImpl(ctx: RenderAllContext): void {
       skipPopups: true,
       behaviourState: ctx.state,
       behaviourAssetBasePath: `${ctx.siteBase}/assets`,
+      reducedMotion: ctx.reducedMotionPreview,
     });
   }
 

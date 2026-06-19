@@ -21,6 +21,11 @@ function emitVideoHoverFailure(video, code, message, cause) {
   }
   throw new Error('[opencanvas video-hover] ' + message);
 }
+function videoHoverPrefersReducedMotion(options) {
+  if (options && options.reducedMotion === 'reduce') return true;
+  if (options && options.reducedMotion === 'no-preference') return false;
+  return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 function readVideoHoverConfig(video) {
   var mode = video.getAttribute('data-opencanvas-video-hover-mode');
   if (mode !== 'play-pause' && mode !== 'play-reset') {
@@ -32,14 +37,14 @@ function readVideoHoverConfig(video) {
   }
   return { mode: mode, reducedMotion: reducedMotion };
 }
-function hydrateVideoHoverStreams(scope) {
+function hydrateVideoHoverStreams(scope, options) {
   var root = scope || document;
   var videos = root.querySelectorAll('video[data-opencanvas-video-hover="true"]');
   for (var i = 0; i < videos.length; i++) {
     var video = videos[i];
     if (video.getAttribute('data-opencanvas-video-hover-hydrated') === 'true') continue;
     var config = readVideoHoverConfig(video);
-    var reduce = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var reduce = videoHoverPrefersReducedMotion(options);
     if (reduce && config.reducedMotion === 'disabled') {
       video.setAttribute('data-opencanvas-video-hover-hydrated', 'true');
       video.setAttribute('data-opencanvas-video-hover-reduced', 'disabled');

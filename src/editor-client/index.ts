@@ -432,6 +432,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
   const ctxPartial: Partial<EditorContext> = {
     // ---- Foundational state ------------------------------------------
     state: null,
+    reducedMotionPreview: 'no-preference',
     mainEl: null,
     selectedElementId: null,
     findElement: runtimeHelperNotInstalled('findElement'),

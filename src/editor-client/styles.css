@@ -2004,6 +2004,20 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   background: var(--red-strong);
   color: #fff;
 }
+.opencanvas-zoom-toolbar button.opencanvas-reduced-motion-preview-toggle {
+  width: auto;
+  min-width: 58px;
+  padding: 0 10px;
+  border-radius: 999px;
+}
+.opencanvas-zoom-toolbar button[data-opencanvas-reduced-motion-preview][aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--surface);
+}
+.opencanvas-zoom-toolbar button[data-opencanvas-reduced-motion-preview][aria-pressed="true"]:hover {
+  background: var(--ink-2);
+  color: var(--surface);
+}
 .opencanvas-viewport[data-interaction-mode="pan"] {
   cursor: grab;
 }

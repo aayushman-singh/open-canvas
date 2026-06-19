@@ -41,6 +41,8 @@ export interface HydrateOptions {
   behaviourState?: EditableSite;
   /** Asset base path used to resolve image-sequence frame URLs in preview. */
   behaviourAssetBasePath?: string;
+  /** Explicit authoring override for previewing visitor reduced-motion paths. */
+  reducedMotion?: 'no-preference' | 'reduce';
 }
 
 export interface RuntimeHydratorOptions extends HydrateOptions {
@@ -122,12 +124,18 @@ export function hydrateInteractives(
   // [data-opencanvas-pointer-fx] attribute (not a data-opencanvas-interactive
   // dispatch arm), mirroring hydratePointerFx in `./pointer-fx.ts` so the
   // editor preview reacts to the cursor exactly as the published site does.
-  hydratePointerFx(root);
+  hydratePointerFx(root, options);
   if (options.behaviourState && options.behaviourAssetBasePath) {
-    hydrateBehaviourPreview(root, options.behaviourState, options.behaviourAssetBasePath);
+    hydrateBehaviourPreview(root, options.behaviourState, options.behaviourAssetBasePath, options.reducedMotion);
   }
-  hydrateMarquees(root);
-  hydrateVideoHoverStreams(root);
+  hydrateMarquees(root, options);
+  hydrateVideoHoverStreams(root, options);
+}
+
+function prefersReducedMotion(options: HydrateOptions): boolean {
+  if (options.reducedMotion === 'reduce') return true;
+  if (options.reducedMotion === 'no-preference') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,14 +187,14 @@ function videoHoverError(err: unknown): Error {
   return new Error('non-error video hover failure');
 }
 
-function hydrateVideoHoverStreams(scope: ParentNode): void {
+function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {}): void {
   const videos = scope.querySelectorAll('[data-opencanvas-video-hover="true"]');
   for (let i = 0; i < videos.length; i++) {
     const node = videos[i];
     if (!(node instanceof HTMLVideoElement)) continue;
     if (node.getAttribute('data-opencanvas-video-hover-hydrated') === 'true') continue;
     const config = readVideoHoverConfig(node);
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduce = prefersReducedMotion(options);
     if (reduce && config.reducedMotion === 'disabled') {
       node.setAttribute('data-opencanvas-video-hover-hydrated', 'true');
       node.setAttribute('data-opencanvas-video-hover-reduced', 'disabled');
@@ -315,14 +323,14 @@ function stripMarqueeCloneInteractivity(node: HTMLElement): void {
   }
 }
 
-function hydrateMarquees(scope: ParentNode): void {
+function hydrateMarquees(scope: ParentNode, options: HydrateOptions = {}): void {
   const nodes = scope.querySelectorAll('[data-opencanvas-marquee="true"]');
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
     if (!(node instanceof HTMLElement)) continue;
     if (node.getAttribute('data-opencanvas-marquee-hydrated') === 'true') continue;
     const config = readMarqueeConfig(node);
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduce = prefersReducedMotion(options);
     if (reduce && config.reducedMotion === 'static') {
       node.setAttribute('data-opencanvas-marquee-hydrated', 'true');
       node.setAttribute('data-opencanvas-marquee-reduced', 'static');
@@ -408,7 +416,7 @@ function hydrateMarquees(scope: ParentNode): void {
 // authored static base (ADR dec 6) is restored.
 // ---------------------------------------------------------------------------
 
-function hydratePointerFx(scope: ParentNode): void {
+function hydratePointerFx(scope: ParentNode, options: HydrateOptions = {}): void {
   const nodes = scope.querySelectorAll('[data-opencanvas-pointer-fx]');
   for (let i = 0; i < nodes.length; i++) {
     const el = nodes[i];
@@ -424,7 +432,7 @@ function hydratePointerFx(scope: ParentNode): void {
         reducedMotion,
       );
     }
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduce = prefersReducedMotion(options);
     if (reduce && reducedMotion === 'disabled') {
       el.setAttribute('data-opencanvas-pfx-hydrated', 'true');
       el.setAttribute('data-opencanvas-pointer-fx-reduced', 'disabled');

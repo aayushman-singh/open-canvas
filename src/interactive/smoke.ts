@@ -233,6 +233,10 @@ function parseAttrs(attrPart: string): Map<string, string> {
   return out;
 }
 
+function stripRuntimeScript(html: string): string {
+  return html.replace(/<script data-opencanvas-interactive-runtime>[\s\S]*?<\/script>/g, '');
+}
+
 function parseHtml(html: string): StubElement {
   const root = new StubElement('#root');
   const stack: StubElement[] = [root];
@@ -539,7 +543,7 @@ assert(
 // ---------------------------------------------------------------------------
 
 const doc1 = new StubDocument();
-const parsed1 = parseHtml(injectedHtml);
+const parsed1 = parseHtml(stripRuntimeScript(injectedHtml));
 // Move parsed children into the document root so querySelectorAll walks them.
 for (const child of parsed1.children) {
   doc1.root.appendChild(child);
@@ -625,7 +629,7 @@ const multiInjected = injectInteractiveRuntime(`<main>${multiHtml}</main>`, {
   ],
 });
 const docMulti = new StubDocument();
-const parsedMulti = parseHtml(multiInjected);
+const parsedMulti = parseHtml(stripRuntimeScript(multiInjected));
 for (const child of parsedMulti.children) docMulti.root.appendChild(child);
 runRuntimeAgainstDocument(docMulti);
 const multiRoot = docMulti.querySelectorAll(
@@ -725,7 +729,7 @@ assert(
 
 // Fresh document so we know the starting state.
 const doc5 = new StubDocument();
-const parsed5 = parseHtml(injectedHtml);
+const parsed5 = parseHtml(stripRuntimeScript(injectedHtml));
 for (const child of parsed5.children) doc5.root.appendChild(child);
 runRuntimeAgainstDocument(doc5);
 const acc5 = doc5.querySelectorAll('[data-opencanvas-interactive="accordion"]')[0] as StubElement;
@@ -768,7 +772,7 @@ assert(before === after, 'pressing unrelated key "a" must NOT change accordion o
 
 const docLoading = new StubDocument();
 docLoading.readyState = 'loading';
-const parsedLoading = parseHtml(injectedHtml);
+const parsedLoading = parseHtml(stripRuntimeScript(injectedHtml));
 for (const child of parsedLoading.children) docLoading.root.appendChild(child);
 runRuntimeAgainstDocument(docLoading);
 const accLoading = docLoading.querySelectorAll(

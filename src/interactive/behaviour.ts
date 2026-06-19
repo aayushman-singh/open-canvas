@@ -6,6 +6,7 @@
 // and throws on any unresolved target, asset, or adapter mismatch.
 
 export const BEHAVIOUR_RUNTIME_SRC = String.raw`
+var behaviourRuntimeOptions = {};
 function behaviourFailure(code, context, cause) {
   var detail = { code: code, context: context, cause: cause && cause.message ? cause.message : String(cause) };
   if (typeof console !== 'undefined' && console.error) console.error('[opencanvas behaviour]', detail);
@@ -16,6 +17,8 @@ function behaviourFailure(code, context, cause) {
 }
 
 function behaviourPrefersReducedMotion() {
+  if (behaviourRuntimeOptions && behaviourRuntimeOptions.reducedMotion === 'reduce') return true;
+  if (behaviourRuntimeOptions && behaviourRuntimeOptions.reducedMotion === 'no-preference') return false;
   return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
@@ -902,7 +905,8 @@ function behaviourHydrateNavThemes(payload, root) {
   window.addEventListener('resize', schedule);
   update();
 }
-function hydrateBehaviour(scope) {
+function hydrateBehaviour(scope, options) {
+  behaviourRuntimeOptions = options || {};
   var root = scope || document;
   if (root === document && document.documentElement.getAttribute('data-opencanvas-behaviour-hydrated') === 'true') return;
   var payload = parseBehaviourPayload();

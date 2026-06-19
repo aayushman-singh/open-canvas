@@ -12,19 +12,24 @@ import {
 import type { EditableSite } from '../canvas/schema.js';
 import { BEHAVIOUR_RUNTIME_SRC } from '../interactive/behaviour.js';
 
-type BehaviourRunner = (doc: Document) => void;
+type BehaviourRunner = (
+  doc: Document,
+  reducedMotion?: 'no-preference' | 'reduce',
+) => void;
 
 const runBehaviourRuntime: BehaviourRunner =
   // eslint-disable-next-line @typescript-eslint/no-implied-eval -- must execute visitor runtime source verbatim
   new Function(
     'document',
-    `${BEHAVIOUR_RUNTIME_SRC}\nhydrateBehaviour(document);`,
+    'reducedMotion',
+    `${BEHAVIOUR_RUNTIME_SRC}\nhydrateBehaviour(document, { reducedMotion });`,
   ) as BehaviourRunner;
 
 export function hydrateBehaviourPreview(
   _root: ParentNode,
   state: EditableSite,
   assetBasePath: string,
+  reducedMotion?: 'no-preference' | 'reduce',
 ): void {
   if (!snapshotHasBehaviourPrimitives(state)) return;
   const payload = buildBehaviourPayload(state, assetBasePath);
@@ -41,5 +46,5 @@ export function hydrateBehaviourPreview(
   script.textContent = serializeBehaviourPayload(payload);
 
   document.documentElement.removeAttribute('data-opencanvas-behaviour-hydrated');
-  runBehaviourRuntime(document);
+  runBehaviourRuntime(document, reducedMotion);
 }

@@ -44,7 +44,12 @@ function emitPointerFxFailure(el, code, message, cause) {
   }
   throw new Error('[opencanvas pointer-fx] ' + message);
 }
-function hydratePointerFx(scope) {
+function pointerFxPrefersReducedMotion(options) {
+  if (options && options.reducedMotion === 'reduce') return true;
+  if (options && options.reducedMotion === 'no-preference') return false;
+  return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+function hydratePointerFx(scope, options) {
   var nodes = (scope || document).querySelectorAll('[data-opencanvas-pointer-fx]');
   for (var i = 0; i < nodes.length; i++) {
     (function (el) {
@@ -54,7 +59,7 @@ function hydratePointerFx(scope) {
       if (reducedMotion !== 'disabled' && reducedMotion !== 'allow') {
         emitPointerFxFailure(el, 'invalid-reduced-motion', 'Pointer FX reduced-motion mode must be disabled or allow', reducedMotion);
       }
-      var reduce = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var reduce = pointerFxPrefersReducedMotion(options);
       if (reduce && reducedMotion === 'disabled') {
         el.setAttribute('data-opencanvas-pfx-hydrated', 'true');
         el.setAttribute('data-opencanvas-pointer-fx-reduced', 'disabled');

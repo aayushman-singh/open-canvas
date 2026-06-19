@@ -22,6 +22,11 @@ function emitMarqueeFailure(el, code, message, cause) {
   }
   throw new Error('[opencanvas marquee] ' + message);
 }
+function marqueePrefersReducedMotion(options) {
+  if (options && options.reducedMotion === 'reduce') return true;
+  if (options && options.reducedMotion === 'no-preference') return false;
+  return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 function readMarqueeConfig(el) {
   var direction = el.getAttribute('data-opencanvas-marquee-direction');
   if (direction !== 'left' && direction !== 'right') {
@@ -64,14 +69,14 @@ function stripMarqueeCloneInteractivity(node) {
     descendants[j].removeAttribute('id');
   }
 }
-function hydrateMarquees(scope) {
+function hydrateMarquees(scope, options) {
   var root = scope || document;
   var nodes = root.querySelectorAll('[data-opencanvas-marquee="true"]');
   for (var i = 0; i < nodes.length; i++) {
     var el = nodes[i];
     if (el.getAttribute('data-opencanvas-marquee-hydrated') === 'true') continue;
     var config = readMarqueeConfig(el);
-    var reduce = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var reduce = marqueePrefersReducedMotion(options);
     if (reduce && config.reducedMotion === 'static') {
       el.setAttribute('data-opencanvas-marquee-hydrated', 'true');
       el.setAttribute('data-opencanvas-marquee-reduced', 'static');
