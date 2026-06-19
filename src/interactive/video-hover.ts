@@ -44,7 +44,15 @@ function readVideoHoverConfig(video) {
   if (posterSrc !== null && posterSrc.trim() === '') {
     emitVideoHoverFailure(video, 'poster-src-empty', 'Video hover alternate poster source cannot be empty', posterSrc);
   }
-  return { mode: mode, scrubOnHover: scrubOnHover, reducedMotion: reducedMotion, streamSrc: streamSrc, posterSrc: posterSrc };
+  var intentDelayAttr = video.getAttribute('data-opencanvas-video-hover-intent-delay-ms');
+  var intentDelayMs = 0;
+  if (intentDelayAttr !== null) {
+    intentDelayMs = Number(intentDelayAttr);
+    if (!isFinite(intentDelayMs) || intentDelayMs < 0 || intentDelayMs > 5000) {
+      emitVideoHoverFailure(video, 'invalid-intent-delay', 'Video hover intent delay must be between 0 and 5000ms', intentDelayAttr);
+    }
+  }
+  return { mode: mode, scrubOnHover: scrubOnHover, reducedMotion: reducedMotion, streamSrc: streamSrc, posterSrc: posterSrc, intentDelayMs: intentDelayMs };
 }
 function setVideoHoverSource(video, src, poster, code) {
   if (!src) return;
@@ -119,9 +127,9 @@ function hydrateVideoHoverStreams(scope, options) {
       emitVideoHoverFailure(video, 'original-src-missing', 'Video hover alternate stream requires an original source to restore', null);
     }
     var active = false;
-    var enter = function(ev) {
-      if (active) return;
-      active = true;
+    var intentTimer = null;
+    var pendingIntentEvent = null;
+    var activate = function(ev) {
       try {
         setVideoHoverSource(video, config.streamSrc, config.posterSrc, 'source-swap-failed');
         if (config.scrubOnHover) {
@@ -138,9 +146,30 @@ function hydrateVideoHoverStreams(scope, options) {
         emitVideoHoverFailure(video, 'play-failed', 'Video hover play failed', err);
       }
     };
+    var enter = function(ev) {
+      if (active) return;
+      active = true;
+      pendingIntentEvent = ev;
+      if (config.intentDelayMs > 0) {
+        intentTimer = setTimeout(function() {
+          intentTimer = null;
+          activate(pendingIntentEvent);
+          pendingIntentEvent = null;
+        }, config.intentDelayMs);
+        return;
+      }
+      activate(ev);
+      pendingIntentEvent = null;
+    };
     var leave = function() {
       if (!active) return;
       active = false;
+      if (intentTimer !== null) {
+        clearTimeout(intentTimer);
+        intentTimer = null;
+        pendingIntentEvent = null;
+        return;
+      }
       try {
         video.pause();
         if (config.mode === 'play-reset') video.currentTime = 0;
@@ -153,6 +182,10 @@ function hydrateVideoHoverStreams(scope, options) {
     target.addEventListener('pointerleave', leave);
     target.addEventListener('pointermove', function(ev) {
       if (!active || !config.scrubOnHover) return;
+      if (intentTimer !== null) {
+        pendingIntentEvent = ev;
+        return;
+      }
       scrubVideoHover(video, target, ev);
     });
     target.addEventListener('focusin', enter);

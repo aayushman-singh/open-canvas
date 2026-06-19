@@ -224,6 +224,27 @@ export function mountVideoPlayback(
     return { row, input };
   }
 
+  function buildNumber(
+    labelText: string,
+    value: number,
+    min: number,
+    max: number,
+  ): { row: HTMLDivElement; input: HTMLInputElement } {
+    const row = document.createElement('div');
+    row.className = 'field';
+    const label = document.createElement('label');
+    label.textContent = labelText;
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = String(min);
+    input.max = String(max);
+    input.step = '1';
+    input.value = String(value);
+    label.appendChild(input);
+    row.appendChild(label);
+    return { row, input };
+  }
+
   const modeBuilt = buildSelect('Hover mode', VIDEO_HOVER_PLAYBACK_MODES, element.hoverPlayback.mode);
   modeBuilt.select.addEventListener('change', function () {
     ctx.captureForUndo();
@@ -277,6 +298,32 @@ export function mountVideoPlayback(
     ctx.scheduleSave();
   });
   host.appendChild(posterBuilt.row);
+
+  const intentDelayBuilt = buildNumber(
+    'Hover intent delay',
+    element.hoverPlayback.intentDelayMs ?? 0,
+    0,
+    5000,
+  );
+  intentDelayBuilt.input.addEventListener('change', function () {
+    ctx.captureForUndo();
+    const value = Number(intentDelayBuilt.input.value);
+    if (!Number.isFinite(value) || value < 0 || value > 5000) {
+      ctx.setStatus('Hover intent delay must be 0-5000ms', 'error');
+      intentDelayBuilt.input.value = String(element.hoverPlayback!.intentDelayMs ?? 0);
+      return;
+    }
+    const rounded = Math.round(value);
+    intentDelayBuilt.input.value = String(rounded);
+    if (rounded === 0) {
+      delete element.hoverPlayback!.intentDelayMs;
+    } else {
+      element.hoverPlayback!.intentDelayMs = rounded;
+    }
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  host.appendChild(intentDelayBuilt.row);
 
   const reducedBuilt = buildSelect(
     'Reduced motion',

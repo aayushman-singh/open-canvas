@@ -1483,6 +1483,17 @@ function validateElement(
               }
             }
           }
+          if (
+            element.hoverPlayback.intentDelayMs !== undefined &&
+            (typeof element.hoverPlayback.intentDelayMs !== 'number' ||
+              !Number.isFinite(element.hoverPlayback.intentDelayMs) ||
+              element.hoverPlayback.intentDelayMs < 0 ||
+              element.hoverPlayback.intentDelayMs > 5000)
+          ) {
+            errors.push(
+              `${basePath}.hoverPlayback.intentDelayMs must be a finite number between 0 and 5000 when present`,
+            );
+          }
           if (element.playback?.autoplay === true) {
             errors.push(
               `${basePath}.hoverPlayback cannot be enabled when playback.autoplay=true`,

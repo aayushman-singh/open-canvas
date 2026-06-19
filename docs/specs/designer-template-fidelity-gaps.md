@@ -359,7 +359,9 @@ Current state:
   It is video-only, muted by contract for browser autoplay policy, focus-aware,
   reduced-motion-aware, and fails through `opencanvas:video-hover-failure`
   instead of silently ignoring rejected playback. Pointer scrub and alternate
-  hover stream/poster assets are schema-owned and editor-exposed.
+  hover stream/poster assets are schema-owned and editor-exposed. Hover intent
+  delay is schema-owned so accidental passes across card grids can be canceled
+  before playback starts.
 - **June 2026 update:** Pointer FX now has an element-level inspector catalog.
   Owners can apply `spotlight`, `tilt`, `magnetic`, `cursor-follow`,
   `reveal-mask`, `pointer-parallax`, `cursor-trail`, or `image-follow` to

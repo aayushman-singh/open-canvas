@@ -33,6 +33,10 @@ assert(
   mountsSrc.includes('Hover poster asset') && mountsSrc.includes('streamPosterAssetId'),
   'media inspector must expose alternate hover poster asset control',
 );
+assert(
+  mountsSrc.includes('Hover intent delay') && mountsSrc.includes('intentDelayMs'),
+  'media inspector must expose hover intent delay control',
+);
 assert(mountsSrc.includes('playback.autoplay = false'), 'enabling hover must clear autoplay conflict');
 assert(
   hydrateSrc.includes('function hydrateVideoHoverStreams'),

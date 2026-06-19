@@ -38,6 +38,7 @@ function makeSite(): EditableSite {
                   mode: 'play-reset',
                   streamAssetId: 'clip-hover',
                   streamPosterAssetId: 'poster-hover',
+                  intentDelayMs: 120,
                   reducedMotion: 'disabled',
                 },
               },
@@ -67,6 +68,7 @@ assert(
     decodedVideo.hoverPlayback?.mode === 'play-reset' &&
     decodedVideo.hoverPlayback.streamAssetId === 'clip-hover' &&
     decodedVideo.hoverPlayback.streamPosterAssetId === 'poster-hover' &&
+    decodedVideo.hoverPlayback.intentDelayMs === 120 &&
     (decodedVideo.hoverPlayback as unknown as Record<string, unknown>).scrubOnHover === true,
   'Yjs projection must preserve video hover config',
 );
@@ -99,6 +101,10 @@ assert(
 assert(
   html.includes('data-opencanvas-video-hover-poster-src="/assets/poster-hover"'),
   'renderer must emit alternate hover poster source',
+);
+assert(
+  html.includes('data-opencanvas-video-hover-intent-delay-ms="120"'),
+  'renderer must emit hover intent delay',
 );
 assert(html.includes(' muted'), 'hover video must render muted for autoplay policy');
 
@@ -172,6 +178,28 @@ assert(
 assert(
   invalidStreamResult.errors.some((error) => error.includes('.hoverPlayback.streamPosterAssetId')),
   'invalid hover poster asset failure must be named',
+);
+
+const invalidIntentDelay = makeSite() as unknown as Record<string, unknown>;
+const invalidIntentDelayElement = (
+  (
+    (((invalidIntentDelay.pages as unknown[])[0] as Record<string, unknown>).sections as unknown[])[0] as Record<
+      string,
+      unknown
+    >
+  ).elements as Record<string, unknown>[]
+)[0]!;
+invalidIntentDelayElement.hoverPlayback = {
+  enabled: true,
+  mode: 'play-reset',
+  intentDelayMs: -1,
+  reducedMotion: 'disabled',
+};
+const invalidIntentDelayResult = validateEditableSite(invalidIntentDelay);
+assert(!invalidIntentDelayResult.valid, 'invalid hover intent delay must fail validation');
+assert(
+  invalidIntentDelayResult.errors.some((error) => error.includes('.hoverPlayback.intentDelayMs')),
+  'invalid hover intent delay failure must be named',
 );
 
 const invalidAutoplay = makeSite();

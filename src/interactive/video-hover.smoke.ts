@@ -39,6 +39,7 @@ const snapshot: PublishedSnapshot = {
                 mode: 'play-pause',
                 streamAssetId: 'hover-clip',
                 streamPosterAssetId: 'hover-poster',
+                intentDelayMs: 150,
                 reducedMotion: 'allow',
               },
             },
@@ -77,6 +78,18 @@ assert(
   'runtime must fail loudly when alternate hover stream source is empty',
 );
 assert(
+  VIDEO_HOVER_RUNTIME_SRC.includes('data-opencanvas-video-hover-intent-delay-ms'),
+  'runtime must read hover intent delay metadata',
+);
+assert(
+  VIDEO_HOVER_RUNTIME_SRC.includes('invalid-intent-delay'),
+  'runtime must fail loudly for invalid hover intent delays',
+);
+assert(
+  VIDEO_HOVER_RUNTIME_SRC.includes('setTimeout') && VIDEO_HOVER_RUNTIME_SRC.includes('clearTimeout'),
+  'runtime must delay hover activation and cancel accidental hovers',
+);
+assert(
   VIDEO_HOVER_RUNTIME_SRC.includes('currentTime') && VIDEO_HOVER_RUNTIME_SRC.includes('duration'),
   'runtime must scrub video currentTime from pointer position',
 );
@@ -103,6 +116,10 @@ assert(
 assert(
   html.includes('data-opencanvas-video-hover-stream-src="/assets/hover-clip"'),
   'renderer must emit alternate hover stream source',
+);
+assert(
+  html.includes('data-opencanvas-video-hover-intent-delay-ms="150"'),
+  'renderer must emit hover intent delay metadata',
 );
 const withRuntime = injectInteractiveRuntime(html, snapshot);
 assert(

@@ -21,6 +21,7 @@ export interface VideoHoverPlayback {
   scrubOnHover?: boolean;
   streamAssetId?: string;
   streamPosterAssetId?: string;
+  intentDelayMs?: number;
   reducedMotion: VideoHoverReducedMotionMode;
 }
 
@@ -97,6 +98,11 @@ export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string 
     if (element.hoverPlayback.streamPosterAssetId !== undefined) {
       attrs.push(
         `data-opencanvas-video-hover-poster-src="${escapeAttr(assetSrc(element.hoverPlayback.streamPosterAssetId))}"`,
+      );
+    }
+    if (element.hoverPlayback.intentDelayMs !== undefined) {
+      attrs.push(
+        `data-opencanvas-video-hover-intent-delay-ms="${escapeAttr(String(element.hoverPlayback.intentDelayMs))}"`,
       );
     }
     attrs.push(

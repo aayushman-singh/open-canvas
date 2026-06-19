@@ -166,6 +166,7 @@ function readVideoHoverConfig(video: HTMLVideoElement): {
   reducedMotion: 'disabled' | 'allow';
   streamSrc: string | null;
   posterSrc: string | null;
+  intentDelayMs: number;
 } {
   const mode = video.getAttribute('data-opencanvas-video-hover-mode');
   if (mode !== 'play-pause' && mode !== 'play-reset') {
@@ -199,7 +200,20 @@ function readVideoHoverConfig(video: HTMLVideoElement): {
       posterSrc,
     );
   }
-  return { mode, scrubOnHover, reducedMotion, streamSrc, posterSrc };
+  const intentDelayAttr = video.getAttribute('data-opencanvas-video-hover-intent-delay-ms');
+  let intentDelayMs = 0;
+  if (intentDelayAttr !== null) {
+    intentDelayMs = Number(intentDelayAttr);
+    if (!Number.isFinite(intentDelayMs) || intentDelayMs < 0 || intentDelayMs > 5000) {
+      failVideoHover(
+        video,
+        'invalid-intent-delay',
+        'Video hover intent delay must be between 0 and 5000ms',
+        intentDelayAttr,
+      );
+    }
+  }
+  return { mode, scrubOnHover, reducedMotion, streamSrc, posterSrc, intentDelayMs };
 }
 
 function videoHoverError(err: unknown): Error {
@@ -309,14 +323,14 @@ function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {
       );
     }
     let active = false;
-    const enter = (ev: Event): void => {
-      if (active) return;
-      active = true;
+    let intentTimer: number | null = null;
+    let pendingIntentEvent: Event | null = null;
+    const activate = (ev: Event | null): void => {
       try {
         setVideoHoverSource(node, config.streamSrc, config.posterSrc, 'source-swap-failed');
         if (config.scrubOnHover) {
           node.pause();
-          scrubVideoHover(node, target, ev);
+          if (ev !== null) scrubVideoHover(node, target, ev);
           return;
         }
         if (config.mode === 'play-reset') node.currentTime = 0;
@@ -337,9 +351,30 @@ function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {
         );
       }
     };
+    const enter = (ev: Event): void => {
+      if (active) return;
+      active = true;
+      pendingIntentEvent = ev;
+      if (config.intentDelayMs > 0) {
+        intentTimer = window.setTimeout((): void => {
+          intentTimer = null;
+          activate(pendingIntentEvent);
+          pendingIntentEvent = null;
+        }, config.intentDelayMs);
+        return;
+      }
+      activate(ev);
+      pendingIntentEvent = null;
+    };
     const leave = (): void => {
       if (!active) return;
       active = false;
+      if (intentTimer !== null) {
+        window.clearTimeout(intentTimer);
+        intentTimer = null;
+        pendingIntentEvent = null;
+        return;
+      }
       try {
         node.pause();
         if (config.mode === 'play-reset') node.currentTime = 0;
@@ -357,6 +392,10 @@ function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {
     target.addEventListener('pointerleave', leave);
     target.addEventListener('pointermove', (ev: Event): void => {
       if (!active || !config.scrubOnHover) return;
+      if (intentTimer !== null) {
+        pendingIntentEvent = ev;
+        return;
+      }
       scrubVideoHover(node, target, ev);
     });
     target.addEventListener('focusin', enter);
