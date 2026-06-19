@@ -61,6 +61,8 @@ import {
   LOAD_EXPERIENCE_GATES,
   LOAD_EXPERIENCE_PRESETS,
   LOAD_EXPERIENCE_RUN_POLICIES,
+  MARQUEE_DIRECTIONS,
+  MARQUEE_REDUCED_MOTION_MODES,
   MEDIA_KINDS,
   MOTION_SEQUENCE_LITE_EFFECTS,
   MOTION_SEQUENCE_LITE_TARGET_TYPES,
@@ -85,6 +87,8 @@ import {
   type LoadExperienceGate,
   type LoadExperiencePreset,
   type LoadExperienceRunPolicy,
+  type MarqueeDirection,
+  type MarqueeReducedMotionMode,
   type MediaKind,
   type MotionSequenceLiteEffect,
   type MotionSequenceLiteTargetType,
@@ -557,6 +561,33 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
   if (value.overflow !== undefined) {
     assertOneOf<OverflowValue>(value.overflow, OVERFLOW_VALUES, `${p}.overflow`, errors);
   }
+}
+
+function validateMarquee(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`${basePath}.marquee must be an object when present`);
+    return;
+  }
+  const p = `${basePath}.marquee`;
+  if (typeof value.enabled !== 'boolean') {
+    errors.push(`${p}.enabled must be a boolean`);
+    return;
+  }
+  if (value.enabled !== true) return;
+  assertOneOf<MarqueeDirection>(value.direction, MARQUEE_DIRECTIONS, `${p}.direction`, errors);
+  if (!isFiniteNumber(value.speedPxPerSecond) || value.speedPxPerSecond <= 0) {
+    errors.push(`${p}.speedPxPerSecond must be a finite number > 0`);
+  }
+  if (value.pauseOnHover !== undefined && typeof value.pauseOnHover !== 'boolean') {
+    errors.push(`${p}.pauseOnHover must be a boolean when present`);
+  }
+  assertOneOf<MarqueeReducedMotionMode>(
+    value.reducedMotion,
+    MARQUEE_REDUCED_MOTION_MODES,
+    `${p}.reducedMotion`,
+    errors,
+  );
 }
 
 function validateComponentStyleObject(
@@ -1152,6 +1183,7 @@ function validateElement(
 
   validateBox(element.box, pageWidth, sectionHeight, basePath, errors);
   validateMotion(element.motion, basePath, errors);
+  validateMarquee(element.marquee, basePath, errors);
   validatePinnedStyle(element.pinnedStyle, basePath, errors);
   validateElementStyle(element.elementStyle, basePath, errors);
   validateAnchorId(element.anchorId, basePath, errors);

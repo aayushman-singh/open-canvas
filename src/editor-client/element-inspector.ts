@@ -33,7 +33,14 @@
 import type { EditorContext } from './editor-context.js';
 import type { InspectorSpec } from '../canvas/elements/inspector-spec.js';
 import type { CanvasElement } from '../canvas/schema.js';
-import { MOTION_PRESETS, type MotionPreset } from '../canvas/schema.js';
+import {
+  MARQUEE_DIRECTIONS,
+  MARQUEE_REDUCED_MOTION_MODES,
+  MOTION_PRESETS,
+  type MarqueeDirection,
+  type MarqueeReducedMotionMode,
+  type MotionPreset,
+} from '../canvas/schema.js';
 import {
   TEXT_SPLIT_UNITS,
   type MotionSequence,
@@ -562,6 +569,8 @@ export function renderInspector(ctx: EditorContext): void {
     ctx.inspector.appendChild(field('Motion delay (ms)', delay));
   }
 
+  renderMarqueeInspector(ctx, element);
+
   if (element.type === 'text') {
     renderTextSplitInspector(ctx, element.id, found.section.id);
   }
@@ -606,6 +615,87 @@ export function renderInspector(ctx: EditorContext): void {
     });
     ctx.inspector.appendChild(useAsTriggerBtn);
   }
+}
+
+function renderMarqueeInspector(ctx: EditorContext, element: CanvasElement): void {
+  if (!ctx.inspector) return;
+  const heading = document.createElement('h3');
+  heading.textContent = 'Marquee';
+  heading.className = 'inspector-section-heading';
+  ctx.inspector.appendChild(heading);
+
+  const enabled = document.createElement('input');
+  enabled.type = 'checkbox';
+  enabled.checked = element.marquee?.enabled === true;
+  enabled.addEventListener('change', () => {
+    ctx.captureForUndo();
+    if (enabled.checked) {
+      element.marquee = {
+        enabled: true,
+        direction: 'left',
+        speedPxPerSecond: 80,
+        pauseOnHover: true,
+        reducedMotion: 'static',
+      };
+    } else {
+      delete element.marquee;
+    }
+    ctx.rebuildElement(element.id);
+    renderInspector(ctx);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Enable marquee', enabled));
+
+  if (element.marquee?.enabled !== true) return;
+
+  const direction = selectInput(MARQUEE_DIRECTIONS, element.marquee.direction);
+  direction.addEventListener('change', () => {
+    ctx.captureForUndo();
+    element.marquee!.direction = direction.value as MarqueeDirection;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Direction', direction));
+
+  const speed = document.createElement('input');
+  speed.type = 'number';
+  speed.min = '1';
+  speed.max = '600';
+  speed.step = '1';
+  speed.value = String(element.marquee.speedPxPerSecond);
+  speed.addEventListener('change', () => {
+    const n = Number(speed.value);
+    if (!Number.isFinite(n) || n <= 0 || n > 600) {
+      ctx.setStatus('Marquee speed must be between 1 and 600 px/s', 'error');
+      speed.value = String(element.marquee!.speedPxPerSecond);
+      return;
+    }
+    ctx.captureForUndo();
+    element.marquee!.speedPxPerSecond = n;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Speed (px/s)', speed));
+
+  const pause = document.createElement('input');
+  pause.type = 'checkbox';
+  pause.checked = element.marquee.pauseOnHover === true;
+  pause.addEventListener('change', () => {
+    ctx.captureForUndo();
+    element.marquee!.pauseOnHover = pause.checked;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Pause on hover', pause));
+
+  const reducedMotion = selectInput(MARQUEE_REDUCED_MOTION_MODES, element.marquee.reducedMotion);
+  reducedMotion.addEventListener('change', () => {
+    ctx.captureForUndo();
+    element.marquee!.reducedMotion = reducedMotion.value as MarqueeReducedMotionMode;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Reduced motion', reducedMotion));
 }
 
 function renderTextSplitInspector(

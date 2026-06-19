@@ -67,6 +67,27 @@ html, body {
   overflow: hidden;
 }
 
+.opencanvas-element[data-opencanvas-marquee="true"] {
+  overflow: hidden;
+}
+
+[data-opencanvas-marquee-belt] {
+  display: flex;
+  align-items: stretch;
+  width: max-content;
+  min-width: 100%;
+  height: 100%;
+  will-change: transform;
+}
+
+[data-opencanvas-marquee-content] {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 100%;
+  height: 100%;
+}
+
 .opencanvas-action {
   display: inline-flex;
   align-items: center;

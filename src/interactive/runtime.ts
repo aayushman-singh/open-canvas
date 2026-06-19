@@ -44,6 +44,7 @@ function hydrateAll(scope, options) {
   // is safe.
   hydratePremiumInteractions(rootScope, options || {});
   hydrateBehaviour(rootScope);
+  hydrateMarquees(rootScope);
 }
 if (typeof window !== 'undefined') window.__opencanvasHydrate = hydrateAll;
 if (document.readyState === 'loading') {

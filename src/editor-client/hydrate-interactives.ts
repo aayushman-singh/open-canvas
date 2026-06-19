@@ -126,6 +126,164 @@ export function hydrateInteractives(
   if (options.behaviourState && options.behaviourAssetBasePath) {
     hydrateBehaviourPreview(root, options.behaviourState, options.behaviourAssetBasePath);
   }
+  hydrateMarquees(root);
+}
+
+// ---------------------------------------------------------------------------
+// Marquee — mirrors MARQUEE_RUNTIME_SRC in `src/interactive/marquee.ts`.
+// ---------------------------------------------------------------------------
+
+function failMarquee(el: HTMLElement, code: string, message: string, cause: string | null): never {
+  const detail = {
+    code,
+    message,
+    elementId: el.getAttribute('data-opencanvas-element'),
+    cause,
+  };
+  window.dispatchEvent(new CustomEvent('opencanvas:marquee-failure', { detail }));
+  console.error('[opencanvas marquee] ' + message, detail);
+  throw new Error('[opencanvas marquee] ' + message);
+}
+
+function readMarqueeConfig(el: HTMLElement): {
+  direction: 'left' | 'right';
+  speed: number;
+  pauseOnHover: boolean;
+  reducedMotion: 'static' | 'slow';
+} {
+  const direction = el.getAttribute('data-opencanvas-marquee-direction');
+  if (direction !== 'left' && direction !== 'right') {
+    failMarquee(el, 'invalid-direction', 'Marquee direction must be left or right', direction);
+  }
+  const speedRaw = el.getAttribute('data-opencanvas-marquee-speed');
+  const speed = speedRaw === null ? Number.NaN : Number(speedRaw);
+  if (!Number.isFinite(speed) || speed <= 0) {
+    failMarquee(el, 'invalid-speed', 'Marquee speed must be a finite number > 0', speedRaw);
+  }
+  const reducedMotion = el.getAttribute('data-opencanvas-marquee-reduced-motion');
+  if (reducedMotion !== 'static' && reducedMotion !== 'slow') {
+    failMarquee(
+      el,
+      'invalid-reduced-motion',
+      'Marquee reduced-motion mode must be static or slow',
+      reducedMotion,
+    );
+  }
+  return {
+    direction,
+    speed,
+    pauseOnHover: el.getAttribute('data-opencanvas-marquee-pause') === 'true',
+    reducedMotion,
+  };
+}
+
+function isMarqueeEditorChrome(node: ChildNode): boolean {
+  if (!(node instanceof HTMLElement)) return false;
+  return (
+    node.classList.contains('element-menu-trigger') ||
+    node.classList.contains('resize-handle') ||
+    node.hasAttribute('data-resize-handle')
+  );
+}
+
+function stripMarqueeCloneInteractivity(node: HTMLElement): void {
+  node.removeAttribute('id');
+  node.setAttribute('aria-hidden', 'true');
+  node.inert = true;
+  const focusables = node.querySelectorAll('a,button,input,select,textarea,[tabindex]');
+  for (let i = 0; i < focusables.length; i++) {
+    focusables[i]?.setAttribute('tabindex', '-1');
+  }
+  const descendants = node.querySelectorAll('[id]');
+  for (let i = 0; i < descendants.length; i++) {
+    descendants[i]?.removeAttribute('id');
+  }
+}
+
+function hydrateMarquees(scope: ParentNode): void {
+  const nodes = scope.querySelectorAll('[data-opencanvas-marquee="true"]');
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    if (!(node instanceof HTMLElement)) continue;
+    if (node.getAttribute('data-opencanvas-marquee-hydrated') === 'true') continue;
+    const config = readMarqueeConfig(node);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce && config.reducedMotion === 'static') {
+      node.setAttribute('data-opencanvas-marquee-hydrated', 'true');
+      node.setAttribute('data-opencanvas-marquee-reduced', 'static');
+      continue;
+    }
+    if (typeof node.animate !== 'function') {
+      failMarquee(node, 'missing-waapi', 'Marquee requires Element.animate support', null);
+    }
+    if (reduce && config.reducedMotion === 'slow') {
+      config.speed = Math.max(1, config.speed / 4);
+      node.setAttribute('data-opencanvas-marquee-reduced', 'slow');
+    }
+    const belt = document.createElement('div');
+    belt.setAttribute('data-opencanvas-marquee-belt', 'true');
+    belt.style.display = 'flex';
+    belt.style.alignItems = 'stretch';
+    belt.style.width = 'max-content';
+    belt.style.minWidth = '100%';
+    belt.style.height = '100%';
+    belt.style.willChange = 'transform';
+    const content = document.createElement('div');
+    content.setAttribute('data-opencanvas-marquee-content', 'true');
+    content.style.display = 'inline-flex';
+    content.style.alignItems = 'center';
+    content.style.flex = '0 0 auto';
+    content.style.minWidth = '100%';
+    content.style.height = '100%';
+    const chrome: ChildNode[] = [];
+    while (node.firstChild) {
+      const child = node.firstChild;
+      node.removeChild(child);
+      if (isMarqueeEditorChrome(child)) {
+        chrome.push(child);
+      } else {
+        content.appendChild(child);
+      }
+    }
+    if (!content.firstChild) {
+      failMarquee(node, 'empty-content', 'Marquee element has no visual content to animate', null);
+    }
+    const clone = content.cloneNode(true);
+    if (!(clone instanceof HTMLElement)) {
+      failMarquee(node, 'clone-failed', 'Marquee content clone did not produce an HTMLElement', null);
+    }
+    stripMarqueeCloneInteractivity(clone);
+    clone.style.pointerEvents = 'none';
+    belt.appendChild(content);
+    belt.appendChild(clone);
+    node.appendChild(belt);
+    for (const child of chrome) node.appendChild(child);
+    node.style.overflow = 'hidden';
+    let width = content.getBoundingClientRect().width;
+    if (!(width > 0)) width = content.scrollWidth || belt.scrollWidth / 2 || node.clientWidth || 0;
+    if (!(width > 0)) {
+      failMarquee(node, 'zero-width', 'Marquee content width must be measurable', null);
+    }
+    const duration = Math.max(100, Math.round((width / config.speed) * 1000));
+    const frames =
+      config.direction === 'left'
+        ? [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-' + width + 'px,0,0)' }]
+        : [{ transform: 'translate3d(-' + width + 'px,0,0)' }, { transform: 'translate3d(0,0,0)' }];
+    const animation = belt.animate(frames, {
+      duration,
+      iterations: Infinity,
+      easing: 'linear',
+    });
+    if (config.pauseOnHover) {
+      node.addEventListener('mouseenter', () => {
+        animation.pause();
+      });
+      node.addEventListener('mouseleave', () => {
+        animation.play();
+      });
+    }
+    node.setAttribute('data-opencanvas-marquee-hydrated', 'true');
+  }
 }
 
 // ---------------------------------------------------------------------------

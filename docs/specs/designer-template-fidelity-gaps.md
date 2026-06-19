@@ -17,6 +17,8 @@ Observable success:
   staggered text/media reveals, and section-to-section continuity.
 - Hover, cursor, and component interactions are authored, previewed, and
   published as part of the Template, not hidden in raw scripts.
+- Repeating motion motifs such as logo/text marquees are editable in the
+  element inspector and match between editor preview and published pages.
 - Modal and overlay behaviour matches the reference: trigger, backdrop,
   entrance, exit, close affordance, focus handling, and body scroll behaviour.
 - Page navigation can preserve visual continuity through page/state
@@ -73,6 +75,11 @@ Open Canvas has real motion and interaction primitives already:
 - Published output now emits first-class overlay shells, load-experience
   shells, route-transition metadata, and Motion Sequence Lite descriptors.
   The Runtime Hydrator rehydrates these after live-publish HTML swaps.
+- **June 2026 update:** element-level Marquee is now schema-owned. The
+  element inspector can enable direction, speed, pause-on-hover, and explicit
+  reduced-motion mode; renderer/editor wrappers emit `data-opencanvas-marquee*`
+  metadata; the Runtime Hydrator duplicates the visual track and animates it in
+  visitor and editor contexts; validator/Yjs/smokes cover the contract.
 
 That baseline is useful, and Premium Interaction v1 closes the first typed
 slice of the modal/preload/route gap. It is still not enough for 1:1
@@ -283,6 +290,10 @@ Current state:
 - Pointer-fx exists as a runtime concept with `spotlight` and `tilt`.
 - Only Form `spotlight` is attached to a shipped variant.
 - Hover states are mostly fixed CSS inside component/style-kit selectors.
+- **June 2026 update:** Marquee is no longer template-JSON-only. Any element
+  can opt into a schema-owned continuous marquee with inspector controls,
+  render metadata, editor/visitor Runtime Hydrator support, named failure
+  events, and explicit reduced-motion behaviour.
 
 User-visible miss:
 
@@ -290,6 +301,8 @@ User-visible miss:
   hover reveal masks, card tilt on arbitrary surfaces, pointer-driven parallax,
   drag/inertia sliders, or hover-to-preview grids.
 - Cannot author touch-specific equivalents for mobile.
+- Marquee does not yet include multi-row staggering, masked edge fades,
+  hover-reverse, or collection-driven ticker sources.
 
 Needed primitive:
 

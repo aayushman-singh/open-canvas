@@ -400,6 +400,16 @@ function applyCommonElementWrapperAttrs(wrapper: HTMLElement, element: CanvasEle
       wrapper.style.setProperty('--opencanvas-motion-delay', String(element.motion.delayMs) + 'ms');
     }
   }
+  if (element.marquee?.enabled === true) {
+    wrapper.setAttribute('data-opencanvas-marquee', 'true');
+    wrapper.setAttribute('data-opencanvas-marquee-direction', element.marquee.direction);
+    wrapper.setAttribute('data-opencanvas-marquee-speed', String(element.marquee.speedPxPerSecond));
+    wrapper.setAttribute(
+      'data-opencanvas-marquee-pause',
+      String(element.marquee.pauseOnHover === true),
+    );
+    wrapper.setAttribute('data-opencanvas-marquee-reduced-motion', element.marquee.reducedMotion);
+  }
 }
 
 export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string): void {

@@ -110,6 +110,20 @@ export const MOTION_PRESETS = [
 ] as const;
 export type MotionPreset = (typeof MOTION_PRESETS)[number];
 
+export const MARQUEE_DIRECTIONS = ['left', 'right'] as const;
+export type MarqueeDirection = (typeof MARQUEE_DIRECTIONS)[number];
+
+export const MARQUEE_REDUCED_MOTION_MODES = ['static', 'slow'] as const;
+export type MarqueeReducedMotionMode = (typeof MARQUEE_REDUCED_MOTION_MODES)[number];
+
+export interface MarqueeBehaviour {
+  enabled: boolean;
+  direction: MarqueeDirection;
+  speedPxPerSecond: number;
+  pauseOnHover?: boolean;
+  reducedMotion: MarqueeReducedMotionMode;
+}
+
 export const SCROLL_TRIGGER_MODES = ['on-load', 'on-scroll'] as const;
 export type ScrollTriggerMode = (typeof SCROLL_TRIGGER_MODES)[number];
 
@@ -353,6 +367,7 @@ export interface BaseElement {
   type: ElementType;
   box: PositionedBox;
   motion?: { preset: MotionPreset; delayMs?: number };
+  marquee?: MarqueeBehaviour;
   /**
    * Escape hatch: arbitrary CSS custom-property overrides applied to the
    * element's root, untouched by the renderer's element-style serializer.

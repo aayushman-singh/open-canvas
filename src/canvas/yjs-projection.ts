@@ -337,6 +337,7 @@ function encodeBaseElementFields(target: Y.Map<unknown>, el: BaseElement): void 
   target.set('type', el.type);
   target.set('box', encodePositionedBox(el.box));
   if (el.motion !== undefined) target.set('motion', encodeMotion(el.motion));
+  if (el.marquee !== undefined) target.set('marquee', encodeJsonValue(el.marquee));
   if (el.pinnedStyle !== undefined) target.set('pinnedStyle', encodeStringRecord(el.pinnedStyle));
   if (el.elementStyle !== undefined)
     target.set('elementStyle', encodeElementStyle(el.elementStyle));
@@ -1147,6 +1148,10 @@ function decodeBaseElement(map: Y.Map<unknown>): BaseElement {
     box: decodePositionedBox(map.get('box') as Y.Map<unknown>),
   };
   if (map.has('motion')) out.motion = decodeMotion(map.get('motion') as Y.Map<unknown>);
+  if (map.has('marquee')) {
+    const marquee = decodeJsonValue(map.get('marquee')) as BaseElement['marquee'];
+    if (marquee !== undefined) out.marquee = marquee;
+  }
   if (map.has('pinnedStyle')) {
     out.pinnedStyle = decodeStringRecord(map.get('pinnedStyle') as Y.Map<string>);
   }
