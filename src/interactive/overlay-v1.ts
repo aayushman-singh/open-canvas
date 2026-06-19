@@ -16,6 +16,11 @@ function hydrateOverlays(scope, options) {
       var triggerType = overlay.getAttribute('data-opencanvas-overlay-trigger-type') || 'load';
       var triggerValue = parseFloat(overlay.getAttribute('data-opencanvas-overlay-trigger-value') || '0');
       var triggerTarget = overlay.getAttribute('data-opencanvas-overlay-trigger-target') || '';
+      var presentation = overlay.getAttribute('data-opencanvas-overlay-presentation') || 'modal';
+      if (presentation !== 'modal' && presentation !== 'fullscreen-menu') {
+        overlayFailure(id, 'overlay-presentation', { presentation: presentation });
+        return;
+      }
       var surface = overlay.querySelector('[data-opencanvas-overlay-surface]');
       var backdrop = overlay.querySelector('[data-opencanvas-overlay-backdrop]');
       var closeButtonEnabled = overlay.getAttribute('data-opencanvas-overlay-close-button') === 'true';
@@ -37,6 +42,10 @@ function hydrateOverlays(scope, options) {
         var closeSequence = overlay.getAttribute('data-opencanvas-overlay-close-sequence');
         if (closeSequence && typeof runMotionSequenceLite === 'function') runMotionSequenceLite(overlay, closeSequence);
         overlay.removeAttribute('data-opencanvas-overlay-open');
+        overlay.removeAttribute('data-opencanvas-overlay-active-presentation');
+        if (document.documentElement.getAttribute('data-opencanvas-overlay-active-presentation') === presentation) {
+          document.documentElement.removeAttribute('data-opencanvas-overlay-active-presentation');
+        }
         overlay.hidden = true;
         if (lockEnabled) document.body.style.overflow = previousOverflow;
         if (returnFocusEnabled && lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
@@ -67,13 +76,15 @@ function hydrateOverlays(scope, options) {
         previousOverflow = document.body.style.overflow || '';
         overlay.hidden = false;
         overlay.setAttribute('data-opencanvas-overlay-open', 'true');
+        overlay.setAttribute('data-opencanvas-overlay-active-presentation', presentation);
+        document.documentElement.setAttribute('data-opencanvas-overlay-active-presentation', presentation);
         if (lockEnabled) document.body.style.overflow = 'hidden';
         if (closeButtonEnabled && surface && !closeButton) {
           closeButton = document.createElement('button');
           closeButton.type = 'button';
           closeButton.className = 'opencanvas-overlay-close';
-          closeButton.setAttribute('aria-label', 'Close overlay');
-          closeButton.textContent = 'x';
+          closeButton.setAttribute('aria-label', presentation === 'fullscreen-menu' ? 'Close menu' : 'Close overlay');
+          closeButton.textContent = presentation === 'fullscreen-menu' ? 'Close' : 'x';
           closeButton.addEventListener('click', close);
           surface.appendChild(closeButton);
         }

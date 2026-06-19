@@ -196,7 +196,8 @@
     "e2e": "npx playwright test",
     "e2e:headed": "npx playwright test --headed",
     "e2e:ui": "npx playwright test --ui",
-    "prepare": "simple-git-hooks"
+    "prepare": "simple-git-hooks",
+    "overlay-v2:smoke": "bun run ./src/canvas/overlay-v2.smoke.ts"
   },
   "simple-git-hooks": {
     "pre-commit": "bunx lint-staged --no-stash && bun run typecheck && bun run ci:smoke"

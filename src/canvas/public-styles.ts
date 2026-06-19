@@ -1093,6 +1093,31 @@ const variantCss = String.raw`
   background: var(--opencanvas-kit-bg, #0c0c0d);
   color: var(--opencanvas-kit-text, #f6f6f6);
 }
+.opencanvas-overlay[data-opencanvas-overlay-presentation="fullscreen-menu"][data-opencanvas-overlay-open] {
+  place-items: stretch;
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="fullscreen-menu"] .opencanvas-overlay-backdrop {
+  background: var(--opencanvas-kit-bg, #0c0c0d);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="fullscreen-menu"] .opencanvas-overlay-surface {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 12% 18%, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 22%, transparent), transparent 34%),
+    var(--opencanvas-kit-bg, #0c0c0d);
+}
+.opencanvas-overlay--fullscreen-menu .opencanvas-overlay-close {
+  top: 24px;
+  right: 24px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in oklab, currentColor 28%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--opencanvas-kit-bg, #0c0c0d) 72%, transparent);
+  color: inherit;
+}
 .opencanvas-overlay-close {
   position: absolute;
   top: 12px;

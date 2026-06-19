@@ -692,3 +692,9 @@ Every existing feature should map into that model:
 
 That keeps behaviour explicit and prevents the next designer-template wave from
 adding disconnected one-off runtimes.
+
+### 17. Overlay v2 Fullscreen Menu Presentation
+
+Status: addressed for the schema-owned fullscreen menu presentation slice. Owners can set an Overlay presentation to `fullscreen-menu`, keep authoring the content through the existing `Overlay.content` Canvas Section, preview it from the Interactions panel, and publish explicit overlay presentation/content-canvas metadata consumed by the Runtime Hydrator. Unsupported presentation modes now fail validation instead of degrading to modal behaviour.
+
+Intentional deferral: richer nested overlay-canvas editing affordances, overlay-specific layout presets, and menu choreography presets remain outside this slice; Motion Sequence Lite can already animate the overlay surface/backdrop.

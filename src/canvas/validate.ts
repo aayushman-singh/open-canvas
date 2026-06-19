@@ -77,6 +77,7 @@ import {
   MOTION_SEQUENCE_LITE_EFFECTS,
   MOTION_SEQUENCE_LITE_TARGET_TYPES,
   MOTION_PRESETS,
+  OVERLAY_PRESENTATION_MODES,
   OVERLAY_TRIGGER_TYPES,
   OVERFLOW_VALUES,
   POINTER_FX_PRIMITIVES,
@@ -2179,6 +2180,20 @@ function validateOverlays(site: Record<string, unknown>, errors: string[]): void
       new Set<string>(),
       pageIds,
     );
+    const presentation = overlay.presentation;
+    if (presentation !== undefined) {
+      if (!isRecord(presentation)) {
+        errors.push(`${basePath}.presentation must be an object when present`);
+      } else {
+        const presentationRecord = presentation;
+        assertOneOf(
+          presentationRecord.mode,
+          OVERLAY_PRESENTATION_MODES,
+          `${basePath}.presentation.mode`,
+          errors,
+        );
+      }
+    }
     const dismissal = overlay.dismissal;
     if (!isRecord(dismissal)) {
       errors.push(`${basePath}.dismissal must be an object`);

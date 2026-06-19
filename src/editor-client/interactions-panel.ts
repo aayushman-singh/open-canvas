@@ -19,6 +19,7 @@ import type {
   MotionSequenceLiteTargetType,
   Overlay,
   OverlayDismissal,
+  OverlayPresentationMode,
   OverlayScope,
   OverlayTriggerType,
   RouteTransition,
@@ -48,6 +49,7 @@ import {
   LOAD_EXPERIENCE_RUN_POLICIES,
   MOTION_SEQUENCE_LITE_EFFECTS,
   MOTION_SEQUENCE_LITE_TARGET_TYPES,
+  OVERLAY_PRESENTATION_MODES,
   OVERLAY_TRIGGER_TYPES,
   ROUTE_TRANSITION_MODES,
   SCROLL_BEHAVIOR_MODES,
@@ -100,6 +102,7 @@ export function defaultOverlay(id: string, name: string, pageId: string): Overla
       height: 420,
       elements: [],
     },
+    presentation: { mode: 'modal' },
     dismissal: defaultDismissal(),
   };
 }
@@ -1766,6 +1769,27 @@ function renderOverlayCard(
     });
   });
   card.appendChild(field('Name', name));
+
+  const presentation = selectInput(OVERLAY_PRESENTATION_MODES, overlay.presentation?.mode ?? 'modal');
+  presentation.addEventListener('change', () => {
+    mutate(ctx, () => {
+      ctx.state!.overlays![index] = {
+        ...overlay,
+        presentation: { mode: presentation.value as OverlayPresentationMode },
+      };
+    });
+  });
+  card.appendChild(field('Presentation', presentation));
+
+  const contentCanvas = compactButton(
+    'Edit content canvas',
+    'Preview this overlay and edit its authored Canvas Section content',
+  );
+  contentCanvas.addEventListener('click', () => {
+    ctx.previewOverlay(overlay.id);
+    ctx.setStatus('Overlay content canvas selected: ' + overlay.content.id, 'ok');
+  });
+  card.appendChild(contentCanvas);
 
   const scopeValue = overlay.scope.type === 'site' ? 'site' : 'current-page';
   const scope = selectInput(['site', 'current-page'], scopeValue);

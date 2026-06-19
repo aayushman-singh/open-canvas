@@ -155,6 +155,13 @@ export type ScrollTriggerMode = (typeof SCROLL_TRIGGER_MODES)[number];
 export const OVERLAY_TRIGGER_TYPES = ['load', 'delay', 'scroll', 'exit-intent', 'element-click'] as const;
 export type OverlayTriggerType = (typeof OVERLAY_TRIGGER_TYPES)[number];
 
+export const OVERLAY_PRESENTATION_MODES = ['modal', 'fullscreen-menu'] as const;
+export type OverlayPresentationMode = (typeof OVERLAY_PRESENTATION_MODES)[number];
+
+export interface OverlayPresentation {
+  mode: OverlayPresentationMode;
+}
+
 export const LOAD_EXPERIENCE_PRESETS = ['fade', 'wipe', 'logo-card', 'progress-bar'] as const;
 export type LoadExperiencePreset = (typeof LOAD_EXPERIENCE_PRESETS)[number];
 
@@ -703,6 +710,8 @@ export interface Overlay {
   scope: OverlayScope;
   trigger: InteractionTrigger;
   content: CanvasSection;
+  /** Visual and interaction presentation of the authored overlay content canvas. */
+  presentation?: OverlayPresentation;
   dismissal: OverlayDismissal;
   openSequence?: MotionSequenceLite;
   closeSequence?: MotionSequenceLite;
