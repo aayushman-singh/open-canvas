@@ -57,7 +57,7 @@ export type CollectionDisplay = (typeof COLLECTION_DISPLAYS)[number];
 export const COLLECTION_SORTS = ['date-desc', 'date-asc', 'manual'] as const;
 export type CollectionSort = (typeof COLLECTION_SORTS)[number];
 
-export const COLLECTION_GALLERY_MODES = ['hover-reveal-detail'] as const;
+export const COLLECTION_GALLERY_MODES = ['hover-reveal-detail', 'drag-slider'] as const;
 export type CollectionGalleryMode = (typeof COLLECTION_GALLERY_MODES)[number];
 
 export const COLLECTION_GALLERY_DETAIL_MODES = ['inline-panel'] as const;
@@ -67,11 +67,16 @@ export const COLLECTION_GALLERY_REDUCED_MOTION_MODES = ['instant', 'allow'] as c
 export type CollectionGalleryReducedMotionMode =
   (typeof COLLECTION_GALLERY_REDUCED_MOTION_MODES)[number];
 
+export const COLLECTION_GALLERY_AXES = ['x', 'y'] as const;
+export type CollectionGalleryAxis = (typeof COLLECTION_GALLERY_AXES)[number];
+
 export interface CollectionGalleryBehaviour {
   mode: CollectionGalleryMode;
   detailMode: CollectionGalleryDetailMode;
   reducedMotion: CollectionGalleryReducedMotionMode;
   videoHover?: VideoHoverPlayback;
+  sliderAxis?: CollectionGalleryAxis;
+  sliderInertia?: boolean;
 }
 
 export interface CollectionStyle {
@@ -211,8 +216,28 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
     ?
       ` data-opencanvas-collection-gallery="${escapeAttr(gallery.mode)}"` +
       ` data-opencanvas-collection-gallery-detail="${escapeAttr(gallery.detailMode)}"` +
-      ` data-opencanvas-collection-gallery-reduced-motion="${escapeAttr(gallery.reducedMotion)}"`
+      ` data-opencanvas-collection-gallery-reduced-motion="${escapeAttr(gallery.reducedMotion)}"` +
+      (gallery.mode === 'drag-slider'
+        ? ` data-opencanvas-collection-gallery-slider-axis="${escapeAttr(gallery.sliderAxis ?? 'x')}"` +
+          ` data-opencanvas-collection-gallery-slider-inertia="${escapeAttr(String(gallery.sliderInertia !== false))}"`
+        : '')
     : '';
+  const effectiveFrameStyle =
+    gallery?.mode === 'drag-slider'
+      ? styleFromEntries([
+          ['display', 'flex'],
+          ['flex-wrap', 'nowrap'],
+          [
+            'gap',
+            displayAttr === 'image-only'
+              ? 'var(--opencanvas-collection-image-only-gap, var(--opencanvas-collection-grid-gap, 16px))'
+              : 'var(--opencanvas-collection-grid-gap, 16px)',
+          ],
+          ['align-content', 'flex-start'],
+          ['position', 'relative'],
+          ['overflow', 'hidden'],
+        ])
+      : frameStyle;
   const entriesHtml = renderCollectionEntries(el, ctx, gallery);
   return (
     `<div class="opencanvas-collection" data-opencanvas-interactive="collection"` +
@@ -221,7 +246,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
     ` data-collection-slug="${slugAttr}"` +
     ` data-collection-folder="${folderAttr}"` +
     galleryAttrs +
-    ` style="${escapeAttr(frameStyle)}">${entriesHtml}</div>`
+    ` style="${escapeAttr(effectiveFrameStyle)}">${entriesHtml}</div>`
   );
 }
 
@@ -319,6 +344,34 @@ function readGalleryBehaviour(el: CollectionElement): CollectionGalleryBehaviour
         el.gallery.reducedMotion,
       )}; expected one of ${COLLECTION_GALLERY_REDUCED_MOTION_MODES.join(' | ')}.`,
     );
+  }
+  if (el.gallery.mode === 'drag-slider') {
+    if (
+      el.gallery.sliderAxis !== undefined &&
+      !(COLLECTION_GALLERY_AXES as readonly string[]).includes(el.gallery.sliderAxis)
+    ) {
+      throw new Error(
+        `Collection element ${el.id}: gallery.sliderAxis has malformed value ${JSON.stringify(
+          el.gallery.sliderAxis,
+        )}; expected one of ${COLLECTION_GALLERY_AXES.join(' | ')}.`,
+      );
+    }
+    if (el.gallery.sliderInertia !== undefined && typeof el.gallery.sliderInertia !== 'boolean') {
+      throw new Error(
+        `Collection element ${el.id}: gallery.sliderInertia must be a boolean when present.`,
+      );
+    }
+  } else {
+    if (el.gallery.sliderAxis !== undefined) {
+      throw new Error(
+        `Collection element ${el.id}: gallery.sliderAxis is only supported when gallery.mode is drag-slider.`,
+      );
+    }
+    if (el.gallery.sliderInertia !== undefined) {
+      throw new Error(
+        `Collection element ${el.id}: gallery.sliderInertia is only supported when gallery.mode is drag-slider.`,
+      );
+    }
   }
   return el.gallery;
 }

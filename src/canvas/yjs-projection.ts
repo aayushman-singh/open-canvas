@@ -823,6 +823,12 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
     gallery.set('mode', el.gallery.mode);
     gallery.set('detailMode', el.gallery.detailMode);
     gallery.set('reducedMotion', el.gallery.reducedMotion);
+    if (el.gallery.sliderAxis !== undefined) {
+      gallery.set('sliderAxis', el.gallery.sliderAxis);
+    }
+    if (el.gallery.sliderInertia !== undefined) {
+      gallery.set('sliderInertia', el.gallery.sliderInertia);
+    }
     if (el.gallery.videoHover !== undefined) {
       const videoHover = new Y.Map<unknown>();
       videoHover.set('enabled', el.gallery.videoHover.enabled);
@@ -1673,6 +1679,16 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
         CollectionElement['gallery']
       >['reducedMotion'],
     };
+    if (rawGallery.has('sliderAxis')) {
+      const sliderAxis: unknown = rawGallery.get('sliderAxis');
+      if (sliderAxis !== 'x' && sliderAxis !== 'y') {
+        throw new Error(`Collection element ${el.id}: gallery.sliderAxis must decode as x or y`);
+      }
+      el.gallery.sliderAxis = sliderAxis;
+    }
+    if (rawGallery.has('sliderInertia')) {
+      el.gallery.sliderInertia = rawGallery.get('sliderInertia') as boolean;
+    }
     if (rawGallery.has('videoHover')) {
       const rawVideoHover: unknown = rawGallery.get('videoHover');
       if (!(rawVideoHover instanceof Y.Map)) {

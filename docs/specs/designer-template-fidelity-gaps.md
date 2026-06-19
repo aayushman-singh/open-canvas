@@ -25,6 +25,9 @@ Observable success:
   pointer-parallax effects plus cursor trails and image-follow cursors are
   selectable on arbitrary elements with explicit reduced-motion behaviour and
   tap/toggle touch activation; drag-inertia can publish draggable offset state.
+- Collection galleries can be dragged as schema-owned sliders that update
+  active-entry state, inspector-authored axis/inertia policy, and editor/visitor
+  Runtime Hydrator state without custom scripts.
 - Rich Motion Assets can represent Rive files as schema-owned assets with
   artboard/state-machine metadata and a bounded runtime adapter.
 - Rich Motion Assets can represent Lottie JSON files as schema-owned assets
@@ -399,8 +402,8 @@ Current state:
 
 User-visible miss:
 
-- Cannot yet bind drag/inertia gestures to collection-aware slider state.
-- Pointer FX does not yet include drag/inertia gestures.
+- Richer collection slider controls such as snap presets, keyboard paging, and
+  visible progress indicators remain deferred beyond the drag-slider primitive.
 
 June 2026 update: Marquee can now bind to a same-section Collection element as
 a schema-owned ticker source (`title`, `excerpt`, or `all-text`) instead of
@@ -783,7 +786,7 @@ Intentional deferral: richer nested overlay-canvas editing affordances, overlay-
 
 ### 18. Collection Gallery v2 Hover Reveal Detail
 
-Status: addressed for the schema-owned Collection gallery v2 slice. A Collection can now opt into `gallery.mode = hover-reveal-detail` with explicit inline detail and reduced-motion policies; the renderer emits collection/entry metadata, the Runtime Hydrator owns active-entry state, the inspector exposes owner controls, and invalid gallery modes fail validation.
+Status: addressed for the schema-owned Collection gallery v2 slice. A Collection can now opt into `gallery.mode = hover-reveal-detail` with explicit inline detail and reduced-motion policies, or `gallery.mode = drag-slider` with owner-authored axis and inertia policy. The renderer emits collection/entry metadata, the Runtime Hydrator owns active-entry and drag-slider offset state, the inspector exposes owner controls, Yjs preserves the gallery policy, and invalid gallery modes or slider relations fail validation.
 
 Intentional deferral: this does not add a 3D helmet viewer or marketplace media inventory; gallery entries continue to be materialized Collection content and can compose existing media/text/card primitives.
 

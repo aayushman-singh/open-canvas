@@ -351,6 +351,28 @@ html, body {
 .opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] {
   align-items: stretch;
 }
+.opencanvas-collection[data-opencanvas-collection-gallery="drag-slider"] {
+  align-items: stretch;
+  cursor: grab;
+  overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+}
+.opencanvas-collection[data-opencanvas-collection-gallery="drag-slider"][data-opencanvas-collection-gallery-dragging="true"] {
+  cursor: grabbing;
+}
+.opencanvas-collection[data-opencanvas-collection-gallery="drag-slider"] .opencanvas-collection-entry {
+  transform: translate3d(
+    var(--opencanvas-collection-slider-x, 0px),
+    var(--opencanvas-collection-slider-y, 0px),
+    0
+  );
+  transition: transform 160ms ease-out;
+  will-change: transform;
+}
+.opencanvas-collection[data-opencanvas-collection-gallery="drag-slider"][data-opencanvas-collection-gallery-dragging="true"] .opencanvas-collection-entry {
+  transition: none;
+}
 .opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry {
   cursor: pointer;
   isolation: isolate;
@@ -383,6 +405,7 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry { transition: none; }
   .opencanvas-collection[data-opencanvas-collection-gallery="hover-reveal-detail"] .opencanvas-collection-entry::after { transition: none; }
+  .opencanvas-collection[data-opencanvas-collection-gallery="drag-slider"] .opencanvas-collection-entry { transition: none; }
 }
 
 /* ---- Forms ------------------------------------------------------------

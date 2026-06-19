@@ -9,6 +9,7 @@ import { CUSTOM_404_PAGE_SLUG } from './page-routing.js';
 import { ACCORDION_VARIANTS } from './elements/accordion.js';
 import {
   COLLECTION_DISPLAYS,
+  COLLECTION_GALLERY_AXES,
   COLLECTION_GALLERY_DETAIL_MODES,
   COLLECTION_GALLERY_MODES,
   COLLECTION_GALLERY_REDUCED_MOTION_MODES,
@@ -1924,6 +1925,29 @@ function validateElement(
               `${basePath}.gallery.videoHover`,
               errors,
             );
+          }
+          if (element.gallery.mode === 'drag-slider') {
+            if (element.gallery.sliderAxis !== undefined) {
+              assertOneOf(
+                element.gallery.sliderAxis,
+                COLLECTION_GALLERY_AXES,
+                `${basePath}.gallery.sliderAxis`,
+                errors,
+              );
+            }
+            if (
+              element.gallery.sliderInertia !== undefined &&
+              typeof element.gallery.sliderInertia !== 'boolean'
+            ) {
+              errors.push(`${basePath}.gallery.sliderInertia must be a boolean when present`);
+            }
+          } else {
+            if (element.gallery.sliderAxis !== undefined) {
+              errors.push(`${basePath}.gallery.sliderAxis is only supported when gallery.mode is drag-slider`);
+            }
+            if (element.gallery.sliderInertia !== undefined) {
+              errors.push(`${basePath}.gallery.sliderInertia is only supported when gallery.mode is drag-slider`);
+            }
           }
         }
       }

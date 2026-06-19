@@ -59,11 +59,13 @@ import {
 } from '../canvas/behaviour-primitives.js';
 import type {
   CollectionElement,
+  CollectionGalleryAxis,
   CollectionGalleryReducedMotionMode,
   CollectionSort,
 } from '../canvas/elements/collection.js';
 import {
   COLLECTION_DISPLAYS,
+  COLLECTION_GALLERY_AXES,
   COLLECTION_GALLERY_REDUCED_MOTION_MODES,
   COLLECTION_SORTS,
 } from '../canvas/elements/collection.js';
@@ -2059,17 +2061,28 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
   galleryReveal.value = 'hover-reveal-detail';
   galleryReveal.textContent = 'Hover reveal + detail';
   galleryModeSelect.appendChild(galleryReveal);
+  const galleryDrag = document.createElement('option');
+  galleryDrag.value = 'drag-slider';
+  galleryDrag.textContent = 'Drag slider';
+  galleryModeSelect.appendChild(galleryDrag);
   galleryModeSelect.value = collection.gallery?.mode ?? 'off';
   galleryModeSelect.addEventListener('change', () => {
     ctx.captureForUndo();
     if (galleryModeSelect.value === 'off') {
       delete collection.gallery;
     } else {
+      const selectedMode = galleryModeSelect.value === 'drag-slider' ? 'drag-slider' : 'hover-reveal-detail';
       collection.gallery = {
-        mode: 'hover-reveal-detail',
+        mode: selectedMode,
         detailMode: 'inline-panel',
         reducedMotion: collection.gallery?.reducedMotion ?? 'allow',
         ...(collection.gallery?.videoHover ? { videoHover: collection.gallery.videoHover } : {}),
+        ...(selectedMode === 'drag-slider'
+          ? {
+              sliderAxis: collection.gallery?.sliderAxis ?? 'x',
+              sliderInertia: collection.gallery?.sliderInertia ?? true,
+            }
+          : {}),
       };
     }
     ctx.rebuildElement(collection.id);
@@ -2078,7 +2091,7 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
   });
   inspector.appendChild(field('Collection gallery', galleryModeSelect));
 
-  if (collection.gallery?.mode === 'hover-reveal-detail') {
+  if (collection.gallery?.mode === 'hover-reveal-detail' || collection.gallery?.mode === 'drag-slider') {
     const reducedMotionSelect = document.createElement('select');
     for (const mode of COLLECTION_GALLERY_REDUCED_MOTION_MODES) {
       const option = document.createElement('option');
@@ -2090,16 +2103,44 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
     reducedMotionSelect.addEventListener('change', () => {
       ctx.captureForUndo();
       collection.gallery = {
-        mode: 'hover-reveal-detail',
+        mode: collection.gallery!.mode,
         detailMode: 'inline-panel',
         reducedMotion: reducedMotionSelect.value as CollectionGalleryReducedMotionMode,
         ...(collection.gallery?.videoHover ? { videoHover: collection.gallery.videoHover } : {}),
+        ...(collection.gallery?.mode === 'drag-slider'
+          ? {
+              sliderAxis: collection.gallery.sliderAxis ?? 'x',
+              sliderInertia: collection.gallery.sliderInertia ?? true,
+            }
+          : {}),
       };
       ctx.rebuildElement(collection.id);
       ctx.scheduleSave();
       ctx.renderInspector();
     });
     inspector.appendChild(field('Gallery reduced motion', reducedMotionSelect));
+
+    if (collection.gallery.mode === 'drag-slider') {
+      const sliderAxis = selectInput(COLLECTION_GALLERY_AXES, collection.gallery.sliderAxis ?? 'x');
+      sliderAxis.addEventListener('change', () => {
+        ctx.captureForUndo();
+        collection.gallery!.sliderAxis = sliderAxis.value as CollectionGalleryAxis;
+        ctx.rebuildElement(collection.id);
+        ctx.scheduleSave();
+      });
+      inspector.appendChild(field('Slider axis', sliderAxis));
+
+      const sliderInertia = document.createElement('input');
+      sliderInertia.type = 'checkbox';
+      sliderInertia.checked = collection.gallery.sliderInertia !== false;
+      sliderInertia.addEventListener('change', () => {
+        ctx.captureForUndo();
+        collection.gallery!.sliderInertia = sliderInertia.checked;
+        ctx.rebuildElement(collection.id);
+        ctx.scheduleSave();
+      });
+      inspector.appendChild(field('Slider inertia', sliderInertia));
+    }
 
     const galleryVideoHover = document.createElement('input');
     galleryVideoHover.type = 'checkbox';

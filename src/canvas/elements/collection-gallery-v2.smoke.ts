@@ -7,6 +7,7 @@ import { decodeYDoc, encodeYDoc } from '../yjs-projection.js';
 import { renderCanvasSnapshot } from '../render.js';
 import { renderCollection, type CollectionElement } from './collection.js';
 import { INTERACTIVE_RUNTIME_SRC } from '../../interactive/build.js';
+import { COLLECTION_GALLERY_RUNTIME_SRC } from '../../interactive/collection-gallery.js';
 import { snapshotNeedsInteractiveRuntime } from '../../interactive/inject.js';
 
 function assert(condition: boolean, message: string): asserts condition {
@@ -124,6 +125,44 @@ assert(
   `validation error must name gallery.videoHover.mode; got ${invalidVideoHoverResult.valid ? 'valid' : invalidVideoHoverResult.errors.join(' | ')}`,
 );
 
+const dragSliderCollection = makeCollection({
+  gallery: {
+    mode: 'drag-slider',
+    detailMode: 'inline-panel',
+    reducedMotion: 'allow',
+    sliderAxis: 'x',
+    sliderInertia: true,
+  },
+});
+const dragSliderState = makeSite(dragSliderCollection);
+const dragSliderValidation = validateEditableSite(dragSliderState);
+assert(
+  dragSliderValidation.valid,
+  dragSliderValidation.valid ? 'valid drag-slider gallery should pass' : dragSliderValidation.errors.join('; '),
+);
+
+const invalidDragSlider = makeSite(
+  makeCollection({
+    gallery: {
+      mode: 'drag-slider',
+      detailMode: 'inline-panel',
+      reducedMotion: 'allow',
+      sliderAxis: 'diagonal',
+      sliderInertia: 'yes',
+    } as unknown as NonNullable<CollectionElement['gallery']>,
+  }),
+);
+const invalidDragSliderResult = validateEditableSite(invalidDragSlider);
+assert(!invalidDragSliderResult.valid, 'invalid collection gallery drag slider must fail validation');
+assert(
+  invalidDragSliderResult.errors.some((error) => error.includes('gallery.sliderAxis')),
+  `validation error must name gallery.sliderAxis; got ${invalidDragSliderResult.valid ? 'valid' : invalidDragSliderResult.errors.join(' | ')}`,
+);
+assert(
+  invalidDragSliderResult.errors.some((error) => error.includes('gallery.sliderInertia')),
+  `validation error must name gallery.sliderInertia; got ${invalidDragSliderResult.valid ? 'valid' : invalidDragSliderResult.errors.join(' | ')}`,
+);
+
 const html = renderCollection(collection, {
   styleKit: 'charcoal',
   assetBasePath: '/assets',
@@ -146,6 +185,24 @@ assert(
   'renderer must mark the initial active detail entry',
 );
 assert(html.includes('role="button"'), 'gallery entries must be keyboard-addressable buttons');
+
+const dragSliderHtml = renderCollection(dragSliderCollection, {
+  styleKit: 'charcoal',
+  assetBasePath: '/assets',
+  renderChild: (child) => `<span data-opencanvas-element="${child.id}"></span>`,
+});
+assert(
+  dragSliderHtml.includes('data-opencanvas-collection-gallery="drag-slider"'),
+  'renderer must emit drag-slider gallery mode metadata',
+);
+assert(
+  dragSliderHtml.includes('data-opencanvas-collection-gallery-slider-axis="x"'),
+  'renderer must emit drag-slider axis metadata',
+);
+assert(
+  dragSliderHtml.includes('data-opencanvas-collection-gallery-slider-inertia="true"'),
+  'renderer must emit drag-slider inertia metadata',
+);
 
 const videoHoverCollection = makeCollection({
   gallery: {
@@ -206,6 +263,15 @@ assert(
   'Yjs projection must preserve collection gallery video hover policy',
 );
 
+const decodedDragSlider = decodeYDoc(encodeYDoc(dragSliderState)).pages[0]!.sections[0]!
+  .elements[0]! as CollectionElement;
+assert(
+  decodedDragSlider.gallery?.mode === 'drag-slider' &&
+    decodedDragSlider.gallery?.sliderAxis === 'x' &&
+    decodedDragSlider.gallery?.sliderInertia === true,
+  'Yjs projection must preserve collection gallery drag-slider policy',
+);
+
 const snapshot: PublishedSnapshot = {
   ...state,
   version: 1,
@@ -224,17 +290,112 @@ assert(
   'collection gallery runtime must emit a named failure event',
 );
 
+interface StubNode {
+  attrs: Record<string, string>;
+  listeners: Record<string, Array<(ev: Record<string, unknown>) => void>>;
+  props: Record<string, string>;
+  getAttribute(key: string): string | null;
+  setAttribute(key: string, value: string): void;
+  addEventListener(type: string, handler: (ev: Record<string, unknown>) => void): void;
+  querySelectorAll(selector: string): StubNode[];
+  getBoundingClientRect(): { width: number; height: number };
+  style: { setProperty(key: string, value: string): void };
+}
+
+function makeStubNode(attrs: Record<string, string>, width = 100): StubNode {
+  const listeners: StubNode['listeners'] = {};
+  const props: Record<string, string> = {};
+  return {
+    attrs,
+    listeners,
+    props,
+    getAttribute(key: string): string | null {
+      return Object.prototype.hasOwnProperty.call(attrs, key) ? attrs[key]! : null;
+    },
+    setAttribute(key: string, value: string): void {
+      attrs[key] = value;
+    },
+    addEventListener(type: string, handler: (ev: Record<string, unknown>) => void): void {
+      (listeners[type] ||= []).push(handler);
+    },
+    querySelectorAll(): StubNode[] {
+      return [];
+    },
+    getBoundingClientRect(): { width: number; height: number } {
+      return { width, height: 80 };
+    },
+    style: {
+      setProperty(key: string, value: string): void {
+        props[key] = value;
+      },
+    },
+  };
+}
+
+type HydrateCollectionGalleries = (scope: StubNode) => void;
+// eslint-disable-next-line @typescript-eslint/no-implied-eval
+const makeHydrateCollectionGalleries = new Function(
+  `${COLLECTION_GALLERY_RUNTIME_SRC}\nreturn hydrateCollectionGalleries;`,
+) as () => HydrateCollectionGalleries;
+const hydrateCollectionGalleries = makeHydrateCollectionGalleries();
+{
+  const firstEntry = makeStubNode({
+    'data-opencanvas-collection-entry': '0',
+    'data-opencanvas-collection-entry-active': 'true',
+    'aria-expanded': 'true',
+  });
+  const secondEntry = makeStubNode({
+    'data-opencanvas-collection-entry': '1',
+    'data-opencanvas-collection-entry-active': 'false',
+    'aria-expanded': 'false',
+  });
+  const root = makeStubNode({
+    'data-opencanvas-collection-gallery': 'drag-slider',
+    'data-opencanvas-collection-gallery-detail': 'inline-panel',
+    'data-opencanvas-collection-gallery-reduced-motion': 'allow',
+    'data-opencanvas-collection-gallery-slider-axis': 'x',
+    'data-opencanvas-collection-gallery-slider-inertia': 'false',
+  });
+  root.querySelectorAll = (selector: string): StubNode[] => {
+    if (selector === '[data-opencanvas-collection-gallery]') return [];
+    if (selector === '[data-opencanvas-collection-entry]') return [firstEntry, secondEntry];
+    return [];
+  };
+  hydrateCollectionGalleries(root);
+  assert((root.listeners.pointerdown?.length ?? 0) === 1, 'drag-slider runtime must wire pointerdown');
+  assert((root.listeners.pointermove?.length ?? 0) === 1, 'drag-slider runtime must wire pointermove');
+  assert((root.listeners.pointerup?.length ?? 0) === 1, 'drag-slider runtime must wire pointerup');
+  root.listeners.pointerdown![0]!({ clientX: 0, clientY: 0, preventDefault(): void {} });
+  root.listeners.pointermove![0]!({ clientX: -120, clientY: 0, preventDefault(): void {} });
+  root.listeners.pointerup![0]!({ clientX: -120, clientY: 0 });
+  assert(
+    root.props['--opencanvas-collection-slider-x'] === '-100.00px',
+    `drag-slider runtime must clamp slider x to the second entry; got ${root.props['--opencanvas-collection-slider-x']}`,
+  );
+  assert(secondEntry.attrs['data-opencanvas-collection-entry-active'] === 'true', 'drag-slider must activate nearest entry');
+  assert(root.attrs['data-opencanvas-collection-active-entry'] === '1', 'drag-slider must publish active entry index');
+}
+
 const inspectorSource = readFileSync(join(repoSrcDir, 'editor-client', 'element-inspector.ts'), 'utf8');
 assert(inspectorSource.includes('Collection gallery'), 'inspector must expose collection gallery controls');
 assert(inspectorSource.includes('hover-reveal-detail'), 'inspector must expose hover-reveal-detail mode');
 assert(inspectorSource.includes('Gallery reduced motion'), 'inspector must expose reduced-motion authoring');
 assert(inspectorSource.includes('Gallery video hover'), 'inspector must expose batch video-hover authoring');
 assert(inspectorSource.includes('videoHover'), 'inspector must write collection gallery video hover config');
+assert(inspectorSource.includes('Drag slider'), 'inspector must expose drag-slider gallery mode');
+assert(inspectorSource.includes('Slider axis'), 'inspector must expose drag-slider axis control');
+assert(inspectorSource.includes('sliderAxis'), 'inspector must write drag-slider axis config');
+assert(inspectorSource.includes('Slider inertia'), 'inspector must expose drag-slider inertia control');
+assert(inspectorSource.includes('sliderInertia'), 'inspector must write drag-slider inertia config');
 
 const publicStyles = readFileSync(join(repoSrcDir, 'canvas', 'public-styles.ts'), 'utf8');
 assert(
   publicStyles.includes('data-opencanvas-collection-gallery="hover-reveal-detail"'),
   'public styles must include gallery v2 hover/reveal selectors',
+);
+assert(
+  publicStyles.includes('data-opencanvas-collection-gallery="drag-slider"'),
+  'public styles must include gallery drag-slider selectors',
 );
 
 const packageJson = JSON.parse(readFileSync(join(repoSrcDir, '..', 'package.json'), 'utf8')) as {
