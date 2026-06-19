@@ -56,6 +56,7 @@ import {
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
   MOTION_SEQUENCE_PROPERTIES,
+  MOTION_SEQUENCE_REPEAT_MODES,
   MOTION_SEQUENCE_TRIGGER_TYPES,
   RICH_MOTION_KINDS,
   RIVE_INPUT_EVENTS,
@@ -2891,6 +2892,31 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           if (sequence.reducedMotion !== 'skip' && sequence.reducedMotion !== 'final-state') {
             errors.push(
               `${sequencePath}.reducedMotion must be "skip" or "final-state" when present (got ${describe(sequence.reducedMotion)})`,
+            );
+          }
+        }
+        if (sequence.repeat !== undefined) {
+          if (!isRecord(sequence.repeat)) {
+            errors.push(`${sequencePath}.repeat must be an object when present`);
+          } else {
+            if (isRecord(sequence.trigger) && sequence.trigger.type === 'scroll-scene') {
+              errors.push(`${sequencePath}.repeat is not supported for scroll-scene Motion Sequences`);
+            }
+            if (
+              !isFiniteNumber(sequence.repeat.count) ||
+              !Number.isInteger(sequence.repeat.count) ||
+              sequence.repeat.count < 1 ||
+              sequence.repeat.count > 20
+            ) {
+              errors.push(
+                `${sequencePath}.repeat.count must be an integer between 1 and 20 (got ${describe(sequence.repeat.count)})`,
+              );
+            }
+            assertOneOf(
+              sequence.repeat.mode,
+              MOTION_SEQUENCE_REPEAT_MODES,
+              `${sequencePath}.repeat.mode`,
+              errors,
             );
           }
         }

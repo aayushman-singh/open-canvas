@@ -190,14 +190,19 @@ Current state:
   Motion Sequences for creation, deletion, trigger editing, reduced-motion
   policy, ordered steps, target selection, text-split unit targeting, numeric
   `from`/`to` properties, delay, duration, stagger, and easing.
+- **June 2026 update:** Motion Sequences now support finite repeat metadata
+  with `restart` or `yoyo` mode for time-based load/section-enter sequences.
+  The Interactions panel exposes repeat count/mode, the Runtime Hydrator maps
+  this to finite Web Animations iterations/direction, and scroll-scene
+  sequences reject repeat instead of silently ignoring it.
 
 User-visible miss:
 
 - Cannot reproduce staged hero intros where logo, mask, headline words, media,
   nav, and CTA all enter on one choreographed timeline.
 - Cannot chain animations across multiple elements.
-- Cannot yet define repeat, yoyo, reverse, wait, visual timeline keyframes,
-  SVG stroke drawing, variable-font axis animation, or non-numeric filter /
+- Cannot yet define reverse, visual timeline keyframes, SVG stroke drawing,
+  variable-font axis animation, non-numeric filter /
   clip-path editing from the UI.
 
 Needed primitive:
@@ -206,8 +211,9 @@ Needed primitive:
   properties, duration, easing, delay, stagger, and completion behaviour.
 - Validation must reject unsupported targets/properties instead of silently
   dropping steps.
-- Remaining next wave: timeline canvas UX, repeat/yoyo/wait controls,
-  non-numeric property editors, and SVG/variable-font effect catalogs.
+- Remaining next wave: timeline canvas UX, reverse/wait controls beyond
+  per-step delay, non-numeric property editors, and SVG/variable-font effect
+  catalogs.
 
 ### 2. Scroll Motion Is Triggered, Not Scrubbed
 

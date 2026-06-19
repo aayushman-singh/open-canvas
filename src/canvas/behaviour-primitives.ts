@@ -14,6 +14,7 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'clipPath',
   'filter',
 ] as const;
+export const MOTION_SEQUENCE_REPEAT_MODES = ['restart', 'yoyo'] as const;
 export const RICH_MOTION_KINDS = [
   'image-sequence',
   'rive',
@@ -56,6 +57,11 @@ export interface MotionSequenceStep {
   easing?: string;
 }
 
+export interface MotionSequenceRepeat {
+  count: number;
+  mode: (typeof MOTION_SEQUENCE_REPEAT_MODES)[number];
+}
+
 export interface MotionSequence {
   id: string;
   trigger:
@@ -63,6 +69,7 @@ export interface MotionSequence {
     | { type: 'section-enter'; sectionId: string }
     | { type: 'scroll-scene'; scrollSceneId: string };
   steps: MotionSequenceStep[];
+  repeat?: MotionSequenceRepeat;
   reducedMotion?: 'skip' | 'final-state';
 }
 

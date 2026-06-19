@@ -46,6 +46,7 @@ import type {
 import {
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
+  MOTION_SEQUENCE_REPEAT_MODES,
   MOTION_SEQUENCE_TRIGGER_TYPES,
   RIVE_INPUT_EVENTS,
   RIVE_INPUT_TYPES,
@@ -103,10 +104,14 @@ type SequenceSlot =
 const DEFAULT_EASING = 'ease-in-out';
 type RiveInputType = (typeof RIVE_INPUT_TYPES)[number];
 type RiveInputEvent = (typeof RIVE_INPUT_EVENTS)[number];
+type MotionSequenceRepeatMode = (typeof MOTION_SEQUENCE_REPEAT_MODES)[number];
 type ShaderScenePreset = (typeof SHADER_SCENE_PRESETS)[number];
 type ShaderSceneReducedMotionMode = (typeof SHADER_SCENE_REDUCED_MOTION_MODES)[number];
 type VideoStreamTrigger = (typeof VIDEO_STREAM_TRIGGERS)[number];
 type VideoStreamReducedMotionMode = (typeof VIDEO_STREAM_REDUCED_MOTION_MODES)[number];
+type MotionSequencePatch = Partial<Omit<MotionSequence, 'repeat'>> & {
+  repeat?: MotionSequence['repeat'] | undefined;
+};
 
 export function defaultOverlay(id: string, name: string, pageId: string): Overlay {
   return {
@@ -1530,9 +1535,11 @@ function renderMotionSequenceCard(
   const trigger = selectInput([...MOTION_SEQUENCE_TRIGGER_TYPES], sequence.trigger.type);
   trigger.addEventListener('change', () => {
     mutate(ctx, () => {
-      updateMotionSequence(ctx, sequence.id, {
+      const patch: MotionSequencePatch = {
         trigger: defaultMotionSequenceTrigger(ctx, trigger.value),
-      });
+      };
+      if (trigger.value === 'scroll-scene') patch.repeat = undefined;
+      updateMotionSequence(ctx, sequence.id, patch);
     });
   });
   card.appendChild(field('Trigger', trigger));
@@ -1545,6 +1552,49 @@ function renderMotionSequenceCard(
     });
   });
   card.appendChild(field('Reduced motion', reduced));
+
+  const repeatDisabled = sequence.trigger.type === 'scroll-scene';
+  const repeatCount = numberInput(sequence.repeat?.count ?? 0, 0, 20, 1);
+  repeatCount.disabled = repeatDisabled;
+  repeatCount.addEventListener('change', () => {
+    const next = validNumber(repeatCount, 0, 20);
+    if (next === null || !Number.isInteger(next)) {
+      ctx.setStatus('Motion Sequence repeat count must be an integer from 0-20', 'error');
+      repeatCount.value = String(sequence.repeat?.count ?? 0);
+      return;
+    }
+    mutate(ctx, () => {
+      if (next === 0) {
+        updateMotionSequence(ctx, sequence.id, { repeat: undefined });
+        return;
+      }
+      updateMotionSequence(ctx, sequence.id, {
+        repeat: { count: next, mode: sequence.repeat?.mode ?? 'restart' },
+      });
+    });
+  });
+  card.appendChild(field('Repeat count', repeatCount));
+
+  const repeatMode = selectInput([...MOTION_SEQUENCE_REPEAT_MODES], sequence.repeat?.mode ?? 'restart');
+  repeatMode.disabled = repeatDisabled;
+  repeatMode.addEventListener('change', () => {
+    mutate(ctx, () => {
+      updateMotionSequence(ctx, sequence.id, {
+        repeat: {
+          count: sequence.repeat?.count ?? 1,
+          mode: repeatMode.value as MotionSequenceRepeatMode,
+        },
+      });
+    });
+  });
+  card.appendChild(field('Repeat mode', repeatMode));
+
+  if (repeatDisabled) {
+    const note = document.createElement('p');
+    note.className = 'opencanvas-section-picker-empty';
+    note.textContent = 'Repeat is disabled for scroll-scene sequences because scroll progress owns replay.';
+    card.appendChild(note);
+  }
 
   const addStep = compactButton('Add step', 'Add a Motion Sequence step');
   addStep.addEventListener('click', () => {
@@ -1839,11 +1889,24 @@ function updateMotionStepFinite(
 function updateMotionSequence(
   ctx: InteractionsPanelContext,
   sequenceId: string,
-  patch: Partial<MotionSequence>,
+  patch: MotionSequencePatch,
 ): void {
   ctx.state!.motionSequences = (ctx.state!.motionSequences ?? []).map((sequence) =>
-    sequence.id === sequenceId ? { ...sequence, ...patch } : sequence,
+    sequence.id === sequenceId ? motionSequenceWithPatch(sequence, patch) : sequence,
   );
+}
+
+function motionSequenceWithPatch(sequence: MotionSequence, patch: MotionSequencePatch): MotionSequence {
+  const { repeat, ...rest } = patch;
+  const next: MotionSequence = { ...sequence, ...rest };
+  if ('repeat' in patch) {
+    if (repeat === undefined) {
+      delete next.repeat;
+    } else {
+      next.repeat = repeat;
+    }
+  }
+  return next;
 }
 
 function defaultMotionSequenceTrigger(ctx: InteractionsPanelContext, type: string): MotionSequence['trigger'] {

@@ -168,7 +168,22 @@ function behaviourApplyProps(node, props) {
   if (transform) node.style.transform = transform;
 }
 
-function behaviourAnimateTargets(targets, step, reducedMode, progress) {
+function behaviourSequenceRepeatOptions(repeat) {
+  if (!repeat) return { iterations: 1, direction: 'normal' };
+  var count = Number(repeat.count);
+  if (!isFinite(count) || Math.floor(count) !== count || count < 1 || count > 20) {
+    behaviourFailure('motion-sequence-repeat-count', { repeat: repeat }, new Error('repeat count must be 1-20'));
+  }
+  if (repeat.mode !== 'restart' && repeat.mode !== 'yoyo') {
+    behaviourFailure('motion-sequence-repeat-mode', { repeat: repeat }, new Error('unsupported repeat mode'));
+  }
+  return {
+    iterations: count + 1,
+    direction: repeat.mode === 'yoyo' ? 'alternate' : 'normal'
+  };
+}
+
+function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat) {
   var from = step.from || {};
   var to = step.to || {};
   var stagger = step.staggerMs || 0;
@@ -192,11 +207,14 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress) {
     var toProps = Object.assign({}, to);
     keyframes.push(behaviourPropsAtProgress(fromProps, toProps, 0));
     keyframes.push(behaviourPropsAtProgress(fromProps, toProps, 1));
+    var repeatOptions = behaviourSequenceRepeatOptions(repeat);
     var options = {
       duration: step.durationMs || 0,
       delay: (step.delayMs || 0) + index * stagger,
       easing: step.easing || 'ease',
       fill: 'forwards',
+      iterations: repeatOptions.iterations,
+      direction: repeatOptions.direction,
     };
     var animKeyframes = keyframes.map(function (frame) {
       var out = {};
@@ -217,7 +235,7 @@ function behaviourRunSequence(sequence, root, reducedMode, progress) {
   for (var i = 0; i < steps.length; i++) {
     var step = steps[i];
     var targets = behaviourResolveTarget(step.target, root);
-    behaviourAnimateTargets(targets, step, reducedMode, progress);
+    behaviourAnimateTargets(targets, step, reducedMode, progress, progress === undefined ? sequence.repeat : null);
   }
 }
 
@@ -271,6 +289,9 @@ function behaviourApplyPin(pinEl, scene, section, progress) {
 }
 
 function behaviourSetupScrollScene(scene, sequence, root) {
+  if (sequence.repeat) {
+    behaviourFailure('motion-sequence-repeat-scroll-scene', { sequenceId: sequence.id, scrollSceneId: scene.id }, new Error('scroll-scene Motion Sequences cannot repeat'));
+  }
   var section = root.querySelector('[data-opencanvas-section="' + scene.sectionId + '"]');
   if (!section) {
     behaviourFailure('behaviour-target-missing', { scrollSceneId: scene.id, sectionId: scene.sectionId }, new Error('scroll scene section not found'));
