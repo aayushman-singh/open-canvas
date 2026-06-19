@@ -111,6 +111,70 @@ export const MOTION_PRESETS = [
 ] as const;
 export type MotionPreset = (typeof MOTION_PRESETS)[number];
 
+export const IMPORT_ANIMATION_INVENTORY_STATUSES = ['mapped', 'unsupported'] as const;
+export type ImportAnimationInventoryStatus = (typeof IMPORT_ANIMATION_INVENTORY_STATUSES)[number];
+
+export const IMPORT_ANIMATION_PRIMITIVES = [
+  'motion-preset',
+  'motion-sequence',
+  'scroll-scene',
+  'text-split-target',
+  'rich-motion-asset',
+  'layout-transition',
+  'overlay',
+  'load-experience',
+  'route-transition',
+  'marquee',
+  'pointer-fx',
+  'video-hover',
+] as const;
+export type ImportAnimationPrimitive = (typeof IMPORT_ANIMATION_PRIMITIVES)[number];
+
+export const IMPORT_ANIMATION_SOURCE_TRIGGERS = [
+  'load',
+  'scroll',
+  'hover',
+  'focus',
+  'click',
+  'unknown',
+] as const;
+export type ImportAnimationSourceTrigger = (typeof IMPORT_ANIMATION_SOURCE_TRIGGERS)[number];
+
+export interface ImportAnimationSource {
+  name?: string;
+  properties: string[];
+  durationMs?: number;
+  delayMs?: number;
+  easing?: string;
+  trigger?: ImportAnimationSourceTrigger;
+  transform?: string;
+  transition?: string;
+  animation?: string;
+  willChange?: string;
+}
+
+export interface ImportAnimationMappedPrimitive {
+  kind: ImportAnimationPrimitive;
+  id?: string;
+  preset?: MotionPreset;
+}
+
+export interface ImportAnimationInventoryItem {
+  id: string;
+  elementId?: string;
+  sectionId?: string;
+  status: ImportAnimationInventoryStatus;
+  source: ImportAnimationSource;
+  mappedPrimitive?: ImportAnimationMappedPrimitive;
+  unsupportedReason?: string;
+}
+
+export interface ImportAnimationInventory {
+  sourceUrl?: string;
+  capturedAt?: string;
+  items: ImportAnimationInventoryItem[];
+}
+
 export const MARQUEE_DIRECTIONS = ['left', 'right'] as const;
 export type MarqueeDirection = (typeof MARQUEE_DIRECTIONS)[number];
 
@@ -805,6 +869,8 @@ export interface EditableSiteBase {
   richMotionAssets?: RichMotionAsset[];
   /** Same-page shared-layout transitions owned by the Runtime Hydrator. */
   layoutTransitions?: LayoutTransition[];
+  /** Source animation facts captured during import before exact primitive mapping. */
+  importAnimationInventory?: ImportAnimationInventory;
   /**
    * Default locale for pages with no explicit `locale`. Optional everywhere;
    * `'en'` when absent.

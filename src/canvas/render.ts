@@ -645,13 +645,14 @@ export function renderCanvasSnapshot(
     ? renderLoadExperienceChrome(behaviourLoadExperience)
     : '';
   const behaviourPayloadScript = renderBehaviourPayloadScript(snapshot, assetBasePath);
+  const importAnimationInventoryScript = renderImportAnimationInventoryScript(snapshot);
   const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
   const routeAttrs =
     snapshot.routeTransition?.enabled === true
       ? ` data-opencanvas-route-transition="${escapeAttr(snapshot.routeTransition.id)}" data-opencanvas-route-mode="${escapeAttr(snapshot.routeTransition.mode)}" data-opencanvas-route-duration-ms="${escapeAttr(String(snapshot.routeTransition.durationMs))}" data-opencanvas-route-easing="${escapeAttr(snapshot.routeTransition.easing)}"${snapshot.routeTransition.sharedElements && snapshot.routeTransition.sharedElements.length > 0 ? ` data-opencanvas-route-shared-elements="${escapeAttr(JSON.stringify(snapshot.routeTransition.sharedElements))}"` : ''}${snapshot.routeTransition.outgoingSequence ? ` data-opencanvas-route-outgoing-sequence="${escapeAttr(snapshot.routeTransition.outgoingSequence.id)}"` : ''}${snapshot.routeTransition.incomingSequence ? ` data-opencanvas-route-incoming-sequence="${escapeAttr(snapshot.routeTransition.incomingSequence.id)}"` : ''}`
       : '';
   const smoothScrollAttrs = renderSmoothScrollAttrs(snapshot.scrollBehavior);
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${loadExperienceHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${loadExperienceHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${importAnimationInventoryScript}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
 }
 
 /**
@@ -779,6 +780,18 @@ function renderLoadExperienceChrome(load: BehaviourLoadExperience): string {
   return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}" style="${style}"><div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div><button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
 }
 
+function serializeJsonScriptData(value: unknown): string {
+  const json = JSON.stringify(value);
+  if (json === undefined) {
+    throw new Error('renderCanvasSnapshot: JSON script data must be serializable');
+  }
+  return json.replace(/</g, '\u003c').replace(/\u2028/g, '\u2028').replace(/\u2029/g, '\u2029');
+}
+
+function renderImportAnimationInventoryScript(snapshot: PublishedSnapshot): string {
+  if (snapshot.importAnimationInventory === undefined) return '';
+  return `<script type="application/json" data-opencanvas-import-animation-inventory>${serializeJsonScriptData(snapshot.importAnimationInventory)}</script>`;
+}
 function renderBehaviourPayloadScript(
   snapshot: PublishedSnapshot,
   assetBasePath: string,

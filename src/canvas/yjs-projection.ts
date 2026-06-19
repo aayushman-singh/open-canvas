@@ -1075,6 +1075,9 @@ export function encodeYDoc(state: EditableSite): Y.Doc {
     if (state.layoutTransitions !== undefined) {
       root.set('layoutTransitions', encodeJsonValue(state.layoutTransitions));
     }
+    if (state.importAnimationInventory !== undefined) {
+      root.set('importAnimationInventory', encodeJsonValue(state.importAnimationInventory));
+    }
 
     const pages = new Y.Array<Y.Map<unknown>>();
     for (const page of state.pages) pages.push([encodePage(page)]);
@@ -1988,6 +1991,11 @@ export function decodeYDoc(doc: Y.Doc): EditableSite {
     state.layoutTransitions = decodeJsonValue(
       root.get('layoutTransitions'),
     ) as NonNullable<EditableSite['layoutTransitions']>;
+  }
+  if (root.has('importAnimationInventory')) {
+    state.importAnimationInventory = decodeJsonValue(
+      root.get('importAnimationInventory'),
+    ) as NonNullable<EditableSite['importAnimationInventory']>;
   }
   if (root.has('header')) {
     state.header = decodeSection(root.get('header') as Y.Map<unknown>);

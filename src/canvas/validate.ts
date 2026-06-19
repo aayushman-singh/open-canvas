@@ -71,6 +71,9 @@ import {
   BACKGROUND_SIZES,
   COLLECTION_PAGE_KINDS,
   ELEMENT_TYPES,
+  IMPORT_ANIMATION_INVENTORY_STATUSES,
+  IMPORT_ANIMATION_PRIMITIVES,
+  IMPORT_ANIMATION_SOURCE_TRIGGERS,
   INLINE_COLOR_HEX_RE,
   INLINE_FONT_SIZE_PX_MAX,
   INLINE_FONT_SIZE_PX_MIN,
@@ -3311,6 +3314,9 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
   scrollScenes: () => {},
   richMotionAssets: () => {},
   layoutTransitions: () => {},
+  importAnimationInventory: ({ state, errors }) => {
+    validateImportAnimationInventory(state.importAnimationInventory, errors);
+  },
   defaultLocale: ({ state, errors }) => {
     // Locale uses the same "non-empty string when present" shape as the
     // helper but carries an extra "BCP-47" hint in the error prose;
@@ -3406,6 +3412,114 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
   },
 };
 
+function validateImportAnimationInventory(value: unknown, errors: string[]): void {
+  if (value === undefined) return;
+  const basePath = 'importAnimationInventory';
+  if (!isRecord(value)) {
+    errors.push(`${basePath} must be an object when present (got ${describe(value)})`);
+    return;
+  }
+
+  assertOptionalNonEmptyString(value.sourceUrl, `${basePath}.sourceUrl`, errors);
+  if (value.capturedAt !== undefined) {
+    if (!isNonEmptyString(value.capturedAt)) {
+      errors.push(
+        `${basePath}.capturedAt must be a non-empty ISO date string when present (got ${describe(value.capturedAt)})`,
+      );
+    } else if (!isParseableDate(value.capturedAt)) {
+      errors.push(`${basePath}.capturedAt "${value.capturedAt}" is not a parseable Date`);
+    }
+  }
+
+  if (!Array.isArray(value.items)) {
+    errors.push(`${basePath}.items must be an array (got ${describe(value.items)})`);
+    return;
+  }
+
+  const knownItemIds = new Set<string>();
+  value.items.forEach((item, itemIdx) => {
+    const itemPath = `${basePath}.items[${String(itemIdx)}]`;
+    if (!isRecord(item)) {
+      errors.push(`${itemPath} must be an object`);
+      return;
+    }
+    if (assertNonEmptyString(item.id, `${itemPath}.id`, errors)) {
+      assertUnique(item.id, knownItemIds, `${itemPath}.id`, 'across importAnimationInventory.items', errors);
+    }
+    assertOptionalNonEmptyString(item.elementId, `${itemPath}.elementId`, errors);
+    assertOptionalNonEmptyString(item.sectionId, `${itemPath}.sectionId`, errors);
+    const statusOk = assertOneOf(
+      item.status,
+      IMPORT_ANIMATION_INVENTORY_STATUSES,
+      `${itemPath}.status`,
+      errors,
+    );
+
+    if (!isRecord(item.source)) {
+      errors.push(`${itemPath}.source must be an object`);
+    } else {
+      const source = item.source;
+      assertOptionalNonEmptyString(source.name, `${itemPath}.source.name`, errors);
+      if (!Array.isArray(source.properties)) {
+        errors.push(`${itemPath}.source.properties must be an array`);
+      } else {
+        source.properties.forEach((property, propertyIdx) => {
+          assertNonEmptyString(
+            property,
+            `${itemPath}.source.properties[${String(propertyIdx)}]`,
+            errors,
+          );
+        });
+      }
+      validateNonNegativeFiniteNumber(source.durationMs, `${itemPath}.source.durationMs`, errors, false);
+      validateNonNegativeFiniteNumber(source.delayMs, `${itemPath}.source.delayMs`, errors, false);
+      assertOptionalNonEmptyString(source.easing, `${itemPath}.source.easing`, errors);
+      if (source.trigger !== undefined) {
+        assertOneOf(
+          source.trigger,
+          IMPORT_ANIMATION_SOURCE_TRIGGERS,
+          `${itemPath}.source.trigger`,
+          errors,
+        );
+      }
+      assertOptionalNonEmptyString(source.transform, `${itemPath}.source.transform`, errors);
+      assertOptionalNonEmptyString(source.transition, `${itemPath}.source.transition`, errors);
+      assertOptionalNonEmptyString(source.animation, `${itemPath}.source.animation`, errors);
+      assertOptionalNonEmptyString(source.willChange, `${itemPath}.source.willChange`, errors);
+    }
+
+    if (item.mappedPrimitive !== undefined && !isRecord(item.mappedPrimitive)) {
+      errors.push(`${itemPath}.mappedPrimitive must be an object when present`);
+    } else if (isRecord(item.mappedPrimitive)) {
+      const primitive = item.mappedPrimitive;
+      const kindOk = assertOneOf(
+        primitive.kind,
+        IMPORT_ANIMATION_PRIMITIVES,
+        `${itemPath}.mappedPrimitive.kind`,
+        errors,
+      );
+      assertOptionalNonEmptyString(primitive.id, `${itemPath}.mappedPrimitive.id`, errors);
+      if (primitive.preset !== undefined || primitive.kind === 'motion-preset') {
+        assertOneOf<MotionPreset>(
+          primitive.preset,
+          MOTION_PRESETS,
+          `${itemPath}.mappedPrimitive.preset`,
+          errors,
+        );
+      }
+      if (kindOk && primitive.kind !== 'motion-preset' && primitive.preset !== undefined) {
+        errors.push(`${itemPath}.mappedPrimitive.preset is only valid when kind === "motion-preset"`);
+      }
+    }
+
+    if (statusOk && item.status === 'mapped' && item.mappedPrimitive === undefined) {
+      errors.push(`${itemPath}.mappedPrimitive is required when status === "mapped"`);
+    }
+    if (statusOk && item.status === 'unsupported') {
+      assertNonEmptyString(item.unsupportedReason, `${itemPath}.unsupportedReason`, errors);
+    }
+  });
+}
 function validateSiteShape(state: unknown, errors: string[]): void {
   if (!isRecord(state)) {
     errors.push('state must be an object');

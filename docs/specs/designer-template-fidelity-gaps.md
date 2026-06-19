@@ -643,7 +643,8 @@ Needed primitive:
    this, but collection render must be real before styling it.
 7. **Pointer/Hover FX catalog.** Useful, but should compose with the Motion
    model instead of becoming its own parallel universe.
-8. **Import animation inventory.** Once the runtime vocabulary exists, import
+8. **Import animation inventory.** 2026-06-19 update: imported animation facts are preserved as `importAnimationInventory` with mapped Open Canvas primitives or explicit unsupported findings. The importer no longer silently drops invalid source motion presets; richer coverage still depends on scraper source facts for duration/easing/trigger/property metadata.
+   Once the runtime vocabulary exists, import
    can map source behaviours exactly or fail loudly.
 
 ## Pushback On The Obvious Shortcut

@@ -15,6 +15,9 @@ import type {
   ShapeElement,
   ContainerElement,
   MotionPreset,
+  ImportAnimationInventoryItem,
+  ImportAnimationSource,
+  ImportAnimationSourceTrigger,
   InlineRun,
   ActionVariant,
   SurfaceVariant,
@@ -52,12 +55,30 @@ export interface ScraperSection {
   backgroundColor?: string;
 }
 
+export interface ScraperMotionSource {
+  name?: string;
+  properties?: string[];
+  durationMs?: number;
+  delayMs?: number;
+  easing?: string;
+  trigger?: string;
+  transform?: string;
+  transition?: string;
+  animation?: string;
+  willChange?: string;
+}
+
 export interface ScraperElement {
   type: string;
   box: { x: number; y: number; w: number; h: number; z: number };
   rotation?: number;
   data: Record<string, unknown>;
-  motion?: { preset: string; delayMs?: number };
+  motion?: {
+    preset: string;
+    delayMs?: number;
+    source?: ScraperMotionSource;
+    unsupportedReason?: string;
+  };
   pinnedStyle?: Record<string, string>;
 }
 
@@ -453,16 +474,20 @@ export function buildEditableSite(
   let siteHeader: CanvasSection | undefined;
   let siteFooter: CanvasSection | undefined;
   const bodySections: CanvasSection[] = [];
+  const importAnimationItems: ImportAnimationInventoryItem[] = [];
 
   data.sections.forEach((s, i) => {
     const name = s.name || `section-${i}`;
     const nameLower = name.toLowerCase();
+    const sectionId = crypto.randomUUID();
     const section: CanvasSection = {
-      id: crypto.randomUUID(),
+      id: sectionId,
       recipeId: 'custom' as const,
       name,
       height: Math.max(Math.round(s.height), 100),
-      elements: s.elements.map((el) => convertElement(el, assetIdMap)),
+      elements: s.elements.map((el) =>
+        convertElement(el, assetIdMap, { sectionId, items: importAnimationItems }),
+      ),
     };
     if (i === 0 && nameLower.includes('header') && siteHeader === undefined) {
       siteHeader = section;
@@ -489,6 +514,15 @@ export function buildEditableSite(
     styleKit: 'custom',
     customStyleKit: buildCustomStyleKit(data, fontFamilyTokenMap),
     pages: [page],
+    ...(importAnimationItems.length > 0
+      ? {
+          importAnimationInventory: {
+            sourceUrl: data.sourceUrl,
+            capturedAt: data.scrapedAt,
+            items: importAnimationItems,
+          },
+        }
+      : {}),
     ...(siteHeader ? { header: siteHeader } : {}),
     ...(siteFooter ? { footer: siteFooter } : {}),
   };
@@ -632,7 +666,13 @@ function primaryFontFamily(value: string): string | null {
  * throw instead of dropping content. Silent skips make imported pages look
  * "successful" while losing user-visible material.
  */
-function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): CanvasElement {
+type ImportAnimationCollector = { sectionId: string; items: ImportAnimationInventoryItem[] };
+
+function convertElement(
+  el: ScraperElement,
+  assetIdMap: Map<string, string>,
+  importAnimationCollector?: ImportAnimationCollector,
+): CanvasElement {
   const baseId = crypto.randomUUID();
   const box = {
     x: Math.max(0, Math.round(el.box.x)),
@@ -643,10 +683,8 @@ function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): Ca
     ...(el.rotation ? { rotation: el.rotation } : {}),
   };
 
-  const motion =
-    el.motion && isValidMotionPreset(el.motion.preset)
-      ? { preset: el.motion.preset, ...(el.motion.delayMs ? { delayMs: el.motion.delayMs } : {}) }
-      : undefined;
+  const motion = collectImportAnimationMotion(el.motion, baseId, importAnimationCollector);
+
 
   const data = el.data;
 
@@ -770,6 +808,90 @@ function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): Ca
   }
 }
 
+function collectImportAnimationMotion(
+  motion: ScraperElement['motion'],
+  elementId: string,
+  collector: ImportAnimationCollector | undefined,
+): { preset: MotionPreset; delayMs?: number } | undefined {
+  if (motion === undefined) return undefined;
+  const source = normaliseImportAnimationSource(motion);
+  if (isValidMotionPreset(motion.preset)) {
+    collector?.items.push({
+      id: `import-animation-${elementId}`,
+      elementId,
+      sectionId: collector.sectionId,
+      status: 'mapped',
+      source,
+      mappedPrimitive: { kind: 'motion-preset', preset: motion.preset },
+    });
+    return {
+      preset: motion.preset,
+      ...(motion.delayMs !== undefined ? { delayMs: motion.delayMs } : {}),
+    };
+  }
+
+  collector?.items.push({
+    id: `import-animation-${elementId}`,
+    elementId,
+    sectionId: collector.sectionId,
+    status: 'unsupported',
+    source,
+    unsupportedReason:
+      motion.unsupportedReason ?? `Unsupported imported motion preset "${motion.preset}"`,
+  });
+  return undefined;
+}
+
+function normaliseImportAnimationSource(motion: NonNullable<ScraperElement['motion']>): ImportAnimationSource {
+  const source = motion.source ?? {};
+  const trigger = normaliseImportAnimationTrigger(source.trigger);
+  return {
+    ...(source.name !== undefined ? { name: source.name } : { name: motion.preset }),
+    properties: normaliseImportAnimationProperties(source),
+    ...(source.durationMs !== undefined ? { durationMs: source.durationMs } : {}),
+    ...(source.delayMs !== undefined
+      ? { delayMs: source.delayMs }
+      : motion.delayMs !== undefined
+        ? { delayMs: motion.delayMs }
+        : {}),
+    ...(source.easing !== undefined ? { easing: source.easing } : {}),
+    ...(trigger !== undefined ? { trigger } : {}),
+    ...(source.transform !== undefined ? { transform: source.transform } : {}),
+    ...(source.transition !== undefined ? { transition: source.transition } : {}),
+    ...(source.animation !== undefined ? { animation: source.animation } : {}),
+    ...(source.willChange !== undefined ? { willChange: source.willChange } : {}),
+  };
+}
+
+function normaliseImportAnimationProperties(source: ScraperMotionSource): string[] {
+  if (Array.isArray(source.properties)) {
+    return source.properties.filter(
+      (property) => typeof property === 'string' && property.length > 0,
+    );
+  }
+  const properties: string[] = [];
+  if (source.transform !== undefined) properties.push('transform');
+  if (source.transition !== undefined) properties.push('transition');
+  if (source.animation !== undefined) properties.push('animation');
+  if (source.willChange !== undefined) properties.push('will-change');
+  return properties;
+}
+
+function normaliseImportAnimationTrigger(
+  trigger: string | undefined,
+): ImportAnimationSourceTrigger | undefined {
+  if (
+    trigger === 'load' ||
+    trigger === 'scroll' ||
+    trigger === 'hover' ||
+    trigger === 'focus' ||
+    trigger === 'click' ||
+    trigger === 'unknown'
+  ) {
+    return trigger;
+  }
+  return undefined;
+}
 function mapTextRole(role?: string): 'heading' | 'body' | 'label' {
   if (!role) return 'body';
   if (role.startsWith('h')) return 'heading';
