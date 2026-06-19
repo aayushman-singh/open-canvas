@@ -823,6 +823,25 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
     gallery.set('mode', el.gallery.mode);
     gallery.set('detailMode', el.gallery.detailMode);
     gallery.set('reducedMotion', el.gallery.reducedMotion);
+    if (el.gallery.videoHover !== undefined) {
+      const videoHover = new Y.Map<unknown>();
+      videoHover.set('enabled', el.gallery.videoHover.enabled);
+      videoHover.set('mode', el.gallery.videoHover.mode);
+      videoHover.set('reducedMotion', el.gallery.videoHover.reducedMotion);
+      if (el.gallery.videoHover.scrubOnHover !== undefined) {
+        videoHover.set('scrubOnHover', el.gallery.videoHover.scrubOnHover);
+      }
+      if (el.gallery.videoHover.streamAssetId !== undefined) {
+        videoHover.set('streamAssetId', el.gallery.videoHover.streamAssetId);
+      }
+      if (el.gallery.videoHover.streamPosterAssetId !== undefined) {
+        videoHover.set('streamPosterAssetId', el.gallery.videoHover.streamPosterAssetId);
+      }
+      if (el.gallery.videoHover.intentDelayMs !== undefined) {
+        videoHover.set('intentDelayMs', el.gallery.videoHover.intentDelayMs);
+      }
+      gallery.set('videoHover', videoHover);
+    }
     out.set('gallery', gallery);
   }
   if (el.manualOrder !== undefined) {
@@ -1654,6 +1673,33 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
         CollectionElement['gallery']
       >['reducedMotion'],
     };
+    if (rawGallery.has('videoHover')) {
+      const rawVideoHover: unknown = rawGallery.get('videoHover');
+      if (!(rawVideoHover instanceof Y.Map)) {
+        throw new Error(`Collection element ${el.id}: gallery.videoHover must decode from a Y.Map`);
+      }
+      el.gallery.videoHover = {
+        enabled: rawVideoHover.get('enabled') === true,
+        mode: rawVideoHover.get('mode') as NonNullable<
+          NonNullable<CollectionElement['gallery']>['videoHover']
+        >['mode'],
+        reducedMotion: rawVideoHover.get('reducedMotion') as NonNullable<
+          NonNullable<CollectionElement['gallery']>['videoHover']
+        >['reducedMotion'],
+      };
+      if (rawVideoHover.has('scrubOnHover')) {
+        el.gallery.videoHover.scrubOnHover = rawVideoHover.get('scrubOnHover') as boolean;
+      }
+      if (rawVideoHover.has('streamAssetId')) {
+        el.gallery.videoHover.streamAssetId = rawVideoHover.get('streamAssetId') as string;
+      }
+      if (rawVideoHover.has('streamPosterAssetId')) {
+        el.gallery.videoHover.streamPosterAssetId = rawVideoHover.get('streamPosterAssetId') as string;
+      }
+      if (rawVideoHover.has('intentDelayMs')) {
+        el.gallery.videoHover.intentDelayMs = rawVideoHover.get('intentDelayMs') as number;
+      }
+    }
   }
   if (map.has('entries')) {
     const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;

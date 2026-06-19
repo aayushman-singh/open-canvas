@@ -390,7 +390,6 @@ User-visible miss:
 
 - Cannot reproduce drag/inertia sliders or hover-to-preview grids.
 - Cannot author touch-specific equivalents for mobile.
-- Video Stream Hover does not yet support collection-gallery batch authoring.
 - Pointer FX does not yet include drag/inertia or touch-specific alternate
   gestures.
 
@@ -398,6 +397,11 @@ June 2026 update: Marquee can now bind to a same-section Collection element as
 a schema-owned ticker source (`title`, `excerpt`, or `all-text`) instead of
 manual text only; validation fails if the relation is missing, points at a
 non-Collection, or resolves no text values.
+
+June 2026 update: Collection Gallery v2 can now batch-apply Video Stream Hover
+to materialized video entries through `gallery.videoHover`; explicit per-entry
+video hover still wins, renderer emits the existing video-hover metadata, and
+Yjs preserves the gallery-level policy.
 
 Needed primitive:
 

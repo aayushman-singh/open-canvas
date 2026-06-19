@@ -21,6 +21,7 @@
 import type { BaseElement, CanvasElement } from '../schema.js';
 import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
+import type { VideoHoverPlayback } from './media.js';
 import {
   COLLECTION_STYLE_SPEC,
   componentStylePatchProperty,
@@ -70,6 +71,7 @@ export interface CollectionGalleryBehaviour {
   mode: CollectionGalleryMode;
   detailMode: CollectionGalleryDetailMode;
   reducedMotion: CollectionGalleryReducedMotionMode;
+  videoHover?: VideoHoverPlayback;
 }
 
 export interface CollectionStyle {
@@ -244,7 +246,9 @@ function renderCollectionEntries(
         ['height', `${String(bounds.h)}px`],
         ['flex', '0 0 auto'],
       ]);
-      const childrenHtml = entry.map((child) => ctx.renderChild!(child)).join('');
+      const childrenHtml = entry
+        .map((child) => ctx.renderChild!(withGalleryVideoHover(child, gallery)))
+        .join('');
       const galleryAttrs = gallery
         ?
           ` data-opencanvas-collection-entry-active="${idx === 0 ? 'true' : 'false'}"` +
@@ -258,6 +262,25 @@ function renderCollectionEntries(
       );
     })
     .join('');
+}
+
+function withGalleryVideoHover(
+  child: CanvasElement,
+  gallery: CollectionGalleryBehaviour | null,
+): CanvasElement {
+  if (
+    gallery?.videoHover?.enabled !== true ||
+    child.type !== 'media' ||
+    child.mediaKind !== 'video' ||
+    child.hoverPlayback?.enabled === true
+  ) {
+    return child;
+  }
+  return {
+    ...child,
+    playback: { ...(child.playback ?? {}), autoplay: false, muted: true },
+    hoverPlayback: gallery.videoHover,
+  };
 }
 
 function entryBounds(entry: readonly CanvasElement[]): { w: number; h: number } {

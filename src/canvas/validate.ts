@@ -761,6 +761,50 @@ function validateMarquee(
   );
 }
 
+function validateVideoHoverPlaybackConfig(value: unknown, basePath: string, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push(`${basePath} must be an object when present`);
+    return;
+  }
+  if (typeof value.enabled !== 'boolean') {
+    errors.push(`${basePath}.enabled must be a boolean`);
+    return;
+  }
+  if (value.enabled !== true) return;
+  assertOneOf<VideoHoverPlaybackMode>(
+    value.mode,
+    VIDEO_HOVER_PLAYBACK_MODES,
+    `${basePath}.mode`,
+    errors,
+  );
+  assertOneOf<VideoHoverReducedMotionMode>(
+    value.reducedMotion,
+    VIDEO_HOVER_REDUCED_MOTION_MODES,
+    `${basePath}.reducedMotion`,
+    errors,
+  );
+  if (value.scrubOnHover !== undefined && typeof value.scrubOnHover !== 'boolean') {
+    errors.push(`${basePath}.scrubOnHover must be a boolean when present`);
+  }
+  for (const field of ['streamAssetId', 'streamPosterAssetId'] as const) {
+    const assetId = value[field];
+    if (assetId !== undefined) {
+      if (typeof assetId !== 'string' || assetId.length === 0 || assetId === '__placeholder__') {
+        errors.push(`${basePath}.${field} must be a non-empty uploaded asset id when present`);
+      }
+    }
+  }
+  if (
+    value.intentDelayMs !== undefined &&
+    (typeof value.intentDelayMs !== 'number' ||
+      !Number.isFinite(value.intentDelayMs) ||
+      value.intentDelayMs < 0 ||
+      value.intentDelayMs > 5000)
+  ) {
+    errors.push(`${basePath}.intentDelayMs must be a finite number between 0 and 5000 when present`);
+  }
+}
+
 function validatePointerFx(value: unknown, basePath: string, errors: string[]): void {
   if (value === undefined) return;
   if (!isRecord(value)) {
@@ -1844,6 +1888,13 @@ function validateElement(
             `${basePath}.gallery.reducedMotion`,
             errors,
           );
+          if (element.gallery.videoHover !== undefined) {
+            validateVideoHoverPlaybackConfig(
+              element.gallery.videoHover,
+              `${basePath}.gallery.videoHover`,
+              errors,
+            );
+          }
         }
       }
       // `manualOrder` is required-shape iff `sort === 'manual'`, optional

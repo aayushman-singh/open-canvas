@@ -63,6 +63,12 @@ import {
   COLLECTION_GALLERY_REDUCED_MOTION_MODES,
   COLLECTION_SORTS,
 } from '../canvas/elements/collection.js';
+import {
+  VIDEO_HOVER_PLAYBACK_MODES,
+  VIDEO_HOVER_REDUCED_MOTION_MODES,
+  type VideoHoverPlaybackMode,
+  type VideoHoverReducedMotionMode,
+} from '../canvas/elements/media.js';
 import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
 import { templateHasAnyPlaceholder } from '../canvas/elements/collection-materializer.js';
 import { renderSectionInspector } from './section-inspector.js';
@@ -2016,6 +2022,7 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
         mode: 'hover-reveal-detail',
         detailMode: 'inline-panel',
         reducedMotion: collection.gallery?.reducedMotion ?? 'allow',
+        ...(collection.gallery?.videoHover ? { videoHover: collection.gallery.videoHover } : {}),
       };
     }
     ctx.rebuildElement(collection.id);
@@ -2039,12 +2046,119 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
         mode: 'hover-reveal-detail',
         detailMode: 'inline-panel',
         reducedMotion: reducedMotionSelect.value as CollectionGalleryReducedMotionMode,
+        ...(collection.gallery?.videoHover ? { videoHover: collection.gallery.videoHover } : {}),
       };
       ctx.rebuildElement(collection.id);
       ctx.scheduleSave();
       ctx.renderInspector();
     });
     inspector.appendChild(field('Gallery reduced motion', reducedMotionSelect));
+
+    const galleryVideoHover = document.createElement('input');
+    galleryVideoHover.type = 'checkbox';
+    galleryVideoHover.checked = collection.gallery.videoHover?.enabled === true;
+    galleryVideoHover.addEventListener('change', () => {
+      ctx.captureForUndo();
+      if (galleryVideoHover.checked) {
+        collection.gallery!.videoHover = collection.gallery!.videoHover ?? {
+          enabled: true,
+          mode: 'play-reset',
+          reducedMotion: 'disabled',
+        };
+        collection.gallery!.videoHover.enabled = true;
+      } else if (collection.gallery?.videoHover) {
+        delete collection.gallery.videoHover;
+      }
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+      ctx.renderInspector();
+    });
+    inspector.appendChild(field('Gallery video hover', galleryVideoHover));
+
+    if (collection.gallery.videoHover?.enabled === true) {
+      const hoverMode = selectInput(VIDEO_HOVER_PLAYBACK_MODES, collection.gallery.videoHover.mode);
+      hoverMode.addEventListener('change', () => {
+        ctx.captureForUndo();
+        collection.gallery!.videoHover = {
+          ...collection.gallery!.videoHover!,
+          enabled: true,
+          mode: hoverMode.value as VideoHoverPlaybackMode,
+        };
+        ctx.rebuildElement(collection.id);
+        ctx.scheduleSave();
+      });
+      inspector.appendChild(field('Gallery hover mode', hoverMode));
+
+      const hoverReduced = selectInput(
+        VIDEO_HOVER_REDUCED_MOTION_MODES,
+        collection.gallery.videoHover.reducedMotion,
+      );
+      hoverReduced.addEventListener('change', () => {
+        ctx.captureForUndo();
+        collection.gallery!.videoHover = {
+          ...collection.gallery!.videoHover!,
+          enabled: true,
+          reducedMotion: hoverReduced.value as VideoHoverReducedMotionMode,
+        };
+        ctx.rebuildElement(collection.id);
+        ctx.scheduleSave();
+      });
+      inspector.appendChild(field('Gallery hover reduced motion', hoverReduced));
+
+      const hoverStream = document.createElement('input');
+      hoverStream.type = 'text';
+      hoverStream.value = collection.gallery.videoHover.streamAssetId ?? '';
+      hoverStream.addEventListener('change', () => {
+        ctx.captureForUndo();
+        const value = hoverStream.value.trim();
+        const next = { ...collection.gallery!.videoHover!, enabled: true };
+        if (value.length > 0) next.streamAssetId = value;
+        else delete next.streamAssetId;
+        collection.gallery!.videoHover = next;
+        ctx.rebuildElement(collection.id);
+        ctx.scheduleSave();
+      });
+      inspector.appendChild(field('Gallery hover stream asset', hoverStream));
+
+      const hoverPoster = document.createElement('input');
+      hoverPoster.type = 'text';
+      hoverPoster.value = collection.gallery.videoHover.streamPosterAssetId ?? '';
+      hoverPoster.addEventListener('change', () => {
+        ctx.captureForUndo();
+        const value = hoverPoster.value.trim();
+        const next = { ...collection.gallery!.videoHover!, enabled: true };
+        if (value.length > 0) next.streamPosterAssetId = value;
+        else delete next.streamPosterAssetId;
+        collection.gallery!.videoHover = next;
+        ctx.rebuildElement(collection.id);
+        ctx.scheduleSave();
+      });
+      inspector.appendChild(field('Gallery hover poster asset', hoverPoster));
+
+      const hoverIntentDelay = document.createElement('input');
+      hoverIntentDelay.type = 'number';
+      hoverIntentDelay.min = '0';
+      hoverIntentDelay.max = '5000';
+      hoverIntentDelay.step = '10';
+      hoverIntentDelay.value = String(collection.gallery.videoHover.intentDelayMs ?? 0);
+      hoverIntentDelay.addEventListener('change', () => {
+        const n = Number(hoverIntentDelay.value);
+        if (!Number.isFinite(n) || n < 0 || n > 5000) {
+          ctx.setStatus('Gallery hover intent delay must be between 0 and 5000ms', 'error');
+          hoverIntentDelay.value = String(collection.gallery!.videoHover?.intentDelayMs ?? 0);
+          return;
+        }
+        ctx.captureForUndo();
+        collection.gallery!.videoHover = {
+          ...collection.gallery!.videoHover!,
+          enabled: true,
+          intentDelayMs: n,
+        };
+        ctx.rebuildElement(collection.id);
+        ctx.scheduleSave();
+      });
+      inspector.appendChild(field('Gallery hover intent delay', hoverIntentDelay));
+    }
   }
 
   mountComponentStyle(ctx, collection, inspector);

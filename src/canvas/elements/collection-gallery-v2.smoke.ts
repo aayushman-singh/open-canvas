@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { CanvasElement, CanvasPage, CanvasSection, EditableSite, PublishedSnapshot } from '../schema.js';
 import { validateEditableSite } from '../validate.js';
 import { decodeYDoc, encodeYDoc } from '../yjs-projection.js';
+import { renderCanvasSnapshot } from '../render.js';
 import { renderCollection, type CollectionElement } from './collection.js';
 import { INTERACTIVE_RUNTIME_SRC } from '../../interactive/build.js';
 import { snapshotNeedsInteractiveRuntime } from '../../interactive/inject.js';
@@ -25,6 +26,20 @@ function textElement(id: string, text: string, y = 0): CanvasElement {
     fontSize: 18,
     fontWeight: 600,
     align: 'left',
+  };
+}
+
+function videoElement(id: string): CanvasElement {
+  return {
+    id,
+    type: 'media',
+    mediaKind: 'video',
+    assetId: 'entry-video',
+    posterAssetId: 'entry-poster',
+    alt: 'Entry video',
+    fit: 'cover',
+    box: { x: 0, y: 0, w: 320, h: 180, z: 1 },
+    playback: { muted: true, loop: true },
   };
 }
 
@@ -88,6 +103,27 @@ assert(
   `validation error must name gallery.mode; got ${invalidResult.valid ? 'valid' : invalidResult.errors.join(' | ')}`,
 );
 
+const invalidVideoHover = makeSite(
+  makeCollection({
+    gallery: {
+      mode: 'hover-reveal-detail',
+      detailMode: 'inline-panel',
+      reducedMotion: 'allow',
+      videoHover: {
+        enabled: true,
+        mode: 'spin',
+        reducedMotion: 'allow',
+      },
+    } as unknown as NonNullable<CollectionElement['gallery']>,
+  }),
+);
+const invalidVideoHoverResult = validateEditableSite(invalidVideoHover);
+assert(!invalidVideoHoverResult.valid, 'invalid collection gallery video hover must fail validation');
+assert(
+  invalidVideoHoverResult.errors.some((error) => error.includes('gallery.videoHover.mode')),
+  `validation error must name gallery.videoHover.mode; got ${invalidVideoHoverResult.valid ? 'valid' : invalidVideoHoverResult.errors.join(' | ')}`,
+);
+
 const html = renderCollection(collection, {
   styleKit: 'charcoal',
   assetBasePath: '/assets',
@@ -111,6 +147,43 @@ assert(
 );
 assert(html.includes('role="button"'), 'gallery entries must be keyboard-addressable buttons');
 
+const videoHoverCollection = makeCollection({
+  gallery: {
+    mode: 'hover-reveal-detail',
+    detailMode: 'inline-panel',
+    reducedMotion: 'allow',
+    videoHover: {
+      enabled: true,
+      mode: 'play-reset',
+      streamAssetId: 'entry-hover-video',
+      streamPosterAssetId: 'entry-hover-poster',
+      intentDelayMs: 100,
+      reducedMotion: 'disabled',
+    },
+  },
+  entries: [[videoElement('entry-video-card')]],
+});
+const videoHoverSnapshot: PublishedSnapshot = {
+  ...makeSite(videoHoverCollection),
+  version: 1,
+  publishedAt: '2026-06-19T00:00:00.000Z',
+};
+const videoHoverHtml = renderCanvasSnapshot(videoHoverSnapshot, '/assets', 'collection-gallery-video-hover', {
+  turnstileSiteKey: 'test-key',
+});
+assert(
+  videoHoverHtml.includes('data-opencanvas-video-hover="true"'),
+  'collection gallery video hover must batch-apply hover metadata to entry videos',
+);
+assert(
+  videoHoverHtml.includes('data-opencanvas-video-hover-stream-src="/assets/entry-hover-video"'),
+  'collection gallery video hover must emit inherited stream asset metadata',
+);
+assert(
+  videoHoverHtml.includes('data-opencanvas-video-hover-intent-delay-ms="100"'),
+  'collection gallery video hover must emit inherited intent delay metadata',
+);
+
 const decoded = decodeYDoc(encodeYDoc(state));
 const decodedCollection = decoded.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
 assert(
@@ -124,6 +197,13 @@ assert(
 assert(
   decodedCollection.gallery?.reducedMotion === 'allow',
   'Yjs projection must preserve collection gallery reduced-motion policy',
+);
+
+const decodedVideoHover = decodeYDoc(encodeYDoc(makeSite(videoHoverCollection))).pages[0]!.sections[0]!
+  .elements[0]! as CollectionElement;
+assert(
+  decodedVideoHover.gallery?.videoHover?.mode === 'play-reset',
+  'Yjs projection must preserve collection gallery video hover policy',
 );
 
 const snapshot: PublishedSnapshot = {
@@ -148,6 +228,8 @@ const inspectorSource = readFileSync(join(repoSrcDir, 'editor-client', 'element-
 assert(inspectorSource.includes('Collection gallery'), 'inspector must expose collection gallery controls');
 assert(inspectorSource.includes('hover-reveal-detail'), 'inspector must expose hover-reveal-detail mode');
 assert(inspectorSource.includes('Gallery reduced motion'), 'inspector must expose reduced-motion authoring');
+assert(inspectorSource.includes('Gallery video hover'), 'inspector must expose batch video-hover authoring');
+assert(inspectorSource.includes('videoHover'), 'inspector must write collection gallery video hover config');
 
 const publicStyles = readFileSync(join(repoSrcDir, 'canvas', 'public-styles.ts'), 'utf8');
 assert(
