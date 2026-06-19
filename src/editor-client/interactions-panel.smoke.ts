@@ -209,9 +209,14 @@ assert(
   'panel must publish Motion Sequence preview progress metadata',
 );
 assert(panelSrc.includes('wireMotionSequenceTimelineDrag'), 'panel must wire draggable Motion Sequence timeline bars');
+assert(panelSrc.includes('wireMotionSequenceTimelineResize'), 'panel must wire resizable Motion Sequence timeline bars');
 assert(
   panelSrc.includes('opencanvas-motion-timeline-bar--draggable'),
   'panel must mark draggable Motion Sequence timeline bars',
+);
+assert(
+  panelSrc.includes('opencanvas-motion-timeline-bar--resizable'),
+  'panel must mark resizable Motion Sequence timeline bars',
 );
 assert(
   panelSrc.includes('Drag timeline bars'),
@@ -267,6 +272,7 @@ for (const [label, src] of [
   assert(src.includes('.opencanvas-motion-timeline-scrub'), label + ' must style Motion Sequence scrub preview controls');
   assert(src.includes('.opencanvas-motion-timeline-playhead'), label + ' must style Motion Sequence scrub playhead');
   assert(src.includes('.opencanvas-motion-timeline-bar--draggable'), label + ' must style draggable Motion Sequence timeline bars');
+  assert(src.includes('.opencanvas-motion-timeline-bar--resizable'), label + ' must style resizable Motion Sequence timeline bars');
   assert(src.includes('.opencanvas-motion-timeline-bar-handle'), label + ' must style Motion Sequence timeline bar handles');
 }
 

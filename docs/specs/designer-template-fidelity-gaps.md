@@ -226,10 +226,14 @@ Current state:
   the timeline to set `startAtMs` directly. Scroll-scene sequences keep drag
   editing disabled because scroll progress, not absolute time, owns their
   replay relation.
+- **June 2026 update:** Timeline bar handles can now be dragged to set
+  `durationMs` directly, with invalid editor measurements reported through the
+  status channel instead of ignored.
 
 User-visible miss:
 
-- Cannot yet resize durations directly from the visual timeline canvas.
+- Cannot yet edit per-step motion properties directly from the visual timeline
+  canvas.
 
 Needed primitive:
 
@@ -237,8 +241,8 @@ Needed primitive:
   properties, duration, easing, delay, stagger, and completion behaviour.
 - Validation must reject unsupported targets/properties instead of silently
   dropping steps.
-- Remaining next wave: timeline resize handles and richer property affordances
-  beyond the current form controls.
+- Remaining next wave: richer property affordances beyond the current form
+  controls.
 
 ### 2. Scroll Motion Is Triggered, Not Scrubbed
 
@@ -690,13 +694,13 @@ Current state:
   Overlays, and Motion Sequence Lite step lists.
 - Full Motion Sequence cards include a Timeline overview with visual bars,
   target lanes, snap handles, scrub preview, and draggable start-time bars for
-  step start/duration. Duration and property editing remain form-based.
+  step start/duration. Property editing remains form-based.
 
 User-visible miss:
 
 - Template authors can inspect, scrub, and reposition time-based choreography as
-  a lane-based timeline, but cannot yet resize durations from the timeline
-  overview.
+  a lane-based timeline, but cannot yet edit transform/opacity/filter values
+  directly from the timeline overview.
 - Long sequences still require field-level editing for detailed timing changes.
 
 Needed primitive:

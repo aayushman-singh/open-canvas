@@ -1805,9 +1805,11 @@ function renderMotionSequenceTimeline(
         bar.title = item.title + ' · Drag timeline bars is disabled because scroll progress owns this sequence.';
       } else {
         bar.classList.add('opencanvas-motion-timeline-bar--draggable');
+        bar.classList.add('opencanvas-motion-timeline-bar--resizable');
         bar.tabIndex = 0;
-        bar.title = item.title + ' · Drag timeline bars to edit start time.';
+        bar.title = item.title + ' · Drag timeline bars to edit start time; drag handle to resize duration.';
         wireMotionSequenceTimelineDrag(ctx, sequence, item, bar, track);
+        wireMotionSequenceTimelineResize(ctx, sequence, item, handle, bar, track);
       }
       lane.appendChild(bar);
     }
@@ -1988,6 +1990,68 @@ function wireMotionSequenceTimelineDrag(
     bar.addEventListener('pointermove', move);
     bar.addEventListener('pointerup', finish);
     bar.addEventListener('pointercancel', cancel);
+  });
+}
+
+function wireMotionSequenceTimelineResize(
+  ctx: InteractionsPanelContext,
+  sequence: MotionSequence,
+  item: MotionSequenceTimelineItem,
+  handle: HTMLElement,
+  bar: HTMLElement,
+  track: HTMLElement,
+): void {
+  handle.addEventListener('pointerdown', (event) => {
+    event.stopPropagation();
+    if (sequence.trigger.type === 'scroll-scene') {
+      ctx.setStatus('Timeline resize is disabled for scroll-scene sequences', 'error');
+      return;
+    }
+    const totalMs = Math.max(1, ...motionSequenceTimelineItems(sequence).map((entry) => entry.endMs));
+    const rect = track.getBoundingClientRect();
+    if (!Number.isFinite(rect.width) || rect.width <= 0) {
+      ctx.setStatus('Motion Sequence timeline width is invalid', 'error');
+      return;
+    }
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    bar.setAttribute('data-opencanvas-motion-timeline-resizing', 'true');
+    const startX = event.clientX;
+    const originalDuration = item.durationMs;
+    const applyResize = (clientX: number, commit: boolean) => {
+      const deltaPercent = ((clientX - startX) / rect.width) * 100;
+      const nextDuration = Math.max(1, Math.min(10000, Math.round(originalDuration + (deltaPercent / 100) * totalMs)));
+      const nextWidthPercent = Math.max(2, Math.min(100, (nextDuration / totalMs) * 100));
+      bar.style.width = nextWidthPercent.toFixed(2) + '%';
+      bar.title = 'Step ' + item.label + ' · start ' + String(item.startMs) + 'ms · duration ' + String(nextDuration) + 'ms';
+      if (commit) {
+        mutate(ctx, () => {
+          updateScrollSequenceStep(ctx, sequence.id, item.step.id, { durationMs: nextDuration });
+        });
+        ctx.setStatus('Motion Sequence step duration updated to ' + String(nextDuration) + 'ms', 'ok');
+      }
+    };
+    const move = (moveEvent: PointerEvent) => applyResize(moveEvent.clientX, false);
+    const finish = (upEvent: PointerEvent) => {
+      handle.releasePointerCapture(upEvent.pointerId);
+      bar.removeAttribute('data-opencanvas-motion-timeline-resizing');
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', finish);
+      handle.removeEventListener('pointercancel', cancel);
+      applyResize(upEvent.clientX, true);
+    };
+    const cancel = (cancelEvent: PointerEvent) => {
+      handle.releasePointerCapture(cancelEvent.pointerId);
+      bar.removeAttribute('data-opencanvas-motion-timeline-resizing');
+      bar.style.width = item.widthPercent.toFixed(2) + '%';
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', finish);
+      handle.removeEventListener('pointercancel', cancel);
+      ctx.setStatus('Motion Sequence timeline resize cancelled', 'error');
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', finish);
+    handle.addEventListener('pointercancel', cancel);
   });
 }
 

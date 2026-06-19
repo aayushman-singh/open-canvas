@@ -1629,6 +1629,10 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   cursor: grab;
   touch-action: none;
 }
+.opencanvas-motion-timeline-bar--resizable .opencanvas-motion-timeline-bar-handle {
+  cursor: ew-resize;
+  touch-action: none;
+}
 .opencanvas-motion-timeline-bar--draggable:focus-visible {
   outline: 2px solid var(--opencanvas-fg);
   outline-offset: 2px;
@@ -1636,6 +1640,9 @@ body[data-placement-active="true"] .opencanvas-section-slot {
 .opencanvas-motion-timeline-bar[data-opencanvas-motion-timeline-dragging="true"] {
   cursor: grabbing;
   filter: brightness(1.08);
+}
+.opencanvas-motion-timeline-bar[data-opencanvas-motion-timeline-resizing="true"] {
+  filter: brightness(1.12);
 }
 .opencanvas-motion-timeline-bar-handle {
   width: 3px;
