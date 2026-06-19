@@ -1404,6 +1404,21 @@ const variantCss = String.raw`
     radial-gradient(circle at 12% 18%, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 22%, transparent), transparent 34%),
     var(--opencanvas-kit-bg, #0c0c0d);
 }
+.opencanvas-overlay[data-opencanvas-overlay-presentation="lightbox"][data-opencanvas-overlay-open] {
+  place-items: center;
+  padding: min(6vw, 56px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="lightbox"] .opencanvas-overlay-backdrop {
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(10px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="lightbox"] .opencanvas-overlay-surface {
+  width: min(94vw, 1180px);
+  max-height: min(92vh, 860px);
+  border-radius: 18px;
+  background: #050505;
+  box-shadow: 0 32px 120px rgba(0, 0, 0, 0.58);
+}
 .opencanvas-overlay--fullscreen-menu .opencanvas-overlay-close {
   top: 24px;
   right: 24px;

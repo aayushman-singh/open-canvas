@@ -17,7 +17,7 @@ function hydrateOverlays(scope, options) {
       var triggerValue = parseFloat(overlay.getAttribute('data-opencanvas-overlay-trigger-value') || '0');
       var triggerTarget = overlay.getAttribute('data-opencanvas-overlay-trigger-target') || '';
       var presentation = overlay.getAttribute('data-opencanvas-overlay-presentation') || 'modal';
-      if (presentation !== 'modal' && presentation !== 'fullscreen-menu') {
+      if (presentation !== 'modal' && presentation !== 'fullscreen-menu' && presentation !== 'lightbox') {
         overlayFailure(id, 'overlay-presentation', { presentation: presentation });
         return;
       }
@@ -99,7 +99,7 @@ function hydrateOverlays(scope, options) {
           closeButton.type = 'button';
           closeButton.className = 'opencanvas-overlay-close opencanvas-overlay-close--' + closePlacement;
           closeButton.setAttribute('data-opencanvas-overlay-close-placement', closePlacement);
-          closeButton.setAttribute('aria-label', presentation === 'fullscreen-menu' ? 'Close menu' : 'Close overlay');
+          closeButton.setAttribute('aria-label', presentation === 'fullscreen-menu' ? 'Close menu' : presentation === 'lightbox' ? 'Close lightbox' : 'Close overlay');
           closeButton.textContent = presentation === 'fullscreen-menu' ? 'Close' : 'x';
           closeButton.addEventListener('click', close);
           surface.appendChild(closeButton);

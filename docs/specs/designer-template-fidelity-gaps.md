@@ -398,16 +398,19 @@ Current state:
   `inside`. Renderer/editor preview emit the same metadata and styling hooks,
   the Runtime Hydrator validates stale/malformed HTML, and the Interactions
   panel exposes the controls.
+- **June 2026 update:** Overlay presentation now includes a bounded `lightbox`
+  mode for gallery/media overlays. The same schema/editor/runtime path emits
+  explicit presentation metadata, a lightbox styling hook, runtime validation,
+  and public styles without custom owner scripts.
 
 User-visible miss:
 
-- Cannot reproduce click-open project modals, nav overlays, command palettes,
-  full-screen menu transitions, iframe drill-ins, gallery lightboxes, or
-  product-tour overlays.
+- Cannot reproduce command palettes or product-tour overlays as named overlay
+  presets yet.
 - Can now style modal/fullscreen chrome from a bounded Template-owned
-  catalog.
-- Richer entrance/exit variants, lightbox/gallery/product-tour presets, and
-  menu choreography presets are still missing.
+  catalog and publish lightbox-style gallery/media overlays.
+- Richer entrance/exit variants, command-palette/product-tour presets, and menu
+  choreography presets are still missing.
 
 Needed primitive:
 

@@ -90,6 +90,18 @@ const snapshot: PublishedSnapshot = {
 const validation = validatePublishedSnapshot(snapshot);
 assert.equal(validation.valid, true, validation.valid ? undefined : validation.errors.join('\n'));
 
+const lightboxSnapshot = structuredClone(snapshot) as PublishedSnapshot;
+(lightboxSnapshot.overlays![0] as unknown as { presentation: { mode: string; chrome: string } }).presentation.mode =
+  'lightbox';
+(lightboxSnapshot.overlays![0] as unknown as { presentation: { mode: string; chrome: string } }).presentation.chrome =
+  'editorial-frame';
+const lightboxValidation = validatePublishedSnapshot(lightboxSnapshot);
+assert.equal(
+  lightboxValidation.valid,
+  true,
+  lightboxValidation.valid ? undefined : lightboxValidation.errors.join('\n'),
+);
+
 const invalid = structuredClone(snapshot) as PublishedSnapshot;
 (invalid.overlays![0] as unknown as { presentation: { mode: string } }).presentation.mode = 'drawer';
 const invalidResult = validatePublishedSnapshot(invalid);
@@ -134,6 +146,18 @@ assert.ok(html.includes('data-opencanvas-overlay-surface'), 'renderer must keep 
 assert.ok(html.includes('opencanvas-overlay--fullscreen-menu'), 'renderer must expose fullscreen menu styling hook');
 assert.ok(html.includes('opencanvas-overlay--chrome-glass-panel'), 'renderer must expose overlay chrome styling hook');
 
+const lightboxHtml = renderCanvasSnapshot(lightboxSnapshot, '/assets', 'overlay-lightbox-site', {
+  turnstileSiteKey: 'test-key',
+});
+assert.ok(
+  lightboxHtml.includes('data-opencanvas-overlay-presentation="lightbox"'),
+  'renderer must emit lightbox overlay presentation metadata',
+);
+assert.ok(
+  lightboxHtml.includes('opencanvas-overlay--lightbox'),
+  'renderer must expose lightbox overlay styling hook',
+);
+
 const roundTrip = decodeYDoc(encodeYDoc(editable));
 assert.equal(
   roundTrip.overlays?.[0]?.presentation?.mode,
@@ -158,6 +182,10 @@ assert.ok(
   OVERLAY_RUNTIME_SRC.includes('overlay-presentation'),
   'overlay runtime must emit named presentation failure events',
 );
+assert.ok(
+  OVERLAY_RUNTIME_SRC.includes("presentation !== 'lightbox'"),
+  'overlay runtime must explicitly allow lightbox presentation',
+);
 
 const interactionsPanel = readFileSync(join(thisDir, '../editor-client/interactions-panel.ts'), 'utf8');
 assert.ok(interactionsPanel.includes('OVERLAY_PRESENTATION_MODES'), 'editor panel must expose overlay presentation modes');
@@ -177,6 +205,10 @@ const publicStyles = readFileSync(join(thisDir, 'public-styles.ts'), 'utf8');
 assert.ok(
   publicStyles.includes('data-opencanvas-overlay-presentation="fullscreen-menu"'),
   'public styles must include fullscreen overlay presentation rules',
+);
+assert.ok(
+  publicStyles.includes('data-opencanvas-overlay-presentation="lightbox"'),
+  'public styles must include lightbox overlay presentation rules',
 );
 assert.ok(
   publicStyles.includes('data-opencanvas-overlay-chrome="glass-panel"'),
