@@ -103,6 +103,11 @@ assert(panelSrc.includes('renderScrollSceneControls'), 'panel must render scroll
 assert(panelSrc.includes('ctx.state!.scrollScenes'), 'panel must mutate scroll scenes');
 assert(panelSrc.includes('ctx.state!.motionSequences'), 'panel must mutate linked motion sequences');
 assert(panelSrc.includes('Validation blocks publish'), 'panel must fail loudly for missing linked sequence');
+assert(panelSrc.includes('renderMotionSequenceControls'), 'panel must render full Motion Sequence controls');
+assert(panelSrc.includes('Add motion sequence'), 'panel must create full Motion Sequences');
+assert(panelSrc.includes('Motion Sequence step'), 'panel must render editable Motion Sequence steps');
+assert(panelSrc.includes('MOTION_SEQUENCE_TRIGGER_TYPES'), 'panel must use schema trigger types');
+assert(panelSrc.includes('TEXT_SPLIT_UNITS'), 'panel must edit text split units');
 assert(panelSrc.includes('LOAD_EXPERIENCE_PRESETS'), 'panel must use load presets');
 assert(panelSrc.includes('ROUTE_TRANSITION_MODES'), 'panel must use route modes');
 assert(panelSrc.includes('OVERLAY_TRIGGER_TYPES'), 'panel must use overlay trigger types');

@@ -142,15 +142,19 @@ Current state:
   2000ms in the inspector.
 - Motion Sequence Lite now exists for Premium Interaction v1, but only for
   overlay, load, and route surfaces with a small target/effect vocabulary.
+- **June 2026 update:** the Interactions panel now exposes full schema-owned
+  Motion Sequences for creation, deletion, trigger editing, reduced-motion
+  policy, ordered steps, target selection, text-split unit targeting, numeric
+  `from`/`to` properties, delay, duration, stagger, and easing.
 
 User-visible miss:
 
 - Cannot reproduce staged hero intros where logo, mask, headline words, media,
   nav, and CTA all enter on one choreographed timeline.
 - Cannot chain animations across multiple elements.
-- Cannot define per-step duration, easing, repeat, yoyo, reverse, or wait.
-- Cannot express character/word line reveals, mask wipes, clip-path reveals,
-  filter/blur timelines, SVG stroke drawing, or variable-font axis animation.
+- Cannot yet define repeat, yoyo, reverse, wait, visual timeline keyframes,
+  SVG stroke drawing, variable-font axis animation, or non-numeric filter /
+  clip-path editing from the UI.
 
 Needed primitive:
 
@@ -158,6 +162,8 @@ Needed primitive:
   properties, duration, easing, delay, stagger, and completion behaviour.
 - Validation must reject unsupported targets/properties instead of silently
   dropping steps.
+- Remaining next wave: timeline canvas UX, repeat/yoyo/wait controls,
+  non-numeric property editors, and SVG/variable-font effect catalogs.
 
 ### 2. Scroll Motion Is Triggered, Not Scrubbed
 

@@ -31,6 +31,10 @@ import type {
   MotionSequenceStep,
   ScrollScene,
 } from '../canvas/behaviour-primitives.js';
+import {
+  MOTION_SEQUENCE_TRIGGER_TYPES,
+  TEXT_SPLIT_UNITS,
+} from '../canvas/behaviour-primitives.js';
 import { isPremiumLoadExperience } from '../canvas/schema.js';
 import {
   LOAD_EXPERIENCE_GATES,
@@ -119,6 +123,7 @@ export function renderInteractionsPanel(ctx: InteractionsPanelContext): void {
   host.replaceChildren();
   host.className = 'opencanvas-interactions-panel';
   renderScrollSceneControls(ctx, host);
+  renderMotionSequenceControls(ctx, host);
   renderLoadControls(ctx, host);
   renderRouteControls(ctx, host);
   renderOverlayControls(ctx, host);
@@ -585,6 +590,441 @@ function updateScrollSequenceStep(
       steps: sequence.steps.map((step) => (step.id === stepId ? { ...step, ...patch } : step)),
     };
   });
+}
+
+type EditableMotionNumber = 'opacity' | 'translateX' | 'translateY' | 'scale' | 'rotate';
+type MotionPropertySide = 'from' | 'to';
+
+const MOTION_TARGET_TYPES = ['site', 'page', 'section', 'element', 'text-split'] as const;
+const MOTION_NUMBER_FIELDS: Array<{
+  key: EditableMotionNumber;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+}> = [
+  { key: 'opacity', label: 'Opacity', min: 0, max: 1, step: 0.05 },
+  { key: 'translateX', label: 'Translate X', min: -5000, max: 5000, step: 1 },
+  { key: 'translateY', label: 'Translate Y', min: -5000, max: 5000, step: 1 },
+  { key: 'scale', label: 'Scale', min: 0, max: 10, step: 0.05 },
+  { key: 'rotate', label: 'Rotate', min: -1080, max: 1080, step: 1 },
+];
+
+function renderMotionSequenceControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
+  if (!ctx.state) return;
+  const wrap = section('Motion Sequences');
+  const add = actionButton('Add motion sequence', 'Create a full Motion Sequence for this site');
+  add.addEventListener('click', () => {
+    mutate(ctx, () => {
+      const id = uniqueMotionSequenceId(ctx, 'motion-sequence-' + Date.now());
+      ctx.state!.motionSequences = [
+        ...(ctx.state!.motionSequences ?? []),
+        {
+          id,
+          trigger: defaultMotionSequenceTrigger(ctx, 'section-enter'),
+          reducedMotion: 'final-state',
+          steps: [defaultMotionSequenceStep(ctx, id, 0)],
+        },
+      ];
+    });
+    ctx.setStatus('Motion Sequence added', 'ok');
+  });
+  wrap.appendChild(add);
+
+  const sequences = ctx.state.motionSequences ?? [];
+  if (sequences.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'opencanvas-section-picker-empty';
+    empty.textContent = 'No Motion Sequences yet.';
+    wrap.appendChild(empty);
+  }
+
+  for (const sequence of sequences) {
+    renderMotionSequenceCard(ctx, wrap, sequence);
+  }
+
+  host.appendChild(wrap);
+}
+
+function renderMotionSequenceCard(
+  ctx: InteractionsPanelContext,
+  host: HTMLElement,
+  sequence: MotionSequence,
+): void {
+  const card = document.createElement('div');
+  card.className = 'opencanvas-interactions-card';
+
+  const header = row('opencanvas-interactions-card-header');
+  const title = document.createElement('strong');
+  title.textContent = sequence.id;
+  header.appendChild(title);
+  const remove = compactButton('Delete', 'Delete this Motion Sequence');
+  remove.addEventListener('click', () => {
+    mutate(ctx, () => {
+      ctx.state!.motionSequences = (ctx.state!.motionSequences ?? []).filter((item) => item.id !== sequence.id);
+      ctx.state!.scrollScenes = (ctx.state!.scrollScenes ?? []).filter((scene) => scene.sequenceId !== sequence.id);
+    });
+    ctx.setStatus('Motion Sequence deleted', 'ok');
+  });
+  header.appendChild(remove);
+  card.appendChild(header);
+
+  const trigger = selectInput([...MOTION_SEQUENCE_TRIGGER_TYPES], sequence.trigger.type);
+  trigger.addEventListener('change', () => {
+    mutate(ctx, () => {
+      updateMotionSequence(ctx, sequence.id, {
+        trigger: defaultMotionSequenceTrigger(ctx, trigger.value),
+      });
+    });
+  });
+  card.appendChild(field('Trigger', trigger));
+  renderMotionSequenceTriggerDetail(ctx, card, sequence);
+
+  const reduced = selectInput(['final-state', 'skip'], sequence.reducedMotion ?? 'final-state');
+  reduced.addEventListener('change', () => {
+    mutate(ctx, () => {
+      updateMotionSequence(ctx, sequence.id, { reducedMotion: reduced.value as 'final-state' | 'skip' });
+    });
+  });
+  card.appendChild(field('Reduced motion', reduced));
+
+  const addStep = compactButton('Add step', 'Add a Motion Sequence step');
+  addStep.addEventListener('click', () => {
+    mutate(ctx, () => {
+      updateMotionSequence(ctx, sequence.id, {
+        steps: [...sequence.steps, defaultMotionSequenceStep(ctx, sequence.id, sequence.steps.length)],
+      });
+    });
+  });
+  card.appendChild(addStep);
+
+  for (let i = 0; i < sequence.steps.length; i++) {
+    renderFullMotionSequenceStep(ctx, card, sequence, sequence.steps[i]!, i);
+  }
+
+  host.appendChild(card);
+}
+
+function renderMotionSequenceTriggerDetail(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  sequence: MotionSequence,
+): void {
+  const trigger = sequence.trigger;
+  if (trigger.type === 'section-enter') {
+    const sectionIds = activePageSections(ctx).map((sectionItem) => sectionItem.id);
+    const sectionInput = selectInput(
+      sectionIds,
+      sectionIds.includes(trigger.sectionId) ? trigger.sectionId : sectionIds[0] ?? trigger.sectionId,
+    );
+    sectionInput.addEventListener('change', () => {
+      mutate(ctx, () => {
+        updateMotionSequence(ctx, sequence.id, {
+          trigger: { type: 'section-enter', sectionId: sectionInput.value },
+        });
+      });
+    });
+    card.appendChild(field('Section', sectionInput));
+  }
+  if (trigger.type === 'scroll-scene') {
+    const sceneIds = (ctx.state?.scrollScenes ?? []).map((scene) => scene.id);
+    if (sceneIds.length > 0) {
+      const sceneInput = selectInput(
+        sceneIds,
+        sceneIds.includes(trigger.scrollSceneId) ? trigger.scrollSceneId : sceneIds[0]!,
+      );
+      sceneInput.addEventListener('change', () => {
+        mutate(ctx, () => {
+          updateMotionSequence(ctx, sequence.id, {
+            trigger: { type: 'scroll-scene', scrollSceneId: sceneInput.value },
+          });
+        });
+      });
+      card.appendChild(field('Scroll scene', sceneInput));
+    } else {
+      const missing = document.createElement('p');
+      missing.className = 'opencanvas-section-picker-empty';
+      missing.textContent = 'Create a Scroll Scene before binding this trigger.';
+      card.appendChild(missing);
+    }
+  }
+}
+
+function renderFullMotionSequenceStep(
+  ctx: InteractionsPanelContext,
+  host: HTMLElement,
+  sequence: MotionSequence,
+  step: MotionSequenceStep,
+  index: number,
+): void {
+  const card = document.createElement('div');
+  card.className = 'opencanvas-interactions-step';
+
+  const header = row('opencanvas-interactions-card-header');
+  const title = document.createElement('strong');
+  title.textContent = 'Motion Sequence step ' + String(index + 1);
+  header.appendChild(title);
+  const remove = compactButton('Remove', 'Remove this Motion Sequence step');
+  remove.addEventListener('click', () => {
+    mutate(ctx, () => {
+      updateMotionSequence(ctx, sequence.id, {
+        steps: sequence.steps.filter((candidate) => candidate.id !== step.id),
+      });
+    });
+  });
+  header.appendChild(remove);
+  card.appendChild(header);
+
+  const targetType = selectInput([...MOTION_TARGET_TYPES], step.target.type);
+  targetType.addEventListener('change', () => {
+    mutate(ctx, () => {
+      updateScrollSequenceStep(ctx, sequence.id, step.id, {
+        target: defaultMotionTargetForType(ctx, targetType.value),
+      });
+    });
+  });
+  card.appendChild(field('Target type', targetType));
+  renderMotionTargetDetail(ctx, card, sequence, step);
+
+  renderMotionPropertyGroup(ctx, card, sequence, step, 'from');
+  renderMotionPropertyGroup(ctx, card, sequence, step, 'to');
+
+  const delay = numberInput(step.delayMs ?? 0, 0, 10000, 10);
+  delay.addEventListener('change', () => updateMotionStepFinite(ctx, sequence.id, step, 'delayMs', delay, 0, 10000));
+  card.appendChild(field('Delay (ms)', delay));
+
+  const duration = numberInput(step.durationMs, 0, 10000, 10);
+  duration.addEventListener('change', () =>
+    updateMotionStepFinite(ctx, sequence.id, step, 'durationMs', duration, 0, 10000),
+  );
+  card.appendChild(field('Duration (ms)', duration));
+
+  const stagger = numberInput(step.staggerMs ?? 0, 0, 10000, 10);
+  stagger.addEventListener('change', () =>
+    updateMotionStepFinite(ctx, sequence.id, step, 'staggerMs', stagger, 0, 10000),
+  );
+  card.appendChild(field('Stagger (ms)', stagger));
+
+  const easing = textInput(step.easing ?? DEFAULT_EASING, DEFAULT_EASING);
+  easing.addEventListener('change', () => {
+    const value = easing.value.trim();
+    if (value.length === 0) {
+      ctx.setStatus('Motion Sequence easing cannot be empty', 'error');
+      easing.value = step.easing ?? DEFAULT_EASING;
+      return;
+    }
+    mutate(ctx, () => updateScrollSequenceStep(ctx, sequence.id, step.id, { easing: value }));
+  });
+  card.appendChild(field('Easing', easing));
+
+  host.appendChild(card);
+}
+
+function renderMotionTargetDetail(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  sequence: MotionSequence,
+  step: MotionSequenceStep,
+): void {
+  if (step.target.type === 'site') return;
+  if (step.target.type === 'page') {
+    const pageIds = ctx.state?.pages.map((page) => page.id) ?? [];
+    const page = selectInput(pageIds, pageIds.includes(step.target.pageId) ? step.target.pageId : pageIds[0] ?? step.target.pageId);
+    page.addEventListener('change', () => {
+      mutate(ctx, () => updateScrollSequenceStep(ctx, sequence.id, step.id, { target: { type: 'page', pageId: page.value } }));
+    });
+    card.appendChild(field('Target page', page));
+    return;
+  }
+  if (step.target.type === 'section') {
+    const sectionIds = activePageSections(ctx).map((sectionItem) => sectionItem.id);
+    const sectionInput = selectInput(
+      sectionIds,
+      sectionIds.includes(step.target.sectionId) ? step.target.sectionId : sectionIds[0] ?? step.target.sectionId,
+    );
+    sectionInput.addEventListener('change', () => {
+      mutate(ctx, () =>
+        updateScrollSequenceStep(ctx, sequence.id, step.id, { target: { type: 'section', sectionId: sectionInput.value } }),
+      );
+    });
+    card.appendChild(field('Target section', sectionInput));
+    return;
+  }
+  if (step.target.type === 'element' || step.target.type === 'text-split') {
+    const target = step.target;
+    const elementId = textInput(target.elementId, 'Element id');
+    elementId.addEventListener('change', () => {
+      const value = elementId.value.trim();
+      if (value.length === 0) {
+        ctx.setStatus('Motion Sequence target element cannot be empty', 'error');
+        elementId.value = target.elementId;
+        return;
+      }
+      mutate(ctx, () => {
+        updateScrollSequenceStep(ctx, sequence.id, step.id, {
+          target:
+            target.type === 'text-split'
+              ? { ...target, elementId: value }
+              : { type: 'element', elementId: value },
+        });
+      });
+    });
+    card.appendChild(field('Target element', elementId));
+    if (target.type === 'text-split') {
+      const unit = selectInput([...TEXT_SPLIT_UNITS], target.unit);
+      unit.addEventListener('change', () => {
+        mutate(ctx, () =>
+          updateScrollSequenceStep(ctx, sequence.id, step.id, {
+            target: { ...target, unit: unit.value as (typeof TEXT_SPLIT_UNITS)[number] },
+          }),
+        );
+      });
+      card.appendChild(field('Split unit', unit));
+    }
+  }
+}
+
+function renderMotionPropertyGroup(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  sequence: MotionSequence,
+  step: MotionSequenceStep,
+  side: MotionPropertySide,
+): void {
+  for (const spec of MOTION_NUMBER_FIELDS) {
+    const input = optionalNumberInput(motionNumberValue(step[side], spec.key), spec.min, spec.max, spec.step);
+    input.addEventListener('change', () =>
+      updateMotionStepProperty(ctx, sequence.id, step, side, spec.key, input, spec.min, spec.max),
+    );
+    card.appendChild(field((side === 'from' ? 'From ' : 'To ') + spec.label, input));
+  }
+}
+
+function optionalNumberInput(
+  value: number | undefined,
+  min: number,
+  max: number,
+  step: number,
+): HTMLInputElement {
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = String(min);
+  input.max = String(max);
+  input.step = String(step);
+  input.value = value === undefined ? '' : String(value);
+  return input;
+}
+
+function motionNumberValue(
+  props: MotionSequenceStep['from'] | MotionSequenceStep['to'] | undefined,
+  key: EditableMotionNumber,
+): number | undefined {
+  const value = props?.[key];
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function updateMotionStepProperty(
+  ctx: InteractionsPanelContext,
+  sequenceId: string,
+  step: MotionSequenceStep,
+  side: MotionPropertySide,
+  key: EditableMotionNumber,
+  input: HTMLInputElement,
+  min: number,
+  max: number,
+): void {
+  const value = input.value.trim();
+  const current = { ...(step[side] ?? {}) };
+  if (value.length === 0) {
+    delete current[key];
+    if (side === 'to' && Object.keys(current).length === 0) {
+      ctx.setStatus('Motion Sequence "to" properties need at least one value', 'error');
+      input.value = String(motionNumberValue(step[side], key) ?? '');
+      return;
+    }
+    mutate(ctx, () => updateScrollSequenceStep(ctx, sequenceId, step.id, { [side]: current }));
+    return;
+  }
+  const next = Number(value);
+  if (!Number.isFinite(next) || next < min || next > max) {
+    ctx.setStatus('Motion Sequence ' + key + ' must be ' + String(min) + '-' + String(max), 'error');
+    input.value = String(motionNumberValue(step[side], key) ?? '');
+    return;
+  }
+  current[key] = next;
+  mutate(ctx, () => updateScrollSequenceStep(ctx, sequenceId, step.id, { [side]: current }));
+}
+
+function updateMotionStepFinite(
+  ctx: InteractionsPanelContext,
+  sequenceId: string,
+  step: MotionSequenceStep,
+  key: 'delayMs' | 'durationMs' | 'staggerMs',
+  input: HTMLInputElement,
+  min: number,
+  max: number,
+): void {
+  const next = validNumber(input, min, max);
+  if (next === null) {
+    ctx.setStatus('Motion Sequence ' + key + ' must be ' + String(min) + '-' + String(max), 'error');
+    input.value = String(step[key] ?? 0);
+    return;
+  }
+  mutate(ctx, () => updateScrollSequenceStep(ctx, sequenceId, step.id, { [key]: next }));
+}
+
+function updateMotionSequence(
+  ctx: InteractionsPanelContext,
+  sequenceId: string,
+  patch: Partial<MotionSequence>,
+): void {
+  ctx.state!.motionSequences = (ctx.state!.motionSequences ?? []).map((sequence) =>
+    sequence.id === sequenceId ? { ...sequence, ...patch } : sequence,
+  );
+}
+
+function defaultMotionSequenceTrigger(ctx: InteractionsPanelContext, type: string): MotionSequence['trigger'] {
+  if (type === 'load-enter') return { type: 'load-enter' };
+  if (type === 'scroll-scene') return { type: 'scroll-scene', scrollSceneId: ctx.state?.scrollScenes?.[0]?.id ?? '' };
+  return { type: 'section-enter', sectionId: activePageSections(ctx)[0]?.id ?? '' };
+}
+
+function defaultMotionTargetForType(ctx: InteractionsPanelContext, type: string): BehaviourTarget {
+  if (type === 'page') return { type: 'page', pageId: activePageId(ctx) ?? ctx.state?.pages[0]?.id ?? '' };
+  if (type === 'section') return { type: 'section', sectionId: activePageSections(ctx)[0]?.id ?? '' };
+  if (type === 'element') return { type: 'element', elementId: ctx.selectedElementId ?? elementIdsForActivePage(ctx)[0] ?? '' };
+  if (type === 'text-split') return { type: 'text-split', elementId: ctx.selectedElementId ?? elementIdsForActivePage(ctx)[0] ?? '', unit: 'word' };
+  return { type: 'site' };
+}
+
+function defaultMotionSequenceStep(
+  ctx: InteractionsPanelContext,
+  sequenceId: string,
+  index: number,
+): MotionSequenceStep {
+  return {
+    id: sequenceId + '-step-' + String(index + 1),
+    target: defaultMotionTargetForType(ctx, ctx.selectedElementId ? 'element' : 'section'),
+    from: { opacity: 0, translateY: 24 },
+    to: { opacity: 1, translateY: 0 },
+    durationMs: 420,
+    delayMs: 0,
+    staggerMs: 0,
+    easing: DEFAULT_EASING,
+  };
+}
+
+function uniqueMotionSequenceId(ctx: InteractionsPanelContext, base: string): string {
+  const ids = new Set((ctx.state?.motionSequences ?? []).map((sequence) => sequence.id));
+  if (!ids.has(base)) return base;
+  let index = 2;
+  while (ids.has(base + '-' + String(index))) index += 1;
+  return base + '-' + String(index);
 }
 
 function renderLoadControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
