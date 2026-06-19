@@ -13,6 +13,7 @@ const editorRenderSrc = await Bun.file(new URL('./render.ts', import.meta.url)).
 const visitorRuntimeSrc = await Bun.file(new URL('../interactive/runtime.ts', import.meta.url)).text();
 const publicRouteSrc = await Bun.file(new URL('../routes/public.ts', import.meta.url)).text();
 const routeTransitionSrc = await Bun.file(new URL('../interactive/route-transition.ts', import.meta.url)).text();
+const packageSrc = await Bun.file(new URL('../../package.json', import.meta.url)).text();
 
 assert(
   visitorRuntimeSrc.includes('window.__opencanvasHydrate = hydrateAll'),
@@ -43,6 +44,14 @@ assert(
   routeTransitionSrc.includes('window.__opencanvasHydrate') &&
     routeTransitionSrc.includes("reason: 'route-transition'"),
   'route transitions must consume the Runtime Hydrator boundary',
+);
+assert(
+  packageSrc.includes('"runtime-hydrator-parity:smoke"'),
+  'package.json must expose the Runtime Hydrator parity smoke',
+);
+assert(
+  packageSrc.includes('bun run runtime-hydrator-parity:smoke'),
+  'ci:smoke must run the Runtime Hydrator parity smoke',
 );
 
 console.log('[runtime-hydrator-parity:smoke] OK');

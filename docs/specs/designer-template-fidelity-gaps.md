@@ -93,6 +93,10 @@ Open Canvas has real motion and interaction primitives already:
 - Published output now emits first-class overlay shells, load-experience
   shells, route-transition metadata, and Motion Sequence Lite descriptors.
   The Runtime Hydrator rehydrates these after live-publish HTML swaps.
+- **June 2026 update:** Runtime Hydrator parity is now a named gate. Visitor
+  output, editor render, live-publish swaps, and route-transition swaps all
+  consume `window.__opencanvasHydrate`; `runtime-hydrator-parity:smoke` is wired
+  into `ci:smoke` so drift fails before publish.
 - **June 2026 update:** element-level Marquee is now schema-owned. The
   element inspector can enable direction, speed, pause-on-hover, hover-reverse,
   and explicit reduced-motion mode plus an edge-fade mask; renderer/editor

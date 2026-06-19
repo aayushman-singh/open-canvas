@@ -15,6 +15,8 @@
 - Added Runtime Hydrator boundary parity: editor render now consumes
   `window.__opencanvasHydrate`, matching visitor, live-publish, and route
   transition swap surfaces.
+- Wired `runtime-hydrator-parity:smoke` into `ci:smoke`, so editor/visitor
+  Runtime Hydrator drift fails in the normal gate.
 - Added full Motion Sequence editor controls for schema-owned triggers, steps,
   targets, text-split units, numeric properties, duration, delay, stagger,
   easing, and reduced-motion policy.
@@ -23,8 +25,6 @@
 
 - Extend the editor from first-step controls to full multi-step Motion Sequence
   editing for scroll-driven timelines.
-- Add a parity smoke that exercises the same Runtime Hydrator path from editor
-  preview and visitor output.
 - Add a visual timeline canvas, waits, repeats, yoyo/reverse, and richer
   text-specific effects.
 - Add Behaviour Load Experience run policy, progress choreography, and
