@@ -607,6 +607,25 @@ Needed primitive:
 - Nav Theme On Scroll remains a schema-owned relation: section target signal ->
   nav theme state. Do not replace it with arbitrary scroll listeners or raw CSS
   snippets.
+### 16. Smooth Scroll Was Native-Only
+
+Current state:
+
+- **June 2026 update:** `scrollBehavior` now owns native and inertial scroll modes.
+  Inertial mode emits explicit `data-opencanvas-smooth-scroll` metadata, a
+  `smoothScroll` behaviour payload, Runtime Hydrator execution, Yjs projection,
+  validator gates, and Interactions panel controls. Reduced-motion handling is
+  authored as `native` or `disabled` and is marked on the document rather than
+  degrading silently.
+- Browser-native smooth scrolling remains available through the same
+  `scrollBehavior` node for existing sites.
+
+Needed primitive:
+
+- Smooth Scroll remains a schema-owned relation from site scroll intent ->
+  Runtime Hydrator execution. Do not replace it with Lenis API calls or raw
+  owner-authored scripts.
+
 ## Priority Order
 
 1. **Runtime single-source/parity.** New interactions will multiply risk unless

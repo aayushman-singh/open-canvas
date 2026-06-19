@@ -645,7 +645,8 @@ export function renderCanvasSnapshot(
     snapshot.routeTransition?.enabled === true
       ? ` data-opencanvas-route-transition="${escapeAttr(snapshot.routeTransition.id)}" data-opencanvas-route-mode="${escapeAttr(snapshot.routeTransition.mode)}" data-opencanvas-route-duration-ms="${escapeAttr(String(snapshot.routeTransition.durationMs))}" data-opencanvas-route-easing="${escapeAttr(snapshot.routeTransition.easing)}"${snapshot.routeTransition.sharedElements && snapshot.routeTransition.sharedElements.length > 0 ? ` data-opencanvas-route-shared-elements="${escapeAttr(JSON.stringify(snapshot.routeTransition.sharedElements))}"` : ''}${snapshot.routeTransition.outgoingSequence ? ` data-opencanvas-route-outgoing-sequence="${escapeAttr(snapshot.routeTransition.outgoingSequence.id)}"` : ''}${snapshot.routeTransition.incomingSequence ? ` data-opencanvas-route-incoming-sequence="${escapeAttr(snapshot.routeTransition.incomingSequence.id)}"` : ''}`
       : '';
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${loadExperienceHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
+  const smoothScrollAttrs = renderSmoothScrollAttrs(snapshot.scrollBehavior);
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${loadExperienceHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
 }
 
 /**
@@ -738,10 +739,17 @@ function walkElements(snapshot: PublishedSnapshot, pred: (el: CanvasElement) => 
  * sticky header instead of under it. Absence (or all-fields-absent) emits
  * nothing — there is no zero-padding default.
  */
+function renderSmoothScrollAttrs(scrollBehavior: PublishedSnapshot['scrollBehavior']): string {
+  if (!scrollBehavior || scrollBehavior.mode !== 'inertial') return '';
+  return ` data-opencanvas-smooth-scroll="inertial" data-opencanvas-smooth-scroll-duration-ms="${escapeAttr(String(scrollBehavior.durationMs))}" data-opencanvas-smooth-scroll-reduced-motion="${escapeAttr(String(scrollBehavior.reducedMotion))}"`;
+}
+
 function renderScrollBehaviourCss(scrollBehavior: PublishedSnapshot['scrollBehavior']): string {
   if (!scrollBehavior) return '';
   const rules: string[] = [];
-  if (scrollBehavior.smooth === true) rules.push('scroll-behavior:smooth');
+  if (scrollBehavior.smooth === true || scrollBehavior.mode === 'native') {
+    rules.push('scroll-behavior:smooth');
+  }
   if (typeof scrollBehavior.paddingTop === 'number' && scrollBehavior.paddingTop >= 0) {
     rules.push(`scroll-padding-top:${String(scrollBehavior.paddingTop)}px`);
   }

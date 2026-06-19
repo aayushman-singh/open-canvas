@@ -23,6 +23,8 @@ import type {
   OverlayTriggerType,
   RouteTransition,
   RouteTransitionMode,
+  ScrollBehaviorMode,
+  ScrollBehaviorReducedMotionMode,
   SharedRouteElement,
   EditableSite,
 } from '../canvas/schema.js';
@@ -48,6 +50,8 @@ import {
   MOTION_SEQUENCE_LITE_TARGET_TYPES,
   OVERLAY_TRIGGER_TYPES,
   ROUTE_TRANSITION_MODES,
+  SCROLL_BEHAVIOR_MODES,
+  SCROLL_BEHAVIOR_REDUCED_MOTION_MODES,
 } from '../canvas/schema.js';
 import type {
   EditorContext,
@@ -147,6 +151,7 @@ export function renderInteractionsPanel(ctx: InteractionsPanelContext): void {
   renderScrollSceneControls(ctx, host);
   renderMotionSequenceControls(ctx, host);
   renderLayoutTransitionControls(ctx, host);
+  renderSmoothScrollControls(ctx, host);
   renderLoadControls(ctx, host);
   renderRouteControls(ctx, host);
   renderOverlayControls(ctx, host);
@@ -1568,6 +1573,120 @@ function updateSharedRouteElement(
         mapping.id === mappingId ? { ...mapping, ...patch } : mapping,
       ),
     };
+  });
+}
+
+function renderSmoothScrollControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
+  if (!ctx.state) return;
+  const wrap = section('Smooth Scroll');
+  const current = ctx.state.scrollBehavior ?? {};
+  const modeValue = current.mode ?? (current.smooth === true ? 'native' : 'off');
+  const mode = selectInput(['off', ...SCROLL_BEHAVIOR_MODES], modeValue);
+
+  mode.addEventListener('change', () => {
+    const value = mode.value as ScrollBehaviorMode | 'off';
+    if (value === 'off') {
+      updateSmoothScroll(ctx, {
+        smooth: undefined,
+        mode: undefined,
+        durationMs: undefined,
+        reducedMotion: undefined,
+      });
+      return;
+    }
+    if (value === 'native') {
+      updateSmoothScroll(ctx, {
+        smooth: true,
+        mode: 'native',
+        durationMs: undefined,
+        reducedMotion: undefined,
+      });
+      return;
+    }
+    updateSmoothScroll(ctx, {
+      smooth: undefined,
+      mode: 'inertial',
+      durationMs: current.durationMs ?? 900,
+      reducedMotion: current.reducedMotion ?? 'native',
+    });
+  });
+  wrap.appendChild(field('Mode', mode));
+
+  const duration = document.createElement('input');
+  duration.type = 'number';
+  duration.min = '100';
+  duration.max = '5000';
+  duration.step = '50';
+  duration.value = String(current.durationMs ?? 900);
+  duration.disabled = modeValue !== 'inertial';
+  duration.addEventListener('change', () => {
+    const next = Number(duration.value);
+    if (!Number.isFinite(next) || next < 100 || next > 5000) {
+      ctx.setStatus('Smooth Scroll duration must be between 100 and 5000ms', 'error');
+      renderInteractionsPanel(ctx);
+      return;
+    }
+    updateSmoothScroll(ctx, { mode: 'inertial', durationMs: next });
+  });
+  wrap.appendChild(field('Duration (ms)', duration));
+
+  const reducedMotion = selectInput(
+    [...SCROLL_BEHAVIOR_REDUCED_MOTION_MODES],
+    current.reducedMotion ?? 'native',
+  );
+  reducedMotion.disabled = modeValue !== 'inertial';
+  reducedMotion.addEventListener('change', () =>
+    updateSmoothScroll(ctx, {
+      mode: 'inertial',
+      reducedMotion: reducedMotion.value as ScrollBehaviorReducedMotionMode,
+    }),
+  );
+  wrap.appendChild(field('Reduced motion', reducedMotion));
+
+  const padding = document.createElement('input');
+  padding.type = 'number';
+  padding.min = '0';
+  padding.step = '1';
+  padding.value = String(current.paddingTop ?? 0);
+  padding.addEventListener('change', () => {
+    const next = Number(padding.value);
+    if (!Number.isFinite(next) || next < 0) {
+      ctx.setStatus('Smooth Scroll padding must be 0 or greater', 'error');
+      renderInteractionsPanel(ctx);
+      return;
+    }
+    updateSmoothScroll(ctx, { paddingTop: next });
+  });
+  wrap.appendChild(field('Scroll padding top', padding));
+
+  const hint = document.createElement('p');
+  hint.className = 'opencanvas-section-picker-empty';
+  hint.textContent =
+    'Inertial mode is a schema-owned Runtime Hydrator primitive; unsupported browser APIs emit opencanvas:behaviour-failure.';
+  wrap.appendChild(hint);
+  host.appendChild(wrap);
+}
+
+type SmoothScrollPatch = {
+  [K in keyof NonNullable<EditableSite['scrollBehavior']>]?:
+    | NonNullable<EditableSite['scrollBehavior']>[K]
+    | undefined;
+};
+
+function updateSmoothScroll(ctx: InteractionsPanelContext, patch: SmoothScrollPatch): void {
+  mutate(ctx, () => {
+    const next: SmoothScrollPatch = {
+      ...(ctx.state!.scrollBehavior ?? {}),
+      ...patch,
+    };
+    for (const key of Object.keys(next) as Array<keyof typeof next>) {
+      if (next[key] === undefined) delete next[key];
+    }
+    if (Object.keys(next).length === 0) {
+      delete ctx.state!.scrollBehavior;
+    } else {
+      ctx.state!.scrollBehavior = next as NonNullable<EditableSite['scrollBehavior']>;
+    }
   });
 }
 

@@ -3307,6 +3307,41 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
         );
       }
     }
+    if (sb.mode !== undefined && sb.mode !== 'native' && sb.mode !== 'inertial') {
+      errors.push(
+        `scrollBehavior.mode must be one of native, inertial when present (got ${describe(sb.mode)})`,
+      );
+    }
+    if (sb.durationMs !== undefined) {
+      if (!isFiniteNumber(sb.durationMs) || sb.durationMs < 100 || sb.durationMs > 5000) {
+        errors.push(
+          `scrollBehavior.durationMs must be a finite number in [100, 5000] when present (got ${describe(sb.durationMs)})`,
+        );
+      }
+      if (sb.mode !== 'inertial') {
+        errors.push('scrollBehavior.durationMs requires scrollBehavior.mode === "inertial"');
+      }
+    }
+    if (
+      sb.reducedMotion !== undefined &&
+      sb.reducedMotion !== 'native' &&
+      sb.reducedMotion !== 'disabled'
+    ) {
+      errors.push(
+        `scrollBehavior.reducedMotion must be one of native, disabled when present (got ${describe(sb.reducedMotion)})`,
+      );
+    }
+    if (sb.reducedMotion !== undefined && sb.mode !== 'inertial') {
+      errors.push('scrollBehavior.reducedMotion requires scrollBehavior.mode === "inertial"');
+    }
+    if (sb.mode === 'inertial') {
+      if (sb.durationMs === undefined) {
+        errors.push('scrollBehavior.durationMs is required when scrollBehavior.mode === "inertial"');
+      }
+      if (sb.reducedMotion === undefined) {
+        errors.push('scrollBehavior.reducedMotion is required when scrollBehavior.mode === "inertial"');
+      }
+    }
   },
 };
 

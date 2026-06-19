@@ -758,6 +758,26 @@ export type EditableSiteStyleKit =
   | { styleKit: BuiltInStyleKit }
   | { styleKit: 'custom'; customStyleKit: StyleKitPreset };
 
+export const SCROLL_BEHAVIOR_MODES = ['native', 'inertial'] as const;
+export type ScrollBehaviorMode = (typeof SCROLL_BEHAVIOR_MODES)[number];
+
+export const SCROLL_BEHAVIOR_REDUCED_MOTION_MODES = ['native', 'disabled'] as const;
+export type ScrollBehaviorReducedMotionMode =
+  (typeof SCROLL_BEHAVIOR_REDUCED_MOTION_MODES)[number];
+
+export interface SiteScrollBehavior {
+  /** Legacy/native browser smooth scrolling switch retained for existing sites. */
+  smooth?: boolean;
+  /** Anchor landing offset for fixed headers or top chrome. */
+  paddingTop?: number;
+  /** Owner-authored page scroll mode. `inertial` is hydrated by Runtime Hydrator. */
+  mode?: ScrollBehaviorMode;
+  /** Required for inertial mode; ignored by native browser smooth scrolling. */
+  durationMs?: number;
+  /** Explicit reduced-motion policy for inertial mode. */
+  reducedMotion?: ScrollBehaviorReducedMotionMode;
+}
+
 export interface EditableSiteBase {
   pages: CanvasPage[];
   /** Site-wide header section shared across all pages. */
@@ -818,10 +838,7 @@ export interface EditableSiteBase {
    * `html { scroll-behavior; scroll-padding-top }` per the fields present.
    * ADR 0050 dec 3. Both fields are independent; absence = browser default.
    */
-  scrollBehavior?: {
-    smooth?: boolean;
-    paddingTop?: number;
-  };
+  scrollBehavior?: SiteScrollBehavior;
 }
 
 export type EditableSite = EditableSiteBase & EditableSiteStyleKit;

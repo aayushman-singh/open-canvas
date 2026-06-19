@@ -1045,6 +1045,9 @@ export function encodeYDoc(state: EditableSite): Y.Doc {
       const scroll = new Y.Map<unknown>();
       setIfDefined(scroll, 'smooth', state.scrollBehavior.smooth);
       setIfDefined(scroll, 'paddingTop', state.scrollBehavior.paddingTop);
+      setIfDefined(scroll, 'mode', state.scrollBehavior.mode);
+      setIfDefined(scroll, 'durationMs', state.scrollBehavior.durationMs);
+      setIfDefined(scroll, 'reducedMotion', state.scrollBehavior.reducedMotion);
       root.set('scrollBehavior', scroll);
     }
     if (state.overlays !== undefined) root.set('overlays', encodeJsonValue(state.overlays));
@@ -1919,6 +1922,13 @@ export function decodeYDoc(doc: Y.Doc): EditableSite {
     const scrollBehavior: NonNullable<EditableSite['scrollBehavior']> = {};
     if (scroll.has('smooth')) scrollBehavior.smooth = scroll.get('smooth') as boolean;
     if (scroll.has('paddingTop')) scrollBehavior.paddingTop = scroll.get('paddingTop') as number;
+    if (scroll.has('mode')) scrollBehavior.mode = scroll.get('mode') as NonNullable<NonNullable<EditableSite['scrollBehavior']>['mode']>;
+    if (scroll.has('durationMs')) scrollBehavior.durationMs = scroll.get('durationMs') as number;
+    if (scroll.has('reducedMotion')) {
+      scrollBehavior.reducedMotion = scroll.get(
+        'reducedMotion',
+      ) as NonNullable<NonNullable<EditableSite['scrollBehavior']>['reducedMotion']>;
+    }
     state.scrollBehavior = scrollBehavior;
   }
   if (root.has('overlays')) {

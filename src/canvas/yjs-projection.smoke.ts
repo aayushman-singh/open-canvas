@@ -443,7 +443,13 @@ const syntheticState: EditableSite = {
   defaultLocale: 'en',
   siteNoIndex: false,
   visitorTheme: 'toggleable',
-  scrollBehavior: { smooth: true, paddingTop: 72 },
+  scrollBehavior: {
+    smooth: true,
+    paddingTop: 72,
+    mode: 'inertial',
+    durationMs: 900,
+    reducedMotion: 'native',
+  },
   motionSequences: [
     {
       id: 'synthetic-scroll-sequence',

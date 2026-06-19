@@ -13,12 +13,20 @@ export interface NavThemeRuntime {
   reducedMotion: NavThemeReducedMotionMode;
 }
 
+export interface SmoothScrollRuntime {
+  mode: 'inertial';
+  durationMs: number;
+  reducedMotion: 'native' | 'disabled';
+  paddingTop?: number;
+}
+
 export interface BehaviourPayload {
   loadExperience?: LoadExperience;
   motionSequences: MotionSequence[];
   scrollScenes: ScrollScene[];
   layoutTransitions?: LayoutTransition[];
   navThemes?: NavThemeRuntime[];
+  smoothScroll?: SmoothScrollRuntime;
   richMotionAssets: Array<RichMotionAsset & { frameUrls?: string[]; posterUrl?: string; srcUrl?: string }>;
 }
 
@@ -28,6 +36,13 @@ interface SnapshotWithBehaviour {
   scrollScenes?: ScrollScene[];
   layoutTransitions?: LayoutTransition[];
   richMotionAssets?: RichMotionAsset[];
+  scrollBehavior?: {
+    smooth?: boolean;
+    paddingTop?: number;
+    mode?: string;
+    durationMs?: number;
+    reducedMotion?: string;
+  };
   pages?: Array<{ sections?: CanvasSection[] }>;
   header?: CanvasSection;
   footer?: CanvasSection;
@@ -74,12 +89,33 @@ function collectNavThemeRuntimes(snapshot: SnapshotWithBehaviour): NavThemeRunti
   return out;
 }
 
+function collectSmoothScrollRuntime(snapshot: SnapshotWithBehaviour): SmoothScrollRuntime | null {
+  const scroll = snapshot.scrollBehavior;
+  if (!scroll || scroll.mode !== 'inertial') return null;
+  if (typeof scroll.durationMs !== 'number' || scroll.durationMs < 100 || scroll.durationMs > 5000) {
+    throw new Error('smooth-scroll-runtime-invalid-duration');
+  }
+  if (scroll.reducedMotion !== 'native' && scroll.reducedMotion !== 'disabled') {
+    throw new Error('smooth-scroll-runtime-invalid-reduced-motion');
+  }
+  const runtime: SmoothScrollRuntime = {
+    mode: 'inertial',
+    durationMs: scroll.durationMs,
+    reducedMotion: scroll.reducedMotion,
+  };
+  if (typeof scroll.paddingTop === 'number' && scroll.paddingTop >= 0) {
+    runtime.paddingTop = scroll.paddingTop;
+  }
+  return runtime;
+}
+
 export function snapshotHasBehaviourPrimitives(snapshot: SnapshotWithBehaviour): boolean {
   if (snapshot.loadExperience !== undefined && 'label' in snapshot.loadExperience) return true;
   if ((snapshot.motionSequences ?? []).length > 0) return true;
   if ((snapshot.scrollScenes ?? []).length > 0) return true;
   if ((snapshot.layoutTransitions ?? []).length > 0) return true;
   if ((snapshot.richMotionAssets ?? []).length > 0) return true;
+  if (collectSmoothScrollRuntime(snapshot) !== null) return true;
   if (collectNavThemeRuntimes(snapshot).length > 0) return true;
   return false;
 }
@@ -122,6 +158,7 @@ export function buildBehaviourPayload(
     return asset;
   });
   const navThemes = collectNavThemeRuntimes(snapshot);
+  const smoothScroll = collectSmoothScrollRuntime(snapshot);
   const payload: BehaviourPayload = {
     motionSequences: snapshot.motionSequences ?? [],
     scrollScenes: snapshot.scrollScenes ?? [],
@@ -129,6 +166,7 @@ export function buildBehaviourPayload(
     richMotionAssets,
   };
   if (navThemes.length > 0) payload.navThemes = navThemes;
+  if (smoothScroll) payload.smoothScroll = smoothScroll;
   if (snapshot.loadExperience !== undefined && 'label' in snapshot.loadExperience) {
     payload.loadExperience = snapshot.loadExperience;
   }

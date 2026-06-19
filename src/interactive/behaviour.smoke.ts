@@ -62,6 +62,8 @@ class StubElement {
   style = new StubStyle();
   clientWidth = 320;
   clientHeight = 240;
+  scrollHeight = 2400;
+  scrollTop = 0;
 
   constructor(tagName: string) {
     this.tagName = tagName.toLowerCase();
@@ -216,6 +218,7 @@ class StubDocument {
 class StubWindow {
   scrollY = 0;
   innerHeight = 900;
+  scrollToCalls = 0;
   listeners = new Map<string, Listener[]>();
   rafQueue: Array<() => void> = [];
   intervals: Array<() => void> = [];
@@ -224,6 +227,18 @@ class StubWindow {
     const list = this.listeners.get(type) ?? [];
     list.push(listener);
     this.listeners.set(type, list);
+  }
+  scrollTo(_x: number, y?: number): void {
+    this.scrollToCalls += 1;
+    this.scrollY = typeof y === 'number' ? y : _x;
+  }
+  dispatchWheel(deltaY: number): StubEvent {
+    const event = makeEvent('wheel') as StubEvent & { deltaY: number; ctrlKey: boolean };
+    event.deltaY = deltaY;
+    event.ctrlKey = false;
+    const listeners = this.listeners.get('wheel') ?? [];
+    for (const fn of listeners) fn(event);
+    return event;
   }
   dispatchScroll(): void {
     const listeners = this.listeners.get('scroll') ?? [];
@@ -757,7 +772,40 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   );
 }
 
-// (7) nav theme-on-scroll mutates the authored active-theme attribute
+// (7) Smooth Scroll intercepts wheel input and drives window scroll through the shared behaviour runtime
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  doc.documentElement.scrollHeight = 3000;
+  doc.documentElement.clientHeight = 900;
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [],
+    scrollScenes: [],
+    richMotionAssets: [],
+    smoothScroll: {
+      mode: 'inertial',
+      durationMs: 900,
+      reducedMotion: 'native',
+      paddingTop: 96,
+    },
+  });
+  doc.body.appendChild(script);
+  runBehaviour(doc, win, StubImage);
+  assert(
+    doc.documentElement.getAttribute('data-opencanvas-smooth-scroll-hydrated') === 'true',
+    'Smooth Scroll must mark the document as hydrated',
+  );
+  const wheel = win.dispatchWheel(480);
+  assert(wheel.defaultPrevented === true, 'Smooth Scroll must prevent default wheel scrolling');
+  win.flushRaf();
+  assert(win.scrollToCalls > 0, 'Smooth Scroll must drive window.scrollTo');
+  assert(win.scrollY > 0, 'Smooth Scroll must move toward the wheel target');
+}
+
+// (8) nav theme-on-scroll mutates the authored active-theme attribute
 {
   const doc = new StubDocument();
   const win = new StubWindow();

@@ -722,6 +722,126 @@ function behaviourHydrateLayoutTransition(transition, root) {
   });
 }
 
+function behaviourHydrateSmoothScroll(payload, root) {
+  var config = payload.smoothScroll;
+  if (!config) return;
+  if (config.mode !== 'inertial') {
+    behaviourFailure('smooth-scroll-unsupported-mode', { mode: config.mode }, new Error('unsupported smooth scroll mode'));
+  }
+  if (!document || !document.documentElement || !window) {
+    behaviourFailure('smooth-scroll-api-missing', { step: 'document-window' }, new Error('document/window unavailable'));
+  }
+  var docEl = document.documentElement;
+  if (docEl.getAttribute('data-opencanvas-smooth-scroll-hydrated') === 'true') return;
+  var duration = Number(config.durationMs);
+  if (!isFinite(duration) || duration < 100 || duration > 5000) {
+    behaviourFailure('smooth-scroll-invalid-duration', { durationMs: config.durationMs }, new Error('invalid smooth scroll duration'));
+  }
+  if (config.reducedMotion !== 'native' && config.reducedMotion !== 'disabled') {
+    behaviourFailure('smooth-scroll-invalid-reduced-motion', { reducedMotion: config.reducedMotion }, new Error('invalid smooth scroll reduced-motion policy'));
+  }
+  docEl.setAttribute('data-opencanvas-smooth-scroll', 'inertial');
+  docEl.setAttribute('data-opencanvas-smooth-scroll-duration-ms', String(duration));
+  docEl.setAttribute('data-opencanvas-smooth-scroll-reduced-motion', config.reducedMotion);
+  if (typeof config.paddingTop === 'number') {
+    docEl.style.scrollPaddingTop = String(config.paddingTop) + 'px';
+  }
+  if (behaviourPrefersReducedMotion()) {
+    docEl.setAttribute('data-opencanvas-smooth-scroll-reduced', config.reducedMotion);
+    if (config.reducedMotion === 'disabled') docEl.style.scrollBehavior = 'auto';
+    docEl.setAttribute('data-opencanvas-smooth-scroll-hydrated', 'true');
+    return;
+  }
+  docEl.setAttribute('data-opencanvas-smooth-scroll-reduced', 'none');
+  if (
+    typeof window.addEventListener !== 'function' ||
+    typeof window.scrollTo !== 'function' ||
+    typeof requestAnimationFrame !== 'function'
+  ) {
+    behaviourFailure('smooth-scroll-api-missing', { step: 'event-loop' }, new Error('required smooth scroll browser APIs unavailable'));
+  }
+  function readScrollY() {
+    return window.scrollY || docEl.scrollTop || (document.body && document.body.scrollTop) || 0;
+  }
+  function maxScrollY() {
+    var scrollHeight = Math.max(
+      docEl.scrollHeight || 0,
+      document.body && document.body.scrollHeight ? document.body.scrollHeight : 0
+    );
+    var viewport = window.innerHeight || docEl.clientHeight || 0;
+    if (!isFinite(scrollHeight) || !isFinite(viewport) || viewport <= 0) {
+      behaviourFailure('smooth-scroll-measurement-invalid', { scrollHeight: scrollHeight, viewport: viewport }, new Error('invalid smooth scroll measurement'));
+    }
+    return Math.max(0, scrollHeight - viewport);
+  }
+  function clamp(value) {
+    return Math.max(0, Math.min(maxScrollY(), value));
+  }
+  var currentY = readScrollY();
+  var targetY = currentY;
+  var active = false;
+  var lastTs = 0;
+  function step(ts) {
+    if (!active) return;
+    var now = typeof ts === 'number' ? ts : lastTs + 16;
+    var elapsed = lastTs > 0 ? Math.max(1, now - lastTs) : 16;
+    lastTs = now;
+    var delta = targetY - currentY;
+    if (Math.abs(delta) < 0.5) {
+      currentY = targetY;
+      window.scrollTo(0, currentY);
+      active = false;
+      lastTs = 0;
+      docEl.setAttribute('data-opencanvas-smooth-scrolling', 'false');
+      return;
+    }
+    var amount = Math.min(1, (elapsed / duration) * 10);
+    currentY += delta * amount;
+    window.scrollTo(0, currentY);
+    requestAnimationFrame(step);
+  }
+  function start() {
+    if (active) return;
+    active = true;
+    docEl.setAttribute('data-opencanvas-smooth-scrolling', 'true');
+    requestAnimationFrame(step);
+  }
+  function moveBy(delta) {
+    currentY = readScrollY();
+    targetY = clamp(targetY + delta);
+    start();
+  }
+  window.addEventListener('wheel', function(event) {
+    if (!event || event.ctrlKey) return;
+    if (typeof event.deltaY !== 'number') {
+      behaviourFailure('smooth-scroll-wheel-invalid', {}, new Error('wheel event missing deltaY'));
+    }
+    event.preventDefault();
+    moveBy(event.deltaY);
+  }, { passive: false });
+  window.addEventListener('keydown', function(event) {
+    var key = event && event.key;
+    var delta = 0;
+    if (key === 'ArrowDown') delta = 80;
+    else if (key === 'ArrowUp') delta = -80;
+    else if (key === 'PageDown' || key === ' ') delta = window.innerHeight * 0.85;
+    else if (key === 'PageUp') delta = -window.innerHeight * 0.85;
+    else if (key === 'Home') targetY = 0;
+    else if (key === 'End') targetY = maxScrollY();
+    else return;
+    event.preventDefault();
+    if (delta !== 0) moveBy(delta);
+    else start();
+  }, { passive: false });
+  window.addEventListener('scroll', function() {
+    if (!active) {
+      currentY = readScrollY();
+      targetY = currentY;
+    }
+  }, { passive: true });
+  docEl.setAttribute('data-opencanvas-smooth-scroll-hydrated', 'true');
+}
+
 function behaviourFindNavThemeRoot(root, navElementId) {
   var nodes = root.querySelectorAll('[data-opencanvas-nav-theme-root]');
   for (var i = 0; i < nodes.length; i++) {
@@ -787,6 +907,7 @@ function hydrateBehaviour(scope) {
   if (root === document && document.documentElement.getAttribute('data-opencanvas-behaviour-hydrated') === 'true') return;
   var payload = parseBehaviourPayload();
   if (!payload) return;
+  behaviourHydrateSmoothScroll(payload, root);
   if (payload.loadExperience) {
     behaviourHydrateLoadExperience(payload.loadExperience, payload, root);
   }

@@ -117,6 +117,13 @@ assert(panelSrc.includes('renderMotionSequenceControls'), 'panel must render ful
 assert(panelSrc.includes('Add motion sequence'), 'panel must create full Motion Sequences');
 assert(panelSrc.includes('Motion Sequence step'), 'panel must render editable Motion Sequence steps');
 assert(panelSrc.includes('renderLayoutTransitionControls'), 'panel must render layout transition controls');
+assert(panelSrc.includes('renderSmoothScrollControls'), 'panel must render Smooth Scroll controls');
+assert(panelSrc.includes('Smooth Scroll'), 'panel must label Smooth Scroll controls');
+assert(panelSrc.includes('SCROLL_BEHAVIOR_MODES'), 'panel must use Smooth Scroll mode schema values');
+assert(
+  panelSrc.includes('SCROLL_BEHAVIOR_REDUCED_MOTION_MODES'),
+  'panel must use Smooth Scroll reduced-motion schema values',
+);
 assert(panelSrc.includes('Add layout transition'), 'panel must create layout transitions');
 assert(
   panelSrc.includes('Select a trigger/source element before adding a layout transition.'),
