@@ -1474,7 +1474,14 @@ function updateScrollSequenceStep(
   });
 }
 
-type EditableMotionNumber = 'opacity' | 'translateX' | 'translateY' | 'scale' | 'rotate';
+type EditableMotionNumber =
+  | 'opacity'
+  | 'translateX'
+  | 'translateY'
+  | 'scale'
+  | 'rotate'
+  | 'strokeDasharray'
+  | 'strokeDashoffset';
 type MotionPropertySide = 'from' | 'to';
 
 const MOTION_TARGET_TYPES = ['site', 'page', 'section', 'element', 'text-split'] as const;
@@ -1490,6 +1497,8 @@ const MOTION_NUMBER_FIELDS: Array<{
   { key: 'translateY', label: 'Translate Y', min: -5000, max: 5000, step: 1 },
   { key: 'scale', label: 'Scale', min: 0, max: 10, step: 0.05 },
   { key: 'rotate', label: 'Rotate', min: -1080, max: 1080, step: 1 },
+  { key: 'strokeDasharray', label: 'Stroke dash array', min: 0, max: 10000, step: 1 },
+  { key: 'strokeDashoffset', label: 'Stroke dash offset', min: -10000, max: 10000, step: 1 },
 ];
 
 function renderMotionSequenceControls(ctx: InteractionsPanelContext, host: HTMLElement): void {

@@ -189,6 +189,12 @@ valid.motionSequences![0]!.steps.push({
   to: { translateY: -24 },
   durationMs: 100,
 });
+const strokeStep = valid.motionSequences![0]!.steps[1] as unknown as {
+  from: Record<string, number>;
+  to: Record<string, number>;
+};
+strokeStep.from = { strokeDasharray: 240, strokeDashoffset: 240 };
+strokeStep.to = { translateY: -24, strokeDasharray: 240, strokeDashoffset: 0 };
 const validation = validateEditableSite(valid);
 assert(
   validation.valid,
@@ -351,11 +357,24 @@ assert(
   secondAnimation.options.delay === 420,
   `waitAfterMs must offset the next timed step by prior duration plus wait; got ${String(secondAnimation.options.delay)}`,
 );
+assert(
+  (secondAnimation.keyframes[0] as { strokeDashoffset?: number }).strokeDashoffset === 0,
+  'reverse stroke draw playback must start from the authored stroke-dash to state',
+);
+assert(
+  (secondAnimation.keyframes[1] as { strokeDashoffset?: number }).strokeDashoffset === 240,
+  'reverse stroke draw playback must end at the authored stroke-dash from state',
+);
+assert(
+  (secondAnimation.keyframes[0] as { strokeDasharray?: number }).strokeDasharray === 240,
+  'stroke draw playback must emit strokeDasharray keyframes',
+);
 
 const panelSource = readFileSync(join(process.cwd(), 'src', 'editor-client', 'interactions-panel.ts'), 'utf8');
 assert(panelSource.includes('Repeat count'), 'Interactions panel must expose Motion Sequence repeat count');
 assert(panelSource.includes('Repeat mode'), 'Interactions panel must expose Motion Sequence repeat mode');
 assert(panelSource.includes('Playback direction'), 'Interactions panel must expose Motion Sequence playback direction');
 assert(panelSource.includes('Wait after'), 'Interactions panel must expose Motion Sequence wait-after controls');
+assert(panelSource.includes('Stroke dash offset'), 'Interactions panel must expose Motion Sequence stroke-draw controls');
 
 console.log('[motion-sequence-repeat:smoke] OK');

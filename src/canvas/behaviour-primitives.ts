@@ -13,6 +13,8 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'rotate',
   'clipPath',
   'filter',
+  'strokeDasharray',
+  'strokeDashoffset',
 ] as const;
 export const MOTION_SEQUENCE_REPEAT_MODES = ['restart', 'yoyo'] as const;
 export const MOTION_SEQUENCE_PLAYBACK_DIRECTIONS = ['normal', 'reverse'] as const;

@@ -218,7 +218,7 @@ Needed primitive:
 - Validation must reject unsupported targets/properties instead of silently
   dropping steps.
 - Remaining next wave: timeline canvas UX, non-numeric property editors, and
-  SVG/variable-font effect catalogs.
+  variable-font effect catalogs.
 
 ### 2. Scroll Motion Is Triggered, Not Scrubbed
 

@@ -150,7 +150,7 @@ function behaviourInterpolateProp(prop, fromVal, toVal, progress) {
 
 function behaviourPropsAtProgress(from, to, progress) {
   var out = {};
-  var keys = ['opacity', 'translateX', 'translateY', 'scale', 'rotate', 'clipPath', 'filter'];
+  var keys = ['opacity', 'translateX', 'translateY', 'scale', 'rotate', 'clipPath', 'filter', 'strokeDasharray', 'strokeDashoffset'];
   for (var i = 0; i < keys.length; i++) {
     var key = keys[i];
     if (to[key] !== undefined || from[key] !== undefined) {
@@ -164,6 +164,8 @@ function behaviourApplyProps(node, props) {
   if (props.opacity !== undefined) node.style.opacity = String(props.opacity);
   if (props.clipPath !== undefined) node.style.clipPath = String(props.clipPath);
   if (props.filter !== undefined) node.style.filter = String(props.filter);
+  if (props.strokeDasharray !== undefined) node.style.strokeDasharray = String(props.strokeDasharray);
+  if (props.strokeDashoffset !== undefined) node.style.strokeDashoffset = String(props.strokeDashoffset);
   var transform = behaviourTransformValue(props, 'to');
   if (transform) node.style.transform = transform;
 }
@@ -228,6 +230,8 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, p
       if (frame.opacity !== undefined) out.opacity = frame.opacity;
       if (frame.clipPath !== undefined) out.clipPath = String(frame.clipPath);
       if (frame.filter !== undefined) out.filter = String(frame.filter);
+      if (frame.strokeDasharray !== undefined) out.strokeDasharray = frame.strokeDasharray;
+      if (frame.strokeDashoffset !== undefined) out.strokeDashoffset = frame.strokeDashoffset;
       var transform = behaviourTransformValue(frame, 'to');
       if (transform) out.transform = transform;
       return out;
