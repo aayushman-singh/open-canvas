@@ -400,6 +400,23 @@ assert(
   'editor rich-motion body must stamp fit metadata',
 );
 
+const elementInspectorSource = readFileSync(
+  join(process.cwd(), 'src', 'editor-client', 'element-inspector.ts'),
+  'utf8',
+);
+assert(
+  elementInspectorSource.includes('renderRichMotionAssetPicker'),
+  'element inspector must render a rich motion asset picker',
+);
+assert(
+  elementInspectorSource.includes('ctx.state?.richMotionAssets ?? []'),
+  'rich motion picker must read schema-owned richMotionAssets',
+);
+assert(
+  elementInspectorSource.includes('Rich motion asset'),
+  'rich motion picker must label the asset selection control',
+);
+
 const yjsState = {
   styleKit: validState.styleKit,
   pages: validState.pages,

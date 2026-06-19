@@ -599,6 +599,10 @@ export function renderInspector(ctx: EditorContext): void {
   renderMarqueeInspector(ctx, element, found.section.elements);
   renderPointerFxInspector(ctx, element);
 
+  if (element.type === 'rich-motion') {
+    renderRichMotionAssetPicker(ctx, element);
+  }
+
   if (element.type === 'text') {
     renderTextSplitInspector(ctx, element.id, found.section.id);
   }
@@ -643,6 +647,45 @@ export function renderInspector(ctx: EditorContext): void {
     });
     ctx.inspector.appendChild(useAsTriggerBtn);
   }
+}
+
+function renderRichMotionAssetPicker(
+  ctx: EditorContext,
+  element: Extract<CanvasElement, { type: 'rich-motion' }>,
+): void {
+  if (!ctx.inspector) return;
+  const assets = ctx.state?.richMotionAssets ?? [];
+  const assetIds = assets.map((asset) => asset.id);
+  const options = assetIds.includes(element.assetRefId)
+    ? assetIds
+    : [element.assetRefId, ...assetIds].filter((assetId) => assetId.length > 0);
+  const select = selectInput(options.length > 0 ? options : ['__placeholder__'], element.assetRefId);
+  select.disabled = assetIds.length === 0;
+  select.addEventListener('change', () => {
+    const next = select.value.trim();
+    if (!assetIds.includes(next)) {
+      ctx.setStatus('Rich Motion asset must reference an existing Rich Motion Asset', 'error');
+      select.value = element.assetRefId;
+      return;
+    }
+    element.assetRefId = next;
+    ctx.rebuildElement(element.id);
+    renderInspector(ctx);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Rich motion asset', select));
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  if (assetIds.length === 0) {
+    meta.textContent = 'Create a Rich Motion Asset in the Interactions panel before publishing this element.';
+  } else if (!assetIds.includes(element.assetRefId)) {
+    meta.textContent = 'Current asset ref is unresolved and will fail publish validation until changed.';
+  } else {
+    const selected = assets.find((asset) => asset.id === element.assetRefId);
+    meta.textContent = selected ? 'Selected kind: ' + selected.kind : '';
+  }
+  ctx.inspector.appendChild(meta);
 }
 
 function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): void {

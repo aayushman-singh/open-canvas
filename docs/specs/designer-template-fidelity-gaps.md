@@ -584,8 +584,10 @@ User-visible miss:
   canvas particle systems.
 - `model-3d` covers bounded GLB-style product/helmet scenes, not custom shader
   pipelines or owner-authored Three.js code.
-- Rive input bindings are schema/runtime-owned and panel-editable, but
-  rich-motion asset upload/selection still needs dedicated asset-picker UI.
+- Rive input bindings are schema/runtime-owned and panel-editable. Rich Motion
+  elements now expose an inspector asset picker backed by
+  `state.richMotionAssets`, so owners can bind an element to authored Rive,
+  Lottie, model, shader, or video-stream assets without hand-editing JSON.
 - Rich Motion asset metadata controls now cover the runtime-supported
   `rive`, `lottie`, `model-3d`, `shader-scene`, and `video-stream` kinds in
   the Interactions panel, so these surfaces are no longer template-JSON-only.
@@ -595,9 +597,10 @@ Needed primitive:
 - A deliberate media-extension decision. Do not add arbitrary "animation file"
   blobs without defining asset type, playback controls, CSP, editor preview,
   reduced-motion handling, and publish-time failure behaviour.
-- Remaining next wave: rich-motion upload/asset picker UI, Rive/Lottie/model
-  events, custom shader authoring decision, CSP policy hardening, and
-  production management support for rich motion asset files.
+- Remaining next wave: upload/storage management UI for rich motion source
+  files, Rive/Lottie/model events, custom shader authoring decision, CSP
+  policy hardening, and production management support for rich motion asset
+  files.
 
 ### 12. Import Collapses Source Motion Too Aggressively
 
