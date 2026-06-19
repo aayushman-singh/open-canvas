@@ -23,6 +23,7 @@ import type {
   OverlayTriggerType,
   RouteTransition,
   RouteTransitionMode,
+  SharedRouteElement,
   EditableSite,
 } from '../canvas/schema.js';
 import type {
@@ -1279,6 +1280,7 @@ function renderRouteControls(ctx: InteractionsPanelContext, host: HTMLElement): 
   const preview = actionButton('Preview route transition', 'Run the route transition state in the editor');
   preview.addEventListener('click', () => ctx.previewRouteTransition());
   wrap.appendChild(preview);
+  renderSharedRouteElements(ctx, wrap, model);
 
   renderSequenceLiteEditor(ctx, wrap, 'Outgoing sequence', 'route-outgoing', () => {
     return (ctx.state?.routeTransition ?? defaultRouteTransition()).outgoingSequence;
@@ -1288,6 +1290,107 @@ function renderRouteControls(ctx: InteractionsPanelContext, host: HTMLElement): 
   });
 
   host.appendChild(wrap);
+}
+
+function renderSharedRouteElements(
+  ctx: InteractionsPanelContext,
+  wrap: HTMLElement,
+  route: RouteTransition,
+): void {
+  const heading = document.createElement('h4');
+  heading.textContent = 'Shared elements';
+  wrap.appendChild(heading);
+  const add = compactButton('Add shared element', 'Map an outgoing element to an incoming element');
+  add.addEventListener('click', () => {
+    if (!ctx.selectedElementId) {
+      ctx.setStatus('Select an element before adding a shared route mapping.', 'error');
+      return;
+    }
+    const selectedElementId = ctx.selectedElementId;
+    mutate(ctx, () => {
+      const current = ctx.state!.routeTransition ?? defaultRouteTransition();
+      const next = [...(current.sharedElements ?? [])];
+      const index = next.length + 1;
+      next.push({
+        id: 'shared-route-' + String(Date.now()),
+        sourceElementId: selectedElementId,
+        targetElementId: selectedElementId,
+        viewTransitionName: 'sharedRoute' + String(index),
+      });
+      ctx.state!.routeTransition = { ...current, sharedElements: next };
+    });
+  });
+  wrap.appendChild(add);
+  for (const mapping of route.sharedElements ?? []) {
+    renderSharedRouteElement(ctx, wrap, route, mapping);
+  }
+}
+
+function renderSharedRouteElement(
+  ctx: InteractionsPanelContext,
+  wrap: HTMLElement,
+  route: RouteTransition,
+  mapping: SharedRouteElement,
+): void {
+  const card = document.createElement('div');
+  card.className = 'opencanvas-interactions-step';
+  const header = row('opencanvas-interactions-card-header');
+  const title = document.createElement('strong');
+  title.textContent = mapping.id;
+  header.appendChild(title);
+  const remove = compactButton('Remove', 'Remove this shared element mapping');
+  remove.addEventListener('click', () => {
+    mutate(ctx, () => {
+      const current = ctx.state!.routeTransition ?? defaultRouteTransition();
+      ctx.state!.routeTransition = {
+        ...current,
+        sharedElements: (current.sharedElements ?? []).filter((item) => item.id !== mapping.id),
+      };
+    });
+  });
+  header.appendChild(remove);
+  card.appendChild(header);
+
+  const source = textInput(mapping.sourceElementId, 'Outgoing element id');
+  source.addEventListener('change', () =>
+    updateSharedRouteElement(ctx, mapping.id, { sourceElementId: source.value.trim() }),
+  );
+  card.appendChild(field('Outgoing element', source));
+
+  const target = textInput(mapping.targetElementId, 'Incoming element id');
+  target.addEventListener('change', () =>
+    updateSharedRouteElement(ctx, mapping.id, { targetElementId: target.value.trim() }),
+  );
+  card.appendChild(field('Incoming element', target));
+
+  const name = textInput(mapping.viewTransitionName, 'sharedName');
+  name.addEventListener('change', () =>
+    updateSharedRouteElement(ctx, mapping.id, { viewTransitionName: name.value.trim() }),
+  );
+  card.appendChild(field('View transition name', name));
+  void route;
+  wrap.appendChild(card);
+}
+
+function updateSharedRouteElement(
+  ctx: InteractionsPanelContext,
+  mappingId: string,
+  patch: Partial<SharedRouteElement>,
+): void {
+  if (Object.values(patch).some((value) => typeof value === 'string' && value.length === 0)) {
+    ctx.setStatus('Shared route element fields cannot be empty', 'error');
+    renderInteractionsPanel(ctx);
+    return;
+  }
+  mutate(ctx, () => {
+    const current = ctx.state!.routeTransition ?? defaultRouteTransition();
+    ctx.state!.routeTransition = {
+      ...current,
+      sharedElements: (current.sharedElements ?? []).map((mapping) =>
+        mapping.id === mappingId ? { ...mapping, ...patch } : mapping,
+      ),
+    };
+  });
 }
 
 function renderOverlayControls(ctx: InteractionsPanelContext, host: HTMLElement): void {

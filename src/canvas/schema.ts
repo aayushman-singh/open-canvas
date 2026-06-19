@@ -722,8 +722,16 @@ export interface RouteTransition {
   mode: RouteTransitionMode;
   durationMs: number;
   easing: string;
+  sharedElements?: SharedRouteElement[];
   outgoingSequence?: MotionSequenceLite;
   incomingSequence?: MotionSequenceLite;
+}
+
+export interface SharedRouteElement {
+  id: string;
+  sourceElementId: string;
+  targetElementId: string;
+  viewTransitionName: string;
 }
 
 /**

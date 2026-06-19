@@ -14,6 +14,14 @@ const snapshot: PublishedSnapshot = {
     mode: 'wipe',
     durationMs: 240,
     easing: 'ease-in-out',
+    sharedElements: [
+      {
+        id: 'route-shared-hero',
+        sourceElementId: 'home-card',
+        targetElementId: 'detail-hero',
+        viewTransitionName: 'heroMorph',
+      },
+    ],
   },
 };
 
@@ -21,9 +29,16 @@ const html = renderCanvasSnapshot(snapshot, '/assets', 'site-1', { turnstileSite
 assert.ok(html.includes('data-opencanvas-route-container'));
 assert.ok(html.includes('data-opencanvas-route-transition="route-main"'));
 assert.ok(html.includes('data-opencanvas-route-mode="wipe"'));
+assert.ok(html.includes('data-opencanvas-route-shared-elements='));
+assert.ok(html.includes('heroMorph'));
 assert.equal(snapshotNeedsInteractiveRuntime(snapshot), true);
-assert.ok(injectInteractiveRuntime(html, snapshot).includes('hydrateRouteTransition'));
-assert.ok(injectInteractiveRuntime(html, snapshot).includes('opencanvas:route-transition-failed'));
-assert.ok(injectInteractiveRuntime(html, snapshot).includes("swapTo(new URL(window.location.href), 'replace')"));
+const runtime = injectInteractiveRuntime(html, snapshot);
+assert.ok(runtime.includes('hydrateRouteTransition'));
+assert.ok(runtime.includes('opencanvas:route-transition-failed'));
+assert.ok(runtime.includes("swapTo(new URL(window.location.href), 'replace')"));
+assert.ok(runtime.includes('document.startViewTransition'));
+assert.ok(runtime.includes('shared-elements-api'));
+assert.ok(runtime.includes('shared-elements-resolve'));
+assert.ok(runtime.includes('data-opencanvas-route-shared-elements'));
 
 console.log('[route-transition:smoke] OK');

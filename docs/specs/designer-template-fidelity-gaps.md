@@ -131,6 +131,9 @@ Shipped on June 17, 2026:
   handoff sequence metadata.
 - **Route Transition v1:** same-origin navigation interception with fade,
   slide, and wipe modes; live-publish rehydration handoff.
+- **Shared-element Route Transition:** schema-owned source/target element
+  mappings expose View Transition API continuity for list/detail navigation,
+  with named failure events when the API or mapped relation is unavailable.
 - **Motion Sequence Lite:** constrained ordered steps for overlay open/close,
   load handoff, and route outgoing/incoming states. Targets are page
   container, overlay surface/backdrop, and load-screen parts; effects are
@@ -143,8 +146,7 @@ Still explicitly out of scope after v1:
   completion behaviour.
 - Scroll Scene: pinned/scrubbed progress, horizontal storytelling, image
   sequence scrubs, and scroll-bound Motion Sequence progress.
-- Shared-element or FLIP route transitions across pages, filters, tabs, and
-  overlay/detail states.
+- FLIP route transitions across filters, tabs, and overlay/detail states.
 - Rich Motion Assets: Lottie/Rive, WebGL/Three.js, shader distortion, Spline
   surfaces, and particle fields.
 
@@ -275,20 +277,26 @@ Current state:
   Runtime Hydrator after the swap.
 - `routeTransition` can enable fade, slide, or wipe transitions with
   outgoing/incoming Motion Sequence Lite hooks.
-- There is no View Transition API shared-element mapping yet.
+- **June 2026 update:** `routeTransition.sharedElements` stores owner-authored
+  source/target element mappings and a view-transition name. The renderer emits
+  `data-opencanvas-route-shared-elements`, the Runtime Hydrator applies View
+  Transition API names during same-origin navigation, and unresolved mappings or
+  missing API support emit `opencanvas:route-transition-failed` instead of
+  degrading to a fade.
 
 User-visible miss:
 
-- Cannot reproduce shared-element transitions between list/detail pages.
+- Can now reproduce same-origin shared-element transitions between list/detail
+  pages when both pages expose the mapped element ids.
 - Cannot animate between template pages with masks, wipes, crossfades, or
   continuity of the clicked card/image/title.
 - Cannot guarantee interactive runtime hydration after page-state swaps.
 
 Needed primitive:
 
-- Next wave: shared-element mapping, geometry capture, View Transition API or
-  FLIP handoff, reduced-motion policy, and explicit failure events when a
-  source/destination relation cannot be resolved.
+- Next wave: FLIP handoff for non-route layout state, reduced-motion authoring
+  preview, and richer geometry policies beyond native View Transition API
+  mapping.
 
 ### 5. Overlay V1 Replaces Popup Sections, But Designer-Grade Modals Need More
 

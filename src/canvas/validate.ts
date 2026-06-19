@@ -2220,6 +2220,41 @@ function validateRouteTransition(value: unknown, errors: string[]): void {
     errors.push('routeTransition.durationMs must be > 0');
   }
   assertNonEmptyString(value.easing, 'routeTransition.easing', errors);
+  if (value.sharedElements !== undefined) {
+    if (!Array.isArray(value.sharedElements)) {
+      errors.push('routeTransition.sharedElements must be an array when present');
+    } else {
+      const sharedIds = new Set<string>();
+      const sharedNames = new Set<string>();
+      value.sharedElements.forEach((mapping, index) => {
+        const path = `routeTransition.sharedElements[${String(index)}]`;
+        if (!isRecord(mapping)) {
+          errors.push(`${path} must be an object`);
+          return;
+        }
+        if (assertNonEmptyString(mapping.id, `${path}.id`, errors)) {
+          assertUnique(mapping.id, sharedIds, `${path}.id`, 'across routeTransition.sharedElements', errors);
+        }
+        assertNonEmptyString(mapping.sourceElementId, `${path}.sourceElementId`, errors);
+        assertNonEmptyString(mapping.targetElementId, `${path}.targetElementId`, errors);
+        if (assertNonEmptyString(mapping.viewTransitionName, `${path}.viewTransitionName`, errors)) {
+          if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(mapping.viewTransitionName)) {
+            errors.push(
+              `${path}.viewTransitionName must be a CSS identifier matching /^[A-Za-z_][A-Za-z0-9_-]*$/`,
+            );
+          } else {
+            assertUnique(
+              mapping.viewTransitionName,
+              sharedNames,
+              `${path}.viewTransitionName`,
+              'across routeTransition.sharedElements',
+              errors,
+            );
+          }
+        }
+      });
+    }
+  }
   validateMotionSequenceLite(value.outgoingSequence, 'routeTransition.outgoingSequence', errors);
   validateMotionSequenceLite(value.incomingSequence, 'routeTransition.incomingSequence', errors);
 }

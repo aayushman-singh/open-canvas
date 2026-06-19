@@ -90,6 +90,14 @@ const premiumSite: EditableSite = {
     mode: 'fade',
     durationMs: 220,
     easing: 'ease-in-out',
+    sharedElements: [
+      {
+        id: 'shared-route-card',
+        sourceElementId: 'home-card',
+        targetElementId: 'detail-hero',
+        viewTransitionName: 'cardHero',
+      },
+    ],
   },
 };
 
@@ -105,6 +113,7 @@ assert.equal(
   'progress-bar',
 );
 assert.equal(roundTrip.routeTransition?.mode, 'fade');
+assert.equal(roundTrip.routeTransition?.sharedElements?.[0]?.viewTransitionName, 'cardHero');
 
 const legacy: EditableSite = {
   ...baseSite,
@@ -138,5 +147,22 @@ const invalid = validateEditableSite({
 });
 assert.equal(invalid.valid, false);
 assert.ok(invalid.errors.some((error) => error.includes('routeTransition.mode')));
+
+const invalidSharedElement = validateEditableSite({
+  ...premiumSite,
+  routeTransition: {
+    ...premiumSite.routeTransition!,
+    sharedElements: [
+      {
+        id: 'bad-shared-route',
+        sourceElementId: 'home-card',
+        targetElementId: 'detail-hero',
+        viewTransitionName: 'bad shared name',
+      },
+    ],
+  },
+});
+assert.equal(invalidSharedElement.valid, false);
+assert.ok(invalidSharedElement.errors.some((error) => error.includes('routeTransition.sharedElements')));
 
 console.log('[premium-interactions:smoke] OK');
