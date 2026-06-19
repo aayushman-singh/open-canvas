@@ -282,12 +282,17 @@ Current state:
   choose horizontal or vertical clipping, author the active progress window,
   and set an explicit reduced-motion endpoint; the Runtime Hydrator clips the
   after element from scene progress and fails loudly for malformed relations.
+- **June 2026 update:** Text Split Targets now include `textEffect =
+  mask-reveal` in addition to deterministic `scramble`. The Interactions panel
+  exposes it through the schema-owned text-effect catalog, validation keeps it
+  on text-split targets, and the Runtime Hydrator clips split spans from
+  Scroll Scene or time-based Motion Sequence progress.
 
 User-visible miss:
 
 - Scroll position can now drive pinned Motion Sequence progress with authored
   stops.
-- Still missing: richer scroll-progress typography authoring.
+- Scroll-progress typography now supports split-text scramble and mask reveals.
 
 Needed primitive:
 
@@ -568,6 +573,10 @@ Current state:
   the effect catalog, validation rejects unsupported/non-text/repeating
   relations, and the Runtime Hydrator applies deterministic scroll-scrubbed
   scramble text while restoring final text at completion.
+- **June 2026 update:** The text-effect catalog now includes `mask-reveal`.
+  It preserves the final semantic text, clips generated split spans from
+  Motion Sequence progress, and is available to owners from the same Text
+  effect control as `scramble`.
 
 User-visible miss:
 
@@ -580,7 +589,7 @@ Needed primitive:
   with semantic HTML preserved and the Motion Sequence targeting generated
   spans. Accessibility must define what screen readers see.
 - Remaining next wave: richer text-specific effects beyond deterministic
-  scramble and visual multi-step editing of split targets.
+  scramble/mask-reveal and visual multi-step editing of split targets.
 
 ### 11. Rich Media / 3D / Shader Surfaces Are Missing
 

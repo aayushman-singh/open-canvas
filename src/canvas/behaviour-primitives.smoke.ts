@@ -108,6 +108,14 @@ function buildValidState(): EditableSite & Record<string, unknown> {
             durationMs: 360,
             staggerMs: 40,
           },
+          {
+            id: 'step-text-mask',
+            target: { type: 'text-split', elementId: 'tab-copy', unit: 'line' },
+            textEffect: 'mask-reveal',
+            from: { opacity: 0 },
+            to: { opacity: 1 },
+            durationMs: 280,
+          },
         ],
       },
       {

@@ -115,7 +115,7 @@ function behaviourSplitTextTarget(el, unit) {
 
 function behaviourMotionTextEffect(step) {
   var effect = step.textEffect || 'none';
-  if (effect !== 'none' && effect !== 'scramble') {
+  if (effect !== 'none' && effect !== 'scramble' && effect !== 'mask-reveal') {
     behaviourFailure('motion-sequence-text-effect', { stepId: step.id, textEffect: step.textEffect }, new Error('unsupported text effect'));
   }
   if (effect !== 'none' && (!step.target || step.target.type !== 'text-split')) {
@@ -146,14 +146,24 @@ function behaviourScrambleText(text, progress) {
 
 function behaviourApplyTextEffect(node, effect, progress) {
   if (effect === 'none') return;
-  if (effect !== 'scramble') {
+  if (effect !== 'scramble' && effect !== 'mask-reveal') {
     behaviourFailure('motion-sequence-text-effect', { textEffect: effect }, new Error('unsupported text effect'));
   }
   var finalText = node.getAttribute('data-opencanvas-text-split-final');
   if (finalText === null) {
     behaviourFailure('motion-sequence-text-effect-target', {}, new Error('text effect target is missing split final text'));
   }
-  node.textContent = behaviourScrambleText(finalText, progress);
+  node.setAttribute('data-opencanvas-text-effect', effect);
+  if (effect === 'scramble') {
+    node.textContent = behaviourScrambleText(finalText, progress);
+    return;
+  }
+  node.textContent = finalText;
+  var clamped = Math.max(0, Math.min(1, Number(progress) || 0));
+  var remaining = Math.max(0, Math.min(100, (1 - clamped) * 100));
+  var remainingText = String(Math.round(remaining * 1000) / 1000);
+  node.style.clipPath = 'inset(0 0 ' + remainingText + '% 0)';
+  node.style.willChange = 'clip-path';
 }
 
 function behaviourAnimateTextEffect(node, effect, delay, duration, direction) {

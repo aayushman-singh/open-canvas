@@ -892,6 +892,75 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(spans[2]!.style.opacity === '0', 'third split word must not start before its stagger window');
 }
 
+// (6) scroll scene mask-reveal text effect clips split text from progress
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'mask-scroll',
+        trigger: { type: 'scroll-scene', scrollSceneId: 'mask-scene' },
+        steps: [
+          {
+            id: 'mask-scroll-step',
+            target: { type: 'text-split', elementId: 'impact-heading', unit: 'word' },
+            textEffect: 'mask-reveal',
+            from: { opacity: 0 },
+            to: { opacity: 1 },
+            durationMs: 100,
+          },
+        ],
+      },
+    ],
+    scrollScenes: [
+      {
+        id: 'mask-scene',
+        sectionId: 'section-story',
+        sequenceId: 'mask-scroll',
+        pinTarget: { type: 'section', sectionId: 'section-story' },
+        startOffsetPx: 0,
+        endOffsetPx: 800,
+      },
+    ],
+    richMotionAssets: [],
+  });
+  doc.body.appendChild(script);
+  const section = new StubElement('section');
+  section.setAttribute('data-opencanvas-section', 'section-story');
+  const heading = new StubElement('div');
+  heading.setAttribute('data-opencanvas-element', 'impact-heading');
+  const headingText = new StubElement('div');
+  headingText.className = 'opencanvas-text';
+  headingText.textContent = 'One two';
+  heading.appendChild(headingText);
+  section.appendChild(heading);
+  doc.body.appendChild(section);
+  section.getBoundingClientRect = (): { top: number; left: number; width: number; height: number } => ({
+    top: 100 - win.scrollY,
+    left: 0,
+    width: 1200,
+    height: 800,
+  });
+  runBehaviour(doc, win, StubImage);
+  win.scrollY = 500;
+  win.dispatchScroll();
+  const spans = heading.querySelectorAll('.opencanvas-text-split');
+  assert(spans.length === 2, 'mask-reveal text effect must resolve split words');
+  assert(
+    spans[0]!.getAttribute('data-opencanvas-text-effect') === 'mask-reveal',
+    'mask-reveal text effect must mark split spans',
+  );
+  assert(
+    spans[0]!.style.clipPath.includes('50%'),
+    'mask-reveal text effect must clip split spans from scroll progress',
+  );
+  assert(spans[0]!.textContent === 'One ', 'mask-reveal text effect must preserve final text');
+}
+
 // (6) scroll scene horizontal track translates with scene progress
 {
   const doc = new StubDocument();

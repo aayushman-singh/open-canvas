@@ -173,6 +173,9 @@ equal(shaderAsset.colorA, '#C8FF1A', 'shader colorA default');
 equal(shaderAsset.reducedMotion, 'static', 'shader reduced-motion default');
 
 const panelSrc = await Bun.file(new URL('./interactions-panel.ts', import.meta.url)).text();
+const behaviourPrimitivesSrc = await Bun.file(
+  new URL('../canvas/behaviour-primitives.ts', import.meta.url),
+).text();
 assert(panelSrc.includes('BehaviourLoadExperience'), 'panel must import behaviour load experience');
 assert(panelSrc.includes('Use designer enter moment'), 'panel must expose designer load mode');
 assert(panelSrc.includes('LOAD_PROGRESS_DISPLAY_MODES'), 'panel must use load progress display modes');
@@ -268,6 +271,10 @@ assert(
 );
 assert(panelSrc.includes('MOTION_SEQUENCE_TRIGGER_TYPES'), 'panel must use schema trigger types');
 assert(panelSrc.includes('MOTION_SEQUENCE_TEXT_EFFECTS'), 'panel must use schema text effect types');
+assert(
+  behaviourPrimitivesSrc.includes("'mask-reveal'"),
+  'schema text effect catalog must include mask-reveal for the panel select',
+);
 assert(panelSrc.includes('Text effect'), 'panel must expose text effect controls');
 assert(
   panelSrc.includes('LAYOUT_TRANSITION_INITIAL_STATES'),
