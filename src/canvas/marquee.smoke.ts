@@ -49,6 +49,7 @@ function makeSite(): EditableSite {
 }
 
 const site = makeSite();
+site.pages[0]!.sections[0]!.elements[0]!.marquee!.edgeFade = true;
 const validation = validateEditableSite(site);
 assert(validation.valid, validation.valid ? 'valid marquee site should pass' : validation.errors.join('\n'));
 
@@ -56,6 +57,10 @@ const decoded = decodeYDoc(encodeYDoc(site));
 assert(
   decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.speedPxPerSecond === 96,
   'Yjs projection must preserve marquee config',
+);
+assert(
+  decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.edgeFade === true,
+  'Yjs projection must preserve marquee edge fade config',
 );
 
 const snapshot: PublishedSnapshot = {
@@ -79,6 +84,10 @@ assert(
   html.includes('data-opencanvas-marquee-reduced-motion="static"'),
   'renderer must emit explicit reduced-motion mode',
 );
+assert(
+  html.includes('data-opencanvas-marquee-edge-fade="true"'),
+  'renderer must emit marquee edge fade metadata',
+);
 
 const invalidDirection = makeSite() as unknown as Record<string, unknown>;
 (
@@ -99,6 +108,7 @@ const invalidDirection = makeSite() as unknown as Record<string, unknown>;
       enabled: true,
       direction: 'diagonal',
       speedPxPerSecond: 0,
+      edgeFade: 'yes',
       reducedMotion: 'maybe',
     },
   },
@@ -116,6 +126,10 @@ assert(
 assert(
   invalid.errors.some((error) => error.includes('.marquee.reducedMotion')),
   'invalid reduced-motion mode must be named',
+);
+assert(
+  invalid.errors.some((error) => error.includes('.marquee.edgeFade')),
+  'invalid edge fade flag must be named',
 );
 
 console.log('[marquee:smoke] OK');

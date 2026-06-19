@@ -624,6 +624,9 @@ function validateMarquee(value: unknown, basePath: string, errors: string[]): vo
   if (value.pauseOnHover !== undefined && typeof value.pauseOnHover !== 'boolean') {
     errors.push(`${p}.pauseOnHover must be a boolean when present`);
   }
+  if (value.edgeFade !== undefined && typeof value.edgeFade !== 'boolean') {
+    errors.push(`${p}.edgeFade must be a boolean when present`);
+  }
   assertOneOf<MarqueeReducedMotionMode>(
     value.reducedMotion,
     MARQUEE_REDUCED_MOTION_MODES,

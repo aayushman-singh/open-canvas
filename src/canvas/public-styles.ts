@@ -71,6 +71,11 @@ html, body {
   overflow: hidden;
 }
 
+.opencanvas-element[data-opencanvas-marquee-edge-fade="true"] {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+}
+
 [data-opencanvas-marquee-belt] {
   display: flex;
   align-items: stretch;

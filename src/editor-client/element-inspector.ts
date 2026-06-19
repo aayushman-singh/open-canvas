@@ -699,6 +699,7 @@ function renderMarqueeInspector(ctx: EditorContext, element: CanvasElement): voi
         direction: 'left',
         speedPxPerSecond: 80,
         pauseOnHover: true,
+        edgeFade: false,
         reducedMotion: 'static',
       };
     } else {
@@ -751,6 +752,17 @@ function renderMarqueeInspector(ctx: EditorContext, element: CanvasElement): voi
     ctx.scheduleSave();
   });
   ctx.inspector.appendChild(field('Pause on hover', pause));
+
+  const edgeFade = document.createElement('input');
+  edgeFade.type = 'checkbox';
+  edgeFade.checked = element.marquee.edgeFade === true;
+  edgeFade.addEventListener('change', () => {
+    ctx.captureForUndo();
+    element.marquee!.edgeFade = edgeFade.checked;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Edge fade mask', edgeFade));
 
   const reducedMotion = selectInput(MARQUEE_REDUCED_MOTION_MODES, element.marquee.reducedMotion);
   reducedMotion.addEventListener('change', () => {

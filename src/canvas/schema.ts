@@ -204,6 +204,7 @@ export interface MarqueeBehaviour {
   direction: MarqueeDirection;
   speedPxPerSecond: number;
   pauseOnHover?: boolean;
+  edgeFade?: boolean;
   reducedMotion: MarqueeReducedMotionMode;
 }
 

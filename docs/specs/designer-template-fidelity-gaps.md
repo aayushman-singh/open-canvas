@@ -90,9 +90,10 @@ Open Canvas has real motion and interaction primitives already:
   The Runtime Hydrator rehydrates these after live-publish HTML swaps.
 - **June 2026 update:** element-level Marquee is now schema-owned. The
   element inspector can enable direction, speed, pause-on-hover, and explicit
-  reduced-motion mode; renderer/editor wrappers emit `data-opencanvas-marquee*`
-  metadata; the Runtime Hydrator duplicates the visual track and animates it in
-  visitor and editor contexts; validator/Yjs/smokes cover the contract.
+  reduced-motion mode plus an edge-fade mask; renderer/editor wrappers emit
+  `data-opencanvas-marquee*` metadata; the Runtime Hydrator duplicates the
+  visual track and animates it in visitor and editor contexts;
+  validator/Yjs/smokes cover the contract.
 - **June 2026 update:** video media elements can now opt into Video Stream
   Hover. The media inspector exposes play-on-hover/focus mode and explicit
   reduced-motion behaviour; renderer emits `data-opencanvas-video-hover*`
@@ -367,8 +368,8 @@ User-visible miss:
 - Cannot reproduce cursor trails, image-follow cursors, pointer-driven
   parallax, drag/inertia sliders, or hover-to-preview grids.
 - Cannot author touch-specific equivalents for mobile.
-- Marquee does not yet include multi-row staggering, masked edge fades,
-  hover-reverse, or collection-driven ticker sources.
+- Marquee does not yet include multi-row staggering, hover-reverse, or
+  collection-driven ticker sources.
 - Video Stream Hover does not yet support separate hover poster/video assets,
   hover scrub by pointer position, or collection-gallery batch authoring.
 - Pointer FX does not yet include cursor trails, drag/inertia, or

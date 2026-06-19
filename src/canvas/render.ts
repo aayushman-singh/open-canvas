@@ -312,7 +312,7 @@ function buildElementCommonAttrs(element: CanvasElement, tintAttr: string): stri
       : '';
   const marqueeAttrs =
     element.marquee?.enabled === true
-      ? ` data-opencanvas-marquee="true" data-opencanvas-marquee-direction="${escapeAttr(element.marquee.direction)}" data-opencanvas-marquee-speed="${escapeAttr(String(element.marquee.speedPxPerSecond))}" data-opencanvas-marquee-pause="${escapeAttr(String(element.marquee.pauseOnHover === true))}" data-opencanvas-marquee-reduced-motion="${escapeAttr(element.marquee.reducedMotion)}"`
+      ? ` data-opencanvas-marquee="true" data-opencanvas-marquee-direction="${escapeAttr(element.marquee.direction)}" data-opencanvas-marquee-speed="${escapeAttr(String(element.marquee.speedPxPerSecond))}" data-opencanvas-marquee-pause="${escapeAttr(String(element.marquee.pauseOnHover === true))}" data-opencanvas-marquee-edge-fade="${escapeAttr(String(element.marquee.edgeFade === true))}" data-opencanvas-marquee-reduced-motion="${escapeAttr(element.marquee.reducedMotion)}"`
       : '';
   const pointerFxAttrs =
     element.pointerFx?.enabled === true
