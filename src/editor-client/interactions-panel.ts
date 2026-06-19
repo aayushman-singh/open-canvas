@@ -1481,7 +1481,10 @@ type EditableMotionNumber =
   | 'scale'
   | 'rotate'
   | 'strokeDasharray'
-  | 'strokeDashoffset';
+  | 'strokeDashoffset'
+  | 'fontVariationWeight'
+  | 'fontVariationWidth'
+  | 'fontVariationSlant';
 type EditableMotionText = 'clipPath' | 'filter';
 type MotionPropertySide = 'from' | 'to';
 
@@ -1500,6 +1503,9 @@ const MOTION_NUMBER_FIELDS: Array<{
   { key: 'rotate', label: 'Rotate', min: -1080, max: 1080, step: 1 },
   { key: 'strokeDasharray', label: 'Stroke dash array', min: 0, max: 10000, step: 1 },
   { key: 'strokeDashoffset', label: 'Stroke dash offset', min: -10000, max: 10000, step: 1 },
+  { key: 'fontVariationWeight', label: 'Variable font weight', min: 1, max: 1000, step: 1 },
+  { key: 'fontVariationWidth', label: 'Variable font width', min: 25, max: 200, step: 1 },
+  { key: 'fontVariationSlant', label: 'Variable font slant', min: -15, max: 15, step: 0.5 },
 ];
 const MOTION_TEXT_FIELDS: Array<{
   key: EditableMotionText;

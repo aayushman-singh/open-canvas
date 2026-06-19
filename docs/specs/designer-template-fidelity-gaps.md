@@ -217,7 +217,7 @@ Needed primitive:
   properties, duration, easing, delay, stagger, and completion behaviour.
 - Validation must reject unsupported targets/properties instead of silently
   dropping steps.
-- Remaining next wave: timeline canvas UX and variable-font effect catalogs.
+- Remaining next wave: timeline canvas UX.
 
 ### 2. Scroll Motion Is Triggered, Not Scrubbed
 

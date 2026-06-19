@@ -139,9 +139,36 @@ function behaviourTransformValue(props, prefix) {
   return parts.length > 0 ? parts.join(' ') : '';
 }
 
+function behaviourFontVariationValue(props) {
+  var parts = [];
+  if (props.fontVariationWeight !== undefined) parts.push('"wght" ' + String(behaviourNumeric(props.fontVariationWeight, 400)));
+  if (props.fontVariationWidth !== undefined) parts.push('"wdth" ' + String(behaviourNumeric(props.fontVariationWidth, 100)));
+  if (props.fontVariationSlant !== undefined) parts.push('"slnt" ' + String(behaviourNumeric(props.fontVariationSlant, 0)));
+  return parts.join(', ');
+}
+
 function behaviourInterpolateProp(prop, fromVal, toVal, progress) {
-  if (prop === 'opacity' || prop === 'scale' || prop === 'translateX' || prop === 'translateY' || prop === 'rotate') {
-    var fromNum = behaviourNumeric(fromVal, prop === 'opacity' ? 1 : prop === 'scale' ? 1 : 0);
+  if (
+    prop === 'opacity' ||
+    prop === 'scale' ||
+    prop === 'translateX' ||
+    prop === 'translateY' ||
+    prop === 'rotate' ||
+    prop === 'fontVariationWeight' ||
+    prop === 'fontVariationWidth' ||
+    prop === 'fontVariationSlant'
+  ) {
+    var fallback =
+      prop === 'opacity'
+        ? 1
+        : prop === 'scale'
+          ? 1
+          : prop === 'fontVariationWeight'
+            ? 400
+            : prop === 'fontVariationWidth'
+              ? 100
+              : 0;
+    var fromNum = behaviourNumeric(fromVal, fallback);
     var toNum = behaviourNumeric(toVal, fromNum);
     return fromNum + (toNum - fromNum) * progress;
   }
@@ -150,7 +177,7 @@ function behaviourInterpolateProp(prop, fromVal, toVal, progress) {
 
 function behaviourPropsAtProgress(from, to, progress) {
   var out = {};
-  var keys = ['opacity', 'translateX', 'translateY', 'scale', 'rotate', 'clipPath', 'filter', 'strokeDasharray', 'strokeDashoffset'];
+  var keys = ['opacity', 'translateX', 'translateY', 'scale', 'rotate', 'clipPath', 'filter', 'strokeDasharray', 'strokeDashoffset', 'fontVariationWeight', 'fontVariationWidth', 'fontVariationSlant'];
   for (var i = 0; i < keys.length; i++) {
     var key = keys[i];
     if (to[key] !== undefined || from[key] !== undefined) {
@@ -166,6 +193,8 @@ function behaviourApplyProps(node, props) {
   if (props.filter !== undefined) node.style.filter = String(props.filter);
   if (props.strokeDasharray !== undefined) node.style.strokeDasharray = String(props.strokeDasharray);
   if (props.strokeDashoffset !== undefined) node.style.strokeDashoffset = String(props.strokeDashoffset);
+  var fontVariation = behaviourFontVariationValue(props);
+  if (fontVariation) node.style.fontVariationSettings = fontVariation;
   var transform = behaviourTransformValue(props, 'to');
   if (transform) node.style.transform = transform;
 }
@@ -232,6 +261,8 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, p
       if (frame.filter !== undefined) out.filter = String(frame.filter);
       if (frame.strokeDasharray !== undefined) out.strokeDasharray = frame.strokeDasharray;
       if (frame.strokeDashoffset !== undefined) out.strokeDashoffset = frame.strokeDashoffset;
+      var fontVariation = behaviourFontVariationValue(frame);
+      if (fontVariation) out.fontVariationSettings = fontVariation;
       var transform = behaviourTransformValue(frame, 'to');
       if (transform) out.transform = transform;
       return out;

@@ -15,6 +15,9 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'filter',
   'strokeDasharray',
   'strokeDashoffset',
+  'fontVariationWeight',
+  'fontVariationWidth',
+  'fontVariationSlant',
 ] as const;
 export const MOTION_SEQUENCE_REPEAT_MODES = ['restart', 'yoyo'] as const;
 export const MOTION_SEQUENCE_PLAYBACK_DIRECTIONS = ['normal', 'reverse'] as const;

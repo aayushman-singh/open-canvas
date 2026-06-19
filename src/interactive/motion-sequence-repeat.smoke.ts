@@ -193,8 +193,19 @@ const strokeStep = valid.motionSequences![0]!.steps[1] as unknown as {
   from: Record<string, number>;
   to: Record<string, number>;
 };
-strokeStep.from = { strokeDasharray: 240, strokeDashoffset: 240 };
-strokeStep.to = { translateY: -24, strokeDasharray: 240, strokeDashoffset: 0 };
+strokeStep.from = {
+  strokeDasharray: 240,
+  strokeDashoffset: 240,
+  fontVariationWeight: 300,
+  fontVariationWidth: 80,
+};
+strokeStep.to = {
+  translateY: -24,
+  strokeDasharray: 240,
+  strokeDashoffset: 0,
+  fontVariationWeight: 820,
+  fontVariationWidth: 120,
+};
 const validation = validateEditableSite(valid);
 assert(
   validation.valid,
@@ -369,6 +380,14 @@ assert(
   (secondAnimation.keyframes[0] as { strokeDasharray?: number }).strokeDasharray === 240,
   'stroke draw playback must emit strokeDasharray keyframes',
 );
+assert(
+  (secondAnimation.keyframes[0] as { fontVariationSettings?: string }).fontVariationSettings === '"wght" 820, "wdth" 120',
+  'reverse variable font playback must start from the authored axis to state',
+);
+assert(
+  (secondAnimation.keyframes[1] as { fontVariationSettings?: string }).fontVariationSettings === '"wght" 300, "wdth" 80',
+  'reverse variable font playback must end at the authored axis from state',
+);
 
 const panelSource = readFileSync(join(process.cwd(), 'src', 'editor-client', 'interactions-panel.ts'), 'utf8');
 assert(panelSource.includes('Repeat count'), 'Interactions panel must expose Motion Sequence repeat count');
@@ -378,5 +397,6 @@ assert(panelSource.includes('Wait after'), 'Interactions panel must expose Motio
 assert(panelSource.includes('Stroke dash offset'), 'Interactions panel must expose Motion Sequence stroke-draw controls');
 assert(panelSource.includes('Clip path'), 'Interactions panel must expose Motion Sequence clip-path controls');
 assert(panelSource.includes('Filter'), 'Interactions panel must expose Motion Sequence filter controls');
+assert(panelSource.includes('Variable font weight'), 'Interactions panel must expose Motion Sequence variable-font controls');
 
 console.log('[motion-sequence-repeat:smoke] OK');
