@@ -226,8 +226,18 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, p
   }
   var stagger = step.staggerMs || 0;
   if (progress !== undefined) {
+    var duration = Number(step.durationMs || 0);
+    if (stagger > 0 && !(duration > 0)) {
+      behaviourFailure('motion-sequence-scroll-stagger-duration', { stepId: step.id, durationMs: step.durationMs, staggerMs: step.staggerMs }, new Error('scroll-scene stagger requires durationMs > 0'));
+      return;
+    }
+    var total = duration > 0 ? duration + stagger * Math.max(0, targets.length - 1) : 1;
     for (var i = 0; i < targets.length; i++) {
-      behaviourApplyProps(targets[i], behaviourPropsAtProgress(from, to, progress));
+      var localProgress =
+        stagger > 0 && duration > 0
+          ? Math.max(0, Math.min(1, (progress * total - i * stagger) / duration))
+          : progress;
+      behaviourApplyProps(targets[i], behaviourPropsAtProgress(from, to, localProgress));
     }
     return;
   }

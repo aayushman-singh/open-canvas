@@ -823,7 +823,70 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   );
 }
 
-// (5) image sequence refuses an empty frame list
+// (5) scroll scene staggers text-split targets across scroll progress
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'split-scroll',
+        trigger: { type: 'scroll-scene', scrollSceneId: 'split-scene' },
+        steps: [
+          {
+            id: 'split-scroll-step',
+            target: { type: 'text-split', elementId: 'impact-heading', unit: 'word' },
+            from: { translateY: 24, opacity: 0 },
+            to: { translateY: 0, opacity: 1 },
+            durationMs: 100,
+            staggerMs: 100,
+          },
+        ],
+      },
+    ],
+    scrollScenes: [
+      {
+        id: 'split-scene',
+        sectionId: 'section-story',
+        sequenceId: 'split-scroll',
+        pinTarget: { type: 'section', sectionId: 'section-story' },
+        startOffsetPx: 0,
+        endOffsetPx: 800,
+      },
+    ],
+    richMotionAssets: [],
+  });
+  doc.body.appendChild(script);
+  const section = new StubElement('section');
+  section.setAttribute('data-opencanvas-section', 'section-story');
+  const heading = new StubElement('div');
+  heading.setAttribute('data-opencanvas-element', 'impact-heading');
+  const headingText = new StubElement('div');
+  headingText.className = 'opencanvas-text';
+  headingText.textContent = 'One two three';
+  heading.appendChild(headingText);
+  section.appendChild(heading);
+  doc.body.appendChild(section);
+  section.getBoundingClientRect = (): { top: number; left: number; width: number; height: number } => ({
+    top: 100 - win.scrollY,
+    left: 0,
+    width: 1200,
+    height: 800,
+  });
+  runBehaviour(doc, win, StubImage);
+  win.scrollY = 500;
+  win.dispatchScroll();
+  const spans = heading.querySelectorAll('.opencanvas-text-split');
+  assert(spans.length === 3, 'scroll text split must resolve every word span');
+  assert(spans[0]!.style.opacity === '1', 'first split word must complete by mid scroll progress');
+  assert(spans[1]!.style.opacity === '0.5', 'second split word must be halfway through its stagger at mid scroll progress');
+  assert(spans[2]!.style.opacity === '0', 'third split word must not start before its stagger window');
+}
+
+// (6) image sequence refuses an empty frame list
 {
   const doc = new StubDocument();
   const win = new StubWindow();
