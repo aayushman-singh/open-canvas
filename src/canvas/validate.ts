@@ -94,6 +94,9 @@ import {
   MARQUEE_REDUCED_MOTION_MODES,
   NAV_THEME_REDUCED_MOTION_MODES,
   NAV_THEME_TARGETS,
+  OVERLAY_BACKDROP_STYLES,
+  OVERLAY_CHROME_PRESETS,
+  OVERLAY_CLOSE_PLACEMENTS,
   MEDIA_KINDS,
   MOTION_SEQUENCE_LITE_EFFECTS,
   MOTION_SEQUENCE_LITE_TARGET_TYPES,
@@ -2256,6 +2259,30 @@ function validateOverlays(site: Record<string, unknown>, errors: string[]): void
           `${basePath}.presentation.mode`,
           errors,
         );
+        if (presentationRecord.chrome !== undefined) {
+          assertOneOf(
+            presentationRecord.chrome,
+            OVERLAY_CHROME_PRESETS,
+            `${basePath}.presentation.chrome`,
+            errors,
+          );
+        }
+        if (presentationRecord.backdrop !== undefined) {
+          assertOneOf(
+            presentationRecord.backdrop,
+            OVERLAY_BACKDROP_STYLES,
+            `${basePath}.presentation.backdrop`,
+            errors,
+          );
+        }
+        if (presentationRecord.closePlacement !== undefined) {
+          assertOneOf(
+            presentationRecord.closePlacement,
+            OVERLAY_CLOSE_PLACEMENTS,
+            `${basePath}.presentation.closePlacement`,
+            errors,
+          );
+        }
       }
     }
     const dismissal = overlay.dismissal;

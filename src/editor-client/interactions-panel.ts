@@ -18,6 +18,9 @@ import type {
   MotionSequenceLiteTarget,
   MotionSequenceLiteTargetType,
   Overlay,
+  OverlayBackdropStyle,
+  OverlayChromePreset,
+  OverlayClosePlacement,
   OverlayDismissal,
   OverlayPresentationMode,
   OverlayScope,
@@ -63,6 +66,9 @@ import {
   LOAD_EXPERIENCE_RUN_POLICIES,
   MOTION_SEQUENCE_LITE_EFFECTS,
   MOTION_SEQUENCE_LITE_TARGET_TYPES,
+  OVERLAY_BACKDROP_STYLES,
+  OVERLAY_CHROME_PRESETS,
+  OVERLAY_CLOSE_PLACEMENTS,
   OVERLAY_PRESENTATION_MODES,
   OVERLAY_TRIGGER_TYPES,
   ROUTE_TRANSITION_MODES,
@@ -126,7 +132,7 @@ export function defaultOverlay(id: string, name: string, pageId: string): Overla
       height: 420,
       elements: [],
     },
-    presentation: { mode: 'modal' },
+    presentation: { mode: 'modal', chrome: 'standard', backdrop: 'dim', closePlacement: 'top-right' },
     dismissal: defaultDismissal(),
   };
 }
@@ -2665,11 +2671,67 @@ function renderOverlayCard(
     mutate(ctx, () => {
       ctx.state!.overlays![index] = {
         ...overlay,
-        presentation: { mode: presentation.value as OverlayPresentationMode },
+        presentation: {
+          mode: presentation.value as OverlayPresentationMode,
+          chrome: overlay.presentation?.chrome ?? 'standard',
+          backdrop: overlay.presentation?.backdrop ?? 'dim',
+          closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+        },
       };
     });
   });
   card.appendChild(field('Presentation', presentation));
+
+  const chrome = selectInput(OVERLAY_CHROME_PRESETS, overlay.presentation?.chrome ?? 'standard');
+  chrome.addEventListener('change', () => {
+    mutate(ctx, () => {
+      ctx.state!.overlays![index] = {
+        ...overlay,
+        presentation: {
+          mode: overlay.presentation?.mode ?? 'modal',
+          chrome: chrome.value as OverlayChromePreset,
+          backdrop: overlay.presentation?.backdrop ?? 'dim',
+          closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+        },
+      };
+    });
+  });
+  card.appendChild(field('Chrome preset', chrome));
+
+  const backdrop = selectInput(OVERLAY_BACKDROP_STYLES, overlay.presentation?.backdrop ?? 'dim');
+  backdrop.addEventListener('change', () => {
+    mutate(ctx, () => {
+      ctx.state!.overlays![index] = {
+        ...overlay,
+        presentation: {
+          mode: overlay.presentation?.mode ?? 'modal',
+          chrome: overlay.presentation?.chrome ?? 'standard',
+          backdrop: backdrop.value as OverlayBackdropStyle,
+          closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+        },
+      };
+    });
+  });
+  card.appendChild(field('Backdrop style', backdrop));
+
+  const closePlacement = selectInput(
+    OVERLAY_CLOSE_PLACEMENTS,
+    overlay.presentation?.closePlacement ?? 'top-right',
+  );
+  closePlacement.addEventListener('change', () => {
+    mutate(ctx, () => {
+      ctx.state!.overlays![index] = {
+        ...overlay,
+        presentation: {
+          mode: overlay.presentation?.mode ?? 'modal',
+          chrome: overlay.presentation?.chrome ?? 'standard',
+          backdrop: overlay.presentation?.backdrop ?? 'dim',
+          closePlacement: closePlacement.value as OverlayClosePlacement,
+        },
+      };
+    });
+  });
+  card.appendChild(field('Close placement', closePlacement));
 
   const contentCanvas = compactButton(
     'Edit content canvas',

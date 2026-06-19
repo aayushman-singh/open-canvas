@@ -21,6 +21,21 @@ function hydrateOverlays(scope, options) {
         overlayFailure(id, 'overlay-presentation', { presentation: presentation });
         return;
       }
+      var chrome = overlay.getAttribute('data-opencanvas-overlay-chrome') || 'standard';
+      if (chrome !== 'standard' && chrome !== 'glass-panel' && chrome !== 'editorial-frame') {
+        overlayFailure(id, 'overlay-chrome', { chrome: chrome });
+        return;
+      }
+      var backdropStyle = overlay.getAttribute('data-opencanvas-overlay-backdrop-style') || 'dim';
+      if (backdropStyle !== 'dim' && backdropStyle !== 'blur' && backdropStyle !== 'solid') {
+        overlayFailure(id, 'overlay-backdrop-style', { backdropStyle: backdropStyle });
+        return;
+      }
+      var closePlacement = overlay.getAttribute('data-opencanvas-overlay-close-placement') || 'top-right';
+      if (closePlacement !== 'top-right' && closePlacement !== 'top-left' && closePlacement !== 'inside') {
+        overlayFailure(id, 'overlay-close-placement', { closePlacement: closePlacement });
+        return;
+      }
       var surface = overlay.querySelector('[data-opencanvas-overlay-surface]');
       var backdrop = overlay.querySelector('[data-opencanvas-overlay-backdrop]');
       var closeButtonEnabled = overlay.getAttribute('data-opencanvas-overlay-close-button') === 'true';
@@ -82,7 +97,8 @@ function hydrateOverlays(scope, options) {
         if (closeButtonEnabled && surface && !closeButton) {
           closeButton = document.createElement('button');
           closeButton.type = 'button';
-          closeButton.className = 'opencanvas-overlay-close';
+          closeButton.className = 'opencanvas-overlay-close opencanvas-overlay-close--' + closePlacement;
+          closeButton.setAttribute('data-opencanvas-overlay-close-placement', closePlacement);
           closeButton.setAttribute('aria-label', presentation === 'fullscreen-menu' ? 'Close menu' : 'Close overlay');
           closeButton.textContent = presentation === 'fullscreen-menu' ? 'Close' : 'x';
           closeButton.addEventListener('click', close);

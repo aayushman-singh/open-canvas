@@ -314,17 +314,22 @@ Current state:
   element-click triggers, template-owned content sections, focus/scroll
   dismissal policy, open/close Motion Sequence Lite metadata, and editor
   preview.
-- Chrome styling is still base-level; there is not yet a reusable overlay
-  chrome style catalog.
+- **June 2026 update:** Overlay presentation now includes a bounded chrome
+  catalog: `standard`, `glass-panel`, or `editorial-frame`; backdrop styles
+  `dim`, `blur`, or `solid`; and close placement `top-right`, `top-left`, or
+  `inside`. Renderer/editor preview emit the same metadata and styling hooks,
+  the Runtime Hydrator validates stale/malformed HTML, and the Interactions
+  panel exposes the controls.
 
 User-visible miss:
 
 - Cannot reproduce click-open project modals, nav overlays, command palettes,
   full-screen menu transitions, iframe drill-ins, gallery lightboxes, or
   product-tour overlays.
-- Cannot style modal chrome as part of a Template.
-- Entrance/exit variants, backdrop variants, close-button placement, and
-  reusable modal chrome presets are still missing.
+- Can now style modal/fullscreen chrome from a bounded Template-owned
+  catalog.
+- Richer entrance/exit variants, lightbox/gallery/product-tour presets, and
+  menu choreography presets are still missing.
 
 Needed primitive:
 
@@ -733,7 +738,7 @@ adding disconnected one-off runtimes.
 
 Status: addressed for the schema-owned fullscreen menu presentation slice. Owners can set an Overlay presentation to `fullscreen-menu`, keep authoring the content through the existing `Overlay.content` Canvas Section, preview it from the Interactions panel, and publish explicit overlay presentation/content-canvas metadata consumed by the Runtime Hydrator. Unsupported presentation modes now fail validation instead of degrading to modal behaviour.
 
-Intentional deferral: richer nested overlay-canvas editing affordances, overlay-specific layout presets, and menu choreography presets remain outside this slice; Motion Sequence Lite can already animate the overlay surface/backdrop.
+Intentional deferral: richer nested overlay-canvas editing affordances, overlay-specific layout presets, and menu choreography presets remain outside this slice; Motion Sequence Lite can already animate the overlay surface/backdrop. A later chrome slice added bounded overlay chrome/backdrop/close placement presets without introducing raw CSS blobs.
 
 ### 18. Collection Gallery v2 Hover Reveal Detail
 

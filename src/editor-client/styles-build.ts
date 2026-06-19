@@ -4047,6 +4047,13 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   inset: 0;
   background: rgba(0, 0, 0, 0.56);
 }
+.opencanvas-overlay[data-opencanvas-overlay-backdrop-style="blur"] .opencanvas-overlay-backdrop {
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(18px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-backdrop-style="solid"] .opencanvas-overlay-backdrop {
+  background: var(--opencanvas-bg);
+}
 .opencanvas-overlay-surface {
   position: relative;
   z-index: 1;
@@ -4057,11 +4064,33 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   color: var(--opencanvas-fg);
   box-shadow: var(--shadow-lg);
 }
+.opencanvas-overlay[data-opencanvas-overlay-chrome="glass-panel"] .opencanvas-overlay-surface {
+  border: 1px solid color-mix(in oklab, currentColor 18%, transparent);
+  border-radius: 28px;
+  background: color-mix(in oklab, var(--opencanvas-bg-panel) 76%, transparent);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(24px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-chrome="editorial-frame"] .opencanvas-overlay-surface {
+  border: 1px solid color-mix(in oklab, var(--opencanvas-accent) 44%, transparent);
+  border-radius: 0;
+  box-shadow: inset 0 0 0 10px color-mix(in oklab, var(--opencanvas-bg-panel) 84%, transparent);
+}
 .opencanvas-overlay-close {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 2;
+}
+.opencanvas-overlay[data-opencanvas-overlay-close-placement="top-left"] .opencanvas-overlay-close,
+.opencanvas-overlay-close--top-left {
+  left: 12px;
+  right: auto;
+}
+.opencanvas-overlay[data-opencanvas-overlay-close-placement="inside"] .opencanvas-overlay-close,
+.opencanvas-overlay-close--inside {
+  top: 20px;
+  right: 20px;
 }
 .opencanvas-load-experience {
   position: fixed;

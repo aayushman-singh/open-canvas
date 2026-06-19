@@ -221,9 +221,18 @@ export type OverlayTriggerType = (typeof OVERLAY_TRIGGER_TYPES)[number];
 
 export const OVERLAY_PRESENTATION_MODES = ['modal', 'fullscreen-menu'] as const;
 export type OverlayPresentationMode = (typeof OVERLAY_PRESENTATION_MODES)[number];
+export const OVERLAY_CHROME_PRESETS = ['standard', 'glass-panel', 'editorial-frame'] as const;
+export type OverlayChromePreset = (typeof OVERLAY_CHROME_PRESETS)[number];
+export const OVERLAY_BACKDROP_STYLES = ['dim', 'blur', 'solid'] as const;
+export type OverlayBackdropStyle = (typeof OVERLAY_BACKDROP_STYLES)[number];
+export const OVERLAY_CLOSE_PLACEMENTS = ['top-right', 'top-left', 'inside'] as const;
+export type OverlayClosePlacement = (typeof OVERLAY_CLOSE_PLACEMENTS)[number];
 
 export interface OverlayPresentation {
   mode: OverlayPresentationMode;
+  chrome?: OverlayChromePreset;
+  backdrop?: OverlayBackdropStyle;
+  closePlacement?: OverlayClosePlacement;
 }
 
 export const LOAD_EXPERIENCE_PRESETS = ['fade', 'wipe', 'logo-card', 'progress-bar'] as const;

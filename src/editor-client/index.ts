@@ -344,9 +344,20 @@ function ensureEditorOverlayPreviewShell(ctx: EditorContext, overlay: Overlay): 
   if (!overlaysRoot.parentNode) layer.appendChild(overlaysRoot);
   const oldShells = overlaysRoot.querySelectorAll('[data-opencanvas-editor-preview-temp="true"]');
   for (let i = 0; i < oldShells.length; i++) oldShells[i]!.remove();
+  const presentation = overlay.presentation?.mode ?? 'modal';
+  const chrome = overlay.presentation?.chrome ?? 'standard';
+  const backdropStyle = overlay.presentation?.backdrop ?? 'dim';
+  const closePlacement = overlay.presentation?.closePlacement ?? 'top-right';
   const shell = document.createElement('div');
-  shell.className = 'opencanvas-overlay';
+  shell.className =
+    presentation === 'fullscreen-menu'
+      ? 'opencanvas-overlay opencanvas-overlay--fullscreen-menu opencanvas-overlay--chrome-' + chrome
+      : 'opencanvas-overlay opencanvas-overlay--chrome-' + chrome;
   shell.setAttribute('data-opencanvas-overlay', overlay.id);
+  shell.setAttribute('data-opencanvas-overlay-presentation', presentation);
+  shell.setAttribute('data-opencanvas-overlay-chrome', chrome);
+  shell.setAttribute('data-opencanvas-overlay-backdrop-style', backdropStyle);
+  shell.setAttribute('data-opencanvas-overlay-close-placement', closePlacement);
   shell.setAttribute('data-opencanvas-overlay-trigger-type', overlay.trigger.type);
   shell.setAttribute('data-opencanvas-editor-preview-temp', 'true');
   shell.setAttribute('hidden', '');
