@@ -523,6 +523,9 @@ User-visible miss:
   pipelines or owner-authored Three.js code.
 - Rive input bindings are schema/runtime-owned and panel-editable, but
   rich-motion asset upload/selection still needs dedicated asset-picker UI.
+- Rich Motion asset metadata controls now cover the runtime-supported
+  `rive`, `lottie`, `model-3d`, `shader-scene`, and `video-stream` kinds in
+  the Interactions panel, so these surfaces are no longer template-JSON-only.
 
 Needed primitive:
 

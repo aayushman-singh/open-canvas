@@ -32,12 +32,15 @@ import type {
 import type {
   BehaviourTarget,
   LayoutTransition,
+  LottieRichMotionAsset,
+  Model3DRichMotionAsset,
   MotionSequence,
   MotionSequenceStep,
   RichMotionAsset,
   RiveInputBinding,
   RiveRichMotionAsset,
   ScrollScene,
+  ShaderSceneRichMotionAsset,
   VideoStreamRichMotionAsset,
 } from '../canvas/behaviour-primitives.js';
 import {
@@ -46,6 +49,8 @@ import {
   MOTION_SEQUENCE_TRIGGER_TYPES,
   RIVE_INPUT_EVENTS,
   RIVE_INPUT_TYPES,
+  SHADER_SCENE_PRESETS,
+  SHADER_SCENE_REDUCED_MOTION_MODES,
   TEXT_SPLIT_UNITS,
   VIDEO_STREAM_REDUCED_MOTION_MODES,
   VIDEO_STREAM_TRIGGERS,
@@ -98,6 +103,8 @@ type SequenceSlot =
 const DEFAULT_EASING = 'ease-in-out';
 type RiveInputType = (typeof RIVE_INPUT_TYPES)[number];
 type RiveInputEvent = (typeof RIVE_INPUT_EVENTS)[number];
+type ShaderScenePreset = (typeof SHADER_SCENE_PRESETS)[number];
+type ShaderSceneReducedMotionMode = (typeof SHADER_SCENE_REDUCED_MOTION_MODES)[number];
 type VideoStreamTrigger = (typeof VIDEO_STREAM_TRIGGERS)[number];
 type VideoStreamReducedMotionMode = (typeof VIDEO_STREAM_REDUCED_MOTION_MODES)[number];
 
@@ -178,6 +185,46 @@ export function defaultRiveInputBinding(id: string): RiveInputBinding {
     inputType: 'boolean',
     event: 'pointer-enter',
     value: true,
+  };
+}
+
+export function defaultLottieRichMotionAsset(id: string): LottieRichMotionAsset {
+  return {
+    id,
+    kind: 'lottie',
+    assetId: id + '.json',
+    alt: 'Lottie animation',
+    renderer: 'svg',
+    loop: true,
+    autoplay: true,
+    reducedMotion: 'pause',
+  };
+}
+
+export function defaultModel3DRichMotionAsset(id: string): Model3DRichMotionAsset {
+  return {
+    id,
+    kind: 'model-3d',
+    assetId: id + '.glb',
+    posterAssetId: id + '-poster.webp',
+    alt: '3D model',
+    cameraControls: true,
+    autoRotate: false,
+    reducedMotion: 'static',
+  };
+}
+
+export function defaultShaderSceneRichMotionAsset(id: string): ShaderSceneRichMotionAsset {
+  return {
+    id,
+    kind: 'shader-scene',
+    preset: 'racing-lines',
+    alt: 'Shader scene',
+    colorA: '#C8FF1A',
+    colorB: '#111112',
+    speed: 0.8,
+    density: 0.7,
+    reducedMotion: 'static',
   };
 }
 
@@ -428,6 +475,18 @@ function isRiveAsset(asset: RichMotionAsset): asset is RiveRichMotionAsset {
   return asset.kind === 'rive';
 }
 
+function isLottieAsset(asset: RichMotionAsset): asset is LottieRichMotionAsset {
+  return asset.kind === 'lottie';
+}
+
+function isModel3DAsset(asset: RichMotionAsset): asset is Model3DRichMotionAsset {
+  return asset.kind === 'model-3d';
+}
+
+function isShaderSceneAsset(asset: RichMotionAsset): asset is ShaderSceneRichMotionAsset {
+  return asset.kind === 'shader-scene';
+}
+
 function isVideoStreamAsset(asset: RichMotionAsset): asset is VideoStreamRichMotionAsset {
   return asset.kind === 'video-stream';
 }
@@ -512,6 +571,45 @@ function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTML
   });
   wrap.appendChild(addRive);
 
+  const addLottie = actionButton('Add Lottie asset', 'Create schema-owned Lottie rich motion metadata');
+  addLottie.addEventListener('click', () => {
+    mutate(ctx, () => {
+      const id = 'lottie-asset-' + Date.now();
+      ctx.state!.richMotionAssets = [
+        ...(ctx.state!.richMotionAssets ?? []),
+        defaultLottieRichMotionAsset(id),
+      ];
+    });
+    ctx.setStatus('Lottie asset metadata added', 'ok');
+  });
+  wrap.appendChild(addLottie);
+
+  const addModel = actionButton('Add model-3d asset', 'Create schema-owned bounded 3D model metadata');
+  addModel.addEventListener('click', () => {
+    mutate(ctx, () => {
+      const id = 'model-3d-' + Date.now();
+      ctx.state!.richMotionAssets = [
+        ...(ctx.state!.richMotionAssets ?? []),
+        defaultModel3DRichMotionAsset(id),
+      ];
+    });
+    ctx.setStatus('Model-3D asset metadata added', 'ok');
+  });
+  wrap.appendChild(addModel);
+
+  const addShader = actionButton('Add shader scene asset', 'Create schema-owned bounded shader scene metadata');
+  addShader.addEventListener('click', () => {
+    mutate(ctx, () => {
+      const id = 'shader-scene-' + Date.now();
+      ctx.state!.richMotionAssets = [
+        ...(ctx.state!.richMotionAssets ?? []),
+        defaultShaderSceneRichMotionAsset(id),
+      ];
+    });
+    ctx.setStatus('Shader scene asset metadata added', 'ok');
+  });
+  wrap.appendChild(addShader);
+
   const addVideo = actionButton('Add video stream asset', 'Create schema-owned hover/focus video stream metadata');
   addVideo.addEventListener('click', () => {
     mutate(ctx, () => {
@@ -568,6 +666,24 @@ function renderRichMotionAssetCard(
     return;
   }
 
+  if (isLottieAsset(asset)) {
+    renderLottieAssetFields(ctx, card, asset);
+    host.appendChild(card);
+    return;
+  }
+
+  if (isModel3DAsset(asset)) {
+    renderModel3DAssetFields(ctx, card, asset);
+    host.appendChild(card);
+    return;
+  }
+
+  if (isShaderSceneAsset(asset)) {
+    renderShaderSceneAssetFields(ctx, card, asset);
+    host.appendChild(card);
+    return;
+  }
+
   if (isVideoStreamAsset(asset)) {
     renderVideoStreamAssetFields(ctx, card, asset);
     host.appendChild(card);
@@ -578,7 +694,7 @@ function renderRichMotionAssetCard(
     const note = document.createElement('p');
     note.className = 'opencanvas-section-picker-empty';
     note.textContent =
-      'This editor slice exposes Rive and video stream asset controls. Other rich motion kinds remain schema-owned.';
+      'This editor slice exposes Rive, Lottie, model-3d, shader-scene, and video stream asset controls. Other rich motion kinds remain schema-owned.';
     card.appendChild(note);
     host.appendChild(card);
     return;
@@ -645,6 +761,203 @@ function renderRiveAssetFields(
     replaceRichMotionAsset(ctx, asset.id, (current) =>
       isRiveAsset(current)
         ? { ...current, reducedMotion: reduced.value === 'play' ? 'play' : 'pause' }
+        : current,
+    ),
+  );
+  card.appendChild(field('Reduced motion', reduced));
+}
+
+function renderLottieAssetFields(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  asset: LottieRichMotionAsset,
+): void {
+  const assetId = textInput(asset.assetId, 'hero.json');
+  assetId.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isLottieAsset(current) ? { ...current, assetId: assetId.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Asset id', assetId));
+
+  const alt = textInput(asset.alt, 'Accessible animation label');
+  alt.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isLottieAsset(current) ? { ...current, alt: alt.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Alt text', alt));
+
+  const renderer = selectInput(['svg', 'canvas'], asset.renderer);
+  renderer.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isLottieAsset(current)
+        ? { ...current, renderer: renderer.value === 'canvas' ? 'canvas' : 'svg' }
+        : current,
+    ),
+  );
+  card.appendChild(field('Renderer', renderer));
+
+  card.appendChild(
+    checkbox(asset.loop === true, 'Loop', (checked) =>
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isLottieAsset(current) ? { ...current, loop: checked } : current,
+      ),
+    ),
+  );
+
+  card.appendChild(
+    checkbox(asset.autoplay !== false, 'Autoplay', (checked) =>
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isLottieAsset(current) ? { ...current, autoplay: checked } : current,
+      ),
+    ),
+  );
+
+  const reduced = selectInput(['pause', 'play'], asset.reducedMotion);
+  reduced.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isLottieAsset(current)
+        ? { ...current, reducedMotion: reduced.value === 'play' ? 'play' : 'pause' }
+        : current,
+    ),
+  );
+  card.appendChild(field('Reduced motion', reduced));
+}
+
+function renderModel3DAssetFields(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  asset: Model3DRichMotionAsset,
+): void {
+  const assetId = textInput(asset.assetId, 'helmet.glb');
+  assetId.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isModel3DAsset(current) ? { ...current, assetId: assetId.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Model asset id', assetId));
+
+  const poster = textInput(asset.posterAssetId ?? '', 'helmet-poster.webp');
+  poster.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) => {
+      if (!isModel3DAsset(current)) return current;
+      const next = poster.value.trim();
+      if (next) return { ...current, posterAssetId: next };
+      const nextAsset = { ...current };
+      delete nextAsset.posterAssetId;
+      return nextAsset;
+    }),
+  );
+  card.appendChild(field('Poster asset id', poster));
+
+  const alt = textInput(asset.alt, 'Accessible model label');
+  alt.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isModel3DAsset(current) ? { ...current, alt: alt.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Alt text', alt));
+
+  card.appendChild(
+    checkbox(asset.cameraControls, 'Camera controls', (checked) =>
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isModel3DAsset(current) ? { ...current, cameraControls: checked } : current,
+      ),
+    ),
+  );
+
+  card.appendChild(
+    checkbox(asset.autoRotate === true, 'Auto rotate', (checked) =>
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isModel3DAsset(current) ? { ...current, autoRotate: checked } : current,
+      ),
+    ),
+  );
+
+  const reduced = selectInput(['static', 'allow'], asset.reducedMotion);
+  reduced.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isModel3DAsset(current)
+        ? { ...current, reducedMotion: reduced.value === 'allow' ? 'allow' : 'static' }
+        : current,
+    ),
+  );
+  card.appendChild(field('Reduced motion', reduced));
+}
+
+function renderShaderSceneAssetFields(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  asset: ShaderSceneRichMotionAsset,
+): void {
+  const preset = selectInput([...SHADER_SCENE_PRESETS], asset.preset);
+  preset.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isShaderSceneAsset(current)
+        ? { ...current, preset: preset.value as ShaderScenePreset }
+        : current,
+    ),
+  );
+  card.appendChild(field('Preset', preset));
+
+  const alt = textInput(asset.alt, 'Accessible shader scene label');
+  alt.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isShaderSceneAsset(current) ? { ...current, alt: alt.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Alt text', alt));
+
+  const colorA = textInput(asset.colorA, '#C8FF1A');
+  colorA.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isShaderSceneAsset(current) ? { ...current, colorA: colorA.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Color A', colorA));
+
+  const colorB = textInput(asset.colorB, '#111112');
+  colorB.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isShaderSceneAsset(current) ? { ...current, colorB: colorB.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Color B', colorB));
+
+  const speed = numberInput(asset.speed ?? 0.8, 0, 4, 0.1);
+  speed.addEventListener('change', () => {
+    const next = validNumber(speed, 0, 4);
+    if (next === null) {
+      ctx.setStatus('Shader scene speed must be between 0 and 4', 'error');
+      speed.value = String(asset.speed ?? 0.8);
+      return;
+    }
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isShaderSceneAsset(current) ? { ...current, speed: next } : current,
+    );
+  });
+  card.appendChild(field('Speed', speed));
+
+  const density = numberInput(asset.density ?? 0.7, 0, 1, 0.05);
+  density.addEventListener('change', () => {
+    const next = validNumber(density, 0, 1);
+    if (next === null) {
+      ctx.setStatus('Shader scene density must be between 0 and 1', 'error');
+      density.value = String(asset.density ?? 0.7);
+      return;
+    }
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isShaderSceneAsset(current) ? { ...current, density: next } : current,
+    );
+  });
+  card.appendChild(field('Density', density));
+
+  const reduced = selectInput([...SHADER_SCENE_REDUCED_MOTION_MODES], asset.reducedMotion);
+  reduced.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isShaderSceneAsset(current)
+        ? { ...current, reducedMotion: reduced.value as ShaderSceneReducedMotionMode }
         : current,
     ),
   );

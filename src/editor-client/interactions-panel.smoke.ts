@@ -2,12 +2,15 @@ export {};
 
 import {
   defaultLoadExperience,
+  defaultLottieRichMotionAsset,
   defaultLayoutTransition,
+  defaultModel3DRichMotionAsset,
   defaultOverlay,
   defaultRiveInputBinding,
   defaultRiveRichMotionAsset,
   defaultRouteTransition,
   defaultScrollScene,
+  defaultShaderSceneRichMotionAsset,
   defaultVideoStreamRichMotionAsset,
 } from './interactions-panel.js';
 
@@ -132,6 +135,28 @@ equal(videoStreamAsset.playback.trigger, 'hover-focus', 'video stream trigger de
 equal(videoStreamAsset.playback.resetOnExit ?? false, true, 'video stream reset default');
 equal(videoStreamAsset.reducedMotion, 'poster', 'video stream reduced-motion default');
 
+const lottieAsset = defaultLottieRichMotionAsset('lottie-a');
+equal(lottieAsset.id, 'lottie-a', 'lottie asset id');
+equal(lottieAsset.kind, 'lottie', 'lottie asset kind');
+equal(lottieAsset.assetId, 'lottie-a.json', 'lottie asset id default');
+equal(lottieAsset.renderer, 'svg', 'lottie renderer default');
+equal(lottieAsset.reducedMotion, 'pause', 'lottie reduced-motion default');
+
+const modelAsset = defaultModel3DRichMotionAsset('model-a');
+equal(modelAsset.id, 'model-a', 'model asset id');
+equal(modelAsset.kind, 'model-3d', 'model asset kind');
+equal(modelAsset.assetId, 'model-a.glb', 'model asset id default');
+equal(modelAsset.posterAssetId ?? '', 'model-a-poster.webp', 'model poster default');
+equal(modelAsset.cameraControls, true, 'model camera controls default');
+equal(modelAsset.reducedMotion, 'static', 'model reduced-motion default');
+
+const shaderAsset = defaultShaderSceneRichMotionAsset('shader-a');
+equal(shaderAsset.id, 'shader-a', 'shader asset id');
+equal(shaderAsset.kind, 'shader-scene', 'shader asset kind');
+equal(shaderAsset.preset, 'racing-lines', 'shader preset default');
+equal(shaderAsset.colorA, '#C8FF1A', 'shader colorA default');
+equal(shaderAsset.reducedMotion, 'static', 'shader reduced-motion default');
+
 const panelSrc = await Bun.file(new URL('./interactions-panel.ts', import.meta.url)).text();
 assert(panelSrc.includes('BehaviourLoadExperience'), 'panel must import behaviour load experience');
 assert(panelSrc.includes('Use designer enter moment'), 'panel must expose designer load mode');
@@ -144,8 +169,19 @@ assert(panelSrc.includes('Validation blocks publish'), 'panel must fail loudly f
 assert(panelSrc.includes('renderMotionSequenceControls'), 'panel must render full Motion Sequence controls');
 assert(panelSrc.includes('renderRichMotionAssetControls'), 'panel must render Rich Motion Asset controls');
 assert(panelSrc.includes('Add Rive asset'), 'panel must create Rive asset metadata');
+assert(panelSrc.includes('Add Lottie asset'), 'panel must create Lottie asset metadata');
+assert(panelSrc.includes('Add model-3d asset'), 'panel must create model-3d asset metadata');
+assert(panelSrc.includes('Add shader scene asset'), 'panel must create shader-scene asset metadata');
 assert(panelSrc.includes('Add video stream asset'), 'panel must create video stream asset metadata');
+assert(panelSrc.includes('renderLottieAssetFields'), 'panel must render Lottie asset fields');
+assert(panelSrc.includes('renderModel3DAssetFields'), 'panel must render model-3d asset fields');
+assert(panelSrc.includes('renderShaderSceneAssetFields'), 'panel must render shader-scene asset fields');
 assert(panelSrc.includes('renderVideoStreamAssetFields'), 'panel must render video stream asset fields');
+assert(panelSrc.includes('SHADER_SCENE_PRESETS'), 'panel must use schema shader-scene preset values');
+assert(
+  panelSrc.includes('SHADER_SCENE_REDUCED_MOTION_MODES'),
+  'panel must use schema shader-scene reduced-motion values',
+);
 assert(panelSrc.includes('VIDEO_STREAM_TRIGGERS'), 'panel must use schema video stream trigger values');
 assert(
   panelSrc.includes('VIDEO_STREAM_REDUCED_MOTION_MODES'),
