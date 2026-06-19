@@ -167,6 +167,12 @@ Current state:
   section crosses a threshold.
 - `parallax-soft` is an entrance preset, not a scroll-progress relation.
 - Sticky is top-only per element; scroll-snap exists only as a carousel mode.
+- **June 2026 update:** Scroll Scene now has an owner-facing editor slice in
+  the Interactions panel for creating/editing a pinned scene, its trigger
+  section, pin target, range, reduced-motion policy, and linked Motion Sequence
+  first target. This closes the "template JSON only" authoring gap for the
+  first scroll-story relation, but horizontal storytelling, snap points,
+  multi-step timeline editing, and unified timeline canvas remain open.
 
 User-visible miss:
 
@@ -362,17 +368,25 @@ Current state:
 
 - Text elements support rich inline runs and some typography fields.
 - Motion targets the whole positioned element wrapper.
+- **June 2026 update:** Text elements now expose a Text Split Target inspector
+  control that writes schema-owned Motion Sequence targets for word, line, or
+  character splitting. The visitor runtime generates presentational split spans
+  with `aria-hidden="true"` and preserves the full semantic text on the host
+  with `aria-label`.
 
 User-visible miss:
 
-- Cannot reproduce word-by-word reveals, line mask reveals, character staggers,
-  kinetic headlines, type scrambles, or text tied to scroll progress.
+- Cannot yet reproduce advanced kinetic headlines, type scrambles, variable
+  font axes, or arbitrary multi-step text timelines from a unified timeline
+  canvas.
 
 Needed primitive:
 
 - Text Split targets as an explicit render mode: by character, word, or line,
   with semantic HTML preserved and the Motion Sequence targeting generated
   spans. Accessibility must define what screen readers see.
+- Remaining next wave: richer text-specific effects, scroll-progress text
+  presets, and visual multi-step editing of split targets.
 
 ### 11. Rich Media / 3D / Shader Surfaces Are Missing
 

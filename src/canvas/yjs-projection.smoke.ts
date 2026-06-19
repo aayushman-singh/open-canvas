@@ -444,6 +444,34 @@ const syntheticState: EditableSite = {
   siteNoIndex: false,
   visitorTheme: 'toggleable',
   scrollBehavior: { smooth: true, paddingTop: 72 },
+  motionSequences: [
+    {
+      id: 'synthetic-scroll-sequence',
+      trigger: { type: 'scroll-scene', scrollSceneId: 'synthetic-scroll-scene' },
+      reducedMotion: 'final-state',
+      steps: [
+        {
+          id: 'synthetic-scroll-step',
+          target: { type: 'element', elementId: 'el-text' },
+          from: { opacity: 0, translateY: 32 },
+          to: { opacity: 1, translateY: 0 },
+          durationMs: 720,
+          delayMs: 0,
+          easing: 'ease-in-out',
+        },
+      ],
+    },
+  ],
+  scrollScenes: [
+    {
+      id: 'synthetic-scroll-scene',
+      sectionId: 'syn-section',
+      sequenceId: 'synthetic-scroll-sequence',
+      pinTarget: { type: 'section', sectionId: 'syn-section' },
+      startOffsetPx: 0,
+      endOffsetPx: 720,
+    },
+  ],
 };
 
 {

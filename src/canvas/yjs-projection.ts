@@ -30,6 +30,8 @@
 //   'overlays'?        -> Y.Array<Y.Map<unknown>>    (Overlay[])
 //   'loadExperience'?  -> Y.Map<unknown>             (LoadExperience)
 //   'routeTransition'? -> Y.Map<unknown>             (RouteTransition)
+//   'motionSequences'? -> Y.Array<Y.Map<unknown>>    (MotionSequence[])
+//   'scrollScenes'?    -> Y.Array<Y.Map<unknown>>    (ScrollScene[])
 //   'pages'            -> Y.Array<Y.Map<unknown>>    (CanvasPage[])
 //
 // Each CanvasPage Y.Map:
@@ -1039,6 +1041,12 @@ export function encodeYDoc(state: EditableSite): Y.Doc {
     if (state.routeTransition !== undefined) {
       root.set('routeTransition', encodeJsonValue(state.routeTransition));
     }
+    if (state.motionSequences !== undefined) {
+      root.set('motionSequences', encodeJsonValue(state.motionSequences));
+    }
+    if (state.scrollScenes !== undefined) {
+      root.set('scrollScenes', encodeJsonValue(state.scrollScenes));
+    }
 
     const pages = new Y.Array<Y.Map<unknown>>();
     for (const page of state.pages) pages.push([encodePage(page)]);
@@ -1884,6 +1892,16 @@ export function decodeYDoc(doc: Y.Doc): EditableSite {
     state.routeTransition = decodeJsonValue(
       root.get('routeTransition'),
     ) as NonNullable<EditableSite['routeTransition']>;
+  }
+  if (root.has('motionSequences')) {
+    state.motionSequences = decodeJsonValue(
+      root.get('motionSequences'),
+    ) as NonNullable<EditableSite['motionSequences']>;
+  }
+  if (root.has('scrollScenes')) {
+    state.scrollScenes = decodeJsonValue(
+      root.get('scrollScenes'),
+    ) as NonNullable<EditableSite['scrollScenes']>;
   }
   if (root.has('header')) {
     state.header = decodeSection(root.get('header') as Y.Map<unknown>);

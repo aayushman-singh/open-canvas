@@ -589,6 +589,14 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   runBehaviour(doc, win, StubImage);
   const spans = heading.querySelectorAll('.opencanvas-text-split');
   assert(spans.length === 3, 'text split must create one span per word');
+  assert(
+    headingText.getAttribute('aria-label') === 'One two three',
+    'text split host must preserve semantic aria-label',
+  );
+  assert(
+    spans.every((span) => span.getAttribute('aria-hidden') === 'true'),
+    'text split generated spans must be presentational',
+  );
 }
 
 // (4) scroll scene computes progress and applies transform

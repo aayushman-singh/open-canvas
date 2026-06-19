@@ -1,6 +1,11 @@
 export {};
 
-import { defaultLoadExperience, defaultOverlay, defaultRouteTransition } from './interactions-panel.js';
+import {
+  defaultLoadExperience,
+  defaultOverlay,
+  defaultRouteTransition,
+  defaultScrollScene,
+} from './interactions-panel.js';
 
 declare const Bun: {
   file(input: URL): { text(): Promise<string> };
@@ -72,7 +77,28 @@ equal(route.mode, 'fade', 'route mode');
 equal(route.durationMs, 220, 'route duration');
 equal(route.easing, 'ease-in-out', 'route easing');
 
+const scroll = defaultScrollScene('scene-a', 'section-a', 'element-a');
+equal(scroll.scene.id, 'scene-a', 'scroll scene id');
+equal(scroll.scene.sectionId, 'section-a', 'scroll scene section id');
+equal(scroll.scene.sequenceId, 'scene-a-sequence', 'scroll scene sequence id');
+equal(scroll.scene.pinTarget.type, 'section', 'scroll scene pin defaults to section');
+equal(scroll.scene.startOffsetPx, 0, 'scroll scene start');
+equal(scroll.scene.endOffsetPx, 720, 'scroll scene end');
+equal(scroll.sequence.id, 'scene-a-sequence', 'scroll sequence id');
+equal(scroll.sequence.trigger.type, 'scroll-scene', 'scroll sequence trigger type');
+equal(
+  scroll.sequence.trigger.type === 'scroll-scene' ? scroll.sequence.trigger.scrollSceneId : '',
+  'scene-a',
+  'scroll sequence trigger scene id',
+);
+equal(scroll.sequence.reducedMotion, 'final-state', 'scroll sequence reduced motion default');
+equal(scroll.sequence.steps[0]?.target.type, 'element', 'selected element becomes first target');
+
 const panelSrc = await Bun.file(new URL('./interactions-panel.ts', import.meta.url)).text();
+assert(panelSrc.includes('renderScrollSceneControls'), 'panel must render scroll scene controls');
+assert(panelSrc.includes('ctx.state!.scrollScenes'), 'panel must mutate scroll scenes');
+assert(panelSrc.includes('ctx.state!.motionSequences'), 'panel must mutate linked motion sequences');
+assert(panelSrc.includes('Validation blocks publish'), 'panel must fail loudly for missing linked sequence');
 assert(panelSrc.includes('LOAD_EXPERIENCE_PRESETS'), 'panel must use load presets');
 assert(panelSrc.includes('ROUTE_TRANSITION_MODES'), 'panel must use route modes');
 assert(panelSrc.includes('OVERLAY_TRIGGER_TYPES'), 'panel must use overlay trigger types');

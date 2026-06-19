@@ -93,11 +93,13 @@ function behaviourSplitTextTarget(el, unit) {
     behaviourFailure('behaviour-text-split-unit', { unit: unit }, new Error('unsupported text split unit'));
   }
   host.textContent = '';
+  host.setAttribute('aria-label', text);
   var spans = [];
   for (var i = 0; i < parts.length; i++) {
     var span = document.createElement('span');
     span.className = 'opencanvas-text-split';
     span.setAttribute('data-opencanvas-text-split-unit', unit);
+    span.setAttribute('aria-hidden', 'true');
     span.style.display = unit === 'line' ? 'block' : 'inline-block';
     span.textContent = parts[i];
     host.appendChild(span);

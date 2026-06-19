@@ -34,6 +34,11 @@ import type { EditorContext } from './editor-context.js';
 import type { InspectorSpec } from '../canvas/elements/inspector-spec.js';
 import type { CanvasElement } from '../canvas/schema.js';
 import { MOTION_PRESETS, type MotionPreset } from '../canvas/schema.js';
+import {
+  TEXT_SPLIT_UNITS,
+  type MotionSequence,
+  type MotionSequenceStep,
+} from '../canvas/behaviour-primitives.js';
 import type { CollectionElement, CollectionSort } from '../canvas/elements/collection.js';
 import { COLLECTION_DISPLAYS, COLLECTION_SORTS } from '../canvas/elements/collection.js';
 import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
@@ -557,6 +562,10 @@ export function renderInspector(ctx: EditorContext): void {
     ctx.inspector.appendChild(field('Motion delay (ms)', delay));
   }
 
+  if (element.type === 'text') {
+    renderTextSplitInspector(ctx, element.id, found.section.id);
+  }
+
   // Play/replay button for this element's animation.
   const elPlayBtn = document.createElement('button');
   elPlayBtn.type = 'button';
@@ -597,6 +606,112 @@ export function renderInspector(ctx: EditorContext): void {
     });
     ctx.inspector.appendChild(useAsTriggerBtn);
   }
+}
+
+function renderTextSplitInspector(
+  ctx: EditorContext,
+  elementId: string,
+  sectionId: string,
+): void {
+  if (!ctx.state || !ctx.inspector) return;
+  const heading = document.createElement('h3');
+  heading.textContent = 'Text Split Target';
+  heading.className = 'inspector-section-heading';
+  ctx.inspector.appendChild(heading);
+
+  const current = findTextSplitStep(ctx.state.motionSequences ?? [], elementId);
+  const currentUnit = current?.step.target.type === 'text-split' ? current.step.target.unit : 'off';
+  const unitSelect = selectInput(['off', ...TEXT_SPLIT_UNITS], currentUnit);
+  unitSelect.addEventListener('change', () => {
+    ctx.captureForUndo();
+    if (unitSelect.value === 'off') {
+      removeTextSplitTarget(ctx, elementId);
+      ctx.setStatus('Text split target disabled', 'ok');
+    } else {
+      upsertTextSplitTarget(ctx, elementId, sectionId, unitSelect.value as (typeof TEXT_SPLIT_UNITS)[number]);
+      ctx.setStatus('Text split target enabled', 'ok');
+    }
+    ctx.renderInspector();
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Split unit', unitSelect));
+
+  const note = document.createElement('p');
+  note.className = 'opencanvas-section-picker-empty';
+  note.textContent =
+    'Creates a schema-owned Motion Sequence target. Runtime split spans are aria-hidden and the text host keeps the full aria-label.';
+  ctx.inspector.appendChild(note);
+}
+
+function findTextSplitStep(
+  sequences: MotionSequence[],
+  elementId: string,
+): { sequence: MotionSequence; step: MotionSequenceStep } | null {
+  for (const sequence of sequences) {
+    for (const step of sequence.steps) {
+      if (step.target.type === 'text-split' && step.target.elementId === elementId) {
+        return { sequence, step };
+      }
+    }
+  }
+  return null;
+}
+
+function uniqueSequenceId(sequences: MotionSequence[], base: string): string {
+  const ids = new Set(sequences.map((sequence) => sequence.id));
+  if (!ids.has(base)) return base;
+  let index = 2;
+  while (ids.has(base + '-' + String(index))) index += 1;
+  return base + '-' + String(index);
+}
+
+function upsertTextSplitTarget(
+  ctx: EditorContext,
+  elementId: string,
+  sectionId: string,
+  unit: (typeof TEXT_SPLIT_UNITS)[number],
+): void {
+  if (!ctx.state) return;
+  const sequences = ctx.state.motionSequences ?? [];
+  const existing = findTextSplitStep(sequences, elementId);
+  if (existing) {
+    existing.step.target = { type: 'text-split', elementId, unit };
+    existing.step.staggerMs = unit === 'char' ? 18 : unit === 'word' ? 40 : 80;
+    ctx.state.motionSequences = sequences;
+    return;
+  }
+  const sequenceId = uniqueSequenceId(sequences, 'text-split-' + elementId);
+  const step: MotionSequenceStep = {
+    id: sequenceId + '-step',
+    target: { type: 'text-split', elementId, unit },
+    from: { opacity: 0, translateY: 24 },
+    to: { opacity: 1, translateY: 0 },
+    durationMs: 420,
+    delayMs: 0,
+    staggerMs: unit === 'char' ? 18 : unit === 'word' ? 40 : 80,
+    easing: 'ease-out',
+  };
+  ctx.state.motionSequences = [
+    ...sequences,
+    {
+      id: sequenceId,
+      trigger: { type: 'section-enter', sectionId },
+      reducedMotion: 'final-state',
+      steps: [step],
+    },
+  ];
+}
+
+function removeTextSplitTarget(ctx: EditorContext, elementId: string): void {
+  if (!ctx.state) return;
+  ctx.state.motionSequences = (ctx.state.motionSequences ?? [])
+    .map((sequence) => ({
+      ...sequence,
+      steps: sequence.steps.filter(
+        (step) => !(step.target.type === 'text-split' && step.target.elementId === elementId),
+      ),
+    }))
+    .filter((sequence) => sequence.steps.length > 0);
 }
 
 // ---------------------------------------------------------------------------

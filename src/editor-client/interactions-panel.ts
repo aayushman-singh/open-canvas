@@ -24,6 +24,12 @@ import type {
   RouteTransitionMode,
   EditableSite,
 } from '../canvas/schema.js';
+import type {
+  BehaviourTarget,
+  MotionSequence,
+  MotionSequenceStep,
+  ScrollScene,
+} from '../canvas/behaviour-primitives.js';
 import { isPremiumLoadExperience } from '../canvas/schema.js';
 import {
   LOAD_EXPERIENCE_GATES,
@@ -111,6 +117,7 @@ export function renderInteractionsPanel(ctx: InteractionsPanelContext): void {
   if (!host || !ctx.state) return;
   host.replaceChildren();
   host.className = 'opencanvas-interactions-panel';
+  renderScrollSceneControls(ctx, host);
   renderLoadControls(ctx, host);
   renderRouteControls(ctx, host);
   renderOverlayControls(ctx, host);
@@ -220,6 +227,317 @@ function activePageId(ctx: InteractionsPanelContext): string | null {
 function currentPremiumLoadExperience(state: EditableSite): PremiumLoadExperience {
   const load = state.loadExperience;
   return isPremiumLoadExperience(load) ? load : defaultLoadExperience();
+}
+
+export function defaultScrollScene(
+  id: string,
+  sectionId: string,
+  selectedElementId?: string | null,
+): { scene: ScrollScene; sequence: MotionSequence } {
+  const sequenceId = id + '-sequence';
+  const target: BehaviourTarget =
+    selectedElementId && selectedElementId.length > 0
+      ? { type: 'element', elementId: selectedElementId }
+      : { type: 'section', sectionId };
+  return {
+    scene: {
+      id,
+      sectionId,
+      sequenceId,
+      pinTarget: { type: 'section', sectionId },
+      startOffsetPx: 0,
+      endOffsetPx: 720,
+    },
+    sequence: {
+      id: sequenceId,
+      trigger: { type: 'scroll-scene', scrollSceneId: id },
+      reducedMotion: 'final-state',
+      steps: [
+        {
+          id: id + '-step-1',
+          target,
+          from: { opacity: 0, translateY: 48 },
+          to: { opacity: 1, translateY: 0 },
+          durationMs: 720,
+          delayMs: 0,
+          easing: DEFAULT_EASING,
+        },
+      ],
+    },
+  };
+}
+
+function activePage(ctx: InteractionsPanelContext) {
+  if (!ctx.state) return null;
+  const pageId = activePageId(ctx);
+  return ctx.state.pages.find((page) => page.id === pageId) ?? ctx.state.pages[0] ?? null;
+}
+
+function activePageSections(ctx: InteractionsPanelContext) {
+  return activePage(ctx)?.sections ?? [];
+}
+
+function sectionLabel(ctx: InteractionsPanelContext, sectionId: string): string {
+  const found = activePageSections(ctx).find((sectionItem) => sectionItem.id === sectionId);
+  return found ? found.name + ' (' + found.id + ')' : sectionId;
+}
+
+function elementIdsForActivePage(ctx: InteractionsPanelContext): string[] {
+  const ids: string[] = [];
+  for (const sectionItem of activePageSections(ctx)) {
+    for (const element of sectionItem.elements) ids.push(element.id);
+  }
+  return ids;
+}
+
+function renderScrollSceneControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
+  if (!ctx.state) return;
+  const wrap = section('Scroll Scenes');
+  const scenes = ctx.state.scrollScenes ?? [];
+  const sections = activePageSections(ctx);
+
+  const add = actionButton('Add scroll scene', 'Create a pinned scroll scene for the active page');
+  add.disabled = sections.length === 0;
+  add.addEventListener('click', () => {
+    const firstSection = sections[0];
+    if (!firstSection) {
+      ctx.setStatus('Add a section before creating a scroll scene', 'error');
+      return;
+    }
+    mutate(ctx, () => {
+      const id = 'scroll-scene-' + Date.now();
+      const created = defaultScrollScene(id, firstSection.id, ctx.selectedElementId);
+      ctx.state!.scrollScenes = [...(ctx.state!.scrollScenes ?? []), created.scene];
+      ctx.state!.motionSequences = [...(ctx.state!.motionSequences ?? []), created.sequence];
+    });
+    ctx.setStatus('Scroll scene added', 'ok');
+  });
+  wrap.appendChild(add);
+
+  if (sections.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'opencanvas-section-picker-empty';
+    empty.textContent = 'Add a section before creating scroll scenes.';
+    wrap.appendChild(empty);
+    host.appendChild(wrap);
+    return;
+  }
+
+  if (scenes.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'opencanvas-section-picker-empty';
+    empty.textContent = 'No scroll scenes yet.';
+    wrap.appendChild(empty);
+  }
+
+  for (let i = 0; i < scenes.length; i++) {
+    renderScrollSceneCard(ctx, wrap, scenes[i]!, i);
+  }
+
+  host.appendChild(wrap);
+}
+
+function renderScrollSceneCard(
+  ctx: InteractionsPanelContext,
+  host: HTMLElement,
+  scene: ScrollScene,
+  index: number,
+): void {
+  const card = document.createElement('div');
+  card.className = 'opencanvas-interactions-card';
+
+  const header = row('opencanvas-interactions-card-header');
+  const title = document.createElement('strong');
+  title.textContent = sectionLabel(ctx, scene.sectionId);
+  header.appendChild(title);
+  const remove = compactButton('Delete', 'Delete this scroll scene and its linked motion sequence');
+  remove.addEventListener('click', () => {
+    mutate(ctx, () => {
+      ctx.state!.scrollScenes = (ctx.state!.scrollScenes ?? []).filter((item) => item.id !== scene.id);
+      ctx.state!.motionSequences = (ctx.state!.motionSequences ?? []).filter(
+        (sequence) => sequence.id !== scene.sequenceId,
+      );
+    });
+    ctx.setStatus('Scroll scene deleted', 'ok');
+  });
+  header.appendChild(remove);
+  card.appendChild(header);
+
+  const sections = activePageSections(ctx);
+  const sectionIds = sections.map((sectionItem) => sectionItem.id);
+  const sectionInput = selectInput(sectionIds, sectionIds.includes(scene.sectionId) ? scene.sectionId : sectionIds[0]!);
+  sectionInput.addEventListener('change', () => {
+    mutate(ctx, () => {
+      const scenes = ctx.state!.scrollScenes ?? [];
+      const next = sectionInput.value;
+      scenes[index] = {
+        ...scene,
+        sectionId: next,
+        pinTarget: scene.pinTarget.type === 'section' ? { type: 'section', sectionId: next } : scene.pinTarget,
+      };
+    });
+  });
+  card.appendChild(field('Trigger section', sectionInput));
+
+  const pinType = selectInput(['section', 'element'], scene.pinTarget.type);
+  pinType.addEventListener('change', () => {
+    mutate(ctx, () => {
+      const elementId = ctx.selectedElementId ?? elementIdsForActivePage(ctx)[0] ?? '';
+      const scenes = ctx.state!.scrollScenes ?? [];
+      scenes[index] = {
+        ...scene,
+        pinTarget:
+          pinType.value === 'element'
+            ? { type: 'element', elementId }
+            : { type: 'section', sectionId: scene.sectionId },
+      };
+    });
+  });
+  card.appendChild(field('Pin target type', pinType));
+
+  if (scene.pinTarget.type === 'element') {
+    const pinElement = textInput(scene.pinTarget.elementId, 'Element id to pin');
+    pinElement.addEventListener('change', () => {
+      const value = pinElement.value.trim();
+      if (value.length === 0) {
+        ctx.setStatus('Scroll scene pin element cannot be empty', 'error');
+        pinElement.value = scene.pinTarget.type === 'element' ? scene.pinTarget.elementId : '';
+        return;
+      }
+      mutate(ctx, () => {
+        const scenes = ctx.state!.scrollScenes ?? [];
+        scenes[index] = { ...scene, pinTarget: { type: 'element', elementId: value } };
+      });
+    });
+    card.appendChild(field('Pin element id', pinElement));
+  }
+
+  const start = numberInput(scene.startOffsetPx, 0, 20000, 10);
+  start.addEventListener('change', () => updateScrollSceneNumber(ctx, scene, index, 'startOffsetPx', start));
+  card.appendChild(field('Start offset (px)', start));
+
+  const end = numberInput(scene.endOffsetPx, 1, 20000, 10);
+  end.addEventListener('change', () => updateScrollSceneNumber(ctx, scene, index, 'endOffsetPx', end));
+  card.appendChild(field('End offset (px)', end));
+
+  renderScrollSequenceControls(ctx, card, scene);
+
+  host.appendChild(card);
+}
+
+function updateScrollSceneNumber(
+  ctx: InteractionsPanelContext,
+  scene: ScrollScene,
+  index: number,
+  key: 'startOffsetPx' | 'endOffsetPx',
+  input: HTMLInputElement,
+): void {
+  const next = validNumber(input, key === 'startOffsetPx' ? 0 : 1, 20000);
+  if (next === null) {
+    ctx.setStatus('Scroll scene ' + key + ' must be within range', 'error');
+    input.value = String(scene[key]);
+    return;
+  }
+  mutate(ctx, () => {
+    const scenes = ctx.state!.scrollScenes ?? [];
+    scenes[index] = { ...scene, [key]: next };
+  });
+}
+
+function renderScrollSequenceControls(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  scene: ScrollScene,
+): void {
+  const sequence = (ctx.state?.motionSequences ?? []).find((item) => item.id === scene.sequenceId);
+  if (!sequence) {
+    const missing = document.createElement('p');
+    missing.className = 'opencanvas-section-picker-empty';
+    missing.textContent = 'Linked Motion Sequence is missing. Validation blocks publish until it is restored.';
+    card.appendChild(missing);
+    return;
+  }
+
+  const reduced = selectInput(['final-state', 'skip'], sequence.reducedMotion ?? 'final-state');
+  reduced.addEventListener('change', () => {
+    mutate(ctx, () => {
+      updateScrollSequence(ctx, sequence.id, { reducedMotion: reduced.value as 'final-state' | 'skip' });
+    });
+  });
+  card.appendChild(field('Reduced motion', reduced));
+
+  const firstStep = sequence.steps[0];
+  if (!firstStep) return;
+
+  const targetType = selectInput(['section', 'element', 'text-split'], firstStep.target.type);
+  targetType.addEventListener('change', () => {
+    mutate(ctx, () => {
+      updateScrollSequenceStep(ctx, sequence.id, firstStep.id, {
+        target: defaultScrollStepTarget(ctx, scene, targetType.value),
+      });
+    });
+  });
+  card.appendChild(field('Step target type', targetType));
+
+  if (firstStep.target.type === 'element' || firstStep.target.type === 'text-split') {
+    const currentTarget = firstStep.target;
+    const elementId = textInput(firstStep.target.elementId, 'Element id');
+    elementId.addEventListener('change', () => {
+      const value = elementId.value.trim();
+      if (value.length === 0) {
+        ctx.setStatus('Scroll scene target element cannot be empty', 'error');
+        elementId.value = currentTarget.elementId;
+        return;
+      }
+      mutate(ctx, () => {
+        const target: BehaviourTarget =
+          currentTarget.type === 'text-split'
+            ? { ...currentTarget, elementId: value }
+            : { type: 'element' as const, elementId: value };
+        updateScrollSequenceStep(ctx, sequence.id, firstStep.id, { target });
+      });
+    });
+    card.appendChild(field('Step target element', elementId));
+  }
+}
+
+function defaultScrollStepTarget(
+  ctx: InteractionsPanelContext,
+  scene: ScrollScene,
+  type: string,
+): BehaviourTarget {
+  if (type === 'text-split') {
+    return { type: 'text-split', elementId: ctx.selectedElementId ?? elementIdsForActivePage(ctx)[0] ?? '', unit: 'word' };
+  }
+  if (type === 'element') {
+    return { type: 'element', elementId: ctx.selectedElementId ?? elementIdsForActivePage(ctx)[0] ?? '' };
+  }
+  return { type: 'section', sectionId: scene.sectionId };
+}
+
+function updateScrollSequence(
+  ctx: InteractionsPanelContext,
+  sequenceId: string,
+  patch: Partial<MotionSequence>,
+): void {
+  ctx.state!.motionSequences = (ctx.state!.motionSequences ?? []).map((sequence) =>
+    sequence.id === sequenceId ? { ...sequence, ...patch } : sequence,
+  );
+}
+
+function updateScrollSequenceStep(
+  ctx: InteractionsPanelContext,
+  sequenceId: string,
+  stepId: string,
+  patch: Partial<MotionSequenceStep>,
+): void {
+  ctx.state!.motionSequences = (ctx.state!.motionSequences ?? []).map((sequence) => {
+    if (sequence.id !== sequenceId) return sequence;
+    return {
+      ...sequence,
+      steps: sequence.steps.map((step) => (step.id === stepId ? { ...step, ...patch } : step)),
+    };
+  });
 }
 
 function renderLoadControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
