@@ -241,7 +241,9 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
   const pointerFx = formPointerFx(variant);
   const variantAttr = ` data-variant="${escapeAttr(variant)}"`;
   const pointerFxAttr =
-    pointerFx !== null ? ` data-opencanvas-pointer-fx="${escapeAttr(pointerFx)}"` : '';
+    pointerFx !== null
+      ? ` data-opencanvas-pointer-fx="${escapeAttr(pointerFx)}" data-opencanvas-pointer-fx-reduced-motion="allow"`
+      : '';
 
   // Turnstile widget. The Cloudflare-managed JS loader script is emitted next
   // to the widget; the Cloudflare CDN caches it so multiple forms on the same

@@ -314,6 +314,10 @@ function buildElementCommonAttrs(element: CanvasElement, tintAttr: string): stri
     element.marquee?.enabled === true
       ? ` data-opencanvas-marquee="true" data-opencanvas-marquee-direction="${escapeAttr(element.marquee.direction)}" data-opencanvas-marquee-speed="${escapeAttr(String(element.marquee.speedPxPerSecond))}" data-opencanvas-marquee-pause="${escapeAttr(String(element.marquee.pauseOnHover === true))}" data-opencanvas-marquee-reduced-motion="${escapeAttr(element.marquee.reducedMotion)}"`
       : '';
+  const pointerFxAttrs =
+    element.pointerFx?.enabled === true
+      ? ` data-opencanvas-pointer-fx="${escapeAttr(element.pointerFx.primitive)}" data-opencanvas-pointer-fx-reduced-motion="${escapeAttr(element.pointerFx.reducedMotion)}"`
+      : '';
   const ariaAttrs = buildAriaWrapperAttrs(element);
   const variant = variantAttr(element);
   const esAttrs = buildElementStyleDataAttrs(element.elementStyle);
@@ -323,7 +327,7 @@ function buildElementCommonAttrs(element: CanvasElement, tintAttr: string): stri
     typeof element.anchorId === 'string' && element.anchorId.length > 0
       ? ` id="${escapeAttr(element.anchorId)}"`
       : '';
-  return `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${marqueeAttrs}${ariaAttrs}${esAttrs}`;
+  return `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${marqueeAttrs}${pointerFxAttrs}${ariaAttrs}${esAttrs}`;
 }
 
 function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {

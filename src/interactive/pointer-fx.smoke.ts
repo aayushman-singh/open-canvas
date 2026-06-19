@@ -82,7 +82,10 @@ interface Rect {
 type Listener = (ev: { clientX: number; clientY: number }) => void;
 
 function makeStub(primitive: string, rect: Rect) {
-  const attrs: Record<string, string> = { 'data-opencanvas-pointer-fx': primitive };
+  const attrs: Record<string, string> = {
+    'data-opencanvas-pointer-fx': primitive,
+    'data-opencanvas-pointer-fx-reduced-motion': 'allow',
+  };
   const props: Record<string, string> = {};
   const listeners: Record<string, Listener[]> = {};
   const el = {
@@ -157,6 +160,18 @@ const hydratePointerFx = makeHydratePointerFx();
     'second hydratePointerFx must be a no-op (idempotence guard)',
   );
   assert(el.getAttribute('data-opencanvas-pfx-hydrated') === 'true', 'hydrated marker must be set');
+}
+
+// -- 4. named failure event is present in the visitor source -----------------
+{
+  assert(
+    POINTER_FX_RUNTIME_SRC.includes('opencanvas:pointer-fx-failure'),
+    'pointer-fx runtime must emit a named failure event',
+  );
+  assert(
+    POINTER_FX_RUNTIME_SRC.includes('data-opencanvas-pointer-fx-reduced-motion'),
+    'pointer-fx runtime must read explicit reduced-motion metadata',
+  );
 }
 
 console.log('[pointer-fx:smoke] OK');

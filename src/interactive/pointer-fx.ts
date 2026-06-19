@@ -29,13 +29,38 @@
 //     so a re-hydrate (live-publish DOM swap) does not double-wire listeners.
 
 export const POINTER_FX_RUNTIME_SRC = String.raw`
+function emitPointerFxFailure(el, code, message, cause) {
+  var detail = {
+    code: code,
+    message: message,
+    elementId: el && el.getAttribute ? el.getAttribute('data-opencanvas-element') : null,
+    cause: cause === null ? null : String(cause)
+  };
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('opencanvas:pointer-fx-failure', { detail: detail }));
+  }
+  if (typeof console !== 'undefined' && console.error) {
+    console.error('[opencanvas pointer-fx] ' + message, detail);
+  }
+  throw new Error('[opencanvas pointer-fx] ' + message);
+}
 function hydratePointerFx(scope) {
   var nodes = (scope || document).querySelectorAll('[data-opencanvas-pointer-fx]');
   for (var i = 0; i < nodes.length; i++) {
     (function (el) {
       if (el.getAttribute('data-opencanvas-pfx-hydrated') === 'true') return;
-      el.setAttribute('data-opencanvas-pfx-hydrated', 'true');
       var primitive = el.getAttribute('data-opencanvas-pointer-fx');
+      var reducedMotion = el.getAttribute('data-opencanvas-pointer-fx-reduced-motion');
+      if (reducedMotion !== 'disabled' && reducedMotion !== 'allow') {
+        emitPointerFxFailure(el, 'invalid-reduced-motion', 'Pointer FX reduced-motion mode must be disabled or allow', reducedMotion);
+      }
+      var reduce = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce && reducedMotion === 'disabled') {
+        el.setAttribute('data-opencanvas-pfx-hydrated', 'true');
+        el.setAttribute('data-opencanvas-pointer-fx-reduced', 'disabled');
+        return;
+      }
+      el.setAttribute('data-opencanvas-pfx-hydrated', 'true');
       if (primitive === 'spotlight') {
         el.addEventListener('pointermove', function (ev) {
           var r = el.getBoundingClientRect();
@@ -63,13 +88,7 @@ function hydratePointerFx(scope) {
           el.style.setProperty('--opencanvas-tilt-y', '0deg');
         });
       } else {
-        // Unknown primitive — fail loud, not silent. The renderer only ever
-        // emits known primitives, so this means a malformed snapshot or a drift
-        // between the render enum and this runtime; surface it instead of
-        // marking the node hydrated-but-inert.
-        if (typeof console !== 'undefined' && console.error) {
-          console.error('[opencanvas pointer-fx] unknown primitive ' + JSON.stringify(primitive));
-        }
+        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight or tilt', primitive);
       }
     })(nodes[i]);
   }

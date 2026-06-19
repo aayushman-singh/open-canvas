@@ -46,6 +46,7 @@ const INTERACTIVE_ELEMENT_TYPES: ReadonlySet<ElementType> = new Set<ElementType>
  * Centralised so adding a future pointer-fx-bearing variant is one edit.
  */
 function elementHasPointerFx(element: CanvasElement): boolean {
+  if (element.pointerFx?.enabled === true) return true;
   if (element.type === 'form') return formPointerFx(element.variant ?? 'classic') !== null;
   return false;
 }

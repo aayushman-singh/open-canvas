@@ -414,8 +414,23 @@ function hydratePointerFx(scope: ParentNode): void {
     const el = nodes[i];
     if (!(el instanceof HTMLElement)) continue;
     if (el.getAttribute('data-opencanvas-pfx-hydrated') === 'true') continue;
-    el.setAttribute('data-opencanvas-pfx-hydrated', 'true');
     const primitive = el.getAttribute('data-opencanvas-pointer-fx');
+    const reducedMotion = el.getAttribute('data-opencanvas-pointer-fx-reduced-motion');
+    if (reducedMotion !== 'disabled' && reducedMotion !== 'allow') {
+      failPointerFx(
+        el,
+        'invalid-reduced-motion',
+        'Pointer FX reduced-motion mode must be disabled or allow',
+        reducedMotion,
+      );
+    }
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce && reducedMotion === 'disabled') {
+      el.setAttribute('data-opencanvas-pfx-hydrated', 'true');
+      el.setAttribute('data-opencanvas-pointer-fx-reduced', 'disabled');
+      continue;
+    }
+    el.setAttribute('data-opencanvas-pfx-hydrated', 'true');
     if (primitive === 'spotlight') {
       el.addEventListener('pointermove', (ev: PointerEvent): void => {
         const r = el.getBoundingClientRect();
@@ -443,10 +458,31 @@ function hydratePointerFx(scope: ParentNode): void {
         el.style.setProperty('--opencanvas-tilt-y', '0deg');
       });
     } else {
-      // Unknown primitive — fail loud (mirrors the visitor fragment).
-      console.error('[opencanvas pointer-fx] unknown primitive ' + JSON.stringify(primitive));
+      failPointerFx(
+        el,
+        'invalid-primitive',
+        'Pointer FX primitive must be spotlight or tilt',
+        primitive,
+      );
     }
   }
+}
+
+function failPointerFx(
+  el: HTMLElement,
+  code: string,
+  message: string,
+  cause: string | null,
+): never {
+  const detail = {
+    code,
+    message,
+    elementId: el.getAttribute('data-opencanvas-element'),
+    cause,
+  };
+  window.dispatchEvent(new CustomEvent('opencanvas:pointer-fx-failure', { detail }));
+  console.error('[opencanvas pointer-fx] ' + message, detail);
+  throw new Error('[opencanvas pointer-fx] ' + message);
 }
 
 // ---------------------------------------------------------------------------

@@ -995,6 +995,21 @@ const variantCss = String.raw`
 /* ---- pointer-fx: generic CSS hooks any element with the attribute uses.
    spotlight publishes --opencanvas-ptr-x/y (consumed per-variant above);
    tilt publishes --opencanvas-tilt-x/y, applied generically here. */
+.opencanvas-element[data-opencanvas-pointer-fx="spotlight"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      220px circle at var(--opencanvas-ptr-x, 50%) var(--opencanvas-ptr-y, 50%),
+      color-mix(in oklab, var(--opencanvas-kit-accent, currentColor) 24%, transparent),
+      transparent 70%
+    );
+  opacity: 0.7;
+}
+
 [data-opencanvas-pointer-fx="tilt"] {
   transform: perspective(700px)
     rotateX(var(--opencanvas-tilt-y, 0deg))

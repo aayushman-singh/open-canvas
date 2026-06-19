@@ -37,9 +37,13 @@ import {
   MARQUEE_DIRECTIONS,
   MARQUEE_REDUCED_MOTION_MODES,
   MOTION_PRESETS,
+  POINTER_FX_PRIMITIVES,
+  POINTER_FX_REDUCED_MOTION_MODES,
   type MarqueeDirection,
   type MarqueeReducedMotionMode,
   type MotionPreset,
+  type PointerFxPrimitive,
+  type PointerFxReducedMotionMode,
 } from '../canvas/schema.js';
 import {
   TEXT_SPLIT_UNITS,
@@ -570,6 +574,7 @@ export function renderInspector(ctx: EditorContext): void {
   }
 
   renderMarqueeInspector(ctx, element);
+  renderPointerFxInspector(ctx, element);
 
   if (element.type === 'text') {
     renderTextSplitInspector(ctx, element.id, found.section.id);
@@ -615,6 +620,57 @@ export function renderInspector(ctx: EditorContext): void {
     });
     ctx.inspector.appendChild(useAsTriggerBtn);
   }
+}
+
+function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): void {
+  if (!ctx.inspector) return;
+  const heading = document.createElement('h3');
+  heading.textContent = 'Pointer FX';
+  heading.className = 'inspector-section-heading';
+  ctx.inspector.appendChild(heading);
+
+  const enabled = document.createElement('input');
+  enabled.type = 'checkbox';
+  enabled.checked = element.pointerFx?.enabled === true;
+  enabled.addEventListener('change', () => {
+    ctx.captureForUndo();
+    if (enabled.checked) {
+      element.pointerFx = {
+        enabled: true,
+        primitive: 'tilt',
+        reducedMotion: 'disabled',
+      };
+    } else {
+      delete element.pointerFx;
+    }
+    ctx.rebuildElement(element.id);
+    renderInspector(ctx);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Enable pointer FX', enabled));
+
+  if (element.pointerFx?.enabled !== true) return;
+
+  const primitive = selectInput(POINTER_FX_PRIMITIVES, element.pointerFx.primitive);
+  primitive.addEventListener('change', () => {
+    ctx.captureForUndo();
+    element.pointerFx!.primitive = primitive.value as PointerFxPrimitive;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Primitive', primitive));
+
+  const reducedMotion = selectInput(
+    POINTER_FX_REDUCED_MOTION_MODES,
+    element.pointerFx.reducedMotion,
+  );
+  reducedMotion.addEventListener('change', () => {
+    ctx.captureForUndo();
+    element.pointerFx!.reducedMotion = reducedMotion.value as PointerFxReducedMotionMode;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Reduced motion', reducedMotion));
 }
 
 function renderMarqueeInspector(ctx: EditorContext, element: CanvasElement): void {

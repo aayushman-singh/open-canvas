@@ -21,6 +21,8 @@ Observable success:
   element inspector and match between editor preview and published pages.
 - Hover video previews are authored on video media elements and execute via
   the same Runtime Hydrator in editor preview and published pages.
+- Pointer-reactive spotlight and tilt effects are selectable on arbitrary
+  elements with explicit reduced-motion behaviour.
 - Modal and overlay behaviour matches the reference: trigger, backdrop,
   entrance, exit, close affordance, focus handling, and body scroll behaviour.
 - Page navigation can preserve visual continuity through page/state
@@ -88,6 +90,10 @@ Open Canvas has real motion and interaction primitives already:
   metadata on the `<video>`; visitor/editor hydrators play, pause, and reset
   via the same named Runtime Hydrator; validation rejects image/autoplay
   conflicts and malformed modes.
+- **June 2026 update:** Pointer FX is now owner-facing beyond Form
+  `spotlight`. Element wrappers can store `pointerFx` with `spotlight` or
+  `tilt`, explicit reduced-motion mode, validator/Yjs persistence, renderer
+  metadata, editor inspector controls, and named runtime failure events.
 
 That baseline is useful, and Premium Interaction v1 closes the first typed
 slice of the modal/preload/route gap. It is still not enough for 1:1
@@ -306,6 +312,10 @@ Current state:
   It is video-only, muted by contract for browser autoplay policy, focus-aware,
   reduced-motion-aware, and fails through `opencanvas:video-hover-failure`
   instead of silently ignoring rejected playback.
+- **June 2026 update:** Pointer FX now has an element-level inspector catalog.
+  Owners can apply `spotlight` or `tilt` to arbitrary elements; Form
+  `spotlight` also emits explicit reduced-motion metadata; malformed runtime
+  attributes fail through `opencanvas:pointer-fx-failure`.
 
 User-visible miss:
 
@@ -317,6 +327,8 @@ User-visible miss:
   hover-reverse, or collection-driven ticker sources.
 - Video Stream Hover does not yet support separate hover poster/video assets,
   hover scrub by pointer position, or collection-gallery batch authoring.
+- Pointer FX does not yet include magnetic attraction, cursor followers,
+  drag/inertia, or touch-specific alternate gestures.
 
 Needed primitive:
 

@@ -410,6 +410,13 @@ function applyCommonElementWrapperAttrs(wrapper: HTMLElement, element: CanvasEle
     );
     wrapper.setAttribute('data-opencanvas-marquee-reduced-motion', element.marquee.reducedMotion);
   }
+  if (element.pointerFx?.enabled === true) {
+    wrapper.setAttribute('data-opencanvas-pointer-fx', element.pointerFx.primitive);
+    wrapper.setAttribute(
+      'data-opencanvas-pointer-fx-reduced-motion',
+      element.pointerFx.reducedMotion,
+    );
+  }
 }
 
 export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string): void {

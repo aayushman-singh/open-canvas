@@ -75,6 +75,8 @@ import {
   MOTION_PRESETS,
   OVERLAY_TRIGGER_TYPES,
   OVERFLOW_VALUES,
+  POINTER_FX_PRIMITIVES,
+  POINTER_FX_REDUCED_MOTION_MODES,
   ROUTE_TRANSITION_MODES,
   SCROLL_TRIGGER_MODES,
   SECTION_RECIPE_IDS,
@@ -101,6 +103,8 @@ import {
   type MotionPreset,
   type OverlayTriggerType,
   type OverflowValue,
+  type PointerFxPrimitive,
+  type PointerFxReducedMotionMode,
   type RouteTransitionMode,
   type ScrollTriggerMode,
   type SectionRecipeId,
@@ -591,6 +595,27 @@ function validateMarquee(value: unknown, basePath: string, errors: string[]): vo
   assertOneOf<MarqueeReducedMotionMode>(
     value.reducedMotion,
     MARQUEE_REDUCED_MOTION_MODES,
+    `${p}.reducedMotion`,
+    errors,
+  );
+}
+
+function validatePointerFx(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`${basePath}.pointerFx must be an object when present`);
+    return;
+  }
+  const p = `${basePath}.pointerFx`;
+  if (typeof value.enabled !== 'boolean') {
+    errors.push(`${p}.enabled must be a boolean`);
+    return;
+  }
+  if (value.enabled !== true) return;
+  assertOneOf<PointerFxPrimitive>(value.primitive, POINTER_FX_PRIMITIVES, `${p}.primitive`, errors);
+  assertOneOf<PointerFxReducedMotionMode>(
+    value.reducedMotion,
+    POINTER_FX_REDUCED_MOTION_MODES,
     `${p}.reducedMotion`,
     errors,
   );
@@ -1190,6 +1215,7 @@ function validateElement(
   validateBox(element.box, pageWidth, sectionHeight, basePath, errors);
   validateMotion(element.motion, basePath, errors);
   validateMarquee(element.marquee, basePath, errors);
+  validatePointerFx(element.pointerFx, basePath, errors);
   validatePinnedStyle(element.pinnedStyle, basePath, errors);
   validateElementStyle(element.elementStyle, basePath, errors);
   validateAnchorId(element.anchorId, basePath, errors);

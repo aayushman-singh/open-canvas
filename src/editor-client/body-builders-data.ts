@@ -288,7 +288,10 @@ export function buildFormBodyImpl(_ctx: BuildFormBodyContext, element: FormEleme
     const variant = element.variant ?? 'classic';
     node.setAttribute('data-variant', variant);
     const pfx = formPointerFx(variant);
-    if (pfx !== null) node.setAttribute('data-opencanvas-pointer-fx', pfx);
+    if (pfx !== null) {
+      node.setAttribute('data-opencanvas-pointer-fx', pfx);
+      node.setAttribute('data-opencanvas-pointer-fx-reduced-motion', 'allow');
+    }
   }
   node.style.display = 'flex';
   node.style.flexDirection = 'column';
