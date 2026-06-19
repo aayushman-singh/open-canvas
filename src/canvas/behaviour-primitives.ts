@@ -215,6 +215,11 @@ export interface LoadExperience {
     assetIds: string[];
     timeoutMs: number;
   };
+  logoDraw?: {
+    text: string;
+    durationMs: number;
+    strokeWidth: number;
+  };
   sequenceId: string;
 }
 

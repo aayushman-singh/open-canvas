@@ -1362,6 +1362,16 @@ const variantCss = String.raw`
   pointer-events: none;
   transition: opacity 180ms ease;
 }
+.opencanvas-load-logo-draw {
+  width: min(420px, 78vw);
+  height: auto;
+  overflow: visible;
+}
+.opencanvas-load-logo-draw text {
+  font: 700 72px/1 var(--opencanvas-kit-heading-font, inherit);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .opencanvas-load-progress {
   width: min(260px, 60vw);
   height: 3px;

@@ -155,6 +155,9 @@ class StubElement {
   getBoundingClientRect(): { top: number; left: number; width: number; height: number } {
     return { top: 100, left: 0, width: 1200, height: 800 };
   }
+  getComputedTextLength(): number {
+    return 320;
+  }
   animate(): { cancel: () => void } {
     return { cancel: () => undefined };
   }
@@ -443,6 +446,11 @@ function baseSnapshot(): PublishedSnapshot {
         assetIds: ['hero-video', 'hero-poster'],
         timeoutMs: 2000,
       },
+      logoDraw: {
+        text: 'Ari Vale',
+        durationMs: 1000,
+        strokeWidth: 2,
+      },
       sequenceId: 'load-sequence',
     },
     motionSequences: [
@@ -526,6 +534,14 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   const enter = new StubElement('button');
   enter.setAttribute('data-opencanvas-load-enter', '');
   load.appendChild(enter);
+  if (html.includes('data-opencanvas-load-logo-draw')) {
+    const logo = new StubElement('svg');
+    logo.setAttribute('data-opencanvas-load-logo-draw', '');
+    const logoText = new StubElement('text');
+    logoText.setAttribute('data-opencanvas-load-logo-draw-text', '');
+    logo.appendChild(logoText);
+    load.appendChild(logo);
+  }
   const readinessMatch = html.match(/data-opencanvas-load-readiness-urls="([^"]*)"/);
   if (readinessMatch?.[1]) {
     load.setAttribute('data-opencanvas-load-readiness-urls', readinessMatch[1]);
@@ -589,6 +605,10 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
     'rendered load experience must emit media readiness asset urls',
   );
   assert(
+    html.includes('data-opencanvas-load-logo-draw'),
+    'rendered load experience must emit logo draw svg',
+  );
+  assert(
     html.includes('data-opencanvas-load-progress-number'),
     'rendered load experience must include progress number node',
   );
@@ -611,6 +631,14 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(
     BEHAVIOUR_RUNTIME_SRC.includes('load-readiness-timeout'),
     'behaviour runtime must fail loudly when media readiness times out',
+  );
+  assert(
+    BEHAVIOUR_RUNTIME_SRC.includes('behaviourHydrateLoadLogoDraw'),
+    'behaviour runtime must hydrate load logo draw',
+  );
+  assert(
+    BEHAVIOUR_RUNTIME_SRC.includes('load-logo-draw-missing'),
+    'behaviour runtime must fail loudly when logo draw node is missing',
   );
   mountRenderedHtml(doc, html);
   runBehaviour(doc, win, StubImage);
@@ -635,6 +663,12 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(
     load.getAttribute('data-opencanvas-load-readiness') === 'ready',
     'load media readiness must mark the load experience ready',
+  );
+  assert(
+    load.querySelector('[data-opencanvas-load-logo-draw]')?.getAttribute(
+      'data-opencanvas-load-logo-draw-hydrated',
+    ) === 'true',
+    'load logo draw must be marked hydrated',
   );
   load.querySelector('[data-opencanvas-load-enter]')?.dispatchEvent(makeEvent('click'));
   assert(

@@ -787,7 +787,13 @@ function renderLoadExperienceChrome(load: BehaviourLoadExperience, assetBasePath
     ['background', background],
     ['color', foreground],
   ]);
-  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}" data-opencanvas-load-run-policy="${escapeAttr(runPolicy)}"${progressAttrs}${readinessAttrs} style="${style}"><div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div>${renderBehaviourLoadProgress(load)}<button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
+  return `<div class="opencanvas-load-experience" data-opencanvas-load-experience="${escapeAttr(load.id)}" data-opencanvas-load-sequence="${escapeAttr(load.sequenceId)}" data-opencanvas-load-run-policy="${escapeAttr(runPolicy)}"${progressAttrs}${readinessAttrs} style="${style}">${renderBehaviourLoadLogoDraw(load)}<div class="opencanvas-load-label" data-opencanvas-load-part="label">${escapeHtml(load.label)}</div>${renderBehaviourLoadProgress(load)}<button type="button" class="opencanvas-load-enter" data-opencanvas-load-enter>${escapeHtml(load.enterLabel)}</button></div>`;
+}
+
+function renderBehaviourLoadLogoDraw(load: BehaviourLoadExperience): string {
+  const logoDraw = load.logoDraw;
+  if (!logoDraw) return '';
+  return `<svg class="opencanvas-load-logo-draw" data-opencanvas-load-logo-draw data-opencanvas-load-logo-draw-duration-ms="${escapeAttr(String(logoDraw.durationMs))}" viewBox="0 0 800 140" role="img" aria-label="${escapeAttr(logoDraw.text)}"><text data-opencanvas-load-logo-draw-text x="400" y="92" text-anchor="middle" fill="transparent" stroke="currentColor" stroke-width="${escapeAttr(String(logoDraw.strokeWidth))}" stroke-linecap="round" stroke-linejoin="round">${escapeHtml(logoDraw.text)}</text></svg>`;
 }
 
 function renderBehaviourLoadProgress(load: BehaviourLoadExperience): string {

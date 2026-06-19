@@ -2244,6 +2244,55 @@ function renderBehaviourLoadControls(
   });
   wrap.appendChild(field('Media readiness timeout', readinessTimeout));
 
+  const logoDrawText = textInput(load.logoDraw?.text ?? '', 'Wordmark text');
+  logoDrawText.addEventListener('change', () => {
+    const value = logoDrawText.value.trim();
+    if (value.length === 0) {
+      updateBehaviourLoadLogoDraw(ctx, undefined);
+      return;
+    }
+    updateBehaviourLoadLogoDraw(ctx, {
+      text: value,
+      durationMs: load.logoDraw?.durationMs ?? 1200,
+      strokeWidth: load.logoDraw?.strokeWidth ?? 2,
+    });
+  });
+  wrap.appendChild(field('Logo draw text', logoDrawText));
+
+  const logoDrawDuration = numberInput(load.logoDraw?.durationMs ?? 1200, 0, 30000, 100);
+  logoDrawDuration.disabled = !load.logoDraw;
+  logoDrawDuration.addEventListener('change', () => {
+    const value = Number(logoDrawDuration.value);
+    if (!Number.isFinite(value) || value < 0 || value > 30000) {
+      ctx.setStatus('Logo draw duration must be 0-30000ms', 'error');
+      logoDrawDuration.value = String(load.logoDraw?.durationMs ?? 1200);
+      return;
+    }
+    updateBehaviourLoadLogoDraw(ctx, {
+      text: load.logoDraw?.text ?? load.label,
+      durationMs: value,
+      strokeWidth: load.logoDraw?.strokeWidth ?? 2,
+    });
+  });
+  wrap.appendChild(field('Logo draw duration', logoDrawDuration));
+
+  const logoDrawStroke = numberInput(load.logoDraw?.strokeWidth ?? 2, 0.1, 20, 0.1);
+  logoDrawStroke.disabled = !load.logoDraw;
+  logoDrawStroke.addEventListener('change', () => {
+    const value = Number(logoDrawStroke.value);
+    if (!Number.isFinite(value) || value <= 0 || value > 20) {
+      ctx.setStatus('Logo draw stroke width must be >0 and <=20', 'error');
+      logoDrawStroke.value = String(load.logoDraw?.strokeWidth ?? 2);
+      return;
+    }
+    updateBehaviourLoadLogoDraw(ctx, {
+      text: load.logoDraw?.text ?? load.label,
+      durationMs: load.logoDraw?.durationMs ?? 1200,
+      strokeWidth: value,
+    });
+  });
+  wrap.appendChild(field('Logo draw stroke', logoDrawStroke));
+
   const sequences = loadEnterSequences(ctx);
   const sequenceIds = sequences.map((sequence) => sequence.id);
   if (sequenceIds.length > 0) {
@@ -2303,6 +2352,23 @@ function updateBehaviourLoadReadiness(
       delete next.mediaReadiness;
     } else {
       next.mediaReadiness = mediaReadiness;
+    }
+    ctx.state!.loadExperience = next;
+  });
+}
+
+function updateBehaviourLoadLogoDraw(
+  ctx: InteractionsPanelContext,
+  logoDraw: BehaviourLoadExperience['logoDraw'] | undefined,
+): void {
+  mutate(ctx, () => {
+    const current = ctx.state!.loadExperience;
+    if (!isBehaviourLoadExperience(current)) return;
+    const next: BehaviourLoadExperience = { ...current };
+    if (logoDraw === undefined) {
+      delete next.logoDraw;
+    } else {
+      next.logoDraw = logoDraw;
     }
     ctx.state!.loadExperience = next;
   });

@@ -2991,6 +2991,27 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           }
         }
       }
+      if (state.loadExperience.logoDraw !== undefined) {
+        if (!isRecord(state.loadExperience.logoDraw)) {
+          errors.push('loadExperience.logoDraw must be an object when present');
+        } else {
+          assertNonEmptyString(state.loadExperience.logoDraw.text, 'loadExperience.logoDraw.text', errors);
+          if (
+            !isFiniteNumber(state.loadExperience.logoDraw.durationMs) ||
+            state.loadExperience.logoDraw.durationMs < 0 ||
+            state.loadExperience.logoDraw.durationMs > 30000
+          ) {
+            errors.push('loadExperience.logoDraw.durationMs must be a finite number between 0 and 30000');
+          }
+          if (
+            !isFiniteNumber(state.loadExperience.logoDraw.strokeWidth) ||
+            state.loadExperience.logoDraw.strokeWidth <= 0 ||
+            state.loadExperience.logoDraw.strokeWidth > 20
+          ) {
+            errors.push('loadExperience.logoDraw.strokeWidth must be a finite number between 0 and 20');
+          }
+        }
+      }
     } else if (!('enabled' in state.loadExperience)) {
       errors.push(
         'loadExperience must be a premium load experience (enabled/preset) or behaviour load chrome (label/sequenceId)',

@@ -80,6 +80,11 @@ function buildValidState(): EditableSite & Record<string, unknown> {
         assetIds: ['hero-video', 'hero-poster'],
         timeoutMs: 2000,
       },
+      logoDraw: {
+        text: 'Ari Vale',
+        durationMs: 1000,
+        strokeWidth: 2,
+      },
       sequenceId: 'sequence-load',
     },
     motionSequences: [
@@ -210,6 +215,16 @@ const invalidLoadReadiness = structuredClone(validState);
 };
 expectInvalid(invalidLoadReadiness, 'loadExperience.mediaReadiness.assetIds[0]', 'load readiness asset');
 expectInvalid(invalidLoadReadiness, 'loadExperience.mediaReadiness.timeoutMs', 'load readiness timeout');
+
+const invalidLogoDraw = structuredClone(validState);
+(invalidLogoDraw.loadExperience as { logoDraw: Record<string, unknown> }).logoDraw = {
+  text: '',
+  durationMs: -1,
+  strokeWidth: 0,
+};
+expectInvalid(invalidLogoDraw, 'loadExperience.logoDraw.text', 'load logo draw text');
+expectInvalid(invalidLogoDraw, 'loadExperience.logoDraw.durationMs', 'load logo draw duration');
+expectInvalid(invalidLogoDraw, 'loadExperience.logoDraw.strokeWidth', 'load logo draw stroke width');
 
 const unsupportedProperty = structuredClone(validState);
 (

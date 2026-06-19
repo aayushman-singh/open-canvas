@@ -164,6 +164,7 @@ assert(panelSrc.includes('LOAD_PROGRESS_DISPLAY_MODES'), 'panel must use load pr
 assert(panelSrc.includes('Progress display'), 'panel must expose load progress display control');
 assert(panelSrc.includes('Behaviour run policy'), 'panel must expose behaviour load run policy');
 assert(panelSrc.includes('Media readiness assets'), 'panel must expose behaviour load media readiness assets');
+assert(panelSrc.includes('Logo draw text'), 'panel must expose behaviour load logo draw controls');
 assert(panelSrc.includes('Create linked sequence'), 'panel must restore missing load-enter sequence');
 assert(panelSrc.includes('Linked load-enter Motion Sequence is missing'), 'panel must fail loudly for missing behaviour load sequence');
 assert(panelSrc.includes('renderScrollSceneControls'), 'panel must render scroll scene controls');

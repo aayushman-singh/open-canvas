@@ -277,12 +277,18 @@ Current state:
   readiness maps. The renderer emits explicit asset URLs and timeout metadata,
   the Behaviour runtime waits on same-origin fetches, blocks premature enter,
   and emits named readiness failures for missing URLs, fetch errors, or timeout.
+- **June 2026 update:** Behaviour Load Experience now supports schema-owned
+  logo/wordmark draw choreography. The renderer emits bounded SVG text, the
+  Behaviour runtime measures and animates stroke dash with WAAPI, and the
+  Interactions panel exposes text, duration, and stroke width.
 
 User-visible miss:
 
 - Cannot reproduce branded preloaders, progress numbers, logo draws, mask
   openings, media-readiness gates, or first-load page reveals.
-- Cannot yet author logo draws for the Behaviour Load Experience model.
+- Custom arbitrary preloader canvas content remains intentionally out of scope;
+  Behaviour Load Experience now covers label, enter action, progress, media
+  readiness, run policy, and bounded logo/wordmark draw.
 
 Needed primitive:
 

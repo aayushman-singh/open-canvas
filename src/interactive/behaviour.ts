@@ -1114,6 +1114,7 @@ function behaviourHydrateLoadExperience(load, payload, root) {
   var enter = node.querySelector('[data-opencanvas-load-enter]');
   var sequence = behaviourFindSequence(payload, load.sequenceId);
   var readiness = behaviourHydrateLoadReadiness(node, load, enter);
+  behaviourHydrateLoadLogoDraw(node, load);
   var finishProgress = behaviourHydrateLoadProgress(node, load);
   function dismiss() {
     if (!readiness.ready) {
@@ -1196,6 +1197,46 @@ function behaviourHydrateLoadReadiness(node, load, enter) {
     })(urls[i]);
   }
   return state;
+}
+
+function behaviourHydrateLoadLogoDraw(node, load) {
+  var logoDraw = load.logoDraw;
+  if (!logoDraw) return;
+  var logo = node.querySelector('[data-opencanvas-load-logo-draw]');
+  if (!logo) {
+    behaviourFailure('load-logo-draw-missing', { loadExperienceId: load.id }, new Error('load logo draw node missing'));
+  }
+  var text = logo.querySelector('[data-opencanvas-load-logo-draw-text]');
+  if (!text) {
+    behaviourFailure('load-logo-draw-text-missing', { loadExperienceId: load.id }, new Error('load logo draw text node missing'));
+  }
+  var durationAttr = logo.getAttribute('data-opencanvas-load-logo-draw-duration-ms');
+  var duration = durationAttr === null ? Number(logoDraw.durationMs) : Number(durationAttr);
+  if (!isFinite(duration) || duration < 0 || duration > 30000) {
+    behaviourFailure('load-logo-draw-duration', { loadExperienceId: load.id, durationMs: durationAttr }, new Error('invalid load logo draw duration'));
+  }
+  if (typeof text.getComputedTextLength !== 'function') {
+    behaviourFailure('load-logo-draw-measure-unavailable', { loadExperienceId: load.id }, new Error('SVG text length API unavailable'));
+  }
+  var length = text.getComputedTextLength();
+  if (!isFinite(length) || length <= 0) {
+    behaviourFailure('load-logo-draw-zero-length', { loadExperienceId: load.id }, new Error('SVG text length must be measurable'));
+  }
+  text.style.strokeDasharray = String(length);
+  text.style.strokeDashoffset = String(length);
+  if (behaviourPrefersReducedMotion() || duration === 0) {
+    text.style.strokeDashoffset = '0';
+    logo.setAttribute('data-opencanvas-load-logo-draw-hydrated', 'true');
+    return;
+  }
+  if (typeof text.animate !== 'function') {
+    behaviourFailure('load-logo-draw-waapi-missing', { loadExperienceId: load.id }, new Error('WAAPI unavailable for load logo draw'));
+  }
+  text.animate(
+    [{ strokeDashoffset: String(length) }, { strokeDashoffset: '0' }],
+    { duration: duration, easing: 'ease-out', fill: 'forwards' },
+  );
+  logo.setAttribute('data-opencanvas-load-logo-draw-hydrated', 'true');
 }
 
 function behaviourLoadRunPolicy(load) {
