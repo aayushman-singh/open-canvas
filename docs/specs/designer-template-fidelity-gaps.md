@@ -498,17 +498,16 @@ Current state:
 
 User-visible miss:
 
-- Cannot yet reproduce advanced kinetic headlines, type scrambles, variable
-  font axes, or arbitrary multi-step text timelines from a unified timeline
-  canvas.
+- Cannot yet reproduce advanced kinetic headlines, type scrambles, or arbitrary
+  multi-step text timelines from a unified timeline canvas.
 
 Needed primitive:
 
 - Text Split targets as an explicit render mode: by character, word, or line,
   with semantic HTML preserved and the Motion Sequence targeting generated
   spans. Accessibility must define what screen readers see.
-- Remaining next wave: richer text-specific effects, scroll-progress text
-  presets, and visual multi-step editing of split targets.
+- Remaining next wave: richer text-specific effects and visual multi-step
+  editing of split targets.
 
 ### 11. Rich Media / 3D / Shader Surfaces Are Missing
 

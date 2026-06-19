@@ -49,6 +49,7 @@ import {
   TEXT_SPLIT_UNITS,
   type MotionSequence,
   type MotionSequenceStep,
+  type ScrollScene,
 } from '../canvas/behaviour-primitives.js';
 import type {
   CollectionElement,
@@ -915,6 +916,22 @@ function renderTextSplitInspector(
   note.textContent =
     'Creates a schema-owned Motion Sequence target. Runtime split spans are aria-hidden and the text host keeps the full aria-label.';
   ctx.inspector.appendChild(note);
+
+  const scrollPreset = document.createElement('button');
+  scrollPreset.type = 'button';
+  scrollPreset.textContent = 'Scroll-progress text preset';
+  scrollPreset.addEventListener('click', () => {
+    ctx.captureForUndo();
+    const unit =
+      unitSelect.value === 'off'
+        ? 'word'
+        : (unitSelect.value as (typeof TEXT_SPLIT_UNITS)[number]);
+    upsertTextSplitScrollPreset(ctx, elementId, sectionId, unit);
+    ctx.setStatus('Scroll-progress text preset enabled', 'ok');
+    ctx.renderInspector();
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(scrollPreset);
 }
 
 function findTextSplitStep(
@@ -937,6 +954,87 @@ function uniqueSequenceId(sequences: MotionSequence[], base: string): string {
   let index = 2;
   while (ids.has(base + '-' + String(index))) index += 1;
   return base + '-' + String(index);
+}
+
+function uniqueScrollSceneId(scenes: ScrollScene[], base: string): string {
+  const ids = new Set(scenes.map((scene) => scene.id));
+  if (!ids.has(base)) return base;
+  let index = 2;
+  while (ids.has(base + '-' + String(index))) index += 1;
+  return base + '-' + String(index);
+}
+
+function scrollTextSplitStep(
+  sequenceId: string,
+  elementId: string,
+  unit: (typeof TEXT_SPLIT_UNITS)[number],
+): MotionSequenceStep {
+  return {
+    id: sequenceId + '-scroll-step',
+    target: { type: 'text-split', elementId, unit },
+    from: { opacity: 0, translateY: 48, filter: 'blur(8px)' },
+    to: { opacity: 1, translateY: 0, filter: 'blur(0px)' },
+    durationMs: 1,
+    delayMs: 0,
+    staggerMs: unit === 'char' ? 18 : unit === 'word' ? 40 : 80,
+    easing: 'linear',
+  };
+}
+
+function upsertTextSplitScrollPreset(
+  ctx: EditorContext,
+  elementId: string,
+  sectionId: string,
+  unit: (typeof TEXT_SPLIT_UNITS)[number],
+): void {
+  if (!ctx.state) return;
+  const sequences = ctx.state.motionSequences ?? [];
+  const scenes = ctx.state.scrollScenes ?? [];
+  const existing = findTextSplitStep(sequences, elementId);
+  const sequenceId = existing?.sequence.id ?? uniqueSequenceId(sequences, 'text-split-scroll-' + elementId);
+  const sceneId =
+    existing?.sequence.trigger.type === 'scroll-scene'
+      ? existing.sequence.trigger.scrollSceneId
+      : uniqueScrollSceneId(scenes, 'text-split-scroll-' + elementId + '-scene');
+  const step = scrollTextSplitStep(sequenceId, elementId, unit);
+  const scene: ScrollScene = {
+    id: sceneId,
+    sectionId,
+    sequenceId,
+    pinTarget: { type: 'section', sectionId },
+    startOffsetPx: 0,
+    endOffsetPx: 720,
+  };
+
+  if (existing) {
+    existing.sequence.trigger = { type: 'scroll-scene', scrollSceneId: sceneId };
+    existing.sequence.reducedMotion = 'final-state';
+    delete existing.sequence.repeat;
+    delete existing.sequence.playbackDirection;
+    existing.sequence.steps = existing.sequence.steps.map((candidate) =>
+      candidate.id === existing.step.id ? { ...step, id: existing.step.id } : candidate,
+    );
+    ctx.state.motionSequences = sequences;
+  } else {
+    ctx.state.motionSequences = [
+      ...sequences,
+      {
+        id: sequenceId,
+        trigger: { type: 'scroll-scene', scrollSceneId: sceneId },
+        reducedMotion: 'final-state',
+        steps: [step],
+      },
+    ];
+  }
+
+  const existingSceneIndex = scenes.findIndex((candidate) => candidate.id === sceneId);
+  if (existingSceneIndex >= 0) {
+    ctx.state.scrollScenes = scenes.map((candidate, index) =>
+      index === existingSceneIndex ? scene : candidate,
+    );
+  } else {
+    ctx.state.scrollScenes = [...scenes, scene];
+  }
 }
 
 function upsertTextSplitTarget(
