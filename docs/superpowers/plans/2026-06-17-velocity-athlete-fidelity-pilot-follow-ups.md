@@ -5,7 +5,7 @@ The pilot branch is implementation-complete, but these items remain outside the 
 ## Pending Items
 
 - Fix the pre-existing `review:smoke` dashboard assertion: `expected dashboard to model all owned sites as SiteCard[] rows, not only one editor link`.
-- Run live visual verification after configuring `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`, then capture desktop and mobile screenshots for the template picker preview, created site, and published site.
+- Add live production visual verification after configuring `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`; standalone desktop/mobile Playwright visual verification now covers the pre-rendered built-in Velocity Athlete template preview via `bun run velocity-athlete:visual-e2e`.
 - Upload the new Velocity seed assets to production R2 with the seed asset upload flow before relying on the template in live public pages.
 - Remove temporary Velocity task worktrees after the feature branch is merged and no further comparison is needed.
 
