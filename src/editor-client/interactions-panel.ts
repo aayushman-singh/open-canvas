@@ -38,6 +38,7 @@ import type {
   RiveInputBinding,
   RiveRichMotionAsset,
   ScrollScene,
+  VideoStreamRichMotionAsset,
 } from '../canvas/behaviour-primitives.js';
 import {
   LAYOUT_TRANSITION_INITIAL_STATES,
@@ -46,6 +47,8 @@ import {
   RIVE_INPUT_EVENTS,
   RIVE_INPUT_TYPES,
   TEXT_SPLIT_UNITS,
+  VIDEO_STREAM_REDUCED_MOTION_MODES,
+  VIDEO_STREAM_TRIGGERS,
 } from '../canvas/behaviour-primitives.js';
 import { isPremiumLoadExperience } from '../canvas/schema.js';
 import {
@@ -95,6 +98,8 @@ type SequenceSlot =
 const DEFAULT_EASING = 'ease-in-out';
 type RiveInputType = (typeof RIVE_INPUT_TYPES)[number];
 type RiveInputEvent = (typeof RIVE_INPUT_EVENTS)[number];
+type VideoStreamTrigger = (typeof VIDEO_STREAM_TRIGGERS)[number];
+type VideoStreamReducedMotionMode = (typeof VIDEO_STREAM_REDUCED_MOTION_MODES)[number];
 
 export function defaultOverlay(id: string, name: string, pageId: string): Overlay {
   return {
@@ -173,6 +178,21 @@ export function defaultRiveInputBinding(id: string): RiveInputBinding {
     inputType: 'boolean',
     event: 'pointer-enter',
     value: true,
+  };
+}
+
+export function defaultVideoStreamRichMotionAsset(id: string): VideoStreamRichMotionAsset {
+  return {
+    id,
+    kind: 'video-stream',
+    assetId: id + '.mp4',
+    posterAssetId: id + '-poster.webp',
+    alt: 'Hover video stream',
+    muted: true,
+    loop: true,
+    controls: false,
+    playback: { trigger: 'hover-focus', resetOnExit: true },
+    reducedMotion: 'poster',
   };
 }
 
@@ -408,6 +428,10 @@ function isRiveAsset(asset: RichMotionAsset): asset is RiveRichMotionAsset {
   return asset.kind === 'rive';
 }
 
+function isVideoStreamAsset(asset: RichMotionAsset): asset is VideoStreamRichMotionAsset {
+  return asset.kind === 'video-stream';
+}
+
 function replaceRichMotionAsset(
   ctx: InteractionsPanelContext,
   assetId: string,
@@ -478,15 +502,28 @@ function coerceRiveBinding(
 function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
   if (!ctx.state) return;
   const wrap = section('Rich Motion Assets');
-  const add = actionButton('Add Rive asset', 'Create schema-owned Rive rich motion metadata');
-  add.addEventListener('click', () => {
+  const addRive = actionButton('Add Rive asset', 'Create schema-owned Rive rich motion metadata');
+  addRive.addEventListener('click', () => {
     mutate(ctx, () => {
       const id = 'rive-asset-' + Date.now();
       ctx.state!.richMotionAssets = [...(ctx.state!.richMotionAssets ?? []), defaultRiveRichMotionAsset(id)];
     });
     ctx.setStatus('Rive asset metadata added', 'ok');
   });
-  wrap.appendChild(add);
+  wrap.appendChild(addRive);
+
+  const addVideo = actionButton('Add video stream asset', 'Create schema-owned hover/focus video stream metadata');
+  addVideo.addEventListener('click', () => {
+    mutate(ctx, () => {
+      const id = 'video-stream-' + Date.now();
+      ctx.state!.richMotionAssets = [
+        ...(ctx.state!.richMotionAssets ?? []),
+        defaultVideoStreamRichMotionAsset(id),
+      ];
+    });
+    ctx.setStatus('Video stream asset metadata added', 'ok');
+  });
+  wrap.appendChild(addVideo);
 
   const assets = ctx.state.richMotionAssets ?? [];
   if (assets.length === 0) {
@@ -524,18 +561,28 @@ function renderRichMotionAssetCard(
   header.appendChild(remove);
   card.appendChild(header);
 
-  if (!isRiveAsset(asset)) {
-    const note = document.createElement('p');
-    note.className = 'opencanvas-section-picker-empty';
-    note.textContent = 'This editor slice exposes Rive asset controls. Other rich motion kinds remain schema-owned.';
-    card.appendChild(note);
+  if (isRiveAsset(asset)) {
+    renderRiveAssetFields(ctx, card, asset);
+    renderRiveInputBindings(ctx, card, asset);
     host.appendChild(card);
     return;
   }
 
-  renderRiveAssetFields(ctx, card, asset);
-  renderRiveInputBindings(ctx, card, asset);
-  host.appendChild(card);
+  if (isVideoStreamAsset(asset)) {
+    renderVideoStreamAssetFields(ctx, card, asset);
+    host.appendChild(card);
+    return;
+  }
+
+  {
+    const note = document.createElement('p');
+    note.className = 'opencanvas-section-picker-empty';
+    note.textContent =
+      'This editor slice exposes Rive and video stream asset controls. Other rich motion kinds remain schema-owned.';
+    card.appendChild(note);
+    host.appendChild(card);
+    return;
+  }
 }
 
 function renderRiveAssetFields(
@@ -598,6 +645,116 @@ function renderRiveAssetFields(
     replaceRichMotionAsset(ctx, asset.id, (current) =>
       isRiveAsset(current)
         ? { ...current, reducedMotion: reduced.value === 'play' ? 'play' : 'pause' }
+        : current,
+    ),
+  );
+  card.appendChild(field('Reduced motion', reduced));
+}
+
+function renderVideoStreamAssetFields(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  asset: VideoStreamRichMotionAsset,
+): void {
+  const assetId = textInput(asset.assetId, 'hover-stream.mp4');
+  assetId.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isVideoStreamAsset(current) ? { ...current, assetId: assetId.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Video asset id', assetId));
+
+  const poster = textInput(asset.posterAssetId ?? '', 'hover-poster.webp');
+  poster.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) => {
+      if (!isVideoStreamAsset(current)) return current;
+      const next = poster.value.trim();
+      if (next) return { ...current, posterAssetId: next };
+      const nextAsset = { ...current };
+      delete nextAsset.posterAssetId;
+      return nextAsset;
+    }),
+  );
+  card.appendChild(field('Poster asset id', poster));
+
+  const alt = textInput(asset.alt, 'Accessible video stream label');
+  alt.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isVideoStreamAsset(current) ? { ...current, alt: alt.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Alt text', alt));
+
+  const trigger = selectInput([...VIDEO_STREAM_TRIGGERS], asset.playback.trigger);
+  trigger.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) => {
+      if (!isVideoStreamAsset(current)) return current;
+      const nextTrigger = trigger.value as VideoStreamTrigger;
+      return {
+        ...current,
+        muted:
+          nextTrigger === 'hover-focus' || nextTrigger === 'load'
+            ? true
+            : current.muted,
+        playback: {
+          ...current.playback,
+          trigger: nextTrigger,
+        },
+      };
+    }),
+  );
+  card.appendChild(field('Playback trigger', trigger));
+
+  card.appendChild(
+    checkbox(asset.playback.resetOnExit === true, 'Reset on exit', (checked) =>
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isVideoStreamAsset(current)
+          ? { ...current, playback: { ...current.playback, resetOnExit: checked } }
+          : current,
+      ),
+    ),
+  );
+
+  card.appendChild(
+    checkbox(asset.muted, 'Muted', (checked) =>
+      replaceRichMotionAsset(ctx, asset.id, (current) => {
+        if (!isVideoStreamAsset(current)) return current;
+        if (
+          !checked &&
+          (current.playback.trigger === 'hover-focus' || current.playback.trigger === 'load')
+        ) {
+          ctx.setStatus('Hover/focus and load video streams must stay muted', 'error');
+          return current;
+        }
+        return { ...current, muted: checked };
+      }),
+    ),
+  );
+
+  card.appendChild(
+    checkbox(asset.loop === true, 'Loop', (checked) =>
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isVideoStreamAsset(current) ? { ...current, loop: checked } : current,
+      ),
+    ),
+  );
+
+  card.appendChild(
+    checkbox(asset.controls === true, 'Controls', (checked) =>
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isVideoStreamAsset(current) ? { ...current, controls: checked } : current,
+      ),
+    ),
+  );
+
+  const reduced = selectInput([...VIDEO_STREAM_REDUCED_MOTION_MODES], asset.reducedMotion);
+  reduced.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isVideoStreamAsset(current)
+        ? {
+            ...current,
+            reducedMotion: reduced.value as VideoStreamReducedMotionMode,
+          }
         : current,
     ),
   );

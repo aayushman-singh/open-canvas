@@ -289,6 +289,48 @@ assert(
   `shader-scene rich-motion snapshot must publish: ${shaderSceneValidation.valid ? '' : shaderSceneValidation.errors.join('; ')}`,
 );
 
+const videoStreamState = structuredClone(goodSnapshot);
+videoStreamState.pages[0]!.sections[0]!.elements[0] = {
+  ...videoStreamState.pages[0]!.sections[0]!.elements[0],
+  assetRefId: 'motion-video-stream',
+} as unknown as typeof richMotionElement;
+(videoStreamState as { richMotionAssets: unknown[] }).richMotionAssets = [
+  {
+    id: 'motion-video-stream',
+    kind: 'video-stream',
+    assetId: 'hover-stream.mp4',
+    posterAssetId: 'hover-poster.webp',
+    alt: 'Hover video stream',
+    muted: true,
+    loop: true,
+    controls: false,
+    playback: { trigger: 'hover-focus', resetOnExit: true },
+    reducedMotion: 'poster',
+  },
+];
+const videoStreamValidation = validatePublishedSnapshot(videoStreamState);
+assert(
+  videoStreamValidation.valid,
+  `video-stream rich-motion snapshot must publish: ${videoStreamValidation.valid ? '' : videoStreamValidation.errors.join('; ')}`,
+);
+
+const invalidVideoStreamState = structuredClone(videoStreamState);
+(
+  (invalidVideoStreamState as { richMotionAssets: Array<Record<string, unknown>> })
+    .richMotionAssets[0]!
+).muted = false;
+const invalidVideoPlayback = (
+  (invalidVideoStreamState as { richMotionAssets: Array<{ playback: Record<string, unknown> }> })
+    .richMotionAssets[0]!
+).playback;
+invalidVideoPlayback.trigger = 'hover-focus';
+const invalidVideoStreamValidation = validatePublishedSnapshot(invalidVideoStreamState);
+assert(!invalidVideoStreamValidation.valid, 'unmuted hover-focus video-stream metadata must fail publish validation');
+assert(
+  invalidVideoStreamValidation.errors.some((error) => error.includes('richMotionAssets[0].muted')),
+  `invalid video-stream failure must mention muted, got ${invalidVideoStreamValidation.valid ? '' : invalidVideoStreamValidation.errors.join('; ')}`,
+);
+
 const invalidShaderSceneState = structuredClone(shaderSceneState);
 (
   (invalidShaderSceneState as { richMotionAssets: Array<Record<string, unknown>> })

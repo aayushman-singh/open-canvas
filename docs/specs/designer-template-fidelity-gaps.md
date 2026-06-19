@@ -500,6 +500,13 @@ Current state:
   reduced-motion behaviour; the runtime owns the shader source and emits named
   failures for missing WebGL context, invalid colours/presets, size, shader
   program, or initialization errors.
+- **June 2026 update:** Rich Motion also includes a `video-stream` kind for
+  hover/focus, click-toggle, or load-driven video streams inside Rich Motion
+  surfaces. Owners choose video/poster asset ids, fit inherits from the
+  Rich Motion element, hover/load triggers are muted by contract, reduced
+  motion can freeze to the poster, and the Runtime Hydrator emits named
+  failures for missing sources, unsupported triggers, unsafe mute relations,
+  reset errors, or rejected playback.
 
 User-visible miss:
 
@@ -507,6 +514,8 @@ User-visible miss:
   scroll-progress state-machine control when the underlying asset exposes the
   named inputs, and bounded WebGL-style shader/particle fields from fixed
   presets.
+- Can now mount schema-owned Rich Motion video streams for hover-preview
+  surfaces beyond ordinary video media elements.
 - Cannot yet reproduce arbitrary WebGL/Three.js scenes, custom shader
   distortion, Spline-like embeds as editable first-class media, or owner-coded
   canvas particle systems.

@@ -14,9 +14,18 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'clipPath',
   'filter',
 ] as const;
-export const RICH_MOTION_KINDS = ['image-sequence', 'rive', 'lottie', 'model-3d', 'shader-scene'] as const;
+export const RICH_MOTION_KINDS = [
+  'image-sequence',
+  'rive',
+  'lottie',
+  'model-3d',
+  'shader-scene',
+  'video-stream',
+] as const;
 export const SHADER_SCENE_PRESETS = ['aurora-flow', 'racing-lines', 'particle-field'] as const;
 export const SHADER_SCENE_REDUCED_MOTION_MODES = ['static', 'animate'] as const;
+export const VIDEO_STREAM_TRIGGERS = ['hover-focus', 'click-toggle', 'load'] as const;
+export const VIDEO_STREAM_REDUCED_MOTION_MODES = ['poster', 'play'] as const;
 export const RIVE_INPUT_TYPES = ['boolean', 'number', 'trigger'] as const;
 export const RIVE_INPUT_EVENTS = [
   'pointer-enter',
@@ -155,12 +164,29 @@ export interface ShaderSceneRichMotionAsset {
   reducedMotion: (typeof SHADER_SCENE_REDUCED_MOTION_MODES)[number];
 }
 
+export interface VideoStreamRichMotionAsset {
+  id: string;
+  kind: 'video-stream';
+  assetId: string;
+  posterAssetId?: string;
+  alt: string;
+  muted: boolean;
+  loop?: boolean;
+  controls?: boolean;
+  playback: {
+    trigger: (typeof VIDEO_STREAM_TRIGGERS)[number];
+    resetOnExit?: boolean;
+  };
+  reducedMotion: (typeof VIDEO_STREAM_REDUCED_MOTION_MODES)[number];
+}
+
 export type RichMotionAsset =
   | ImageSequenceRichMotionAsset
   | RiveRichMotionAsset
   | LottieRichMotionAsset
   | Model3DRichMotionAsset
-  | ShaderSceneRichMotionAsset;
+  | ShaderSceneRichMotionAsset
+  | VideoStreamRichMotionAsset;
 
 export interface LoadExperience {
   id: string;

@@ -8,6 +8,7 @@ import {
   defaultRiveRichMotionAsset,
   defaultRouteTransition,
   defaultScrollScene,
+  defaultVideoStreamRichMotionAsset,
 } from './interactions-panel.js';
 
 declare const Bun: {
@@ -121,6 +122,16 @@ equal(riveInput.inputType, 'boolean', 'rive input type');
 equal(riveInput.event, 'pointer-enter', 'rive input event');
 equal(riveInput.inputType === 'boolean' ? riveInput.value : false, true, 'rive input boolean value');
 
+const videoStreamAsset = defaultVideoStreamRichMotionAsset('stream-a');
+equal(videoStreamAsset.id, 'stream-a', 'video stream asset id');
+equal(videoStreamAsset.kind, 'video-stream', 'video stream asset kind');
+equal(videoStreamAsset.assetId, 'stream-a.mp4', 'video stream asset id default');
+equal(videoStreamAsset.posterAssetId ?? '', 'stream-a-poster.webp', 'video stream poster default');
+equal(videoStreamAsset.muted, true, 'video stream muted default');
+equal(videoStreamAsset.playback.trigger, 'hover-focus', 'video stream trigger default');
+equal(videoStreamAsset.playback.resetOnExit ?? false, true, 'video stream reset default');
+equal(videoStreamAsset.reducedMotion, 'poster', 'video stream reduced-motion default');
+
 const panelSrc = await Bun.file(new URL('./interactions-panel.ts', import.meta.url)).text();
 assert(panelSrc.includes('BehaviourLoadExperience'), 'panel must import behaviour load experience');
 assert(panelSrc.includes('Use designer enter moment'), 'panel must expose designer load mode');
@@ -133,6 +144,13 @@ assert(panelSrc.includes('Validation blocks publish'), 'panel must fail loudly f
 assert(panelSrc.includes('renderMotionSequenceControls'), 'panel must render full Motion Sequence controls');
 assert(panelSrc.includes('renderRichMotionAssetControls'), 'panel must render Rich Motion Asset controls');
 assert(panelSrc.includes('Add Rive asset'), 'panel must create Rive asset metadata');
+assert(panelSrc.includes('Add video stream asset'), 'panel must create video stream asset metadata');
+assert(panelSrc.includes('renderVideoStreamAssetFields'), 'panel must render video stream asset fields');
+assert(panelSrc.includes('VIDEO_STREAM_TRIGGERS'), 'panel must use schema video stream trigger values');
+assert(
+  panelSrc.includes('VIDEO_STREAM_REDUCED_MOTION_MODES'),
+  'panel must use schema video stream reduced-motion values',
+);
 assert(panelSrc.includes('Rive input bindings'), 'panel must edit Rive input bindings');
 assert(panelSrc.includes('RIVE_INPUT_EVENTS'), 'panel must use schema Rive input event values');
 assert(panelSrc.includes('RIVE_INPUT_TYPES'), 'panel must use schema Rive input type values');

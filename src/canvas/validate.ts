@@ -63,6 +63,8 @@ import {
   SHADER_SCENE_PRESETS,
   SHADER_SCENE_REDUCED_MOTION_MODES,
   TEXT_SPLIT_UNITS,
+  VIDEO_STREAM_REDUCED_MOTION_MODES,
+  VIDEO_STREAM_TRIGGERS,
 } from './behaviour-primitives.js';
 
 // Re-export the canonical href allowlist so existing consumers (agent
@@ -3290,6 +3292,60 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           );
           return;
         }
+        if (asset.kind === 'video-stream') {
+          if (!isAssetIdLike(asset.assetId)) {
+            errors.push(
+              `${assetPath}.assetId must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(asset.assetId)})`,
+            );
+          }
+          if (asset.posterAssetId !== undefined && !isAssetIdLike(asset.posterAssetId)) {
+            errors.push(
+              `${assetPath}.posterAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ when present (got ${describe(asset.posterAssetId)})`,
+            );
+          }
+          assertNonEmptyString(asset.alt, `${assetPath}.alt`, errors);
+          if (typeof asset.muted !== 'boolean') {
+            errors.push(`${assetPath}.muted must be a boolean (got ${describe(asset.muted)})`);
+          }
+          if (asset.loop !== undefined && typeof asset.loop !== 'boolean') {
+            errors.push(`${assetPath}.loop must be a boolean when present`);
+          }
+          if (asset.controls !== undefined && typeof asset.controls !== 'boolean') {
+            errors.push(`${assetPath}.controls must be a boolean when present`);
+          }
+          if (!isRecord(asset.playback)) {
+            errors.push(`${assetPath}.playback must be an object`);
+          } else {
+            const triggerOk = assertOneOf(
+              asset.playback.trigger,
+              VIDEO_STREAM_TRIGGERS,
+              `${assetPath}.playback.trigger`,
+              errors,
+            );
+            if (asset.playback.resetOnExit !== undefined && typeof asset.playback.resetOnExit !== 'boolean') {
+              errors.push(`${assetPath}.playback.resetOnExit must be a boolean when present`);
+            }
+            if (
+              triggerOk &&
+              (asset.playback.trigger === 'hover-focus' || asset.playback.trigger === 'load') &&
+              asset.muted !== true
+            ) {
+              errors.push(
+                `${assetPath}.muted must be true when playback.trigger is "${asset.playback.trigger}"`,
+              );
+            }
+          }
+          const reducedOk = assertOneOf(
+            asset.reducedMotion,
+            VIDEO_STREAM_REDUCED_MOTION_MODES,
+            `${assetPath}.reducedMotion`,
+            errors,
+          );
+          if (reducedOk && asset.reducedMotion === 'poster' && asset.posterAssetId === undefined) {
+            errors.push(`${assetPath}.posterAssetId is required when reducedMotion is "poster"`);
+          }
+          return;
+        }
         if (!isAssetIdLike(asset.assetId)) {
           errors.push(
             `${assetPath}.assetId must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(asset.assetId)})`,
@@ -3886,7 +3942,8 @@ function validatePublishedRichMotionReferencesInElement(
       asset.kind !== 'rive' &&
       asset.kind !== 'lottie' &&
       asset.kind !== 'model-3d' &&
-      asset.kind !== 'shader-scene'
+      asset.kind !== 'shader-scene' &&
+      asset.kind !== 'video-stream'
     ) {
       errors.push(
         `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: ${asset.path}.kind ${JSON.stringify(asset.kind)} is not supported for published rich-motion elements`,

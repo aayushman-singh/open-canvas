@@ -158,6 +158,16 @@ export function buildBehaviourPayload(
     if (asset.kind === 'shader-scene') {
       return asset;
     }
+    if (asset.kind === 'video-stream') {
+      const videoAsset = {
+        ...asset,
+        srcUrl: `${assetBasePath}/${asset.assetId}`,
+      };
+      if (asset.posterAssetId !== undefined) {
+        return { ...videoAsset, posterUrl: `${assetBasePath}/${asset.posterAssetId}` };
+      }
+      return videoAsset;
+    }
     return asset;
   });
   const navThemes = collectNavThemeRuntimes(snapshot);

@@ -777,6 +777,137 @@ function behaviourHydrateRive(asset, root, payload) {
   });
 }
 
+function behaviourVideoStreamPlay(asset, video, eventName) {
+  if (!video || typeof video.play !== 'function') {
+    behaviourFailure('rich-motion-video-stream-api', { assetId: asset.id, event: eventName }, new Error('video.play unavailable'));
+  }
+  var result = video.play();
+  if (result && typeof result.catch === 'function') {
+    result.catch(function (err) {
+      behaviourFailure('rich-motion-video-stream-play', { assetId: asset.id, event: eventName }, err || new Error('video play failed'));
+    });
+  }
+}
+
+function behaviourVideoStreamPause(asset, video, resetOnExit) {
+  if (!video || typeof video.pause !== 'function') {
+    behaviourFailure('rich-motion-video-stream-api', { assetId: asset.id, event: 'pause' }, new Error('video.pause unavailable'));
+  }
+  video.pause();
+  if (resetOnExit) {
+    try {
+      video.currentTime = 0;
+    } catch (err) {
+      behaviourFailure('rich-motion-video-stream-reset', { assetId: asset.id }, err || new Error('video reset failed'));
+    }
+  }
+}
+
+function behaviourHydrateVideoStream(asset, root) {
+  if (!asset.srcUrl) {
+    behaviourFailure('rich-motion-video-stream-src-missing', { assetId: asset.id }, new Error('video-stream asset srcUrl missing'));
+  }
+  var nodes = behaviourFindRichMotionNodes(root, asset.id);
+  if (!nodes.length) {
+    behaviourFailure('rich-motion-node-missing', { assetId: asset.id }, new Error('rich motion element not found'));
+  }
+  var trigger = asset.playback && asset.playback.trigger;
+  if (trigger !== 'hover-focus' && trigger !== 'click-toggle' && trigger !== 'load') {
+    behaviourFailure('rich-motion-video-stream-trigger', { assetId: asset.id, trigger: trigger }, new Error('unsupported video-stream trigger'));
+  }
+  if ((trigger === 'hover-focus' || trigger === 'load') && asset.muted !== true) {
+    behaviourFailure('rich-motion-video-stream-muted', { assetId: asset.id, trigger: trigger }, new Error('hover/load video streams must be muted'));
+  }
+  for (var n = 0; n < nodes.length; n++) {
+    var node = nodes[n];
+    if (node.getAttribute('data-opencanvas-video-stream-hydrated') === 'true') continue;
+    try {
+      var canvas = node.querySelector('[data-opencanvas-rich-motion-canvas]');
+      if (canvas) {
+        canvas.style.display = 'none';
+        canvas.setAttribute('hidden', '');
+      }
+      var video = document.createElement('video');
+      video.setAttribute('data-opencanvas-video-stream', asset.id);
+      video.setAttribute('src', asset.srcUrl);
+      video.src = asset.srcUrl;
+      if (asset.posterUrl) {
+        video.setAttribute('poster', asset.posterUrl);
+        video.poster = asset.posterUrl;
+      }
+      video.setAttribute('preload', 'metadata');
+      video.preload = 'metadata';
+      video.setAttribute('playsinline', '');
+      video.playsInline = true;
+      video.muted = asset.muted === true;
+      if (video.muted) video.setAttribute('muted', '');
+      video.loop = asset.loop === true;
+      if (video.loop) video.setAttribute('loop', '');
+      video.controls = asset.controls === true;
+      if (video.controls) video.setAttribute('controls', '');
+      video.style.width = '100%';
+      video.style.height = '100%';
+      video.style.display = 'block';
+      video.style.objectFit = node.getAttribute('data-rich-motion-fit') === 'contain' ? 'contain' : 'cover';
+      if (asset.alt) {
+        node.setAttribute('aria-label', asset.alt);
+        video.setAttribute('aria-label', asset.alt);
+      }
+      node.appendChild(video);
+      node.setAttribute('data-opencanvas-video-stream-trigger', trigger);
+      var reduce = behaviourPrefersReducedMotion() && asset.reducedMotion === 'poster';
+      if (reduce) {
+        if (!asset.posterUrl) {
+          behaviourFailure('rich-motion-video-stream-poster-missing', { assetId: asset.id }, new Error('reduced-motion poster requested without posterUrl'));
+        }
+        node.setAttribute('data-opencanvas-video-stream-reduced', 'poster');
+        node.setAttribute('data-opencanvas-video-stream-hydrated', 'true');
+        continue;
+      }
+      var resetOnExit = !!(asset.playback && asset.playback.resetOnExit);
+      if (trigger === 'hover-focus') {
+        if (!node.getAttribute('tabindex')) node.setAttribute('tabindex', '0');
+        (function (assetRef, videoRef, nodeRef, resetRef) {
+          nodeRef.addEventListener('pointerenter', function () {
+            behaviourVideoStreamPlay(assetRef, videoRef, 'pointerenter');
+          });
+          nodeRef.addEventListener('focusin', function () {
+            behaviourVideoStreamPlay(assetRef, videoRef, 'focusin');
+          });
+          nodeRef.addEventListener('pointerleave', function () {
+            behaviourVideoStreamPause(assetRef, videoRef, resetRef);
+          });
+          nodeRef.addEventListener('focusout', function () {
+            behaviourVideoStreamPause(assetRef, videoRef, resetRef);
+          });
+        })(asset, video, node, resetOnExit);
+      } else if (trigger === 'click-toggle') {
+        if (!node.getAttribute('tabindex')) node.setAttribute('tabindex', '0');
+        (function (assetRef, videoRef, nodeRef) {
+          function toggle(event) {
+            if (event && typeof event.preventDefault === 'function') event.preventDefault();
+            if (videoRef.paused === false) {
+              behaviourVideoStreamPause(assetRef, videoRef, false);
+            } else {
+              behaviourVideoStreamPlay(assetRef, videoRef, 'click');
+            }
+          }
+          nodeRef.addEventListener('click', toggle);
+          nodeRef.addEventListener('keydown', function (event) {
+            var key = event && event.key;
+            if (key === 'Enter' || key === ' ') toggle(event);
+          });
+        })(asset, video, node);
+      } else {
+        behaviourVideoStreamPlay(asset, video, 'load');
+      }
+      node.setAttribute('data-opencanvas-video-stream-hydrated', 'true');
+    } catch (err) {
+      behaviourFailure('rich-motion-video-stream-init', { assetId: asset.id }, err || new Error('video-stream init failed'));
+    }
+  }
+}
+
 function behaviourHydrateModel3D(asset, root) {
   if (!asset.srcUrl) {
     behaviourFailure('rich-motion-model-3d-src-missing', { assetId: asset.id }, new Error('model-3d asset srcUrl missing'));
@@ -1275,6 +1406,8 @@ function hydrateBehaviour(scope, options) {
       behaviourHydrateModel3D(assets[a], root);
     } else if (assets[a].kind === 'shader-scene') {
       behaviourHydrateShaderScene(assets[a], root);
+    } else if (assets[a].kind === 'video-stream') {
+      behaviourHydrateVideoStream(assets[a], root);
     } else {
       behaviourFailure('rich-motion-unsupported-kind', { assetId: assets[a].id, kind: assets[a].kind }, new Error('unsupported rich motion kind'));
     }
