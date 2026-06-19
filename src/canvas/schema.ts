@@ -259,7 +259,7 @@ export type ScrollTriggerMode = (typeof SCROLL_TRIGGER_MODES)[number];
 export const OVERLAY_TRIGGER_TYPES = ['load', 'delay', 'scroll', 'exit-intent', 'element-click'] as const;
 export type OverlayTriggerType = (typeof OVERLAY_TRIGGER_TYPES)[number];
 
-export const OVERLAY_PRESENTATION_MODES = ['modal', 'fullscreen-menu', 'lightbox'] as const;
+export const OVERLAY_PRESENTATION_MODES = ['modal', 'fullscreen-menu', 'lightbox', 'command-palette'] as const;
 export type OverlayPresentationMode = (typeof OVERLAY_PRESENTATION_MODES)[number];
 export const OVERLAY_CHROME_PRESETS = ['standard', 'glass-panel', 'editorial-frame'] as const;
 export type OverlayChromePreset = (typeof OVERLAY_CHROME_PRESETS)[number];

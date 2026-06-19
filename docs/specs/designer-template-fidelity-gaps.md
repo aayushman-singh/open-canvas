@@ -402,15 +402,19 @@ Current state:
   mode for gallery/media overlays. The same schema/editor/runtime path emits
   explicit presentation metadata, a lightbox styling hook, runtime validation,
   and public styles without custom owner scripts.
+- **June 2026 update:** Overlay presentation now includes a bounded
+  `command-palette` mode. Owners can select it from the Interactions panel,
+  renderer/editor preview emit explicit presentation metadata and class hooks,
+  the Runtime Hydrator validates the mode, and public styles provide the
+  centered palette surface without arbitrary owner CSS.
 
 User-visible miss:
 
-- Cannot reproduce command palettes or product-tour overlays as named overlay
-  presets yet.
-- Can now style modal/fullscreen chrome from a bounded Template-owned
-  catalog and publish lightbox-style gallery/media overlays.
-- Richer entrance/exit variants, command-palette/product-tour presets, and menu
-  choreography presets are still missing.
+- Cannot reproduce product-tour overlays as a named overlay preset yet.
+- Can now style modal/fullscreen chrome from a bounded Template-owned catalog
+  and publish lightbox-style gallery/media overlays or command-palette overlays.
+- Richer entrance/exit variants, product-tour presets, and menu choreography
+  presets are still missing.
 
 Needed primitive:
 

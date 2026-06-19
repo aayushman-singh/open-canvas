@@ -102,6 +102,18 @@ assert.equal(
   lightboxValidation.valid ? undefined : lightboxValidation.errors.join('\n'),
 );
 
+const commandPaletteSnapshot = structuredClone(snapshot) as PublishedSnapshot;
+(commandPaletteSnapshot.overlays![0] as unknown as { presentation: { mode: string; chrome: string } }).presentation.mode =
+  'command-palette';
+(commandPaletteSnapshot.overlays![0] as unknown as { presentation: { mode: string; chrome: string } }).presentation.chrome =
+  'glass-panel';
+const commandPaletteValidation = validatePublishedSnapshot(commandPaletteSnapshot);
+assert.equal(
+  commandPaletteValidation.valid,
+  true,
+  commandPaletteValidation.valid ? undefined : commandPaletteValidation.errors.join('\n'),
+);
+
 const invalid = structuredClone(snapshot) as PublishedSnapshot;
 (invalid.overlays![0] as unknown as { presentation: { mode: string } }).presentation.mode = 'drawer';
 const invalidResult = validatePublishedSnapshot(invalid);
@@ -158,6 +170,18 @@ assert.ok(
   'renderer must expose lightbox overlay styling hook',
 );
 
+const commandPaletteHtml = renderCanvasSnapshot(commandPaletteSnapshot, '/assets', 'overlay-command-palette-site', {
+  turnstileSiteKey: 'test-key',
+});
+assert.ok(
+  commandPaletteHtml.includes('data-opencanvas-overlay-presentation="command-palette"'),
+  'renderer must emit command-palette overlay presentation metadata',
+);
+assert.ok(
+  commandPaletteHtml.includes('opencanvas-overlay--command-palette'),
+  'renderer must expose command-palette overlay styling hook',
+);
+
 const roundTrip = decodeYDoc(encodeYDoc(editable));
 assert.equal(
   roundTrip.overlays?.[0]?.presentation?.mode,
@@ -186,6 +210,10 @@ assert.ok(
   OVERLAY_RUNTIME_SRC.includes("presentation !== 'lightbox'"),
   'overlay runtime must explicitly allow lightbox presentation',
 );
+assert.ok(
+  OVERLAY_RUNTIME_SRC.includes("presentation !== 'command-palette'"),
+  'overlay runtime must explicitly allow command-palette presentation',
+);
 
 const interactionsPanel = readFileSync(join(thisDir, '../editor-client/interactions-panel.ts'), 'utf8');
 assert.ok(interactionsPanel.includes('OVERLAY_PRESENTATION_MODES'), 'editor panel must expose overlay presentation modes');
@@ -211,11 +239,14 @@ assert.ok(
   'public styles must include lightbox overlay presentation rules',
 );
 assert.ok(
+  publicStyles.includes('data-opencanvas-overlay-presentation="command-palette"'),
+  'public styles must include command-palette overlay presentation rules',
+);
+assert.ok(
   publicStyles.includes('data-opencanvas-overlay-chrome="glass-panel"'),
   'public styles must include overlay chrome preset rules',
 );
 
 console.log('[overlay-v2:smoke] OK');
-
 
 

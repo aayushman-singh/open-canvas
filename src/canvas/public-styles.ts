@@ -1419,6 +1419,24 @@ const variantCss = String.raw`
   background: #050505;
   box-shadow: 0 32px 120px rgba(0, 0, 0, 0.58);
 }
+.opencanvas-overlay[data-opencanvas-overlay-presentation="command-palette"][data-opencanvas-overlay-open] {
+  place-items: start center;
+  padding: min(14vh, 96px) min(5vw, 48px) 32px;
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="command-palette"] .opencanvas-overlay-backdrop {
+  background: rgba(4, 5, 8, 0.48);
+  backdrop-filter: blur(14px) saturate(1.25);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="command-palette"] .opencanvas-overlay-surface {
+  width: min(92vw, 720px);
+  max-height: min(72vh, 720px);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--opencanvas-kit-panel, #ffffff) 96%, transparent), color-mix(in oklab, var(--opencanvas-kit-panel, #ffffff) 88%, var(--opencanvas-kit-bg, #0c0c0d))),
+    var(--opencanvas-kit-panel, #ffffff);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38), 0 0 0 1px color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 22%, transparent);
+  overflow: hidden;
+}
 .opencanvas-overlay--fullscreen-menu .opencanvas-overlay-close {
   top: 24px;
   right: 24px;
