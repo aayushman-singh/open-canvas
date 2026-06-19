@@ -4,6 +4,8 @@ import {
   defaultLoadExperience,
   defaultLayoutTransition,
   defaultOverlay,
+  defaultRiveInputBinding,
+  defaultRiveRichMotionAsset,
   defaultRouteTransition,
   defaultScrollScene,
 } from './interactions-panel.js';
@@ -104,6 +106,21 @@ equal(
 equal(scroll.sequence.reducedMotion, 'final-state', 'scroll sequence reduced motion default');
 equal(scroll.sequence.steps[0]?.target.type, 'element', 'selected element becomes first target');
 
+const riveAsset = defaultRiveRichMotionAsset('rive-a');
+equal(riveAsset.id, 'rive-a', 'rive asset id');
+equal(riveAsset.kind, 'rive', 'rive asset kind');
+equal(riveAsset.assetId, 'rive-a.riv', 'rive asset id default');
+equal(riveAsset.stateMachine, 'State Machine 1', 'rive default state machine');
+equal(riveAsset.reducedMotion, 'pause', 'rive default reduced motion');
+deepEqual(riveAsset.inputs, [], 'rive default inputs');
+
+const riveInput = defaultRiveInputBinding('input-a');
+equal(riveInput.id, 'input-a', 'rive input id');
+equal(riveInput.inputName, 'isHovered', 'rive input name');
+equal(riveInput.inputType, 'boolean', 'rive input type');
+equal(riveInput.event, 'pointer-enter', 'rive input event');
+equal(riveInput.inputType === 'boolean' ? riveInput.value : false, true, 'rive input boolean value');
+
 const panelSrc = await Bun.file(new URL('./interactions-panel.ts', import.meta.url)).text();
 assert(panelSrc.includes('BehaviourLoadExperience'), 'panel must import behaviour load experience');
 assert(panelSrc.includes('Use designer enter moment'), 'panel must expose designer load mode');
@@ -114,6 +131,11 @@ assert(panelSrc.includes('ctx.state!.scrollScenes'), 'panel must mutate scroll s
 assert(panelSrc.includes('ctx.state!.motionSequences'), 'panel must mutate linked motion sequences');
 assert(panelSrc.includes('Validation blocks publish'), 'panel must fail loudly for missing linked sequence');
 assert(panelSrc.includes('renderMotionSequenceControls'), 'panel must render full Motion Sequence controls');
+assert(panelSrc.includes('renderRichMotionAssetControls'), 'panel must render Rich Motion Asset controls');
+assert(panelSrc.includes('Add Rive asset'), 'panel must create Rive asset metadata');
+assert(panelSrc.includes('Rive input bindings'), 'panel must edit Rive input bindings');
+assert(panelSrc.includes('RIVE_INPUT_EVENTS'), 'panel must use schema Rive input event values');
+assert(panelSrc.includes('RIVE_INPUT_TYPES'), 'panel must use schema Rive input type values');
 assert(panelSrc.includes('Add motion sequence'), 'panel must create full Motion Sequences');
 assert(panelSrc.includes('Motion Sequence step'), 'panel must render editable Motion Sequence steps');
 assert(panelSrc.includes('renderLayoutTransitionControls'), 'panel must render layout transition controls');

@@ -491,7 +491,9 @@ Current state:
   progress. Validation rejects impossible input/event relations, Yjs preserves
   the bindings, the behaviour payload serializes them, and the Runtime
   Hydrator fails through named Rive input errors when the state machine,
-  input, type, API, or scroll target cannot resolve.
+  input, type, API, or scroll target cannot resolve. The Interactions panel
+  exposes Rive asset metadata and input-binding controls for existing or
+  manually added Rive assets.
 
 User-visible miss:
 
@@ -503,17 +505,17 @@ User-visible miss:
   fields.
 - `model-3d` covers bounded GLB-style product/helmet scenes, not custom shader
   pipelines or owner-authored Three.js code.
-- Rive input bindings are schema/runtime-owned, but rich-motion asset upload
-  and binding management still need dedicated editor asset-picker UI.
+- Rive input bindings are schema/runtime-owned and panel-editable, but
+  rich-motion asset upload/selection still needs dedicated asset-picker UI.
 
 Needed primitive:
 
 - A deliberate media-extension decision. Do not add arbitrary "animation file"
   blobs without defining asset type, playback controls, CSP, editor preview,
   reduced-motion handling, and publish-time failure behaviour.
-- Remaining next wave: rich-motion asset picker/editor UI, Rive/Lottie/model
-  events, custom shader/WebGL scene kind, CSP policy hardening, and upload /
-  management support for rich motion assets.
+- Remaining next wave: rich-motion upload/asset picker UI, Rive/Lottie/model
+  events, custom shader/WebGL scene kind, CSP policy hardening, and production
+  management support for rich motion asset files.
 
 ### 12. Import Collapses Source Motion Too Aggressively
 

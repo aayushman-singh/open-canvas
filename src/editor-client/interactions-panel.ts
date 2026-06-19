@@ -34,12 +34,17 @@ import type {
   LayoutTransition,
   MotionSequence,
   MotionSequenceStep,
+  RichMotionAsset,
+  RiveInputBinding,
+  RiveRichMotionAsset,
   ScrollScene,
 } from '../canvas/behaviour-primitives.js';
 import {
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
   MOTION_SEQUENCE_TRIGGER_TYPES,
+  RIVE_INPUT_EVENTS,
+  RIVE_INPUT_TYPES,
   TEXT_SPLIT_UNITS,
 } from '../canvas/behaviour-primitives.js';
 import { isPremiumLoadExperience } from '../canvas/schema.js';
@@ -88,6 +93,8 @@ type SequenceSlot =
   | 'overlay-close';
 
 const DEFAULT_EASING = 'ease-in-out';
+type RiveInputType = (typeof RIVE_INPUT_TYPES)[number];
+type RiveInputEvent = (typeof RIVE_INPUT_EVENTS)[number];
 
 export function defaultOverlay(id: string, name: string, pageId: string): Overlay {
   return {
@@ -146,6 +153,29 @@ export function defaultLayoutTransition(
   };
 }
 
+export function defaultRiveRichMotionAsset(id: string): RiveRichMotionAsset {
+  return {
+    id,
+    kind: 'rive',
+    assetId: id + '.riv',
+    alt: 'Rive animation',
+    stateMachine: 'State Machine 1',
+    autoplay: true,
+    reducedMotion: 'pause',
+    inputs: [],
+  };
+}
+
+export function defaultRiveInputBinding(id: string): RiveInputBinding {
+  return {
+    id,
+    inputName: 'isHovered',
+    inputType: 'boolean',
+    event: 'pointer-enter',
+    value: true,
+  };
+}
+
 export function renderInteractionsPanel(ctx: InteractionsPanelContext): void {
   const host = document.getElementById('opencanvas-interactions-panel');
   if (!host || !ctx.state) return;
@@ -153,6 +183,7 @@ export function renderInteractionsPanel(ctx: InteractionsPanelContext): void {
   host.className = 'opencanvas-interactions-panel';
   renderScrollSceneControls(ctx, host);
   renderMotionSequenceControls(ctx, host);
+  renderRichMotionAssetControls(ctx, host);
   renderLayoutTransitionControls(ctx, host);
   renderSmoothScrollControls(ctx, host);
   renderLoadControls(ctx, host);
@@ -371,6 +402,332 @@ function elementIdsForActivePage(ctx: InteractionsPanelContext): string[] {
     for (const element of sectionItem.elements) ids.push(element.id);
   }
   return ids;
+}
+
+function isRiveAsset(asset: RichMotionAsset): asset is RiveRichMotionAsset {
+  return asset.kind === 'rive';
+}
+
+function replaceRichMotionAsset(
+  ctx: InteractionsPanelContext,
+  assetId: string,
+  update: (asset: RichMotionAsset) => RichMotionAsset,
+): void {
+  mutate(ctx, () => {
+    const assets = ctx.state!.richMotionAssets ?? [];
+    ctx.state!.richMotionAssets = assets.map((asset) => (asset.id === assetId ? update(asset) : asset));
+  });
+}
+
+function replaceRiveInputBinding(
+  ctx: InteractionsPanelContext,
+  asset: RiveRichMotionAsset,
+  bindingId: string,
+  update: (binding: RiveInputBinding) => RiveInputBinding,
+): void {
+  replaceRichMotionAsset(ctx, asset.id, (current) => {
+    if (!isRiveAsset(current)) return current;
+    return {
+      ...current,
+      inputs: (current.inputs ?? []).map((binding) =>
+        binding.id === bindingId ? update(binding) : binding,
+      ),
+    };
+  });
+}
+
+function coerceRiveBinding(
+  binding: RiveInputBinding,
+  inputType: RiveInputType,
+  event: RiveInputEvent,
+  ctx: InteractionsPanelContext,
+): RiveInputBinding {
+  const inputName = binding.inputName || 'input';
+  if (event === 'scroll-progress') {
+    const existing =
+      binding.event === 'scroll-progress' ? binding.scrollSceneId : ctx.state?.scrollScenes?.[0]?.id;
+    return {
+      id: binding.id,
+      inputName,
+      inputType: 'number',
+      event: 'scroll-progress',
+      scrollSceneId: existing ?? '',
+    };
+  }
+  if (inputType === 'trigger') {
+    return { id: binding.id, inputName, inputType: 'trigger', event };
+  }
+  if (inputType === 'number') {
+    return {
+      id: binding.id,
+      inputName,
+      inputType: 'number',
+      event,
+      value: binding.inputType === 'number' && binding.event !== 'scroll-progress' ? binding.value : 0,
+    };
+  }
+  return {
+    id: binding.id,
+    inputName,
+    inputType: 'boolean',
+    event,
+    value: binding.inputType === 'boolean' ? binding.value : true,
+  };
+}
+
+function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
+  if (!ctx.state) return;
+  const wrap = section('Rich Motion Assets');
+  const add = actionButton('Add Rive asset', 'Create schema-owned Rive rich motion metadata');
+  add.addEventListener('click', () => {
+    mutate(ctx, () => {
+      const id = 'rive-asset-' + Date.now();
+      ctx.state!.richMotionAssets = [...(ctx.state!.richMotionAssets ?? []), defaultRiveRichMotionAsset(id)];
+    });
+    ctx.setStatus('Rive asset metadata added', 'ok');
+  });
+  wrap.appendChild(add);
+
+  const assets = ctx.state.richMotionAssets ?? [];
+  if (assets.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'opencanvas-section-picker-empty';
+    empty.textContent = 'No rich motion assets yet.';
+    wrap.appendChild(empty);
+  }
+
+  for (const asset of assets) {
+    renderRichMotionAssetCard(ctx, wrap, asset);
+  }
+
+  host.appendChild(wrap);
+}
+
+function renderRichMotionAssetCard(
+  ctx: InteractionsPanelContext,
+  host: HTMLElement,
+  asset: RichMotionAsset,
+): void {
+  const card = document.createElement('div');
+  card.className = 'opencanvas-interactions-card';
+  const header = row('opencanvas-interactions-card-header');
+  const title = document.createElement('strong');
+  title.textContent = asset.id + ' (' + asset.kind + ')';
+  header.appendChild(title);
+  const remove = compactButton('Delete', 'Delete this rich motion asset metadata');
+  remove.addEventListener('click', () => {
+    mutate(ctx, () => {
+      ctx.state!.richMotionAssets = (ctx.state!.richMotionAssets ?? []).filter((item) => item.id !== asset.id);
+    });
+    ctx.setStatus('Rich motion asset deleted', 'ok');
+  });
+  header.appendChild(remove);
+  card.appendChild(header);
+
+  if (!isRiveAsset(asset)) {
+    const note = document.createElement('p');
+    note.className = 'opencanvas-section-picker-empty';
+    note.textContent = 'This editor slice exposes Rive asset controls. Other rich motion kinds remain schema-owned.';
+    card.appendChild(note);
+    host.appendChild(card);
+    return;
+  }
+
+  renderRiveAssetFields(ctx, card, asset);
+  renderRiveInputBindings(ctx, card, asset);
+  host.appendChild(card);
+}
+
+function renderRiveAssetFields(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  asset: RiveRichMotionAsset,
+): void {
+  const assetId = textInput(asset.assetId, 'hero.riv');
+  assetId.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isRiveAsset(current) ? { ...current, assetId: assetId.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Asset id', assetId));
+
+  const alt = textInput(asset.alt, 'Accessible animation label');
+  alt.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isRiveAsset(current) ? { ...current, alt: alt.value.trim() } : current,
+    ),
+  );
+  card.appendChild(field('Alt text', alt));
+
+  const artboard = textInput(asset.artboard ?? '', 'Optional artboard');
+  artboard.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) => {
+      if (!isRiveAsset(current)) return current;
+      const next = artboard.value.trim();
+      if (next) return { ...current, artboard: next };
+      const nextAsset = { ...current };
+      delete nextAsset.artboard;
+      return nextAsset;
+    }),
+  );
+  card.appendChild(field('Artboard', artboard));
+
+  const stateMachine = textInput(asset.stateMachine ?? '', 'State machine name');
+  stateMachine.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) => {
+      if (!isRiveAsset(current)) return current;
+      const next = stateMachine.value.trim();
+      if (next) return { ...current, stateMachine: next };
+      const nextAsset = { ...current };
+      delete nextAsset.stateMachine;
+      return nextAsset;
+    }),
+  );
+  card.appendChild(field('State machine', stateMachine));
+
+  card.appendChild(
+    checkbox(asset.autoplay !== false, 'Autoplay', (checked) =>
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isRiveAsset(current) ? { ...current, autoplay: checked } : current,
+      ),
+    ),
+  );
+
+  const reduced = selectInput(['pause', 'play'], asset.reducedMotion);
+  reduced.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isRiveAsset(current)
+        ? { ...current, reducedMotion: reduced.value === 'play' ? 'play' : 'pause' }
+        : current,
+    ),
+  );
+  card.appendChild(field('Reduced motion', reduced));
+}
+
+function renderRiveInputBindings(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  asset: RiveRichMotionAsset,
+): void {
+  const header = row('opencanvas-interactions-card-header');
+  const label = document.createElement('strong');
+  label.textContent = 'Rive input bindings';
+  header.appendChild(label);
+  const add = compactButton('Add input', 'Bind a Rive state-machine input to an Open Canvas event');
+  add.addEventListener('click', () => {
+    replaceRichMotionAsset(ctx, asset.id, (current) => {
+      if (!isRiveAsset(current)) return current;
+      const id = 'rive-input-' + Date.now();
+      return { ...current, inputs: [...(current.inputs ?? []), defaultRiveInputBinding(id)] };
+    });
+    ctx.setStatus('Rive input binding added', 'ok');
+  });
+  header.appendChild(add);
+  card.appendChild(header);
+
+  const bindings = asset.inputs ?? [];
+  if (bindings.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'opencanvas-section-picker-empty';
+    empty.textContent = 'No Rive input bindings yet.';
+    card.appendChild(empty);
+    return;
+  }
+  for (const binding of bindings) {
+    renderRiveInputBindingCard(ctx, card, asset, binding);
+  }
+}
+
+function renderRiveInputBindingCard(
+  ctx: InteractionsPanelContext,
+  host: HTMLElement,
+  asset: RiveRichMotionAsset,
+  binding: RiveInputBinding,
+): void {
+  const card = document.createElement('div');
+  card.className = 'opencanvas-interactions-card opencanvas-interactions-nested-card';
+  const header = row('opencanvas-interactions-card-header');
+  const title = document.createElement('strong');
+  title.textContent = binding.id;
+  header.appendChild(title);
+  const remove = compactButton('Delete', 'Delete this Rive input binding');
+  remove.addEventListener('click', () => {
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isRiveAsset(current)
+        ? { ...current, inputs: (current.inputs ?? []).filter((item) => item.id !== binding.id) }
+        : current,
+    );
+    ctx.setStatus('Rive input binding deleted', 'ok');
+  });
+  header.appendChild(remove);
+  card.appendChild(header);
+
+  const inputName = textInput(binding.inputName, 'Rive input name');
+  inputName.addEventListener('change', () =>
+    replaceRiveInputBinding(ctx, asset, binding.id, (current) => ({
+      ...current,
+      inputName: inputName.value.trim(),
+    })),
+  );
+  card.appendChild(field('Input name', inputName));
+
+  const event = selectInput([...RIVE_INPUT_EVENTS], binding.event);
+  event.addEventListener('change', () =>
+    replaceRiveInputBinding(ctx, asset, binding.id, (current) =>
+      coerceRiveBinding(current, current.inputType, event.value as RiveInputEvent, ctx),
+    ),
+  );
+  card.appendChild(field('Event', event));
+
+  const inputType = selectInput([...RIVE_INPUT_TYPES], binding.inputType);
+  inputType.disabled = binding.event === 'scroll-progress';
+  inputType.addEventListener('change', () =>
+    replaceRiveInputBinding(ctx, asset, binding.id, (current) =>
+      coerceRiveBinding(current, inputType.value as RiveInputType, current.event, ctx),
+    ),
+  );
+  card.appendChild(field('Input type', inputType));
+
+  if (binding.event === 'scroll-progress') {
+    const sceneIds = (ctx.state?.scrollScenes ?? []).map((scene) => scene.id);
+    const scene = selectInput(sceneIds.length > 0 ? sceneIds : [''], binding.scrollSceneId);
+    scene.addEventListener('change', () =>
+      replaceRiveInputBinding(ctx, asset, binding.id, (current) =>
+        current.event === 'scroll-progress' ? { ...current, scrollSceneId: scene.value } : current,
+      ),
+    );
+    card.appendChild(field('Scroll scene', scene));
+  } else if (binding.inputType === 'boolean') {
+    card.appendChild(
+      checkbox(binding.value, 'Set true on event', (checked) =>
+        replaceRiveInputBinding(ctx, asset, binding.id, (current) =>
+          current.inputType === 'boolean' ? { ...current, value: checked } : current,
+        ),
+      ),
+    );
+  } else if (binding.inputType === 'number') {
+    const value = numberInput(binding.value, -100000, 100000, 0.01);
+    value.addEventListener('change', () => {
+      const next = validNumber(value, -100000, 100000);
+      if (next === null) {
+        ctx.setStatus('Rive number input value must be finite', 'error');
+        return;
+      }
+      replaceRiveInputBinding(ctx, asset, binding.id, (current) =>
+        current.inputType === 'number' && current.event !== 'scroll-progress'
+          ? { ...current, value: next }
+          : current,
+      );
+    });
+    card.appendChild(field('Value', value));
+  } else {
+    const note = document.createElement('p');
+    note.className = 'opencanvas-section-picker-empty';
+    note.textContent = 'Trigger inputs fire when the event occurs.';
+    card.appendChild(note);
+  }
+
+  host.appendChild(card);
 }
 
 function renderScrollSceneControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
