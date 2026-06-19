@@ -162,6 +162,7 @@ function failVideoHover(
 
 function readVideoHoverConfig(video: HTMLVideoElement): {
   mode: 'play-pause' | 'play-reset';
+  scrubOnHover: boolean;
   reducedMotion: 'disabled' | 'allow';
 } {
   const mode = video.getAttribute('data-opencanvas-video-hover-mode');
@@ -177,7 +178,8 @@ function readVideoHoverConfig(video: HTMLVideoElement): {
       reducedMotion,
     );
   }
-  return { mode, reducedMotion };
+  const scrubOnHover = video.getAttribute('data-opencanvas-video-hover-scrub') === 'true';
+  return { mode, scrubOnHover, reducedMotion };
 }
 
 function videoHoverError(err: unknown): Error {
@@ -185,6 +187,30 @@ function videoHoverError(err: unknown): Error {
   if (typeof err === 'string') return new Error(err);
   if (typeof err === 'number' || typeof err === 'boolean') return new Error(String(err));
   return new Error('non-error video hover failure');
+}
+
+function scrubVideoHover(video: HTMLVideoElement, target: Element, ev: Event): void {
+  if (!(ev instanceof PointerEvent)) return;
+  const duration = Number(video.duration);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    failVideoHover(
+      video,
+      'scrub-duration-missing',
+      'Video hover scrub requires a finite video duration',
+      String(video.duration),
+    );
+  }
+  const rect = target.getBoundingClientRect();
+  if (!(rect.width > 0)) {
+    failVideoHover(
+      video,
+      'scrub-target-width',
+      'Video hover scrub target width must be > 0',
+      String(rect.width),
+    );
+  }
+  const progress = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+  video.currentTime = progress * duration;
 }
 
 function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {}): void {
@@ -207,10 +233,15 @@ function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {
     node.playsInline = true;
     const target = node.closest('[data-opencanvas-element]') ?? node;
     let active = false;
-    const enter = (): void => {
+    const enter = (ev: Event): void => {
       if (active) return;
       active = true;
       try {
+        if (config.scrubOnHover) {
+          node.pause();
+          scrubVideoHover(node, target, ev);
+          return;
+        }
         if (config.mode === 'play-reset') node.currentTime = 0;
         node.play().catch((err: unknown) => {
           failVideoHover(
@@ -246,6 +277,10 @@ function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {
     };
     target.addEventListener('pointerenter', enter);
     target.addEventListener('pointerleave', leave);
+    target.addEventListener('pointermove', (ev: Event): void => {
+      if (!active || !config.scrubOnHover) return;
+      scrubVideoHover(node, target, ev);
+    });
     target.addEventListener('focusin', enter);
     target.addEventListener('focusout', leave);
     node.setAttribute('data-opencanvas-video-hover-hydrated', 'true');

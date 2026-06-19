@@ -18,6 +18,7 @@ export type VideoHoverReducedMotionMode = (typeof VIDEO_HOVER_REDUCED_MOTION_MOD
 export interface VideoHoverPlayback {
   enabled: boolean;
   mode: VideoHoverPlaybackMode;
+  scrubOnHover?: boolean;
   reducedMotion: VideoHoverReducedMotionMode;
 }
 
@@ -83,6 +84,7 @@ export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string 
   if (element.hoverPlayback?.enabled === true) {
     attrs.push(`data-opencanvas-video-hover="true"`);
     attrs.push(`data-opencanvas-video-hover-mode="${escapeAttr(element.hoverPlayback.mode)}"`);
+    attrs.push(`data-opencanvas-video-hover-scrub="${escapeAttr(String(element.hoverPlayback.scrubOnHover === true))}"`);
     attrs.push(
       `data-opencanvas-video-hover-reduced-motion="${escapeAttr(element.hoverPlayback.reducedMotion)}"`,
     );

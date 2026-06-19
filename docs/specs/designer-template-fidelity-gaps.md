@@ -96,10 +96,10 @@ Open Canvas has real motion and interaction primitives already:
   validator/Yjs/smokes cover the contract.
 - **June 2026 update:** video media elements can now opt into Video Stream
   Hover. The media inspector exposes play-on-hover/focus mode and explicit
-  reduced-motion behaviour; renderer emits `data-opencanvas-video-hover*`
-  metadata on the `<video>`; visitor/editor hydrators play, pause, and reset
-  via the same named Runtime Hydrator; validation rejects image/autoplay
-  conflicts and malformed modes.
+  reduced-motion behaviour plus pointer scrub; renderer emits
+  `data-opencanvas-video-hover*` metadata on the `<video>`; visitor/editor
+  hydrators play, pause, reset, and scrub via the same named Runtime Hydrator;
+  validation rejects image/autoplay conflicts and malformed modes.
 - **June 2026 update:** Pointer FX is now owner-facing beyond Form
   `spotlight`. Element wrappers can store `pointerFx` with `spotlight`, `tilt`,
   `magnetic`, `cursor-follow`, or `reveal-mask`, explicit reduced-motion mode,
@@ -370,8 +370,8 @@ User-visible miss:
 - Cannot author touch-specific equivalents for mobile.
 - Marquee does not yet include multi-row staggering or collection-driven ticker
   sources.
-- Video Stream Hover does not yet support separate hover poster/video assets,
-  hover scrub by pointer position, or collection-gallery batch authoring.
+- Video Stream Hover does not yet support separate hover poster/video assets or
+  collection-gallery batch authoring.
 - Pointer FX does not yet include cursor trails, drag/inertia, or
   touch-specific alternate gestures.
 

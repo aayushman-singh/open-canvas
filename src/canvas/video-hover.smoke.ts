@@ -48,6 +48,12 @@ function makeSite(): EditableSite {
 }
 
 const site = makeSite();
+(
+  site.pages[0]!.sections[0]!.elements[0]!.type === 'media' &&
+  site.pages[0]!.sections[0]!.elements[0]!.mediaKind === 'video'
+    ? (site.pages[0]!.sections[0]!.elements[0]!.hoverPlayback as unknown as Record<string, unknown>)
+    : {}
+).scrubOnHover = true;
 const validation = validateEditableSite(site);
 assert(validation.valid, validation.valid ? 'valid video-hover site should pass' : validation.errors.join('\n'));
 
@@ -56,7 +62,8 @@ const decodedVideo = decoded.pages[0]?.sections[0]?.elements[0];
 assert(
   decodedVideo?.type === 'media' &&
     decodedVideo.mediaKind === 'video' &&
-    decodedVideo.hoverPlayback?.mode === 'play-reset',
+    decodedVideo.hoverPlayback?.mode === 'play-reset' &&
+    (decodedVideo.hoverPlayback as unknown as Record<string, unknown>).scrubOnHover === true,
   'Yjs projection must preserve video hover config',
 );
 
@@ -77,6 +84,10 @@ assert(
   html.includes('data-opencanvas-video-hover-reduced-motion="disabled"'),
   'renderer must emit reduced-motion mode',
 );
+assert(
+  html.includes('data-opencanvas-video-hover-scrub="true"'),
+  'renderer must emit hover scrub metadata',
+);
 assert(html.includes(' muted'), 'hover video must render muted for autoplay policy');
 
 const invalid = makeSite() as unknown as Record<string, unknown>;
@@ -92,6 +103,7 @@ invalidElement.mediaKind = 'image';
 invalidElement.hoverPlayback = {
   enabled: true,
   mode: 'spin',
+  scrubOnHover: 'yes',
   reducedMotion: 'maybe',
 };
 const invalidResult = validateEditableSite(invalid);
@@ -99,6 +111,28 @@ assert(!invalidResult.valid, 'image hover video config must fail validation');
 assert(
   invalidResult.errors.some((error) => error.includes('.hoverPlayback is only allowed')),
   'image rejection must name hoverPlayback',
+);
+
+const invalidScrub = makeSite() as unknown as Record<string, unknown>;
+const invalidScrubElement = (
+  (
+    (((invalidScrub.pages as unknown[])[0] as Record<string, unknown>).sections as unknown[])[0] as Record<
+      string,
+      unknown
+    >
+  ).elements as Record<string, unknown>[]
+)[0]!;
+invalidScrubElement.hoverPlayback = {
+  enabled: true,
+  mode: 'play-reset',
+  scrubOnHover: 'yes',
+  reducedMotion: 'disabled',
+};
+const invalidScrubResult = validateEditableSite(invalidScrub);
+assert(!invalidScrubResult.valid, 'invalid scrub config must fail validation');
+assert(
+  invalidScrubResult.errors.some((error) => error.includes('.hoverPlayback.scrubOnHover')),
+  'invalid scrub config must be named',
 );
 
 const invalidAutoplay = makeSite();

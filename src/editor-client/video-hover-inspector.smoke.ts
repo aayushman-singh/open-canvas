@@ -23,6 +23,8 @@ assert(
   mountsSrc.includes('VIDEO_HOVER_REDUCED_MOTION_MODES'),
   'reduced-motion select must use schema modes',
 );
+assert(mountsSrc.includes('Scrub by pointer'), 'media inspector must expose pointer scrub control');
+assert(mountsSrc.includes('scrubOnHover'), 'media inspector must save pointer scrub config');
 assert(mountsSrc.includes('playback.autoplay = false'), 'enabling hover must clear autoplay conflict');
 assert(
   hydrateSrc.includes('function hydrateVideoHoverStreams'),
@@ -32,8 +34,10 @@ assert(
   hydrateSrc.includes('opencanvas:video-hover-failure'),
   'editor runtime must emit named video-hover failure event',
 );
+const marqueeHydrateCall = hydrateSrc.indexOf('hydrateMarquees(root, options)');
+const videoHoverHydrateCall = hydrateSrc.indexOf('hydrateVideoHoverStreams(root, options)');
 assert(
-  hydrateSrc.indexOf('hydrateMarquees(root)') < hydrateSrc.indexOf('hydrateVideoHoverStreams(root)'),
+  marqueeHydrateCall >= 0 && videoHoverHydrateCall > marqueeHydrateCall,
   'editor video-hover hydration must run after marquee hydration',
 );
 

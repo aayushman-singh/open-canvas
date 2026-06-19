@@ -47,6 +47,12 @@ const snapshot: PublishedSnapshot = {
   ],
 };
 
+const hover = snapshot.pages[0]!.sections[0]!.elements[0]!;
+if (hover.type !== 'media' || hover.mediaKind !== 'video') {
+  throw new Error('[video-hover-runtime:smoke] fixture drift');
+}
+(hover.hoverPlayback as unknown as Record<string, unknown>).scrubOnHover = true;
+
 assert(snapshotNeedsInteractiveRuntime(snapshot), 'video hover must request interactive runtime');
 assert(
   VIDEO_HOVER_RUNTIME_SRC.includes('opencanvas:video-hover-failure'),
@@ -55,6 +61,14 @@ assert(
 assert(
   VIDEO_HOVER_RUNTIME_SRC.includes('pointerenter'),
   'runtime must listen for hover enter',
+);
+assert(
+  VIDEO_HOVER_RUNTIME_SRC.includes('data-opencanvas-video-hover-scrub'),
+  'runtime must read hover scrub metadata',
+);
+assert(
+  VIDEO_HOVER_RUNTIME_SRC.includes('currentTime') && VIDEO_HOVER_RUNTIME_SRC.includes('duration'),
+  'runtime must scrub video currentTime from pointer position',
 );
 assert(
   VIDEO_HOVER_RUNTIME_SRC.includes("window.matchMedia('(prefers-reduced-motion: reduce)')"),
@@ -72,6 +86,10 @@ assert(
 const html = renderCanvasSnapshot(snapshot, '/assets', 'site-video-hover', {
   turnstileSiteKey: 'test-turnstile-key',
 });
+assert(
+  html.includes('data-opencanvas-video-hover-scrub="true"'),
+  'renderer must emit hover scrub metadata',
+);
 const withRuntime = injectInteractiveRuntime(html, snapshot);
 assert(
   withRuntime.includes('data-opencanvas-interactive-runtime'),

@@ -170,6 +170,7 @@ export function mountVideoPlayback(
       element.hoverPlayback = {
         enabled: true,
         mode: 'play-reset',
+        scrubOnHover: false,
         reducedMotion: 'disabled',
       };
     } else {
@@ -213,6 +214,15 @@ export function mountVideoPlayback(
     ctx.scheduleSave();
   });
   host.appendChild(modeBuilt.row);
+
+  const scrubBuilt = buildToggle('Scrub by pointer', element.hoverPlayback.scrubOnHover === true);
+  scrubBuilt.input.addEventListener('change', function () {
+    ctx.captureForUndo();
+    element.hoverPlayback!.scrubOnHover = scrubBuilt.input.checked;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  host.appendChild(scrubBuilt.row);
 
   const reducedBuilt = buildSelect(
     'Reduced motion',

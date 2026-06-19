@@ -35,7 +35,26 @@ function readVideoHoverConfig(video) {
   if (reducedMotion !== 'disabled' && reducedMotion !== 'allow') {
     emitVideoHoverFailure(video, 'invalid-reduced-motion', 'Video hover reduced-motion mode must be disabled or allow', reducedMotion);
   }
-  return { mode: mode, reducedMotion: reducedMotion };
+  var scrubOnHover = video.getAttribute('data-opencanvas-video-hover-scrub') === 'true';
+  return { mode: mode, scrubOnHover: scrubOnHover, reducedMotion: reducedMotion };
+}
+function scrubVideoHover(video, target, ev) {
+  if (!ev || typeof ev.clientX !== 'number') return;
+  var duration = Number(video.duration);
+  if (!isFinite(duration) || duration <= 0) {
+    emitVideoHoverFailure(video, 'scrub-duration-missing', 'Video hover scrub requires a finite video duration', video.duration);
+  }
+  if (!target || typeof target.getBoundingClientRect !== 'function') {
+    emitVideoHoverFailure(video, 'scrub-target-missing', 'Video hover scrub target must be measurable', null);
+  }
+  var rect = target.getBoundingClientRect();
+  if (!(rect.width > 0)) {
+    emitVideoHoverFailure(video, 'scrub-target-width', 'Video hover scrub target width must be > 0', rect.width);
+  }
+  var progress = (ev.clientX - rect.left) / rect.width;
+  if (progress < 0) progress = 0;
+  if (progress > 1) progress = 1;
+  video.currentTime = progress * duration;
 }
 function hydrateVideoHoverStreams(scope, options) {
   var root = scope || document;
@@ -57,10 +76,15 @@ function hydrateVideoHoverStreams(scope, options) {
     video.playsInline = true;
     var target = video.closest ? video.closest('[data-opencanvas-element]') || video : video;
     var active = false;
-    var enter = function() {
+    var enter = function(ev) {
       if (active) return;
       active = true;
       try {
+        if (config.scrubOnHover) {
+          video.pause();
+          scrubVideoHover(video, target, ev);
+          return;
+        }
         if (config.mode === 'play-reset') video.currentTime = 0;
         var result = video.play();
         if (result && typeof result.catch === 'function') {
@@ -82,6 +106,10 @@ function hydrateVideoHoverStreams(scope, options) {
     };
     target.addEventListener('pointerenter', enter);
     target.addEventListener('pointerleave', leave);
+    target.addEventListener('pointermove', function(ev) {
+      if (!active || !config.scrubOnHover) return;
+      scrubVideoHover(video, target, ev);
+    });
     target.addEventListener('focusin', enter);
     target.addEventListener('focusout', leave);
     video.setAttribute('data-opencanvas-video-hover-hydrated', 'true');

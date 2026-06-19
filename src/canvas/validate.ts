@@ -1459,6 +1459,12 @@ function validateElement(
             `${basePath}.hoverPlayback.reducedMotion`,
             errors,
           );
+          if (
+            element.hoverPlayback.scrubOnHover !== undefined &&
+            typeof element.hoverPlayback.scrubOnHover !== 'boolean'
+          ) {
+            errors.push(`${basePath}.hoverPlayback.scrubOnHover must be a boolean when present`);
+          }
           if (element.playback?.autoplay === true) {
             errors.push(
               `${basePath}.hoverPlayback cannot be enabled when playback.autoplay=true`,
