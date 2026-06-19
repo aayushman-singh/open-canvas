@@ -582,6 +582,31 @@ Needed primitive:
 - A Motion panel that shows triggers, targets, sequence steps, delays, preview,
   replay, reduced-motion state, and validation errors in one place.
 
+### 15. Nav Theme On Scroll Was Template-Only
+
+Current state:
+
+- **June 2026 update:** sections can carry `navThemeTarget`, nav elements can
+  enable `themeOnScroll`, and the renderer emits explicit
+  `data-opencanvas-nav-theme-*` metadata. The behaviour payload hydrates the
+  relation through the Runtime Hydrator in both visitor and editor preview.
+- Validation rejects unsupported theme tokens and reduced-motion modes instead
+  of letting malformed scroll-theme relations publish.
+- The section inspector exposes the target selector; the nav inspector exposes
+  enable/default-theme/reduced-motion controls.
+
+User-visible miss:
+
+- Owners can now reproduce designer-site nav inversion across scroll regions
+  without custom JavaScript.
+- Remaining next wave: richer token catalog, per-nav style recipes, active-link
+  theme coupling, and visual preview controls for reduced-motion media queries.
+
+Needed primitive:
+
+- Nav Theme On Scroll remains a schema-owned relation: section target signal ->
+  nav theme state. Do not replace it with arbitrary scroll listeners or raw CSS
+  snippets.
 ## Priority Order
 
 1. **Runtime single-source/parity.** New interactions will multiply risk unless

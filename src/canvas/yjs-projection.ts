@@ -676,6 +676,13 @@ function encodeNavElement(el: NavElement): Y.Map<unknown> {
   out.set('links', links);
   out.set('layout', el.layout);
   out.set('sticky', el.sticky);
+  if (el.themeOnScroll !== undefined) {
+    const theme = new Y.Map<unknown>();
+    theme.set('enabled', el.themeOnScroll.enabled);
+    theme.set('defaultTheme', el.themeOnScroll.defaultTheme);
+    theme.set('reducedMotion', el.themeOnScroll.reducedMotion);
+    out.set('themeOnScroll', theme);
+  }
   return out;
 }
 
@@ -894,6 +901,7 @@ function encodeSection(section: CanvasSection): Y.Map<unknown> {
   setIfDefined(out, 'role', section.role);
   setIfDefined(out, 'anchorId', section.anchorId);
   setIfDefined(out, 'backgroundEffect', section.backgroundEffect);
+  setIfDefined(out, 'navThemeTarget', section.navThemeTarget);
   // ADR 0062 — discriminated-union accent border. Encoded as a nested
   // Y.Map keyed by the union's `type` discriminator plus the arm-specific
   // fields. Mirrors the `trigger` encoding above.
@@ -1445,6 +1453,14 @@ function decodeNavElement(map: Y.Map<unknown>, base: BaseElement): NavElement {
   if (map.has('primaryAction')) {
     el.primaryAction = decodeNavLink(map.get('primaryAction') as Y.Map<unknown>);
   }
+  if (map.has('themeOnScroll')) {
+    const theme = map.get('themeOnScroll') as Y.Map<unknown>;
+    el.themeOnScroll = {
+      enabled: theme.get('enabled') as boolean,
+      defaultTheme: theme.get('defaultTheme') as NonNullable<NavElement['themeOnScroll']>['defaultTheme'],
+      reducedMotion: theme.get('reducedMotion') as NonNullable<NavElement['themeOnScroll']>['reducedMotion'],
+    };
+  }
   return el;
 }
 
@@ -1742,6 +1758,11 @@ function decodeSection(map: Y.Map<unknown>): CanvasSection {
   if (map.has('backgroundEffect')) {
     section.backgroundEffect = map.get('backgroundEffect') as NonNullable<
       CanvasSection['backgroundEffect']
+    >;
+  }
+  if (map.has('navThemeTarget')) {
+    section.navThemeTarget = map.get('navThemeTarget') as NonNullable<
+      CanvasSection['navThemeTarget']
     >;
   }
   // ADR 0062 — decode discriminated-union accent border. Mirrors the

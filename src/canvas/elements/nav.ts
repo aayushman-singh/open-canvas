@@ -34,7 +34,7 @@
 import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
-import type { BaseElement } from '../schema.js';
+import type { BaseElement, NavThemeOnScroll } from '../schema.js';
 import { escapeAttr, escapeHtml, styleFromEntries } from './render-utils.js';
 
 export const NAV_LINK_KINDS = ['internal', 'external', 'anchor'] as const;
@@ -70,6 +70,7 @@ export interface NavElement extends Omit<BaseElement, 'sticky'> {
   primaryAction?: NavLink;
   layout: NavLayout;
   sticky: boolean;
+  themeOnScroll?: NavThemeOnScroll;
 }
 
 export interface NavRenderCtx {
@@ -158,6 +159,13 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
   navStyleEntries.push(['display', 'flex']);
   navStyleEntries.push(['align-items', 'center']);
   const navStyle = styleFromEntries(navStyleEntries);
+  const themeOnScroll = el.themeOnScroll?.enabled === true ? el.themeOnScroll : null;
+  const navThemeAttrs = themeOnScroll
+    ? ` data-opencanvas-nav-theme-root="${escapeAttr(el.id)}"` +
+      ` data-opencanvas-nav-theme-default="${escapeAttr(themeOnScroll.defaultTheme)}"` +
+      ` data-opencanvas-nav-theme-active="${escapeAttr(themeOnScroll.defaultTheme)}"` +
+      ` data-opencanvas-nav-theme-reduced-motion="${escapeAttr(themeOnScroll.reducedMotion)}"`
+    : '';
 
   // Left slot bundles logo + siteTitle so both ride a single flex item; either
   // or both may be empty, but the slot itself is always emitted so the CSS
@@ -175,7 +183,7 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
 
   return (
     `<nav class="opencanvas-nav" data-opencanvas-nav-layout="${escapeAttr(el.layout)}" ` +
-    `data-opencanvas-nav-sticky="${el.sticky ? 'true' : 'false'}" ` +
+    `data-opencanvas-nav-sticky="${el.sticky ? 'true' : 'false'}"${navThemeAttrs} ` +
     `style="${navStyle}">` +
     `${leftSlot}${linksSlot}${primarySlot}` +
     `</nav>`
@@ -206,6 +214,7 @@ export const navInspectorSpec: InspectorSpec = {
       defaultValue: 'left-right',
     },
     { kind: 'checkbox', label: 'Sticky', path: 'sticky' },
+    { kind: 'custom-mount', name: 'nav-theme-on-scroll' },
     {
       kind: 'text',
       label: 'Site title',
@@ -270,6 +279,17 @@ export const navAgentToolSpec: AgentToolSpec = {
       description:
         'Optional text wordmark shown in the left slot. Independent of logoAssetId. Nav elements only.',
     },
+    themeOnScroll: {
+      type: 'object',
+      description:
+        'Optional nav theme-on-scroll behaviour. Nav elements only. Enable to let section navThemeTarget values change this nav theme while scrolling.',
+      properties: {
+        enabled: { type: 'boolean' },
+        defaultTheme: { type: 'string', enum: ['transparent', 'light', 'dark', 'solid'] },
+        reducedMotion: { type: 'string', enum: ['instant', 'allow'] },
+      },
+      required: ['enabled', 'defaultTheme', 'reducedMotion'],
+    },
     primaryAction: {
       type: 'object',
       description:
@@ -303,6 +323,12 @@ export const navAgentToolSpec: AgentToolSpec = {
     if (args.siteTitle !== undefined) {
       if (typeof args.siteTitle !== 'string') throw new Error('siteTitle must be a string');
       patch.siteTitle = args.siteTitle;
+    }
+    if (args.themeOnScroll !== undefined) {
+      if (typeof args.themeOnScroll !== 'object' || args.themeOnScroll === null) {
+        throw new Error('themeOnScroll must be an object');
+      }
+      patch.themeOnScroll = args.themeOnScroll;
     }
     if (args.primaryAction !== undefined) {
       if (typeof args.primaryAction !== 'object' || args.primaryAction === null) {

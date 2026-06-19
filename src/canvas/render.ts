@@ -424,6 +424,9 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
         return ` data-opencanvas-popup="true" data-opencanvas-trigger-type="${escapeAttr(t.type)}" data-opencanvas-trigger-value="${escapeAttr(value)}"`;
       })()
     : '';
+  const navThemeTargetAttr = section.navThemeTarget
+    ? ` data-opencanvas-nav-theme-target="${escapeAttr(section.navThemeTarget)}"`
+    : '';
   const bgVideoHtml = section.backgroundVideoAssetId
     ? `<video autoplay loop muted playsinline aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none"><source src="${escapeAttr(`${ctx.assetBasePath}/${section.backgroundVideoAssetId}`)}" type="video/mp4"></video>`
     : '';
@@ -447,7 +450,7 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   const accentAttr = section.accentBorder
     ? ` data-accent-border="${escapeAttr(section.accentBorder.type)}"`
     : '';
-  return `<section class="opencanvas-section"${idAttr} data-opencanvas-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs}${scopeAttr} data-bg-effect="${escapeAttr(bgEffect)}"${accentAttr} data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
+  return `<section class="opencanvas-section"${idAttr} data-opencanvas-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs}${scopeAttr}${navThemeTargetAttr} data-bg-effect="${escapeAttr(bgEffect)}"${accentAttr} data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
 }
 
 function renderPage(

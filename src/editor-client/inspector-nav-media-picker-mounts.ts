@@ -34,6 +34,12 @@ import type {
 } from './editor-context.js';
 import type { NavElement } from '../canvas/elements/nav.js';
 import type { MediaElement } from '../canvas/elements/media.js';
+import {
+  NAV_THEME_REDUCED_MOTION_MODES,
+  NAV_THEME_TARGETS,
+  type NavThemeReducedMotionMode,
+  type NavThemeTarget,
+} from '../canvas/schema.js';
 import { field, selectInput } from './dom-builders.js';
 import { createInspectorEntry } from './inspector-leaf-builders.js';
 
@@ -382,6 +388,82 @@ export function mountNavLogo(
   });
 
   void refreshGalleryGrid();
+}
+
+export function mountNavThemeOnScroll(
+  ctx: MountNavLinkContext,
+  element: NavElement,
+  host: HTMLElement,
+): void {
+  const wrap = document.createElement('div');
+
+  function commit(): void {
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  }
+
+  function ensureTheme(): NonNullable<NavElement['themeOnScroll']> {
+    if (element.themeOnScroll === undefined) {
+      element.themeOnScroll = {
+        enabled: true,
+        defaultTheme: 'transparent',
+        reducedMotion: 'instant',
+      };
+    }
+    return element.themeOnScroll;
+  }
+
+  function renderBody(): void {
+    wrap.replaceChildren();
+    const toggleField = document.createElement('div');
+    toggleField.className = 'field field--toggle';
+    const toggleLabel = document.createElement('label');
+    toggleLabel.className = 'opencanvas-toggle';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.className = 'opencanvas-toggle-input';
+    input.checked = element.themeOnScroll?.enabled === true;
+    const track = document.createElement('span');
+    track.className = 'opencanvas-toggle-track';
+    track.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    label.className = 'opencanvas-toggle-text';
+    label.textContent = 'Respond to section theme targets';
+    input.addEventListener('change', function () {
+      if (input.checked) {
+        const theme = ensureTheme();
+        theme.enabled = true;
+      } else {
+        delete element.themeOnScroll;
+      }
+      renderBody();
+      commit();
+    });
+    toggleLabel.appendChild(input);
+    toggleLabel.appendChild(track);
+    toggleLabel.appendChild(label);
+    toggleField.appendChild(toggleLabel);
+    wrap.appendChild(toggleField);
+
+    if (element.themeOnScroll?.enabled !== true) return;
+    const theme = ensureTheme();
+    const defaultSel = selectInput([...NAV_THEME_TARGETS], theme.defaultTheme);
+    defaultSel.addEventListener('change', function () {
+      theme.defaultTheme = defaultSel.value as NavThemeTarget;
+      commit();
+    });
+    wrap.appendChild(field('Default theme', defaultSel));
+
+    const reducedSel = selectInput([...NAV_THEME_REDUCED_MOTION_MODES], theme.reducedMotion);
+    reducedSel.addEventListener('change', function () {
+      theme.reducedMotion = reducedSel.value as NavThemeReducedMotionMode;
+      commit();
+    });
+    wrap.appendChild(field('Reduced motion', reducedSel));
+  }
+
+  renderBody();
+  host.appendChild(field('Theme on scroll', wrap));
 }
 
 export function mountNavPrimaryAction(

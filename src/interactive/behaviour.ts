@@ -722,6 +722,66 @@ function behaviourHydrateLayoutTransition(transition, root) {
   });
 }
 
+function behaviourFindNavThemeRoot(root, navElementId) {
+  var nodes = root.querySelectorAll('[data-opencanvas-nav-theme-root]');
+  for (var i = 0; i < nodes.length; i++) {
+    if (nodes[i].getAttribute('data-opencanvas-nav-theme-root') === navElementId) return nodes[i];
+  }
+  behaviourFailure('nav-theme-root-missing', { navElementId: navElementId }, new Error('nav theme root not found'));
+}
+
+function behaviourHydrateNavThemes(payload, root) {
+  var configs = payload.navThemes || [];
+  if (!configs.length) return;
+  var targets = root.querySelectorAll('[data-opencanvas-nav-theme-target]');
+  if (!targets || targets.length === 0) {
+    var ids = [];
+    for (var m = 0; m < configs.length; m++) ids.push(configs[m].navElementId);
+    behaviourFailure('nav-theme-targets-missing', { navElementIds: ids }, new Error('nav theme targets not found'));
+  }
+  var navs = [];
+  for (var i = 0; i < configs.length; i++) {
+    var config = configs[i];
+    var nav = behaviourFindNavThemeRoot(root, config.navElementId);
+    nav.setAttribute('data-opencanvas-nav-theme-default', config.defaultTheme);
+    nav.setAttribute('data-opencanvas-nav-theme-active', config.defaultTheme);
+    nav.setAttribute('data-opencanvas-nav-theme-reduced-motion', config.reducedMotion);
+    nav.setAttribute('data-opencanvas-nav-theme-hydrated', 'true');
+    navs.push({ node: nav, config: config });
+  }
+  function activeTheme() {
+    var probe = (window.innerHeight || document.documentElement.clientHeight || 0) * 0.4;
+    for (var t = 0; t < targets.length; t++) {
+      var target = targets[t];
+      if (typeof target.getBoundingClientRect !== 'function') {
+        behaviourFailure('nav-theme-target-unmeasurable', { targetIndex: t }, new Error('nav theme target cannot be measured'));
+      }
+      var rect = target.getBoundingClientRect();
+      if (rect.top <= probe && rect.top + rect.height >= probe) {
+        return target.getAttribute('data-opencanvas-nav-theme-target');
+      }
+    }
+    return null;
+  }
+  function update() {
+    var theme = activeTheme();
+    for (var n = 0; n < navs.length; n++) {
+      navs[n].node.setAttribute('data-opencanvas-nav-theme-active', theme || navs[n].config.defaultTheme);
+    }
+  }
+  var scheduled = false;
+  function schedule() {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(function() {
+      scheduled = false;
+      update();
+    });
+  }
+  window.addEventListener('scroll', schedule, { passive: true });
+  window.addEventListener('resize', schedule);
+  update();
+}
 function hydrateBehaviour(scope) {
   var root = scope || document;
   if (root === document && document.documentElement.getAttribute('data-opencanvas-behaviour-hydrated') === 'true') return;
@@ -755,6 +815,7 @@ function hydrateBehaviour(scope) {
   for (var l = 0; l < layoutTransitions.length; l++) {
     behaviourHydrateLayoutTransition(layoutTransitions[l], root);
   }
+  behaviourHydrateNavThemes(payload, root);
   var assets = payload.richMotionAssets || [];
   for (var a = 0; a < assets.length; a++) {
     if (assets[a].kind === 'image-sequence') {

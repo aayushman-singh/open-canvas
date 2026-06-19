@@ -5,38 +5,87 @@ import type {
   RichMotionAsset,
   ScrollScene,
 } from './behaviour-primitives.js';
+import type { CanvasElement, CanvasSection, NavThemeReducedMotionMode, NavThemeTarget } from './schema.js';
+
+export interface NavThemeRuntime {
+  navElementId: string;
+  defaultTheme: NavThemeTarget;
+  reducedMotion: NavThemeReducedMotionMode;
+}
 
 export interface BehaviourPayload {
   loadExperience?: LoadExperience;
   motionSequences: MotionSequence[];
   scrollScenes: ScrollScene[];
   layoutTransitions?: LayoutTransition[];
+  navThemes?: NavThemeRuntime[];
   richMotionAssets: Array<RichMotionAsset & { frameUrls?: string[]; posterUrl?: string; srcUrl?: string }>;
 }
 
-export function snapshotHasBehaviourPrimitives(snapshot: {
+interface SnapshotWithBehaviour {
   loadExperience?: LoadExperience | { enabled?: boolean };
   motionSequences?: MotionSequence[];
   scrollScenes?: ScrollScene[];
   layoutTransitions?: LayoutTransition[];
   richMotionAssets?: RichMotionAsset[];
-}): boolean {
+  pages?: Array<{ sections?: CanvasSection[] }>;
+  header?: CanvasSection;
+  footer?: CanvasSection;
+}
+
+function collectNavThemeRuntimes(snapshot: SnapshotWithBehaviour): NavThemeRuntime[] {
+  const out: NavThemeRuntime[] = [];
+  const seen = new Set<string>();
+  const visitElement = (element: CanvasElement): void => {
+    if (element.type === 'nav' && element.themeOnScroll?.enabled === true && !seen.has(element.id)) {
+      seen.add(element.id);
+      out.push({
+        navElementId: element.id,
+        defaultTheme: element.themeOnScroll.defaultTheme,
+        reducedMotion: element.themeOnScroll.reducedMotion,
+      });
+    }
+    if (element.type === 'tabs') {
+      for (const tab of element.tabs) {
+        for (const child of tab.elements) visitElement(child);
+      }
+    } else if (element.type === 'collection') {
+      if (Array.isArray(element.customTemplate)) {
+        for (const child of element.customTemplate) visitElement(child);
+      }
+      if (Array.isArray(element.entries)) {
+        for (const entry of element.entries) {
+          for (const child of entry) visitElement(child);
+        }
+      }
+    } else if (element.type === 'flow-container') {
+      for (const item of element.items) visitElement(item.element);
+    }
+  };
+  const visitSection = (section: CanvasSection | undefined): void => {
+    if (!section) return;
+    for (const element of section.elements) visitElement(element);
+  };
+  visitSection(snapshot.header);
+  for (const page of snapshot.pages ?? []) {
+    for (const section of page.sections ?? []) visitSection(section);
+  }
+  visitSection(snapshot.footer);
+  return out;
+}
+
+export function snapshotHasBehaviourPrimitives(snapshot: SnapshotWithBehaviour): boolean {
   if (snapshot.loadExperience !== undefined && 'label' in snapshot.loadExperience) return true;
   if ((snapshot.motionSequences ?? []).length > 0) return true;
   if ((snapshot.scrollScenes ?? []).length > 0) return true;
   if ((snapshot.layoutTransitions ?? []).length > 0) return true;
   if ((snapshot.richMotionAssets ?? []).length > 0) return true;
+  if (collectNavThemeRuntimes(snapshot).length > 0) return true;
   return false;
 }
 
 export function buildBehaviourPayload(
-  snapshot: {
-    loadExperience?: LoadExperience | { enabled?: boolean };
-    motionSequences?: MotionSequence[];
-    scrollScenes?: ScrollScene[];
-    layoutTransitions?: LayoutTransition[];
-    richMotionAssets?: RichMotionAsset[];
-  },
+  snapshot: SnapshotWithBehaviour,
   assetBasePath: string,
 ): BehaviourPayload | null {
   if (!snapshotHasBehaviourPrimitives(snapshot)) return null;
@@ -72,12 +121,14 @@ export function buildBehaviourPayload(
     }
     return asset;
   });
+  const navThemes = collectNavThemeRuntimes(snapshot);
   const payload: BehaviourPayload = {
     motionSequences: snapshot.motionSequences ?? [],
     scrollScenes: snapshot.scrollScenes ?? [],
     layoutTransitions: snapshot.layoutTransitions ?? [],
     richMotionAssets,
   };
+  if (navThemes.length > 0) payload.navThemes = navThemes;
   if (snapshot.loadExperience !== undefined && 'label' in snapshot.loadExperience) {
     payload.loadExperience = snapshot.loadExperience;
   }

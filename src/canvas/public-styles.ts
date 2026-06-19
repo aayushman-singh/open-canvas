@@ -241,7 +241,35 @@ html, body {
 .opencanvas-nav-primary-action:hover {
   filter: brightness(1.08);
 }
-
+.opencanvas-nav[data-opencanvas-nav-theme-root] {
+  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+.opencanvas-nav[data-opencanvas-nav-theme-reduced-motion="instant"] {
+  transition: none;
+}
+.opencanvas-nav[data-opencanvas-nav-theme-active="transparent"] {
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+}
+.opencanvas-nav[data-opencanvas-nav-theme-active="light"] {
+  background: rgba(255, 255, 255, 0.9);
+  color: #101114;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.12);
+}
+.opencanvas-nav[data-opencanvas-nav-theme-active="dark"] {
+  background: rgba(8, 10, 14, 0.9);
+  color: #f6f6f6;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+}
+.opencanvas-nav[data-opencanvas-nav-theme-active="solid"] {
+  background: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
+  color: var(--opencanvas-kit-accent-text, var(--kit-bg, #0c0c0d));
+  box-shadow: 0 12px 34px color-mix(in oklab, var(--opencanvas-kit-accent, currentColor) 22%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .opencanvas-nav[data-opencanvas-nav-theme-root] { transition: none; }
+}
 /* Presence indicator — a tiny pill that lives in the top-right of the
    published page. Hidden by default; the visitor script removes the
    [hidden] attribute when more than one socket is connected. */

@@ -195,6 +195,7 @@ const REGISTERED_MOUNTS = [
   'nav-links',
   'nav-primary-action',
   'nav-logo',
+  'nav-theme-on-scroll',
   'chart-data',
   'form-fields',
   'form-style',

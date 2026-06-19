@@ -24,9 +24,10 @@ import type {
   AccentBorder,
   BackgroundEffect,
   MotionPreset,
+  NavThemeTarget,
   SectionRole,
 } from '../canvas/schema.js';
-import { MOTION_PRESETS } from '../canvas/schema.js';
+import { MOTION_PRESETS, NAV_THEME_TARGETS } from '../canvas/schema.js';
 import { selectInput } from './dom-builders.js';
 import { buildColorRow } from './inspector-leaf-builders.js';
 
@@ -471,6 +472,21 @@ export function renderSectionInspector(ctx: SectionInspectorContext): void {
     valRow.appendChild(unit);
     groupBeh.appendChild(valRow);
   }
+  const navThemeLabel = document.createElement('label');
+  navThemeLabel.textContent = 'Nav theme target';
+  navThemeLabel.style.cssText =
+    'display:block;font-size:12px;color:var(--opencanvas-fg-mute);margin:10px 0 4px';
+  groupBeh.appendChild(navThemeLabel);
+  const navThemeOptions = ['none', ...NAV_THEME_TARGETS];
+  const navThemeSel = selectInput(navThemeOptions, section.navThemeTarget ?? 'none');
+  navThemeSel.addEventListener('change', function () {
+    if (navThemeSel.value === 'none') delete section.navThemeTarget;
+    else section.navThemeTarget = navThemeSel.value as NavThemeTarget;
+    ctx.captureForUndo();
+    ctx.renderAll();
+    ctx.scheduleSave();
+  });
+  groupBeh.appendChild(navThemeSel);
   ctx.inspector.appendChild(groupBeh);
 
   // -- Action buttons (existing grid below the fields) ----------------

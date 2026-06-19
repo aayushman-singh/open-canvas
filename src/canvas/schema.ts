@@ -123,6 +123,18 @@ export type PointerFxPrimitive = (typeof POINTER_FX_PRIMITIVES)[number];
 export const POINTER_FX_REDUCED_MOTION_MODES = ['disabled', 'allow'] as const;
 export type PointerFxReducedMotionMode = (typeof POINTER_FX_REDUCED_MOTION_MODES)[number];
 
+export const NAV_THEME_TARGETS = ['transparent', 'light', 'dark', 'solid'] as const;
+export type NavThemeTarget = (typeof NAV_THEME_TARGETS)[number];
+
+export const NAV_THEME_REDUCED_MOTION_MODES = ['instant', 'allow'] as const;
+export type NavThemeReducedMotionMode = (typeof NAV_THEME_REDUCED_MOTION_MODES)[number];
+
+export interface NavThemeOnScroll {
+  enabled: boolean;
+  defaultTheme: NavThemeTarget;
+  reducedMotion: NavThemeReducedMotionMode;
+}
+
 export interface MarqueeBehaviour {
   enabled: boolean;
   direction: MarqueeDirection;
@@ -545,6 +557,7 @@ export interface CanvasSection {
   height: number;
   role?: SectionRole;
   backgroundEffect?: BackgroundEffect;
+  navThemeTarget?: NavThemeTarget;
   /**
    * ADR 0062 — section accent border. Absent = no accent. The four
    * variants are mutually exclusive by construction (discriminated

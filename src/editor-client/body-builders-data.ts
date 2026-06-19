@@ -621,6 +621,12 @@ export function buildNavBodyImpl(ctx: BuildNavBodyContext, element: NavElement):
   const layout = element.layout === 'left-right' ? 'left-right' : 'left-center-right';
   nav.setAttribute('data-opencanvas-nav-layout', layout);
   nav.setAttribute('data-opencanvas-nav-sticky', element.sticky ? 'true' : 'false');
+  if (element.themeOnScroll?.enabled === true) {
+    nav.setAttribute('data-opencanvas-nav-theme-root', element.id);
+    nav.setAttribute('data-opencanvas-nav-theme-default', element.themeOnScroll.defaultTheme);
+    nav.setAttribute('data-opencanvas-nav-theme-active', element.themeOnScroll.defaultTheme);
+    nav.setAttribute('data-opencanvas-nav-theme-reduced-motion', element.themeOnScroll.reducedMotion);
+  }
   nav.style.position = 'relative';
   nav.style.width = '100%';
   nav.style.height = '100%';

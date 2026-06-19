@@ -757,6 +757,60 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   );
 }
 
+// (7) nav theme-on-scroll mutates the authored active-theme attribute
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [],
+    scrollScenes: [],
+    richMotionAssets: [],
+    navThemes: [
+      {
+        navElementId: 'nav-main',
+        defaultTheme: 'transparent',
+        reducedMotion: 'instant',
+      },
+    ],
+  });
+  doc.body.appendChild(script);
+  const nav = new StubElement('nav');
+  nav.setAttribute('data-opencanvas-nav-theme-root', 'nav-main');
+  nav.setAttribute('data-opencanvas-nav-theme-active', 'transparent');
+  nav.setAttribute('data-opencanvas-nav-theme-default', 'transparent');
+  nav.setAttribute('data-opencanvas-nav-theme-reduced-motion', 'instant');
+  doc.body.appendChild(nav);
+  const section = new StubElement('section');
+  section.setAttribute('data-opencanvas-section', 'dark-story');
+  section.setAttribute('data-opencanvas-nav-theme-target', 'dark');
+  section.getBoundingClientRect = (): { top: number; left: number; width: number; height: number } => ({
+    top: 0,
+    left: 0,
+    width: 1200,
+    height: 700,
+  });
+  doc.body.appendChild(section);
+  runBehaviour(doc, win, StubImage);
+  assert(
+    nav.getAttribute('data-opencanvas-nav-theme-active') === 'dark',
+    'nav theme hydration must activate the intersecting section theme',
+  );
+  section.getBoundingClientRect = (): { top: number; left: number; width: number; height: number } => ({
+    top: 1200,
+    left: 0,
+    width: 1200,
+    height: 700,
+  });
+  win.dispatchScroll();
+  assert(
+    nav.getAttribute('data-opencanvas-nav-theme-active') === 'transparent',
+    'nav theme hydration must restore the default theme outside authored targets',
+  );
+}
+
 assert(
   INTERACTIVE_RUNTIME_SRC.includes('hydrateBehaviour'),
   'assembled interactive runtime must include hydrateBehaviour',

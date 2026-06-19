@@ -71,6 +71,8 @@ import {
   LOAD_EXPERIENCE_RUN_POLICIES,
   MARQUEE_DIRECTIONS,
   MARQUEE_REDUCED_MOTION_MODES,
+  NAV_THEME_REDUCED_MOTION_MODES,
+  NAV_THEME_TARGETS,
   MEDIA_KINDS,
   MOTION_SEQUENCE_LITE_EFFECTS,
   MOTION_SEQUENCE_LITE_TARGET_TYPES,
@@ -99,6 +101,8 @@ import {
   type LoadExperienceRunPolicy,
   type MarqueeDirection,
   type MarqueeReducedMotionMode,
+  type NavThemeReducedMotionMode,
+  type NavThemeTarget,
   type MediaKind,
   type MotionSequenceLiteEffect,
   type MotionSequenceLiteTargetType,
@@ -620,6 +624,26 @@ function validatePointerFx(value: unknown, basePath: string, errors: string[]): 
     value.reducedMotion,
     POINTER_FX_REDUCED_MOTION_MODES,
     `${p}.reducedMotion`,
+    errors,
+  );
+}
+
+function validateNavThemeOnScroll(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`${basePath} must be an object when present`);
+    return;
+  }
+  if (typeof value.enabled !== 'boolean') {
+    errors.push(`${basePath}.enabled must be a boolean`);
+    return;
+  }
+  if (value.enabled !== true) return;
+  assertOneOf<NavThemeTarget>(value.defaultTheme, NAV_THEME_TARGETS, `${basePath}.defaultTheme`, errors);
+  assertOneOf<NavThemeReducedMotionMode>(
+    value.reducedMotion,
+    NAV_THEME_REDUCED_MOTION_MODES,
+    `${basePath}.reducedMotion`,
     errors,
   );
 }
@@ -1650,6 +1674,7 @@ function validateElement(
       if (typeof element.sticky !== 'boolean') {
         errors.push(`${basePath}.sticky must be a boolean (got ${describe(element.sticky)})`);
       }
+      validateNavThemeOnScroll(element.themeOnScroll, `${basePath}.themeOnScroll`, errors);
       if (element.logoAssetId !== undefined && !isAssetIdLike(element.logoAssetId)) {
         errors.push(
           `${basePath}.logoAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ when present (got ${describe(element.logoAssetId)})`,
@@ -1896,6 +1921,14 @@ function validateSection(
       section.backgroundEffect,
       BACKGROUND_EFFECTS,
       `${basePath}.backgroundEffect`,
+      errors,
+    );
+  }
+  if (section.navThemeTarget !== undefined) {
+    assertOneOf<NavThemeTarget>(
+      section.navThemeTarget,
+      NAV_THEME_TARGETS,
+      `${basePath}.navThemeTarget`,
       errors,
     );
   }

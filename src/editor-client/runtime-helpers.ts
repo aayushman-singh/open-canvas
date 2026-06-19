@@ -54,6 +54,7 @@ import {
   mountNavLinks,
   mountNavLogo,
   mountNavPrimaryAction,
+  mountNavThemeOnScroll,
 } from './inspector-nav-media-picker-mounts.js';
 import {
   normalizePastedHtml,
@@ -703,6 +704,7 @@ export function buildSectionNodeImpl(
   node.setAttribute('data-opencanvas-section', section.id);
   node.setAttribute('data-recipe', section.recipeId);
   if (section.backgroundEffect) node.setAttribute('data-bg-effect', section.backgroundEffect);
+  if (section.navThemeTarget) node.setAttribute('data-opencanvas-nav-theme-target', section.navThemeTarget);
   if (section.entrance) node.setAttribute('data-entrance', section.entrance);
   node.style.position = 'relative';
   node.style.width = pageWidth + 'px';
@@ -949,6 +951,8 @@ function inspectorMountHandler(
       mountNavPrimaryAction(ctx, element as Parameters<typeof mountNavPrimaryAction>[1], host),
     'nav-logo': (element, host) =>
       mountNavLogo(ctx, element as Parameters<typeof mountNavLogo>[1], host),
+    'nav-theme-on-scroll': (element, host) =>
+      mountNavThemeOnScroll(ctx, element as Parameters<typeof mountNavThemeOnScroll>[1], host),
     'chart-data': (element, host) => mountChartData(ctx, element as ChartElement, host),
     'form-fields': (element, host) => mountFormFields(ctx, element as FormElement, host),
     'form-style': (element, host) => mountComponentStyle(ctx, element, host),
