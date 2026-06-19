@@ -40,6 +40,40 @@ function makeSite(): EditableSite {
                   reducedMotion: 'static',
                 },
               },
+              {
+                id: 'ticker-source',
+                type: 'collection',
+                box: { x: 120, y: 300, w: 720, h: 220, z: 1 },
+                collectionSlug: 'race-notes',
+                sort: 'date-desc',
+                display: 'custom',
+                entries: [
+                  [
+                    {
+                      id: 'ticker-source-entry-1-title',
+                      type: 'text',
+                      box: { x: 0, y: 0, w: 240, h: 40, z: 1 },
+                      content: [{ text: 'Monaco' }],
+                      role: 'heading',
+                      fontSize: 24,
+                      fontWeight: 700,
+                      align: 'left',
+                    },
+                  ],
+                  [
+                    {
+                      id: 'ticker-source-entry-2-title',
+                      type: 'text',
+                      box: { x: 0, y: 0, w: 240, h: 40, z: 1 },
+                      content: [{ text: 'Silverstone' }],
+                      role: 'heading',
+                      fontSize: 24,
+                      fontWeight: 700,
+                      align: 'left',
+                    },
+                  ],
+                ],
+              },
             ],
           },
         ],
@@ -55,6 +89,12 @@ site.pages[0]!.sections[0]!.elements[0]!.marquee!.hoverReverse = true;
 site.pages[0]!.sections[0]!.elements[0]!.marquee!.rows = 3;
 site.pages[0]!.sections[0]!.elements[0]!.marquee!.rowGapPx = 8;
 site.pages[0]!.sections[0]!.elements[0]!.marquee!.rowOffsetPercent = 33;
+site.pages[0]!.sections[0]!.elements[0]!.marquee!.source = {
+  type: 'collection-element',
+  elementId: 'ticker-source',
+  field: 'title',
+  separator: ' / ',
+};
 const validation = validateEditableSite(site);
 assert(validation.valid, validation.valid ? 'valid marquee site should pass' : validation.errors.join('\n'));
 
@@ -76,6 +116,11 @@ assert(
     decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.rowGapPx === 8 &&
     decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.rowOffsetPercent === 33,
   'Yjs projection must preserve marquee multi-row config',
+);
+assert(
+  decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.source?.type === 'collection-element' &&
+    decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.source?.elementId === 'ticker-source',
+  'Yjs projection must preserve marquee collection source config',
 );
 
 const snapshot: PublishedSnapshot = {
@@ -113,6 +158,7 @@ assert(
   html.includes('data-opencanvas-marquee-row-offset="33"'),
   'renderer must emit marquee row offset',
 );
+assert(html.includes('Monaco / Silverstone'), 'renderer must materialize collection-sourced marquee text');
 
 const invalidDirection = makeSite() as unknown as Record<string, unknown>;
 (
@@ -175,6 +221,19 @@ assert(
 assert(
   invalid.errors.some((error) => error.includes('.marquee.rowOffsetPercent')),
   'invalid row offset must be named',
+);
+
+const invalidSource = makeSite();
+invalidSource.pages[0]!.sections[0]!.elements[0]!.marquee!.source = {
+  type: 'collection-element',
+  elementId: 'missing-source',
+  field: 'title',
+};
+const invalidSourceResult = validateEditableSite(invalidSource);
+assert(!invalidSourceResult.valid, 'missing marquee collection source must fail validation');
+assert(
+  invalidSourceResult.errors.some((error) => error.includes('.marquee.source.elementId')),
+  'missing collection source failure must name elementId',
 );
 
 const conflicting = makeSite() as unknown as Record<string, unknown>;

@@ -21,6 +21,9 @@ assert(
 assert(inspectorSrc.includes('speedPxPerSecond'), 'inspector must edit marquee speed');
 assert(inspectorSrc.includes('Rows'), 'inspector must edit marquee row count');
 assert(inspectorSrc.includes('rowOffsetPercent'), 'inspector must edit marquee row offset');
+assert(inspectorSrc.includes('Marquee source'), 'inspector must edit marquee source mode');
+assert(inspectorSrc.includes('collectionElementId'), 'inspector must edit marquee collection source element');
+assert(inspectorSrc.includes('MARQUEE_COLLECTION_FIELDS'), 'inspector must use schema-owned marquee source fields');
 assert(inspectorSrc.includes('pauseOnHover'), 'inspector must edit pause-on-hover');
 assert(
   wrapperSrc.includes('data-opencanvas-marquee-reduced-motion'),

@@ -35,10 +35,12 @@ import type { InspectorSpec } from '../canvas/elements/inspector-spec.js';
 import type { CanvasElement } from '../canvas/schema.js';
 import {
   MARQUEE_DIRECTIONS,
+  MARQUEE_COLLECTION_FIELDS,
   MARQUEE_REDUCED_MOTION_MODES,
   MOTION_PRESETS,
   POINTER_FX_PRIMITIVES,
   POINTER_FX_REDUCED_MOTION_MODES,
+  type MarqueeCollectionField,
   type MarqueeDirection,
   type MarqueeReducedMotionMode,
   type MotionPreset,
@@ -582,7 +584,7 @@ export function renderInspector(ctx: EditorContext): void {
     ctx.inspector.appendChild(field('Motion delay (ms)', delay));
   }
 
-  renderMarqueeInspector(ctx, element);
+  renderMarqueeInspector(ctx, element, found.section.elements);
   renderPointerFxInspector(ctx, element);
 
   if (element.type === 'text') {
@@ -702,7 +704,11 @@ function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): v
   ctx.inspector.appendChild(field('Reduced motion', reducedMotion));
 }
 
-function renderMarqueeInspector(ctx: EditorContext, element: CanvasElement): void {
+function renderMarqueeInspector(
+  ctx: EditorContext,
+  element: CanvasElement,
+  sectionElements: CanvasElement[],
+): void {
   if (!ctx.inspector) return;
   const heading = document.createElement('h3');
   heading.textContent = 'Marquee';
@@ -835,6 +841,135 @@ function renderMarqueeInspector(ctx: EditorContext, element: CanvasElement): voi
     ctx.scheduleSave();
   });
   ctx.inspector.appendChild(field('Row offset (%)', rowOffset));
+
+  const sourceMode = selectInput(
+    ['manual', 'collection-element'],
+    element.marquee.source?.type ?? 'manual',
+  );
+  sourceMode.addEventListener('change', () => {
+    ctx.captureForUndo();
+    if (sourceMode.value === 'manual') {
+      delete element.marquee!.source;
+    } else {
+      const firstCollection = sectionElements.find((candidate) => candidate.type === 'collection');
+      if (!firstCollection) {
+        ctx.setStatus('Add a Collection element in this section before binding marquee source', 'error');
+        sourceMode.value = 'manual';
+        return;
+      }
+      element.marquee!.source = {
+        type: 'collection-element',
+        elementId: firstCollection.id,
+        field: 'title',
+        separator: ' / ',
+      };
+    }
+    ctx.rebuildElement(element.id);
+    renderInspector(ctx);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Marquee source', sourceMode));
+
+  if (element.marquee.source?.type === 'collection-element') {
+    const collectionElements = sectionElements.filter((candidate) => candidate.type === 'collection');
+    const collectionElementId = element.marquee.source.elementId;
+    if (collectionElements.length === 0) {
+      const missing = document.createElement('p');
+      missing.className = 'opencanvas-section-picker-empty';
+      missing.textContent = 'Add a Collection element in this section before binding marquee source.';
+      ctx.inspector.appendChild(missing);
+    } else {
+      const collectionInput = selectInput(
+        collectionElements.map((candidate) => candidate.id),
+        collectionElements.some((candidate) => candidate.id === collectionElementId)
+          ? collectionElementId
+          : collectionElements[0]!.id,
+      );
+      collectionInput.addEventListener('change', () => {
+        ctx.captureForUndo();
+        const currentSource =
+          element.marquee!.source?.type === 'collection-element'
+            ? element.marquee!.source
+            : { type: 'collection-element' as const, elementId: collectionInput.value, field: 'title' as const };
+        element.marquee!.source = {
+          ...currentSource,
+          elementId: collectionInput.value,
+        };
+        ctx.rebuildElement(element.id);
+        ctx.scheduleSave();
+      });
+      ctx.inspector.appendChild(field('Collection element', collectionInput));
+
+      const sourceField = selectInput(MARQUEE_COLLECTION_FIELDS, element.marquee.source.field);
+      sourceField.addEventListener('change', () => {
+        ctx.captureForUndo();
+        const currentSource =
+          element.marquee!.source?.type === 'collection-element'
+            ? element.marquee!.source
+            : { type: 'collection-element' as const, elementId: collectionInput.value, field: 'title' as const };
+        element.marquee!.source = {
+          ...currentSource,
+          field: sourceField.value as MarqueeCollectionField,
+        };
+        ctx.rebuildElement(element.id);
+        ctx.scheduleSave();
+      });
+      ctx.inspector.appendChild(field('Collection field', sourceField));
+
+      const separator = document.createElement('input');
+      separator.type = 'text';
+      separator.value = element.marquee.source.separator ?? ' / ';
+      separator.addEventListener('change', () => {
+        const value = separator.value;
+        if (value.trim().length === 0) {
+          ctx.setStatus('Marquee source separator cannot be empty', 'error');
+          separator.value = element.marquee!.source?.type === 'collection-element'
+            ? (element.marquee!.source.separator ?? ' / ')
+            : ' / ';
+          return;
+        }
+        ctx.captureForUndo();
+        const currentSource =
+          element.marquee!.source?.type === 'collection-element'
+            ? element.marquee!.source
+            : { type: 'collection-element' as const, elementId: collectionInput.value, field: 'title' as const };
+        element.marquee!.source = {
+          ...currentSource,
+          separator: value,
+        };
+        ctx.rebuildElement(element.id);
+        ctx.scheduleSave();
+      });
+      ctx.inspector.appendChild(field('Source separator', separator));
+
+      const maxItems = document.createElement('input');
+      maxItems.type = 'number';
+      maxItems.min = '1';
+      maxItems.max = '50';
+      maxItems.step = '1';
+      maxItems.value = String(element.marquee.source.maxItems ?? 50);
+      maxItems.addEventListener('change', () => {
+        const n = Number(maxItems.value);
+        if (!Number.isInteger(n) || n < 1 || n > 50) {
+          ctx.setStatus('Marquee source max items must be between 1 and 50', 'error');
+          maxItems.value = String(element.marquee!.source?.type === 'collection-element' ? (element.marquee!.source.maxItems ?? 50) : 50);
+          return;
+        }
+        ctx.captureForUndo();
+        const currentSource =
+          element.marquee!.source?.type === 'collection-element'
+            ? element.marquee!.source
+            : { type: 'collection-element' as const, elementId: collectionInput.value, field: 'title' as const };
+        element.marquee!.source = {
+          ...currentSource,
+          maxItems: n,
+        };
+        ctx.rebuildElement(element.id);
+        ctx.scheduleSave();
+      });
+      ctx.inspector.appendChild(field('Source max items', maxItems));
+    }
+  }
 
   const pause = document.createElement('input');
   pause.type = 'checkbox';

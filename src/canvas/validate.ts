@@ -94,7 +94,9 @@ import {
   LOAD_EXPERIENCE_PRESETS,
   LOAD_EXPERIENCE_RUN_POLICIES,
   MARQUEE_DIRECTIONS,
+  MARQUEE_COLLECTION_FIELDS,
   MARQUEE_REDUCED_MOTION_MODES,
+  MARQUEE_SOURCE_TYPES,
   NAV_THEME_REDUCED_MOTION_MODES,
   NAV_THEME_TARGETS,
   OVERLAY_BACKDROP_STYLES,
@@ -127,8 +129,10 @@ import {
   type LoadExperienceGate,
   type LoadExperiencePreset,
   type LoadExperienceRunPolicy,
+  type MarqueeCollectionField,
   type MarqueeDirection,
   type MarqueeReducedMotionMode,
+  type MarqueeSourceType,
   type NavThemeReducedMotionMode,
   type NavThemeTarget,
   type MediaKind,
@@ -608,7 +612,98 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
   }
 }
 
-function validateMarquee(value: unknown, basePath: string, errors: string[]): void {
+function textValueFromElement(element: unknown): { role: string | null; text: string } | null {
+  if (!isRecord(element) || element.type !== 'text' || !Array.isArray(element.content)) return null;
+  const text = element.content
+    .map((run) => (isRecord(run) && typeof run.text === 'string' ? run.text : ''))
+    .join('')
+    .trim();
+  if (text.length === 0) return null;
+  return { role: typeof element.role === 'string' ? element.role : null, text };
+}
+
+function marqueeCollectionFieldValues(collection: unknown, field: MarqueeCollectionField): string[] {
+  if (!isRecord(collection) || !Array.isArray(collection.entries)) return [];
+  const values: string[] = [];
+  for (const entry of collection.entries) {
+    if (!Array.isArray(entry)) continue;
+    const texts = entry
+      .map((child) => textValueFromElement(child))
+      .filter((item): item is { role: string | null; text: string } => item !== null);
+    if (field === 'all-text') {
+      const joined = texts.map((item) => item.text).join(' ').trim();
+      if (joined.length > 0) values.push(joined);
+      continue;
+    }
+    const role = field === 'title' ? 'heading' : 'body';
+    const match = texts.find((item) => item.role === role) ?? texts[0];
+    if (match !== undefined) values.push(match.text);
+  }
+  return values;
+}
+
+function validateMarqueeSource(
+  value: unknown,
+  basePath: string,
+  errors: string[],
+  sectionElements: readonly unknown[] | null,
+): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`${basePath} must be an object when present`);
+    return;
+  }
+  assertOneOf<MarqueeSourceType>(value.type, MARQUEE_SOURCE_TYPES, `${basePath}.type`, errors);
+  if (value.type === 'manual') return;
+  if (value.type !== 'collection-element') return;
+  if (!isNonEmptyString(value.elementId)) {
+    errors.push(`${basePath}.elementId must be a non-empty string`);
+    return;
+  }
+  const fieldValid = assertOneOf<MarqueeCollectionField>(
+    value.field,
+    MARQUEE_COLLECTION_FIELDS,
+    `${basePath}.field`,
+    errors,
+  );
+  if (value.separator !== undefined) {
+    assertOptionalNonEmptyString(value.separator, `${basePath}.separator`, errors);
+  }
+  if (
+    value.maxItems !== undefined &&
+    (!Number.isInteger(value.maxItems) || (value.maxItems as number) < 1 || (value.maxItems as number) > 50)
+  ) {
+    errors.push(`${basePath}.maxItems must be an integer between 1 and 50 when present`);
+  }
+  if (sectionElements === null) {
+    errors.push(`${basePath}.elementId can only reference a collection element in the same section`);
+    return;
+  }
+  const collection = sectionElements.find(
+    (candidate) => isRecord(candidate) && candidate.id === value.elementId,
+  );
+  if (!isRecord(collection)) {
+    errors.push(`${basePath}.elementId must reference an element in the same section`);
+    return;
+  }
+  if (collection.type !== 'collection') {
+    errors.push(`${basePath}.elementId must reference a collection element`);
+    return;
+  }
+  if (fieldValid) {
+    const values = marqueeCollectionFieldValues(collection, value.field as MarqueeCollectionField);
+    if (values.length === 0) {
+      errors.push(`${basePath}.field must resolve at least one text value from the collection entries`);
+    }
+  }
+}
+
+function validateMarquee(
+  value: unknown,
+  basePath: string,
+  errors: string[],
+  sectionElements: readonly unknown[] | null,
+): void {
   if (value === undefined) return;
   if (!isRecord(value)) {
     errors.push(`${basePath}.marquee must be an object when present`);
@@ -657,6 +752,7 @@ function validateMarquee(value: unknown, basePath: string, errors: string[]): vo
   ) {
     errors.push(`${p}.rowOffsetPercent must be a finite number between 0 and 100 when present`);
   }
+  validateMarqueeSource(value.source, `${p}.source`, errors, sectionElements);
   assertOneOf<MarqueeReducedMotionMode>(
     value.reducedMotion,
     MARQUEE_REDUCED_MOTION_MODES,
@@ -1286,6 +1382,7 @@ function validateElement(
   errors: string[],
   validPageIds: Set<string> | null,
   pageIds: Set<string>,
+  sectionElements: readonly unknown[] | null = null,
 ): void {
   if (!isRecord(element)) {
     errors.push(`${basePath} must be an object`);
@@ -1306,7 +1403,7 @@ function validateElement(
 
   validateBox(element.box, pageWidth, sectionHeight, basePath, errors);
   validateMotion(element.motion, basePath, errors);
-  validateMarquee(element.marquee, basePath, errors);
+  validateMarquee(element.marquee, basePath, errors, sectionElements);
   validatePointerFx(element.pointerFx, basePath, errors);
   validatePinnedStyle(element.pinnedStyle, basePath, errors);
   validateElementStyle(element.elementStyle, basePath, errors);
@@ -2110,6 +2207,7 @@ function validateSection(
       errors,
       validPageIds,
       localIds,
+      section.elements as unknown[],
     );
   });
 }

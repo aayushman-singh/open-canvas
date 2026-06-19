@@ -352,6 +352,67 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
   return `<div class="opencanvas-element"${commonAttrs} style="${wrapperStyle}">${inner}</div>`;
 }
 
+function renderedTextValueFromElement(element: CanvasElement): { role: string | null; text: string } | null {
+  if (element.type !== 'text') return null;
+  const text = element.content
+    .map((run) => run.text)
+    .join('')
+    .trim();
+  if (text.length === 0) return null;
+  return { role: element.role, text };
+}
+
+function collectionMarqueeValues(
+  collection: Extract<CanvasElement, { type: 'collection' }>,
+  field: 'title' | 'excerpt' | 'all-text',
+): string[] {
+  const values: string[] = [];
+  for (const entry of collection.entries ?? []) {
+    const texts = entry
+      .map((child) => renderedTextValueFromElement(child))
+      .filter((item): item is { role: string | null; text: string } => item !== null);
+    if (field === 'all-text') {
+      const joined = texts.map((item) => item.text).join(' ').trim();
+      if (joined.length > 0) values.push(joined);
+      continue;
+    }
+    const role = field === 'title' ? 'heading' : 'body';
+    const match = texts.find((item) => item.role === role) ?? texts[0];
+    if (match !== undefined) values.push(match.text);
+  }
+  return values;
+}
+
+function resolveCollectionMarqueeText(
+  element: CanvasElement,
+  sectionElements: readonly CanvasElement[],
+): CanvasElement {
+  if (element.type !== 'text' || element.marquee?.source?.type !== 'collection-element') return element;
+  const source = element.marquee.source;
+  const collection = sectionElements.find((candidate) => candidate.id === source.elementId);
+  if (collection === undefined) {
+    throw new Error(
+      `Marquee element ${element.id}: collection source ${source.elementId} was not found in the same section.`,
+    );
+  }
+  if (collection.type !== 'collection') {
+    throw new Error(
+      `Marquee element ${element.id}: source ${source.elementId} is ${collection.type}, expected collection.`,
+    );
+  }
+  const maxItems = source.maxItems ?? 50;
+  const values = collectionMarqueeValues(collection, source.field).slice(0, maxItems);
+  if (values.length === 0) {
+    throw new Error(
+      `Marquee element ${element.id}: collection source ${source.elementId} produced no ${source.field} values.`,
+    );
+  }
+  return {
+    ...element,
+    content: [{ text: values.join(source.separator ?? ' / ') }],
+  };
+}
+
 function renderHostedElement(element: CanvasElement, ctx: ElementRenderCtx): string {
   const inner = renderElementBody(element, ctx, 'flow-hosted');
   let wrapperStyle = buildHostedElementWrapperStyle(element, ctx.assetBasePath);
@@ -412,7 +473,9 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   // contract: whatever order elements appear in the array is the order DOM
   // emits them, which is what assistive tech reads. Owner-side reorder tools
   // (T5.7) are the Owner's lever for changing it independent of visual z/x/y.
-  const elementsHtml = section.elements.map((element) => renderElement(element, ctx)).join('');
+  const elementsHtml = section.elements
+    .map((element) => renderElement(resolveCollectionMarqueeText(element, section.elements), ctx))
+    .join('');
   const roleAttr =
     section.role && section.role !== 'body'
       ? ` data-section-role="${escapeAttr(section.role)}"`

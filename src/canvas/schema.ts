@@ -180,6 +180,20 @@ export type MarqueeDirection = (typeof MARQUEE_DIRECTIONS)[number];
 
 export const MARQUEE_REDUCED_MOTION_MODES = ['static', 'slow'] as const;
 export type MarqueeReducedMotionMode = (typeof MARQUEE_REDUCED_MOTION_MODES)[number];
+export const MARQUEE_SOURCE_TYPES = ['manual', 'collection-element'] as const;
+export type MarqueeSourceType = (typeof MARQUEE_SOURCE_TYPES)[number];
+export const MARQUEE_COLLECTION_FIELDS = ['title', 'excerpt', 'all-text'] as const;
+export type MarqueeCollectionField = (typeof MARQUEE_COLLECTION_FIELDS)[number];
+
+export type MarqueeSource =
+  | { type: 'manual' }
+  | {
+      type: 'collection-element';
+      elementId: string;
+      field: MarqueeCollectionField;
+      separator?: string;
+      maxItems?: number;
+    };
 
 export const POINTER_FX_PRIMITIVES = [
   'spotlight',
@@ -218,6 +232,7 @@ export interface MarqueeBehaviour {
   rows?: number;
   rowGapPx?: number;
   rowOffsetPercent?: number;
+  source?: MarqueeSource;
   reducedMotion: MarqueeReducedMotionMode;
 }
 
