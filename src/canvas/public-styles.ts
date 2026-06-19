@@ -345,6 +345,22 @@ html, body {
 .opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="media"] .opencanvas-media {
   border-radius: var(--opencanvas-collection-card-image-radius, 0);
 }
+.opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="text"][data-opencanvas-element^="card-default-title"] .opencanvas-text {
+  color: var(--opencanvas-collection-title-color, inherit);
+  font-size: var(--opencanvas-collection-title-font-size, inherit);
+  font-weight: var(--opencanvas-collection-title-font-weight, inherit);
+  line-height: var(--opencanvas-collection-title-line-height, inherit);
+}
+.opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="text"][data-opencanvas-element^="card-default-excerpt"] .opencanvas-text {
+  color: var(--opencanvas-collection-excerpt-color, inherit);
+  font-size: var(--opencanvas-collection-excerpt-font-size, inherit);
+  line-height: var(--opencanvas-collection-excerpt-line-height, inherit);
+}
+.opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="action"][data-opencanvas-element^="card-default-cta"] .opencanvas-action {
+  color: var(--opencanvas-collection-cta-color, inherit);
+  font-size: var(--opencanvas-collection-cta-font-size, inherit);
+  font-weight: var(--opencanvas-collection-cta-font-weight, inherit);
+}
 .opencanvas-collection[data-collection-display="image-only"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="media"] .opencanvas-media {
   border-radius: var(--opencanvas-collection-image-only-radius, 0);
 }

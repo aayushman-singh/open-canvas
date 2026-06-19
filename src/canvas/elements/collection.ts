@@ -24,6 +24,7 @@ import type { SidebarSpec } from './sidebar-spec.js';
 import type { VideoHoverPlayback } from './media.js';
 import {
   COLLECTION_STYLE_SPEC,
+  type ComponentStyleFontWeight,
   componentStylePatchProperty,
   parseComponentStylePatchValue,
 } from './component-style.js';
@@ -89,6 +90,16 @@ export interface CollectionStyle {
   cardShadow?: string;
   cardPadding?: number;
   cardImageRadius?: number;
+  titleColor?: string;
+  titleFontSize?: number;
+  titleFontWeight?: ComponentStyleFontWeight;
+  titleLineHeight?: number;
+  excerptColor?: string;
+  excerptFontSize?: number;
+  excerptLineHeight?: number;
+  ctaColor?: string;
+  ctaFontSize?: number;
+  ctaFontWeight?: ComponentStyleFontWeight;
   imageOnlyGap?: number;
   imageOnlyRadius?: number;
 }

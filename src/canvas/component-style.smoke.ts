@@ -211,6 +211,13 @@ function expectRoundTrip(state: EditableSite, label: string): void {
         gridGap: 18,
         cardBackgroundColor: '#ffeeee',
         cardImageRadius: 12,
+        titleColor: '#101010',
+        titleFontSize: 24,
+        titleFontWeight: 'bold',
+        excerptFontSize: 15,
+        excerptLineHeight: 1.55,
+        ctaFontSize: 13,
+        ctaFontWeight: 'medium',
       },
     ),
   ]);
@@ -242,6 +249,34 @@ function expectRoundTrip(state: EditableSite, label: string): void {
   assert(
     html.includes('--opencanvas-collection-card-bg:#ffeeee'),
     'collectionStyle must emit card background on the wrapper',
+  );
+  assert(
+    html.includes('--opencanvas-collection-title-font-size:24px'),
+    'collectionStyle must emit title font size on the wrapper',
+  );
+  assert(
+    html.includes('--opencanvas-collection-title-font-weight:700'),
+    'collectionStyle must emit title font weight on the wrapper',
+  );
+  assert(
+    html.includes('--opencanvas-collection-excerpt-line-height:1.55'),
+    'collectionStyle must emit excerpt line height on the wrapper',
+  );
+  assert(
+    html.includes('--opencanvas-collection-cta-font-weight:500'),
+    'collectionStyle must emit CTA font weight on the wrapper',
+  );
+  assert(
+    canvasPublishedStyles.includes('--opencanvas-collection-title-font-size'),
+    'public styles must consume collection title typography variables',
+  );
+  assert(
+    canvasPublishedStyles.includes('--opencanvas-collection-excerpt-line-height'),
+    'public styles must consume collection excerpt typography variables',
+  );
+  assert(
+    canvasPublishedStyles.includes('--opencanvas-collection-cta-font-weight'),
+    'public styles must consume collection CTA typography variables',
   );
   assert(
     html.includes('Materialized entry'),

@@ -491,16 +491,21 @@ Current state:
   inspector smoke coverage.
 - Editor/public DOM parity is in place for the styled component parts covered
   by ADR 0067.
+- **June 2026 update:** Collection Component Style now includes default-card
+  typography controls for title, excerpt, and CTA parts. The modeled fields
+  validate/Yjs-round-trip through the shared Component Style catalog, render as
+  CSS variables on the collection wrapper, public styles consume those
+  variables on the built-in card parts, and the generic inspector exposes the
+  controls.
 
 User-visible miss:
 
 - A template author can now tune the first ADR 0067 field catalog without raw
   `pinnedStyle`.
-- Template fidelity still stops at the first catalog: there are no reusable
-  saved Component Style recipes, arbitrary unit controls, collection title /
-  excerpt / CTA typography controls, or Component Style objects for unrelated
-  elements such as action, shape, container, table, nav, chart, code, text,
-  media, and embed.
+- Template fidelity still stops short of reusable saved Component Style
+  recipes, arbitrary unit controls, and Component Style objects for unrelated
+  elements such as shape, container, table, nav, chart, code, text, media, and
+  embed.
 
 Needed primitive:
 

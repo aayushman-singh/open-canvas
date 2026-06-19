@@ -4,6 +4,7 @@
 // Run with `bun run inspector-component-style:smoke`.
 
 import type { ActionElement, TabsElement } from '../canvas/schema.js';
+import type { CollectionElement } from '../canvas/elements/collection.js';
 import { actionInspectorSpec } from '../canvas/elements/action.js';
 import { accordionInspectorSpec } from '../canvas/elements/accordion.js';
 import { carouselInspectorSpec } from '../canvas/elements/carousel.js';
@@ -214,6 +215,18 @@ function makeTabs(overrides: Partial<TabsElement> = {}): TabsElement {
   };
 }
 
+function makeCollection(overrides: Partial<CollectionElement> = {}): CollectionElement {
+  return {
+    id: 'collection-1',
+    type: 'collection',
+    box: { x: 0, y: 0, w: 720, h: 420, z: 1 },
+    display: 'card',
+    sort: 'date-desc',
+    entries: [],
+    ...overrides,
+  };
+}
+
 function control(host: StubNode, key: string): StubNode {
   const found = host.querySelector(`[data-component-style-input="${key}"]`);
   assert(found !== null, `mount must render control for ${key}`);
@@ -291,6 +304,24 @@ function control(host: StubNode, key: string): StubNode {
   input.dispatchEvent('change');
 
   assert(tabs.tabsStyle?.tabPaddingX === 18, 'number controls must store finite numbers');
+}
+
+{
+  const collection = makeCollection();
+  const host = makeStubNode('div');
+  const { ctx, log } = makeCtx();
+  mountComponentStyle(ctx, collection, host as unknown as HTMLElement);
+
+  const input = control(host, 'titleFontSize');
+  input.value = '24';
+  input.dispatchEvent('change');
+
+  assert(
+    collection.collectionStyle?.titleFontSize === 24,
+    'typing collection title font size must set collectionStyle.titleFontSize',
+  );
+  assert(log.rebuildCalls.join(',') === 'collection-1', 'setting a collection field must rebuild the element');
+  assert(log.saveCalls === 1, 'setting a collection field must schedule one save');
 }
 
 if (savedDocument === undefined) {

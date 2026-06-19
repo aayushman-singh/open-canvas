@@ -275,6 +275,28 @@ export const COLLECTION_STYLE_FIELDS = [
     kind: 'numberPx',
     cssVar: '--opencanvas-collection-card-image-radius',
   },
+  { key: 'titleColor', kind: 'string', cssVar: '--opencanvas-collection-title-color' },
+  { key: 'titleFontSize', kind: 'numberPx', cssVar: '--opencanvas-collection-title-font-size' },
+  { key: 'titleFontWeight', kind: 'fontWeight', cssVar: '--opencanvas-collection-title-font-weight' },
+  {
+    key: 'titleLineHeight',
+    kind: 'numberUnitless',
+    cssVar: '--opencanvas-collection-title-line-height',
+  },
+  { key: 'excerptColor', kind: 'string', cssVar: '--opencanvas-collection-excerpt-color' },
+  {
+    key: 'excerptFontSize',
+    kind: 'numberPx',
+    cssVar: '--opencanvas-collection-excerpt-font-size',
+  },
+  {
+    key: 'excerptLineHeight',
+    kind: 'numberUnitless',
+    cssVar: '--opencanvas-collection-excerpt-line-height',
+  },
+  { key: 'ctaColor', kind: 'string', cssVar: '--opencanvas-collection-cta-color' },
+  { key: 'ctaFontSize', kind: 'numberPx', cssVar: '--opencanvas-collection-cta-font-size' },
+  { key: 'ctaFontWeight', kind: 'fontWeight', cssVar: '--opencanvas-collection-cta-font-weight' },
   { key: 'imageOnlyGap', kind: 'numberPx', cssVar: '--opencanvas-collection-image-only-gap' },
   {
     key: 'imageOnlyRadius',
