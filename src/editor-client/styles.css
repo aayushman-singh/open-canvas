@@ -1860,6 +1860,40 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   min-width: 0;
   max-width: 100%;
 }
+.opencanvas-motion-timeline {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 2px 0 4px;
+}
+.opencanvas-motion-timeline-label {
+  color: var(--opencanvas-fg-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.opencanvas-motion-timeline-track {
+  position: relative;
+  min-height: 30px;
+  overflow: hidden;
+  border: 1px solid var(--opencanvas-hairline);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--opencanvas-bg-muted) 78%, transparent);
+}
+.opencanvas-motion-timeline-bar {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  display: grid;
+  min-width: 18px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--opencanvas-accent);
+  color: var(--opencanvas-bg);
+  font-size: 10px;
+  font-weight: 800;
+}
 
 .opencanvas-sidebar-command-grid,
 .opencanvas-sidebar-kit-grid {

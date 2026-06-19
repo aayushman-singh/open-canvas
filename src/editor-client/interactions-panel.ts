@@ -1720,6 +1720,8 @@ function renderMotionSequenceCard(
     card.appendChild(note);
   }
 
+  renderMotionSequenceTimeline(card, sequence);
+
   const addStep = compactButton('Add step', 'Add a Motion Sequence step');
   addStep.addEventListener('click', () => {
     mutate(ctx, () => {
@@ -1735,6 +1737,69 @@ function renderMotionSequenceCard(
   }
 
   host.appendChild(card);
+}
+
+function renderMotionSequenceTimeline(card: HTMLElement, sequence: MotionSequence): void {
+  const wrap = document.createElement('div');
+  wrap.className = 'opencanvas-motion-timeline';
+  const label = document.createElement('div');
+  label.className = 'opencanvas-motion-timeline-label';
+  label.textContent = 'Timeline overview';
+  wrap.appendChild(label);
+
+  const track = document.createElement('div');
+  track.className = 'opencanvas-motion-timeline-track';
+  const scheduled = motionSequenceTimelineItems(sequence);
+  for (const item of scheduled) {
+    const bar = document.createElement('div');
+    bar.className = 'opencanvas-motion-timeline-bar';
+    bar.style.left = item.leftPercent.toFixed(2) + '%';
+    bar.style.width = item.widthPercent.toFixed(2) + '%';
+    bar.textContent = item.label;
+    bar.title = item.title;
+    track.appendChild(bar);
+  }
+  wrap.appendChild(track);
+  card.appendChild(wrap);
+}
+
+function motionSequenceTimelineItems(
+  sequence: MotionSequence,
+): Array<{ leftPercent: number; widthPercent: number; label: string; title: string }> {
+  let cursorMs = 0;
+  const raw = sequence.steps.map((step, index) => {
+    const base = sequence.trigger.type === 'scroll-scene' ? cursorMs : step.startAtMs ?? cursorMs;
+    const start = base + (step.delayMs ?? 0);
+    const duration = Math.max(1, step.durationMs ?? 0);
+    const end = start + duration;
+    const cursorEnd = end + (step.staggerMs ?? 0) + (step.waitAfterMs ?? 0);
+    cursorMs = Math.max(cursorMs, cursorEnd);
+    return {
+      start,
+      duration,
+      label: String(index + 1),
+      title:
+        'Step ' +
+        String(index + 1) +
+        ' · ' +
+        step.target.type +
+        ' · start ' +
+        String(start) +
+        'ms · duration ' +
+        String(duration) +
+        'ms',
+    };
+  });
+  const total = Math.max(
+    1,
+    ...raw.map((item) => item.start + item.duration),
+  );
+  return raw.map((item) => ({
+    leftPercent: Math.max(0, Math.min(100, (item.start / total) * 100)),
+    widthPercent: Math.max(2, Math.min(100, (item.duration / total) * 100)),
+    label: item.label,
+    title: item.title,
+  }));
 }
 
 function renderMotionSequenceTriggerDetail(

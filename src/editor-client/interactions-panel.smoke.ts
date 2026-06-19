@@ -197,6 +197,9 @@ assert(panelSrc.includes('RIVE_INPUT_EVENTS'), 'panel must use schema Rive input
 assert(panelSrc.includes('RIVE_INPUT_TYPES'), 'panel must use schema Rive input type values');
 assert(panelSrc.includes('Add motion sequence'), 'panel must create full Motion Sequences');
 assert(panelSrc.includes('Motion Sequence step'), 'panel must render editable Motion Sequence steps');
+assert(panelSrc.includes('renderMotionSequenceTimeline'), 'panel must render a Motion Sequence timeline overview');
+assert(panelSrc.includes('Timeline overview'), 'panel must label the Motion Sequence timeline overview');
+assert(panelSrc.includes('opencanvas-motion-timeline'), 'panel must use timeline-specific DOM classes');
 assert(panelSrc.includes('renderLayoutTransitionControls'), 'panel must render layout transition controls');
 assert(panelSrc.includes('renderSmoothScrollControls'), 'panel must render Smooth Scroll controls');
 assert(panelSrc.includes('Smooth Scroll'), 'panel must label Smooth Scroll controls');
@@ -233,5 +236,15 @@ assert(panelSrc.includes('MOTION_SEQUENCE_LITE_EFFECTS'), 'panel must use motion
 assert(panelSrc.includes('MOTION_SEQUENCE_LITE_TARGET_TYPES'), 'panel must use motion targets');
 assert(panelSrc.includes('renderSequenceLiteEditor'), 'panel must render sequence editor');
 assert(panelSrc.includes('Snap points'), 'panel must expose Scroll Scene snap point controls');
+
+const stylesCssSrc = await Bun.file(new URL('./styles.css', import.meta.url)).text();
+const stylesBuildSrc = await Bun.file(new URL('./styles-build.ts', import.meta.url)).text();
+for (const [label, src] of [
+  ['styles.css', stylesCssSrc],
+  ['styles-build.ts', stylesBuildSrc],
+] as const) {
+  assert(src.includes('.opencanvas-motion-timeline'), label + ' must style the Motion Sequence timeline overview');
+  assert(src.includes('.opencanvas-motion-timeline-bar'), label + ' must style Motion Sequence timeline bars');
+}
 
 console.log('[interactions-panel:smoke] OK');
