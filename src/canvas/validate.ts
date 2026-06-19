@@ -55,6 +55,7 @@ import {
   BEHAVIOUR_TARGET_TYPES,
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
+  MOTION_SEQUENCE_PLAYBACK_DIRECTIONS,
   MOTION_SEQUENCE_PROPERTIES,
   MOTION_SEQUENCE_REPEAT_MODES,
   MOTION_SEQUENCE_TRIGGER_TYPES,
@@ -2942,6 +2943,17 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
             errors.push(
               `${sequencePath}.reducedMotion must be "skip" or "final-state" when present (got ${describe(sequence.reducedMotion)})`,
             );
+          }
+        }
+        if (sequence.playbackDirection !== undefined) {
+          assertOneOf(
+            sequence.playbackDirection,
+            MOTION_SEQUENCE_PLAYBACK_DIRECTIONS,
+            `${sequencePath}.playbackDirection`,
+            errors,
+          );
+          if (isRecord(sequence.trigger) && sequence.trigger.type === 'scroll-scene') {
+            errors.push(`${sequencePath}.playbackDirection is not supported for scroll-scene Motion Sequences`);
           }
         }
         if (sequence.repeat !== undefined) {

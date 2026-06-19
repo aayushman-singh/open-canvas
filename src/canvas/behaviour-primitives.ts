@@ -15,6 +15,7 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'filter',
 ] as const;
 export const MOTION_SEQUENCE_REPEAT_MODES = ['restart', 'yoyo'] as const;
+export const MOTION_SEQUENCE_PLAYBACK_DIRECTIONS = ['normal', 'reverse'] as const;
 export const RICH_MOTION_KINDS = [
   'image-sequence',
   'rive',
@@ -70,6 +71,7 @@ export interface MotionSequence {
     | { type: 'scroll-scene'; scrollSceneId: string };
   steps: MotionSequenceStep[];
   repeat?: MotionSequenceRepeat;
+  playbackDirection?: (typeof MOTION_SEQUENCE_PLAYBACK_DIRECTIONS)[number];
   reducedMotion?: 'skip' | 'final-state';
 }
 

@@ -181,10 +181,11 @@ function baseSite(): EditableSite & Record<string, unknown> {
 }
 
 const valid = baseSite();
+(valid.motionSequences![0] as unknown as Record<string, unknown>).playbackDirection = 'reverse';
 const validation = validateEditableSite(valid);
 assert(
   validation.valid,
-  `repeat/yoyo motion sequence must validate: ${validation.valid ? '' : validation.errors.join('; ')}`,
+  `repeat/yoyo reverse motion sequence must validate: ${validation.valid ? '' : validation.errors.join('; ')}`,
 );
 
 const invalidScrollRepeat = baseSite();
@@ -220,6 +221,48 @@ assert(
   `scroll repeat failure must mention repeat; got ${invalidScrollValidation.valid ? '' : invalidScrollValidation.errors.join('; ')}`,
 );
 
+const invalidScrollReverse = baseSite();
+invalidScrollReverse.motionSequences = [
+  {
+    id: 'scroll-reverse',
+    trigger: { type: 'scroll-scene', scrollSceneId: 'scene-hero' },
+    steps: [
+      {
+        id: 'site-fade',
+        target: { type: 'site' },
+        to: { opacity: 1 },
+        durationMs: 1,
+      },
+    ],
+  },
+];
+(invalidScrollReverse.motionSequences[0] as unknown as Record<string, unknown>).playbackDirection = 'reverse';
+invalidScrollReverse.scrollScenes = [
+  {
+    id: 'scene-hero',
+    sectionId: 'hero',
+    sequenceId: 'scroll-reverse',
+    pinTarget: { type: 'section', sectionId: 'hero' },
+    startOffsetPx: 0,
+    endOffsetPx: 720,
+  },
+];
+const invalidScrollReverseValidation = validateEditableSite(invalidScrollReverse);
+assert(!invalidScrollReverseValidation.valid, 'scroll-scrubbed Motion Sequences must reject reverse playback');
+assert(
+  invalidScrollReverseValidation.errors.some((error) => error.includes('motionSequences[0].playbackDirection')),
+  `scroll reverse failure must mention playbackDirection; got ${invalidScrollReverseValidation.valid ? '' : invalidScrollReverseValidation.errors.join('; ')}`,
+);
+
+const invalidDirection = baseSite();
+(invalidDirection.motionSequences![0] as unknown as Record<string, unknown>).playbackDirection = 'sideways';
+const invalidDirectionValidation = validateEditableSite(invalidDirection);
+assert(!invalidDirectionValidation.valid, 'unsupported Motion Sequence playback direction must fail validation');
+assert(
+  invalidDirectionValidation.errors.some((error) => error.includes('motionSequences[0].playbackDirection')),
+  `invalid playback direction failure must mention playbackDirection; got ${invalidDirectionValidation.valid ? '' : invalidDirectionValidation.errors.join('; ')}`,
+);
+
 const invalidCount = baseSite();
 (
   (invalidCount.motionSequences as Array<{ repeat: { count: number } }>)[0]!
@@ -245,9 +288,18 @@ const animation = doc.documentElement.animations[0];
 assert(animation !== undefined, 'load-enter repeat sequence must animate the site target');
 assert(animation.options.iterations === 3, 'repeat count 2 must run 3 total iterations');
 assert(animation.options.direction === 'alternate', 'yoyo repeat mode must map to alternate direction');
+assert(
+  (animation.keyframes[0] as { opacity?: number }).opacity === 1,
+  'reverse playback must start from the authored to state',
+);
+assert(
+  (animation.keyframes[1] as { opacity?: number }).opacity === 0,
+  'reverse playback must end at the authored from state',
+);
 
 const panelSource = readFileSync(join(process.cwd(), 'src', 'editor-client', 'interactions-panel.ts'), 'utf8');
 assert(panelSource.includes('Repeat count'), 'Interactions panel must expose Motion Sequence repeat count');
 assert(panelSource.includes('Repeat mode'), 'Interactions panel must expose Motion Sequence repeat mode');
+assert(panelSource.includes('Playback direction'), 'Interactions panel must expose Motion Sequence playback direction');
 
 console.log('[motion-sequence-repeat:smoke] OK');

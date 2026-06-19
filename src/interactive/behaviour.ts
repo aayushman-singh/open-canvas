@@ -183,9 +183,16 @@ function behaviourSequenceRepeatOptions(repeat) {
   };
 }
 
-function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat) {
+function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, playbackDirection) {
   var from = step.from || {};
   var to = step.to || {};
+  var direction = playbackDirection || 'normal';
+  if (direction !== 'normal' && direction !== 'reverse') {
+    behaviourFailure('motion-sequence-playback-direction', { playbackDirection: playbackDirection }, new Error('unsupported playback direction'));
+  }
+  if (progress !== undefined && direction === 'reverse') {
+    behaviourFailure('motion-sequence-playback-direction-scroll-scene', { playbackDirection: playbackDirection }, new Error('scroll-scene Motion Sequences cannot reverse playback'));
+  }
   var stagger = step.staggerMs || 0;
   if (progress !== undefined) {
     for (var i = 0; i < targets.length; i++) {
@@ -205,8 +212,8 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat) {
     var keyframes = [];
     var fromProps = Object.assign({}, from);
     var toProps = Object.assign({}, to);
-    keyframes.push(behaviourPropsAtProgress(fromProps, toProps, 0));
-    keyframes.push(behaviourPropsAtProgress(fromProps, toProps, 1));
+    keyframes.push(behaviourPropsAtProgress(fromProps, toProps, direction === 'reverse' ? 1 : 0));
+    keyframes.push(behaviourPropsAtProgress(fromProps, toProps, direction === 'reverse' ? 0 : 1));
     var repeatOptions = behaviourSequenceRepeatOptions(repeat);
     var options = {
       duration: step.durationMs || 0,
@@ -235,7 +242,14 @@ function behaviourRunSequence(sequence, root, reducedMode, progress) {
   for (var i = 0; i < steps.length; i++) {
     var step = steps[i];
     var targets = behaviourResolveTarget(step.target, root);
-    behaviourAnimateTargets(targets, step, reducedMode, progress, progress === undefined ? sequence.repeat : null);
+    behaviourAnimateTargets(
+      targets,
+      step,
+      reducedMode,
+      progress,
+      progress === undefined ? sequence.repeat : null,
+      sequence.playbackDirection || 'normal',
+    );
   }
 }
 

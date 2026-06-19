@@ -49,6 +49,7 @@ import type {
 import {
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
+  MOTION_SEQUENCE_PLAYBACK_DIRECTIONS,
   MOTION_SEQUENCE_REPEAT_MODES,
   MOTION_SEQUENCE_TRIGGER_TYPES,
   RIVE_INPUT_EVENTS,
@@ -111,12 +112,14 @@ const DEFAULT_EASING = 'ease-in-out';
 type RiveInputType = (typeof RIVE_INPUT_TYPES)[number];
 type RiveInputEvent = (typeof RIVE_INPUT_EVENTS)[number];
 type MotionSequenceRepeatMode = (typeof MOTION_SEQUENCE_REPEAT_MODES)[number];
+type MotionSequencePlaybackDirection = (typeof MOTION_SEQUENCE_PLAYBACK_DIRECTIONS)[number];
 type ShaderScenePreset = (typeof SHADER_SCENE_PRESETS)[number];
 type ShaderSceneReducedMotionMode = (typeof SHADER_SCENE_REDUCED_MOTION_MODES)[number];
 type VideoStreamTrigger = (typeof VIDEO_STREAM_TRIGGERS)[number];
 type VideoStreamReducedMotionMode = (typeof VIDEO_STREAM_REDUCED_MOTION_MODES)[number];
-type MotionSequencePatch = Partial<Omit<MotionSequence, 'repeat'>> & {
+type MotionSequencePatch = Partial<Omit<MotionSequence, 'repeat' | 'playbackDirection'>> & {
   repeat?: MotionSequence['repeat'] | undefined;
+  playbackDirection?: MotionSequence['playbackDirection'] | undefined;
 };
 
 export function defaultOverlay(id: string, name: string, pageId: string): Overlay {
@@ -1544,7 +1547,10 @@ function renderMotionSequenceCard(
       const patch: MotionSequencePatch = {
         trigger: defaultMotionSequenceTrigger(ctx, trigger.value),
       };
-      if (trigger.value === 'scroll-scene') patch.repeat = undefined;
+      if (trigger.value === 'scroll-scene') {
+        patch.repeat = undefined;
+        patch.playbackDirection = undefined;
+      }
       updateMotionSequence(ctx, sequence.id, patch);
     });
   });
@@ -1558,6 +1564,22 @@ function renderMotionSequenceCard(
     });
   });
   card.appendChild(field('Reduced motion', reduced));
+
+  const directionDisabled = sequence.trigger.type === 'scroll-scene';
+  const playbackDirection = selectInput(
+    [...MOTION_SEQUENCE_PLAYBACK_DIRECTIONS],
+    sequence.playbackDirection ?? 'normal',
+  );
+  playbackDirection.disabled = directionDisabled;
+  playbackDirection.addEventListener('change', () => {
+    mutate(ctx, () => {
+      const next = playbackDirection.value as MotionSequencePlaybackDirection;
+      updateMotionSequence(ctx, sequence.id, {
+        playbackDirection: next === 'normal' ? undefined : next,
+      });
+    });
+  });
+  card.appendChild(field('Playback direction', playbackDirection));
 
   const repeatDisabled = sequence.trigger.type === 'scroll-scene';
   const repeatCount = numberInput(sequence.repeat?.count ?? 0, 0, 20, 1);
@@ -1903,13 +1925,20 @@ function updateMotionSequence(
 }
 
 function motionSequenceWithPatch(sequence: MotionSequence, patch: MotionSequencePatch): MotionSequence {
-  const { repeat, ...rest } = patch;
+  const { repeat, playbackDirection, ...rest } = patch;
   const next: MotionSequence = { ...sequence, ...rest };
   if ('repeat' in patch) {
     if (repeat === undefined) {
       delete next.repeat;
     } else {
       next.repeat = repeat;
+    }
+  }
+  if ('playbackDirection' in patch) {
+    if (playbackDirection === undefined) {
+      delete next.playbackDirection;
+    } else {
+      next.playbackDirection = playbackDirection;
     }
   }
   return next;
