@@ -1,6 +1,7 @@
 export {};
 
 import {
+  defaultImageSequenceRichMotionAsset,
   defaultLoadExperience,
   defaultLottieRichMotionAsset,
   defaultLayoutTransition,
@@ -135,6 +136,20 @@ equal(videoStreamAsset.playback.trigger, 'hover-focus', 'video stream trigger de
 equal(videoStreamAsset.playback.resetOnExit ?? false, true, 'video stream reset default');
 equal(videoStreamAsset.reducedMotion, 'poster', 'video stream reduced-motion default');
 
+const imageSequenceAsset = defaultImageSequenceRichMotionAsset('sequence-a');
+equal(imageSequenceAsset.id, 'sequence-a', 'image sequence asset id');
+equal(imageSequenceAsset.kind, 'image-sequence', 'image sequence asset kind');
+deepEqual(
+  imageSequenceAsset.frameAssetIds,
+  ['sequence-a-frame-001.webp', 'sequence-a-frame-002.webp'],
+  'image sequence frame defaults',
+);
+equal(imageSequenceAsset.posterAssetId, 'sequence-a-poster.webp', 'image sequence poster default');
+equal(imageSequenceAsset.alt, 'Image sequence', 'image sequence alt default');
+equal(imageSequenceAsset.playback.driver, 'load', 'image sequence driver default');
+equal(imageSequenceAsset.playback.fps ?? 0, 24, 'image sequence fps default');
+equal(imageSequenceAsset.playback.loop ?? true, false, 'image sequence loop default');
+
 const lottieAsset = defaultLottieRichMotionAsset('lottie-a');
 equal(lottieAsset.id, 'lottie-a', 'lottie asset id');
 equal(lottieAsset.kind, 'lottie', 'lottie asset kind');
@@ -175,11 +190,16 @@ assert(panelSrc.includes('Horizontal track'), 'panel must expose Scroll Scene ho
 assert(panelSrc.includes('horizontalTrack'), 'panel must mutate Scroll Scene horizontal track state');
 assert(panelSrc.includes('renderMotionSequenceControls'), 'panel must render full Motion Sequence controls');
 assert(panelSrc.includes('renderRichMotionAssetControls'), 'panel must render Rich Motion Asset controls');
+assert(panelSrc.includes('Add image sequence asset'), 'panel must create image-sequence asset metadata');
 assert(panelSrc.includes('Add Rive asset'), 'panel must create Rive asset metadata');
 assert(panelSrc.includes('Add Lottie asset'), 'panel must create Lottie asset metadata');
 assert(panelSrc.includes('Add model-3d asset'), 'panel must create model-3d asset metadata');
 assert(panelSrc.includes('Add shader scene asset'), 'panel must create shader-scene asset metadata');
 assert(panelSrc.includes('Add video stream asset'), 'panel must create video stream asset metadata');
+assert(panelSrc.includes('renderImageSequenceAssetFields'), 'panel must render image-sequence asset fields');
+assert(panelSrc.includes('Image sequence playback'), 'panel must expose image sequence playback driver control');
+assert(panelSrc.includes('Frame asset ids'), 'panel must expose image sequence frame controls');
+assert(panelSrc.includes('Scroll scene'), 'panel must bind image sequence scrub playback to Scroll Scenes');
 assert(panelSrc.includes('renderLottieAssetFields'), 'panel must render Lottie asset fields');
 assert(panelSrc.includes('renderModel3DAssetFields'), 'panel must render model-3d asset fields');
 assert(panelSrc.includes('renderShaderSceneAssetFields'), 'panel must render shader-scene asset fields');

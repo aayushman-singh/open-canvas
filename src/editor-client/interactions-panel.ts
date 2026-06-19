@@ -34,6 +34,7 @@ import type {
 } from '../canvas/schema.js';
 import type {
   BehaviourTarget,
+  ImageSequenceRichMotionAsset,
   LayoutTransition,
   LottieRichMotionAsset,
   Model3DRichMotionAsset,
@@ -245,6 +246,17 @@ export function defaultShaderSceneRichMotionAsset(id: string): ShaderSceneRichMo
     speed: 0.8,
     density: 0.7,
     reducedMotion: 'static',
+  };
+}
+
+export function defaultImageSequenceRichMotionAsset(id: string): ImageSequenceRichMotionAsset {
+  return {
+    id,
+    kind: 'image-sequence',
+    frameAssetIds: [id + '-frame-001.webp', id + '-frame-002.webp'],
+    posterAssetId: id + '-poster.webp',
+    alt: 'Image sequence',
+    playback: { driver: 'load', fps: 24, loop: false },
   };
 }
 
@@ -501,6 +513,10 @@ function isRiveAsset(asset: RichMotionAsset): asset is RiveRichMotionAsset {
   return asset.kind === 'rive';
 }
 
+function isImageSequenceAsset(asset: RichMotionAsset): asset is ImageSequenceRichMotionAsset {
+  return asset.kind === 'image-sequence';
+}
+
 function isLottieAsset(asset: RichMotionAsset): asset is LottieRichMotionAsset {
   return asset.kind === 'lottie';
 }
@@ -587,6 +603,22 @@ function coerceRiveBinding(
 function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
   if (!ctx.state) return;
   const wrap = section('Rich Motion Assets');
+  const addImageSequence = actionButton(
+    'Add image sequence asset',
+    'Create schema-owned image-sequence rich motion metadata',
+  );
+  addImageSequence.addEventListener('click', () => {
+    mutate(ctx, () => {
+      const id = 'image-sequence-' + Date.now();
+      ctx.state!.richMotionAssets = [
+        ...(ctx.state!.richMotionAssets ?? []),
+        defaultImageSequenceRichMotionAsset(id),
+      ];
+    });
+    ctx.setStatus('Image sequence asset metadata added', 'ok');
+  });
+  wrap.appendChild(addImageSequence);
+
   const addRive = actionButton('Add Rive asset', 'Create schema-owned Rive rich motion metadata');
   addRive.addEventListener('click', () => {
     mutate(ctx, () => {
@@ -685,6 +717,12 @@ function renderRichMotionAssetCard(
   header.appendChild(remove);
   card.appendChild(header);
 
+  if (isImageSequenceAsset(asset)) {
+    renderImageSequenceAssetFields(ctx, card, asset);
+    host.appendChild(card);
+    return;
+  }
+
   if (isRiveAsset(asset)) {
     renderRiveAssetFields(ctx, card, asset);
     renderRiveInputBindings(ctx, card, asset);
@@ -720,11 +758,164 @@ function renderRichMotionAssetCard(
     const note = document.createElement('p');
     note.className = 'opencanvas-section-picker-empty';
     note.textContent =
-      'This editor slice exposes Rive, Lottie, model-3d, shader-scene, and video stream asset controls. Other rich motion kinds remain schema-owned.';
+      'This editor slice exposes image-sequence, Rive, Lottie, model-3d, shader-scene, and video stream asset controls. Other rich motion kinds remain schema-owned.';
     card.appendChild(note);
     host.appendChild(card);
     return;
   }
+}
+
+function renderImageSequenceAssetFields(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  asset: ImageSequenceRichMotionAsset,
+): void {
+  const frames = textInput(asset.frameAssetIds.join(', '), 'frame-001.webp, frame-002.webp');
+  frames.addEventListener('change', () => {
+    const frameAssetIds = frames.value
+      .split(',')
+      .map((frame) => frame.trim())
+      .filter(Boolean);
+    if (frameAssetIds.length === 0) {
+      frames.value = asset.frameAssetIds.join(', ');
+      ctx.setStatus('Image sequence requires at least one frame asset id', 'error');
+      return;
+    }
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isImageSequenceAsset(current) ? { ...current, frameAssetIds } : current,
+    );
+  });
+  card.appendChild(field('Frame asset ids', frames));
+
+  const poster = textInput(asset.posterAssetId, 'sequence-poster.webp');
+  poster.addEventListener('change', () => {
+    const next = poster.value.trim();
+    if (!next) {
+      poster.value = asset.posterAssetId;
+      ctx.setStatus('Image sequence poster asset id is required', 'error');
+      return;
+    }
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isImageSequenceAsset(current) ? { ...current, posterAssetId: next } : current,
+    );
+  });
+  card.appendChild(field('Poster asset id', poster));
+
+  const alt = textInput(asset.alt, 'Accessible image sequence label');
+  alt.addEventListener('change', () => {
+    const next = alt.value.trim();
+    if (!next) {
+      alt.value = asset.alt;
+      ctx.setStatus('Image sequence alt text is required', 'error');
+      return;
+    }
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isImageSequenceAsset(current) ? { ...current, alt: next } : current,
+    );
+  });
+  card.appendChild(field('Alt text', alt));
+
+  const driver = selectInput(['load', 'scroll-scene'], asset.playback.driver);
+  driver.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) => {
+      if (!isImageSequenceAsset(current)) return current;
+      if (driver.value === 'scroll-scene') {
+        const sceneIds = (ctx.state?.scrollScenes ?? []).map((scene) => scene.id);
+        const scrollSceneId = current.playback.scrollSceneId ?? sceneIds[0] ?? '';
+        if (!scrollSceneId) {
+          ctx.setStatus(
+            'Create a Scroll Scene before binding image-sequence scrub playback. Validation blocks publish until it is restored.',
+            'error',
+          );
+        }
+        return { ...current, playback: { driver: 'scroll-scene', scrollSceneId } };
+      }
+      return {
+        ...current,
+        playback: {
+          driver: 'load',
+          fps: current.playback.fps ?? 24,
+          loop: current.playback.loop ?? false,
+        },
+      };
+    }),
+  );
+  card.appendChild(field('Image sequence playback', driver));
+
+  if (asset.playback.driver === 'scroll-scene') {
+    const sceneIds = (ctx.state?.scrollScenes ?? []).map((scene) => scene.id);
+    const currentSceneId = asset.playback.scrollSceneId ?? '';
+    const sceneOptions =
+      currentSceneId && !sceneIds.includes(currentSceneId)
+        ? [currentSceneId, ...sceneIds]
+        : sceneIds.length > 0
+          ? sceneIds
+          : [''];
+    const scene = selectInput(sceneOptions, currentSceneId);
+    scene.addEventListener('change', () =>
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isImageSequenceAsset(current)
+          ? { ...current, playback: { driver: 'scroll-scene', scrollSceneId: scene.value } }
+          : current,
+      ),
+    );
+    card.appendChild(field('Scroll scene', scene));
+
+    if (sceneIds.length === 0) {
+      const note = document.createElement('p');
+      note.className = 'opencanvas-section-picker-empty';
+      note.textContent =
+        'Create a Scroll Scene before binding image-sequence scrub playback. Validation blocks publish until it is restored.';
+      card.appendChild(note);
+    } else if (currentSceneId && !sceneIds.includes(currentSceneId)) {
+      const note = document.createElement('p');
+      note.className = 'opencanvas-section-picker-empty';
+      note.textContent =
+        'Linked Scroll Scene is missing. Validation blocks publish until the image-sequence scrub binding is restored.';
+      card.appendChild(note);
+    }
+    return;
+  }
+
+  const fps = numberInput(asset.playback.fps ?? 24, 1, 60, 1);
+  fps.addEventListener('change', () => {
+    const next = validNumber(fps, 1, 60);
+    if (next === null) {
+      fps.value = String(asset.playback.fps ?? 24);
+      ctx.setStatus('Image sequence fps must be between 1 and 60', 'error');
+      return;
+    }
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isImageSequenceAsset(current)
+        ? {
+            ...current,
+            playback: {
+              driver: 'load',
+              fps: next,
+              loop: current.playback.loop ?? false,
+            },
+          }
+        : current,
+    );
+  });
+  card.appendChild(field('FPS', fps));
+
+  card.appendChild(
+    checkbox(asset.playback.loop === true, 'Loop', (checked) =>
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isImageSequenceAsset(current)
+          ? {
+              ...current,
+              playback: {
+                driver: 'load',
+                fps: current.playback.fps ?? 24,
+                loop: checked,
+              },
+            }
+          : current,
+      ),
+    ),
+  );
 }
 
 function renderRiveAssetFields(

@@ -269,13 +269,17 @@ Current state:
   Runtime Hydrator translates it from scene progress with named failures for
   unresolved or unmeasurable tracks. Velocity Athlete uses this instead of a
   template-only transform to prove horizontal storytelling is owner-editable.
+- **June 2026 update:** Image-sequence Rich Motion Assets can now bind playback
+  to a Scroll Scene from the Interactions panel. Owners can choose load playback
+  with FPS/loop controls or scroll-scrub playback against a named Scroll Scene;
+  missing scene relations are surfaced in the editor and blocked by validation.
 
 User-visible miss:
 
 - Scroll position can now drive pinned Motion Sequence progress with authored
   stops.
-- Still missing: image sequence scrub controls in the editor, before/after
-  reveal controls, and richer scroll-progress typography authoring.
+- Still missing: before/after reveal controls and richer scroll-progress
+  typography authoring.
 
 Needed primitive:
 
@@ -619,11 +623,13 @@ User-visible miss:
   pipelines or owner-authored Three.js code.
 - Rive input bindings are schema/runtime-owned and panel-editable. Rich Motion
   elements now expose an inspector asset picker backed by
-  `state.richMotionAssets`, so owners can bind an element to authored Rive,
-  Lottie, model, shader, or video-stream assets without hand-editing JSON.
+  `state.richMotionAssets`, so owners can bind an element to authored
+  image-sequence, Rive, Lottie, model, shader, or video-stream assets without
+  hand-editing JSON.
 - Rich Motion asset metadata controls now cover the runtime-supported
-  `rive`, `lottie`, `model-3d`, `shader-scene`, and `video-stream` kinds in
-  the Interactions panel, so these surfaces are no longer template-JSON-only.
+  `image-sequence`, `rive`, `lottie`, `model-3d`, `shader-scene`, and
+  `video-stream` kinds in the Interactions panel, so these surfaces are no
+  longer template-JSON-only.
 
 Needed primitive:
 
