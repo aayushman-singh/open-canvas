@@ -142,6 +142,42 @@ assert(
   dragSliderValidation.valid ? 'valid drag-slider gallery should pass' : dragSliderValidation.errors.join('; '),
 );
 
+const searchCollection = makeCollection({
+  search: {
+    enabled: true,
+    placeholder: 'Search helmets',
+    emptyMessage: 'No matching helmets',
+    reducedMotion: 'instant',
+  },
+});
+const searchState = makeSite(searchCollection);
+const searchValidation = validateEditableSite(searchState);
+assert(
+  searchValidation.valid,
+  searchValidation.valid ? 'valid collection search should pass' : searchValidation.errors.join('; '),
+);
+
+const invalidSearch = makeSite(
+  makeCollection({
+    search: {
+      enabled: true,
+      placeholder: '',
+      emptyMessage: '',
+      reducedMotion: 'fade',
+    },
+  } as unknown as Partial<CollectionElement>),
+);
+const invalidSearchResult = validateEditableSite(invalidSearch);
+assert(!invalidSearchResult.valid, 'invalid collection search config must fail validation');
+assert(
+  invalidSearchResult.errors.some((error) => error.includes('search.reducedMotion')),
+  `validation error must name search.reducedMotion; got ${invalidSearchResult.valid ? 'valid' : invalidSearchResult.errors.join(' | ')}`,
+);
+assert(
+  invalidSearchResult.errors.some((error) => error.includes('search.placeholder')),
+  `validation error must name search.placeholder; got ${invalidSearchResult.valid ? 'valid' : invalidSearchResult.errors.join(' | ')}`,
+);
+
 const invalidDragSlider = makeSite(
   makeCollection({
     gallery: {
@@ -222,6 +258,32 @@ assert(
   'renderer must make drag-slider gallery roots keyboard focusable',
 );
 
+const searchHtml = renderCollection(searchCollection, {
+  styleKit: 'charcoal',
+  assetBasePath: '/assets',
+  renderChild: (child) => `<span data-opencanvas-element="${child.id}">${child.type === 'text' ? 'Searchable ' + child.id : ''}</span>`,
+});
+assert(
+  searchHtml.includes('data-opencanvas-collection-search="true"'),
+  'renderer must emit collection search metadata',
+);
+assert(
+  searchHtml.includes('data-opencanvas-collection-search-reduced-motion="instant"'),
+  'renderer must emit collection search reduced-motion metadata',
+);
+assert(
+  searchHtml.includes('data-opencanvas-collection-search-input'),
+  'renderer must emit a collection search input control',
+);
+assert(
+  searchHtml.includes('placeholder="Search helmets"'),
+  'renderer must emit owner-authored search placeholder copy',
+);
+assert(
+  searchHtml.includes('No matching helmets'),
+  'renderer must emit owner-authored search empty-state copy',
+);
+
 const videoHoverCollection = makeCollection({
   gallery: {
     mode: 'hover-reveal-detail',
@@ -290,6 +352,15 @@ assert(
     decodedDragSlider.gallery?.showProgress === true,
   'Yjs projection must preserve collection gallery drag-slider policy',
 );
+const decodedSearch = decodeYDoc(encodeYDoc(searchState)).pages[0]!.sections[0]!
+  .elements[0]! as CollectionElement;
+assert(
+  decodedSearch.search?.enabled === true &&
+    decodedSearch.search.placeholder === 'Search helmets' &&
+    decodedSearch.search.emptyMessage === 'No matching helmets' &&
+    decodedSearch.search.reducedMotion === 'instant',
+  'Yjs projection must preserve collection search policy',
+);
 
 const snapshot: PublishedSnapshot = {
   ...state,
@@ -308,6 +379,20 @@ assert(
   INTERACTIVE_RUNTIME_SRC.includes('opencanvas:collection-gallery-failed'),
   'collection gallery runtime must emit a named failure event',
 );
+assert(
+  INTERACTIVE_RUNTIME_SRC.includes('opencanvas:collection-search-failed'),
+  'collection search runtime must emit a named failure event',
+);
+
+const searchSnapshot: PublishedSnapshot = {
+  ...searchState,
+  version: 1,
+  publishedAt: '2026-06-19T00:00:00.000Z',
+};
+assert(
+  snapshotNeedsInteractiveRuntime(searchSnapshot),
+  'search-enabled Collection must require the visitor interactive runtime',
+);
 
 interface StubNode {
   attrs: Record<string, string>;
@@ -317,17 +402,24 @@ interface StubNode {
   setAttribute(key: string, value: string): void;
   addEventListener(type: string, handler: (ev: Record<string, unknown>) => void): void;
   querySelectorAll(selector: string): StubNode[];
+  querySelector(selector: string): StubNode | null;
   getBoundingClientRect(): { width: number; height: number };
   style: { setProperty(key: string, value: string): void };
+  hidden: boolean;
+  textContent: string;
+  value: string;
 }
 
-function makeStubNode(attrs: Record<string, string>, width = 100): StubNode {
+function makeStubNode(attrs: Record<string, string>, width = 100, textContent = ''): StubNode {
   const listeners: StubNode['listeners'] = {};
   const props: Record<string, string> = {};
   return {
     attrs,
     listeners,
     props,
+    hidden: false,
+    textContent,
+    value: '',
     getAttribute(key: string): string | null {
       return Object.prototype.hasOwnProperty.call(attrs, key) ? attrs[key]! : null;
     },
@@ -339,6 +431,9 @@ function makeStubNode(attrs: Record<string, string>, width = 100): StubNode {
     },
     querySelectorAll(): StubNode[] {
       return [];
+    },
+    querySelector(): StubNode | null {
+      return null;
     },
     getBoundingClientRect(): { width: number; height: number } {
       return { width, height: 80 };
@@ -357,6 +452,9 @@ const makeHydrateCollectionGalleries = new Function(
   `${COLLECTION_GALLERY_RUNTIME_SRC}\nreturn hydrateCollectionGalleries;`,
 ) as () => HydrateCollectionGalleries;
 const hydrateCollectionGalleries = makeHydrateCollectionGalleries();
+function stubHidden(node: StubNode): boolean {
+  return node.hidden;
+}
 {
   const firstEntry = makeStubNode({
     'data-opencanvas-collection-entry': '0',
@@ -424,6 +522,50 @@ const hydrateCollectionGalleries = makeHydrateCollectionGalleries();
     `ArrowLeft must move slider x to the previous entry; got ${sliderAfterArrow}`,
   );
 }
+{
+  const firstEntry = makeStubNode({ 'data-opencanvas-collection-entry': '0' }, 100, 'First Helmet Aero');
+  const secondEntry = makeStubNode({ 'data-opencanvas-collection-entry': '1' }, 100, 'Second Helmet Rain');
+  const input = makeStubNode({ 'data-opencanvas-collection-search-input': '' });
+  const empty = makeStubNode({ 'data-opencanvas-collection-search-empty': '' });
+  const root = makeStubNode({
+    'data-opencanvas-collection-search': 'true',
+    'data-opencanvas-collection-search-reduced-motion': 'instant',
+  });
+  root.querySelectorAll = (selector: string): StubNode[] => {
+    if (selector === '[data-opencanvas-collection-gallery],[data-opencanvas-collection-search="true"]') return [];
+    if (selector === '[data-opencanvas-collection-entry]') return [firstEntry, secondEntry];
+    return [];
+  };
+  root.querySelector = (selector: string): StubNode | null => {
+    if (selector === '[data-opencanvas-collection-search-input]') return input;
+    if (selector === '[data-opencanvas-collection-search-empty]') return empty;
+    return null;
+  };
+  hydrateCollectionGalleries(root);
+  assert((input.listeners.input?.length ?? 0) === 1, 'collection search runtime must wire input events');
+  input.value = 'rain';
+  input.listeners.input![0]!({});
+  assert(stubHidden(firstEntry) === true, 'collection search must hide unmatched entries');
+  assert(stubHidden(secondEntry) === false, 'collection search must keep matched entries visible');
+  assert(
+    firstEntry.attrs['data-opencanvas-collection-entry-search-match'] === 'false',
+    'collection search must publish unmatched entry state',
+  );
+  assert(
+    secondEntry.attrs['data-opencanvas-collection-entry-search-match'] === 'true',
+    'collection search must publish matched entry state',
+  );
+  assert(empty.hidden === true, 'collection search empty state must stay hidden when matches exist');
+  input.value = 'nomatch';
+  input.listeners.input![0]!({});
+  assert(stubHidden(empty) === false, 'collection search empty state must show when no entries match');
+  input.value = '';
+  input.listeners.input![0]!({});
+  assert(
+    stubHidden(firstEntry) === false && stubHidden(secondEntry) === false,
+    'empty collection search must restore all entries',
+  );
+}
 
 const inspectorSource = readFileSync(join(repoSrcDir, 'editor-client', 'element-inspector.ts'), 'utf8');
 assert(inspectorSource.includes('Collection gallery'), 'inspector must expose collection gallery controls');
@@ -438,6 +580,10 @@ assert(inspectorSource.includes('Slider inertia'), 'inspector must expose drag-s
 assert(inspectorSource.includes('sliderInertia'), 'inspector must write drag-slider inertia config');
 assert(inspectorSource.includes('Show progress'), 'inspector must expose drag-slider progress controls');
 assert(inspectorSource.includes('showProgress'), 'inspector must write drag-slider progress config');
+assert(inspectorSource.includes('Collection search'), 'inspector must expose collection search controls');
+assert(inspectorSource.includes('Search placeholder'), 'inspector must expose collection search placeholder copy');
+assert(inspectorSource.includes('Search empty message'), 'inspector must expose collection search empty-state copy');
+assert(inspectorSource.includes('search?.enabled'), 'inspector must read collection search enabled state');
 
 const publicStyles = readFileSync(join(repoSrcDir, 'canvas', 'public-styles.ts'), 'utf8');
 assert(
@@ -451,6 +597,10 @@ assert(
 assert(
   publicStyles.includes('data-opencanvas-collection-gallery-progress-dot'),
   'public styles must include gallery progress dot selectors',
+);
+assert(
+  publicStyles.includes('data-opencanvas-collection-search-controls'),
+  'public styles must include collection search controls',
 );
 
 const packageJson = JSON.parse(readFileSync(join(repoSrcDir, '..', 'package.json'), 'utf8')) as {
@@ -467,5 +617,3 @@ assert(
 );
 
 console.log('[collection-gallery-v2:smoke] OK');
-
-

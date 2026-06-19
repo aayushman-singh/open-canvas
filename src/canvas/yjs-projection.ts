@@ -853,6 +853,18 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
     }
     out.set('gallery', gallery);
   }
+  if (el.search !== undefined) {
+    const search = new Y.Map<unknown>();
+    search.set('enabled', el.search.enabled);
+    search.set('reducedMotion', el.search.reducedMotion);
+    if (el.search.placeholder !== undefined) {
+      search.set('placeholder', el.search.placeholder);
+    }
+    if (el.search.emptyMessage !== undefined) {
+      search.set('emptyMessage', el.search.emptyMessage);
+    }
+    out.set('search', search);
+  }
   if (el.manualOrder !== undefined) {
     const arr = new Y.Array<string>();
     for (const id of el.manualOrder) arr.push([id]);
@@ -1721,6 +1733,24 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
       if (rawVideoHover.has('intentDelayMs')) {
         el.gallery.videoHover.intentDelayMs = rawVideoHover.get('intentDelayMs') as number;
       }
+    }
+  }
+  if (map.has('search')) {
+    const rawSearch = map.get('search');
+    if (!(rawSearch instanceof Y.Map)) {
+      throw new Error(`Collection element ${el.id}: search must decode from a Y.Map`);
+    }
+    el.search = {
+      enabled: rawSearch.get('enabled') === true,
+      reducedMotion: rawSearch.get('reducedMotion') as NonNullable<
+        CollectionElement['search']
+      >['reducedMotion'],
+    } as NonNullable<CollectionElement['search']>;
+    if (rawSearch.has('placeholder')) {
+      el.search.placeholder = rawSearch.get('placeholder') as string;
+    }
+    if (rawSearch.has('emptyMessage')) {
+      el.search.emptyMessage = rawSearch.get('emptyMessage') as string;
     }
   }
   if (map.has('entries')) {

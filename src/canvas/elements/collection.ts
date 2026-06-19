@@ -71,6 +71,10 @@ export type CollectionGalleryReducedMotionMode =
 export const COLLECTION_GALLERY_AXES = ['x', 'y'] as const;
 export type CollectionGalleryAxis = (typeof COLLECTION_GALLERY_AXES)[number];
 
+export const COLLECTION_SEARCH_REDUCED_MOTION_MODES = ['instant', 'allow'] as const;
+export type CollectionSearchReducedMotionMode =
+  (typeof COLLECTION_SEARCH_REDUCED_MOTION_MODES)[number];
+
 export interface CollectionGalleryBehaviour {
   mode: CollectionGalleryMode;
   detailMode: CollectionGalleryDetailMode;
@@ -79,6 +83,13 @@ export interface CollectionGalleryBehaviour {
   sliderAxis?: CollectionGalleryAxis;
   sliderInertia?: boolean;
   showProgress?: boolean;
+}
+
+export interface CollectionSearchBehaviour {
+  enabled: true;
+  reducedMotion: CollectionSearchReducedMotionMode;
+  placeholder?: string;
+  emptyMessage?: string;
 }
 
 export interface CollectionStyle {
@@ -150,6 +161,12 @@ export interface CollectionElement extends BaseElement {
    * Optional because absence means the Collection renders in its normal display mode.
    */
   gallery?: CollectionGalleryBehaviour;
+
+  /**
+   * Owner-authored collection search. The runtime filters materialized entry
+   * text in editor and visitor contexts without custom owner JavaScript.
+   */
+  search?: CollectionSearchBehaviour;
 
   /**
    * Per-entry instances written by the materializer (ADR 0063 dec 6).
@@ -224,6 +241,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
   const folderAttr = el.folder !== undefined ? escapeAttr(el.folder) : '';
   const sortAttr = readSortString(el);
   const gallery = readGalleryBehaviour(el);
+  const search = readSearchBehaviour(el);
   const galleryAttrs = gallery
     ?
       ` data-opencanvas-collection-gallery="${escapeAttr(gallery.mode)}"` +
@@ -236,6 +254,11 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
             ? ` data-opencanvas-collection-gallery-progress="true"`
             : '')
         : '')
+    : '';
+  const searchAttrs = search
+    ?
+      ` data-opencanvas-collection-search="true"` +
+      ` data-opencanvas-collection-search-reduced-motion="${escapeAttr(search.reducedMotion)}"`
     : '';
   const effectiveFrameStyle =
     gallery?.mode === 'drag-slider'
@@ -255,6 +278,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
       : frameStyle;
   const entriesHtml = renderCollectionEntries(el, ctx, gallery);
   const progressHtml = renderCollectionGalleryProgress(el, gallery);
+  const searchHtml = renderCollectionSearchControls(search);
   const keyboardAttrs = gallery?.mode === 'drag-slider' ? ` tabindex="0"` : '';
   return (
     `<div class="opencanvas-collection" data-opencanvas-interactive="collection"` +
@@ -262,9 +286,28 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
     ` data-collection-sort="${escapeAttr(sortAttr)}"` +
     ` data-collection-slug="${slugAttr}"` +
     ` data-collection-folder="${folderAttr}"` +
+    searchAttrs +
     galleryAttrs +
     keyboardAttrs +
-    ` style="${escapeAttr(effectiveFrameStyle)}">${entriesHtml}${progressHtml}</div>`
+    ` style="${escapeAttr(effectiveFrameStyle)}">${searchHtml}${entriesHtml}${progressHtml}</div>`
+  );
+}
+
+function renderCollectionSearchControls(search: CollectionSearchBehaviour | null): string {
+  if (search === null) return '';
+  const placeholder = search.placeholder ?? 'Search collection';
+  const emptyMessage = search.emptyMessage ?? 'No matching entries';
+  return (
+    `<div class="opencanvas-collection-search" data-opencanvas-collection-search-controls>` +
+    `<label class="opencanvas-collection-search-label">` +
+    `<span class="opencanvas-collection-search-label-text">Search collection</span>` +
+    `<input type="search" class="opencanvas-collection-search-input"` +
+    ` data-opencanvas-collection-search-input aria-label="Search collection"` +
+    ` autocomplete="off" placeholder="${escapeAttr(placeholder)}">` +
+    `</label>` +
+    `<div class="opencanvas-collection-search-empty"` +
+    ` data-opencanvas-collection-search-empty hidden>${escapeAttr(emptyMessage)}</div>` +
+    `</div>`
   );
 }
 
@@ -423,6 +466,45 @@ function readGalleryBehaviour(el: CollectionElement): CollectionGalleryBehaviour
     }
   }
   return el.gallery;
+}
+
+function readSearchBehaviour(el: CollectionElement): CollectionSearchBehaviour | null {
+  if (el.search === undefined) return null;
+  if (el.search.enabled !== true) {
+    throw new Error(`Collection element ${el.id}: search.enabled must be true when search is present.`);
+  }
+  if (
+    !(COLLECTION_SEARCH_REDUCED_MOTION_MODES as readonly string[]).includes(
+      el.search.reducedMotion,
+    )
+  ) {
+    throw new Error(
+      `Collection element ${el.id}: search.reducedMotion has malformed value ${JSON.stringify(
+        el.search.reducedMotion,
+      )}; expected one of ${COLLECTION_SEARCH_REDUCED_MOTION_MODES.join(' | ')}.`,
+    );
+  }
+  if (el.search.placeholder !== undefined) {
+    if (typeof el.search.placeholder !== 'string' || el.search.placeholder.length === 0) {
+      throw new Error(
+        `Collection element ${el.id}: search.placeholder must be a non-empty string when present.`,
+      );
+    }
+    if (el.search.placeholder.length > 120) {
+      throw new Error(`Collection element ${el.id}: search.placeholder exceeds 120 characters.`);
+    }
+  }
+  if (el.search.emptyMessage !== undefined) {
+    if (typeof el.search.emptyMessage !== 'string' || el.search.emptyMessage.length === 0) {
+      throw new Error(
+        `Collection element ${el.id}: search.emptyMessage must be a non-empty string when present.`,
+      );
+    }
+    if (el.search.emptyMessage.length > 160) {
+      throw new Error(`Collection element ${el.id}: search.emptyMessage exceeds 160 characters.`);
+    }
+  }
+  return el.search;
 }
 
 function readSortString(el: CollectionElement): CollectionSort {

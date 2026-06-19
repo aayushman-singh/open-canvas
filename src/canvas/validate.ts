@@ -13,6 +13,7 @@ import {
   COLLECTION_GALLERY_DETAIL_MODES,
   COLLECTION_GALLERY_MODES,
   COLLECTION_GALLERY_REDUCED_MOTION_MODES,
+  COLLECTION_SEARCH_REDUCED_MOTION_MODES,
   COLLECTION_SORTS,
 } from './elements/collection.js';
 import type { CollectionDisplay, CollectionSort } from './elements/collection.js';
@@ -1975,6 +1976,43 @@ function validateElement(
             }
             if (element.gallery.showProgress !== undefined) {
               errors.push(`${basePath}.gallery.showProgress is only supported when gallery.mode is drag-slider`);
+            }
+          }
+        }
+      }
+      if (element.search !== undefined) {
+        if (!isRecord(element.search)) {
+          errors.push(`${basePath}.search must be an object when present`);
+        } else {
+          if (element.search.enabled !== true) {
+            errors.push(`${basePath}.search.enabled must be true when search is present`);
+          }
+          assertOneOf(
+            element.search.reducedMotion,
+            COLLECTION_SEARCH_REDUCED_MOTION_MODES,
+            `${basePath}.search.reducedMotion`,
+            errors,
+          );
+          if (element.search.placeholder !== undefined) {
+            if (!isNonEmptyString(element.search.placeholder)) {
+              errors.push(
+                `${basePath}.search.placeholder must be a non-empty string when present (got ${describe(element.search.placeholder)})`,
+              );
+            } else if (element.search.placeholder.length > 120) {
+              errors.push(
+                `${basePath}.search.placeholder exceeds the 120-char cap (got ${String(element.search.placeholder.length)})`,
+              );
+            }
+          }
+          if (element.search.emptyMessage !== undefined) {
+            if (!isNonEmptyString(element.search.emptyMessage)) {
+              errors.push(
+                `${basePath}.search.emptyMessage must be a non-empty string when present (got ${describe(element.search.emptyMessage)})`,
+              );
+            } else if (element.search.emptyMessage.length > 160) {
+              errors.push(
+                `${basePath}.search.emptyMessage exceeds the 160-char cap (got ${String(element.search.emptyMessage.length)})`,
+              );
             }
           }
         }

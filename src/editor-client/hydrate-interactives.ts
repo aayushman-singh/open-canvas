@@ -129,6 +129,7 @@ export function hydrateInteractives(
     hydrateBehaviourPreview(root, options.behaviourState, options.behaviourAssetBasePath, options.reducedMotion);
   }
   hydrateMarquees(root, options);
+  hydrateCollectionSearches(root, options);
   hydrateVideoHoverStreams(root, options);
 }
 
@@ -136,6 +137,93 @@ function prefersReducedMotion(options: HydrateOptions): boolean {
   if (options.reducedMotion === 'reduce') return true;
   if (options.reducedMotion === 'no-preference') return false;
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function emitCollectionSearchFailure(root: Element, code: string, message: string, cause: unknown): never {
+  const detail = {
+    code,
+    message,
+    collectionId: root.getAttribute('data-opencanvas-element'),
+    cause: cause === null ? null : describeCollectionSearchCause(cause),
+  };
+  window.dispatchEvent(new CustomEvent('opencanvas:collection-search-failed', { detail }));
+  console.error('[opencanvas collection-search] ' + message, detail);
+  throw new Error('[opencanvas collection-search] ' + message);
+}
+
+function describeCollectionSearchCause(cause: unknown): string {
+  if (cause instanceof Error) return cause.message;
+  if (typeof cause === 'string') return cause;
+  if (typeof cause === 'number' || typeof cause === 'boolean' || typeof cause === 'bigint') {
+    return String(cause);
+  }
+  if (cause === undefined) return 'undefined';
+  return Object.prototype.toString.call(cause);
+}
+
+function normaliseCollectionSearchText(value: string | null | undefined): string {
+  return (value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function isCollectionSearchRoot(value: ParentNode): value is Element {
+  const candidate = value as { getAttribute?: unknown };
+  return typeof candidate.getAttribute === 'function';
+}
+
+function hydrateCollectionSearches(root: ParentNode, options: HydrateOptions): void {
+  const nodes: Element[] = [];
+  if (isCollectionSearchRoot(root) && root.getAttribute('data-opencanvas-collection-search') === 'true') {
+    nodes.push(root);
+  }
+  const found = root.querySelectorAll('[data-opencanvas-collection-search="true"]');
+  for (let i = 0; i < found.length; i++) nodes.push(found[i]!);
+  for (const node of nodes) {
+    if (node.getAttribute('data-opencanvas-collection-search-hydrated') === 'true') continue;
+    const reducedMotion = node.getAttribute('data-opencanvas-collection-search-reduced-motion');
+    if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
+      emitCollectionSearchFailure(
+        node,
+        'invalid-reduced-motion',
+        'Collection search reduced-motion mode must be instant or allow',
+        reducedMotion,
+      );
+    }
+    const input = node.querySelector<HTMLInputElement>('[data-opencanvas-collection-search-input]');
+    if (input === null) {
+      emitCollectionSearchFailure(
+        node,
+        'missing-search-input',
+        'Collection search requires a rendered search input',
+        null,
+      );
+    }
+    const entries = node.querySelectorAll<HTMLElement>('[data-opencanvas-collection-entry]');
+    const empty = node.querySelector<HTMLElement>('[data-opencanvas-collection-search-empty]');
+    if (prefersReducedMotion(options) && reducedMotion === 'instant') {
+      node.setAttribute('data-opencanvas-collection-search-reduced', 'instant');
+    }
+    const applySearch = (): void => {
+      const query = normaliseCollectionSearchText(input.value);
+      let visible = 0;
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i]!;
+        const matched =
+          query.length === 0 ||
+          normaliseCollectionSearchText(entry.textContent).indexOf(query) !== -1;
+        entry.hidden = !matched;
+        entry.setAttribute('data-opencanvas-collection-entry-search-match', matched ? 'true' : 'false');
+        if (matched) visible += 1;
+      }
+      node.setAttribute('data-opencanvas-collection-search-query', query);
+      node.setAttribute('data-opencanvas-collection-search-visible-count', String(visible));
+      if (empty !== null) empty.hidden = visible !== 0;
+    };
+    input.addEventListener('input', applySearch);
+    input.addEventListener('mousedown', (ev) => ev.stopPropagation());
+    input.addEventListener('click', (ev) => ev.stopPropagation());
+    applySearch();
+    node.setAttribute('data-opencanvas-collection-search-hydrated', 'true');
+  }
 }
 
 // ---------------------------------------------------------------------------

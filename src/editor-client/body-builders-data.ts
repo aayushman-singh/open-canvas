@@ -26,7 +26,10 @@ import type { AccordionElement } from '../canvas/elements/accordion.js';
 import type { CarouselElement } from '../canvas/elements/carousel.js';
 import type { ChartElement } from '../canvas/elements/chart.js';
 import type { CodeElement } from '../canvas/elements/code.js';
-import type { CollectionElement } from '../canvas/elements/collection.js';
+import type {
+  CollectionElement,
+  CollectionSearchBehaviour,
+} from '../canvas/elements/collection.js';
 import type { EmbedElement } from '../canvas/elements/embed.js';
 import type {
   FlowAlign,
@@ -806,14 +809,21 @@ export function buildCollectionBodyImpl(
     return placeholder;
   }
   const node = document.createElement('div');
-  node.className = 'opencanvas-collection-preview';
+  node.className = 'opencanvas-collection-preview opencanvas-collection';
+  if (element.search?.enabled === true) {
+    node.setAttribute('data-opencanvas-collection-search', 'true');
+    node.setAttribute('data-opencanvas-collection-search-reduced-motion', element.search.reducedMotion);
+  }
   node.style.display = 'grid';
   node.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
   node.style.gap = '8px';
+  appendCollectionSearchControls(node, element.search);
   for (let i = 0; i < entries.length; i++) {
     const raw = entries[i];
     const entry: CanvasElement[] = Array.isArray(raw) ? raw : [];
     const card = document.createElement('div');
+    card.className = 'opencanvas-collection-entry';
+    card.setAttribute('data-opencanvas-collection-entry', String(i));
     card.style.position = 'relative';
     card.style.minHeight = '80px';
     for (let j = 0; j < entry.length; j++) {
@@ -823,6 +833,44 @@ export function buildCollectionBodyImpl(
     node.appendChild(card);
   }
   return node;
+}
+
+function appendCollectionSearchControls(
+  host: HTMLElement,
+  search: CollectionSearchBehaviour | undefined,
+): void {
+  if (search?.enabled !== true) return;
+  const controls = document.createElement('div');
+  controls.className = 'opencanvas-collection-search';
+  controls.setAttribute('data-opencanvas-collection-search-controls', '');
+  controls.style.gridColumn = '1 / -1';
+
+  const label = document.createElement('label');
+  label.className = 'opencanvas-collection-search-label';
+  const labelText = document.createElement('span');
+  labelText.className = 'opencanvas-collection-search-label-text';
+  labelText.textContent = 'Search collection';
+  const input = document.createElement('input');
+  input.type = 'search';
+  input.className = 'opencanvas-collection-search-input';
+  input.setAttribute('data-opencanvas-collection-search-input', '');
+  input.setAttribute('aria-label', 'Search collection');
+  input.autocomplete = 'off';
+  input.placeholder = search.placeholder ?? 'Search collection';
+  input.addEventListener('mousedown', (ev) => ev.stopPropagation());
+  input.addEventListener('click', (ev) => ev.stopPropagation());
+  label.appendChild(labelText);
+  label.appendChild(input);
+  controls.appendChild(label);
+
+  const empty = document.createElement('div');
+  empty.className = 'opencanvas-collection-search-empty';
+  empty.setAttribute('data-opencanvas-collection-search-empty', '');
+  empty.hidden = true;
+  empty.textContent = search.emptyMessage ?? 'No matching entries';
+  controls.appendChild(empty);
+
+  host.appendChild(controls);
 }
 
 export function buildTabsBodyImpl(ctx: BuildTabsBodyContext, element: TabsElement): HTMLElement {

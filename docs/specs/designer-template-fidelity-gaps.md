@@ -537,12 +537,17 @@ Current state:
 - Built-in `card` and `image-only` displays consume `collectionStyle` host
   variables for entry chrome; `custom` display keeps the Owner's custom
   template-owned chrome.
+- **June 2026 update:** Collection Search is now schema-owned. Owners can
+  enable search on a Collection, author placeholder/empty-state copy, choose
+  explicit reduced-motion behaviour, preview filtering in the editor, and
+  publish runtime-owned entry visibility without custom scripts.
 
 User-visible miss:
 
-- Basic published collection cards and custom templates are real, but premium
-  CMS experiences still lack animated card reveals, hover transitions, filters,
-  search, editorial states, drafts, scheduling, and full detail/list workflow.
+- Basic published collection cards, custom templates, gallery reveal/slider
+  states, and text search are real, but premium CMS experiences still lack
+  taxonomy filter chips, editorial states, drafts, scheduling, and full
+  detail/list workflow.
 
 Needed primitive:
 
@@ -889,9 +894,9 @@ Intentional deferral: richer nested overlay-canvas editing affordances, overlay-
 
 ### 18. Collection Gallery v2 Hover Reveal Detail
 
-Status: addressed for the schema-owned Collection gallery v2 slice. A Collection can now opt into `gallery.mode = hover-reveal-detail` with explicit inline detail and reduced-motion policies, or `gallery.mode = drag-slider` with owner-authored axis, inertia, and progress-dot policy. The renderer emits collection/entry metadata, the Runtime Hydrator owns active-entry, progress-dot, and drag-slider offset state, the inspector exposes owner controls, Yjs preserves the gallery policy, and invalid gallery modes or slider relations fail validation.
+Status: addressed for the schema-owned Collection gallery v2 slice. A Collection can now opt into `gallery.mode = hover-reveal-detail` with explicit inline detail and reduced-motion policies, or `gallery.mode = drag-slider` with owner-authored axis, inertia, and progress-dot policy. Collection Search adds an owner-authored search relation with placeholder/empty-state copy and explicit reduced-motion policy. The renderer emits collection/entry/search metadata, the Runtime Hydrator owns active-entry, progress-dot, drag-slider offset, and search visibility state, the inspector exposes owner controls, Yjs preserves the gallery/search policy, and invalid gallery, slider, or search relations fail validation.
 
-Intentional deferral: this does not add a 3D helmet viewer or marketplace media inventory; gallery entries continue to be materialized Collection content and can compose existing media/text/card primitives.
+Intentional deferral: this does not add a 3D helmet viewer, taxonomy filter chips, or marketplace media inventory; gallery entries continue to be materialized Collection content and can compose existing media/text/card primitives.
 
 ### 19. Iframe Drill-in Overlay
 

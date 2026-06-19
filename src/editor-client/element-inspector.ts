@@ -61,12 +61,14 @@ import type {
   CollectionElement,
   CollectionGalleryAxis,
   CollectionGalleryReducedMotionMode,
+  CollectionSearchReducedMotionMode,
   CollectionSort,
 } from '../canvas/elements/collection.js';
 import {
   COLLECTION_DISPLAYS,
   COLLECTION_GALLERY_AXES,
   COLLECTION_GALLERY_REDUCED_MOTION_MODES,
+  COLLECTION_SEARCH_REDUCED_MOTION_MODES,
   COLLECTION_SORTS,
 } from '../canvas/elements/collection.js';
 import {
@@ -2303,6 +2305,85 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
       });
       inspector.appendChild(field('Gallery hover intent delay', hoverIntentDelay));
     }
+  }
+
+  const searchEnabled = document.createElement('input');
+  searchEnabled.type = 'checkbox';
+  searchEnabled.checked = collection.search?.enabled === true;
+  searchEnabled.addEventListener('change', () => {
+    ctx.captureForUndo();
+    if (searchEnabled.checked) {
+      collection.search = {
+        enabled: true,
+        reducedMotion: collection.search?.reducedMotion ?? 'allow',
+        ...(collection.search?.placeholder ? { placeholder: collection.search.placeholder } : {}),
+        ...(collection.search?.emptyMessage ? { emptyMessage: collection.search.emptyMessage } : {}),
+      };
+    } else {
+      delete collection.search;
+    }
+    ctx.rebuildElement(collection.id);
+    ctx.scheduleSave();
+    ctx.renderInspector();
+  });
+  inspector.appendChild(field('Collection search', searchEnabled));
+
+  if (collection.search?.enabled === true) {
+    const searchReduced = selectInput(
+      COLLECTION_SEARCH_REDUCED_MOTION_MODES,
+      collection.search.reducedMotion,
+    );
+    searchReduced.addEventListener('change', () => {
+      ctx.captureForUndo();
+      collection.search = {
+        ...collection.search!,
+        enabled: true,
+        reducedMotion: searchReduced.value as CollectionSearchReducedMotionMode,
+      };
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+    });
+    inspector.appendChild(field('Search reduced motion', searchReduced));
+
+    const searchPlaceholder = document.createElement('input');
+    searchPlaceholder.type = 'text';
+    searchPlaceholder.maxLength = 120;
+    searchPlaceholder.placeholder = 'Search collection';
+    searchPlaceholder.value = collection.search.placeholder ?? '';
+    searchPlaceholder.addEventListener('change', () => {
+      ctx.captureForUndo();
+      const next: NonNullable<CollectionElement['search']> = {
+        ...collection.search!,
+        enabled: true,
+      };
+      const value = searchPlaceholder.value.trim();
+      if (value.length > 0) next.placeholder = value;
+      else delete next.placeholder;
+      collection.search = next;
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+    });
+    inspector.appendChild(field('Search placeholder', searchPlaceholder));
+
+    const searchEmptyMessage = document.createElement('input');
+    searchEmptyMessage.type = 'text';
+    searchEmptyMessage.maxLength = 160;
+    searchEmptyMessage.placeholder = 'No matching entries';
+    searchEmptyMessage.value = collection.search.emptyMessage ?? '';
+    searchEmptyMessage.addEventListener('change', () => {
+      ctx.captureForUndo();
+      const next: NonNullable<CollectionElement['search']> = {
+        ...collection.search!,
+        enabled: true,
+      };
+      const value = searchEmptyMessage.value.trim();
+      if (value.length > 0) next.emptyMessage = value;
+      else delete next.emptyMessage;
+      collection.search = next;
+      ctx.rebuildElement(collection.id);
+      ctx.scheduleSave();
+    });
+    inspector.appendChild(field('Search empty message', searchEmptyMessage));
   }
 
   mountComponentStyle(ctx, collection, inspector);

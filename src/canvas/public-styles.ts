@@ -335,6 +335,45 @@ html, body {
 .opencanvas-collection-entry {
   position: relative;
 }
+.opencanvas-collection-search[data-opencanvas-collection-search-controls] {
+  flex: 0 0 100%;
+  width: 100%;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+}
+.opencanvas-collection-search-label {
+  display: grid;
+  gap: 6px;
+}
+.opencanvas-collection-search-label-text {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.68;
+}
+.opencanvas-collection-search-input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid color-mix(in oklab, currentColor 22%, transparent);
+  border-radius: 999px;
+  padding: 0 16px;
+  background: color-mix(in oklab, var(--opencanvas-kit-panel, #ffffff) 80%, transparent);
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+.opencanvas-collection-search-input:focus {
+  border-color: var(--opencanvas-kit-accent, currentColor);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--opencanvas-kit-accent, currentColor) 20%, transparent);
+}
+.opencanvas-collection-search-empty {
+  font-size: 13px;
+  opacity: 0.72;
+}
+.opencanvas-collection-entry[data-opencanvas-collection-entry-search-match="false"] {
+  display: none;
+}
 .opencanvas-collection[data-collection-display="card"] .opencanvas-collection-entry > .opencanvas-element[data-element-type="container"]:first-child > .opencanvas-surface {
   background: var(--opencanvas-collection-card-bg, inherit);
   border: var(--opencanvas-collection-card-border-width, 0) solid var(--opencanvas-collection-card-border-color, transparent);
