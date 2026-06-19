@@ -102,6 +102,7 @@ function buildValidState(): EditableSite & Record<string, unknown> {
           {
             id: 'step-text',
             target: { type: 'text-split', elementId: 'tab-copy', unit: 'word' },
+            textEffect: 'scramble',
             from: { opacity: 0, translateY: 24 },
             to: { opacity: 1, translateY: 0 },
             durationMs: 360,
@@ -235,6 +236,28 @@ expectInvalid(
   unsupportedProperty,
   'motionSequences[0].steps[0].to.skewX',
   'unsupported motion property',
+);
+
+const unsupportedTextEffect = structuredClone(validState);
+(
+  (unsupportedTextEffect.motionSequences as { steps: { textEffect?: string }[] }[])[0]!
+    .steps[1]!
+).textEffect = 'randomize';
+expectInvalid(
+  unsupportedTextEffect,
+  'motionSequences[0].steps[1].textEffect',
+  'unsupported text effect',
+);
+
+const textEffectOnElement = structuredClone(validState);
+(
+  (textEffectOnElement.motionSequences as { steps: { textEffect?: string }[] }[])[0]!
+    .steps[0]!
+).textEffect = 'scramble';
+expectInvalid(
+  textEffectOnElement,
+  'motionSequences[0].steps[0].textEffect',
+  'text effect target guard',
 );
 
 console.log('[behaviour-primitives:smoke] OK');

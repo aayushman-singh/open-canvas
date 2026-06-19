@@ -61,6 +61,7 @@ import {
   MOTION_SEQUENCE_PLAYBACK_DIRECTIONS,
   MOTION_SEQUENCE_PROPERTIES,
   MOTION_SEQUENCE_REPEAT_MODES,
+  MOTION_SEQUENCE_TEXT_EFFECTS,
   MOTION_SEQUENCE_TRIGGER_TYPES,
   RICH_MOTION_KINDS,
   RIVE_INPUT_EVENTS,
@@ -3333,6 +3334,22 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
             );
           }
           validateBehaviourTarget(step.target, `${stepPath}.target`, errors, targetIndex);
+          if (step.textEffect !== undefined) {
+            const textEffectValid = assertOneOf(
+              step.textEffect,
+              MOTION_SEQUENCE_TEXT_EFFECTS,
+              `${stepPath}.textEffect`,
+              errors,
+            );
+            if (textEffectValid && step.textEffect !== 'none') {
+              if (!isRecord(step.target) || step.target.type !== 'text-split') {
+                errors.push(`${stepPath}.textEffect is only supported for text-split targets`);
+              }
+              if (sequence.repeat !== undefined) {
+                errors.push(`${stepPath}.textEffect is not supported on repeating Motion Sequences`);
+              }
+            }
+          }
           validateMotionProperties(step.from, `${stepPath}.from`, errors, false);
           validateMotionProperties(step.to, `${stepPath}.to`, errors, true);
           validateNonNegativeFiniteNumber(step.durationMs, `${stepPath}.durationMs`, errors, true);

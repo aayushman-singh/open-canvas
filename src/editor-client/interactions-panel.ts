@@ -53,6 +53,7 @@ import {
   LOAD_PROGRESS_DISPLAY_MODES,
   MOTION_SEQUENCE_PLAYBACK_DIRECTIONS,
   MOTION_SEQUENCE_REPEAT_MODES,
+  MOTION_SEQUENCE_TEXT_EFFECTS,
   MOTION_SEQUENCE_TRIGGER_TYPES,
   RIVE_INPUT_EVENTS,
   RIVE_INPUT_TYPES,
@@ -115,6 +116,7 @@ type RiveInputType = (typeof RIVE_INPUT_TYPES)[number];
 type RiveInputEvent = (typeof RIVE_INPUT_EVENTS)[number];
 type MotionSequenceRepeatMode = (typeof MOTION_SEQUENCE_REPEAT_MODES)[number];
 type MotionSequencePlaybackDirection = (typeof MOTION_SEQUENCE_PLAYBACK_DIRECTIONS)[number];
+type MotionSequenceTextEffect = (typeof MOTION_SEQUENCE_TEXT_EFFECTS)[number];
 type BehaviourLoadRunPolicy = (typeof BEHAVIOUR_LOAD_RUN_POLICIES)[number];
 type LoadProgressDisplayMode = (typeof LOAD_PROGRESS_DISPLAY_MODES)[number];
 type ShaderScenePreset = (typeof SHADER_SCENE_PRESETS)[number];
@@ -1474,6 +1476,30 @@ function updateScrollSequenceStep(
   });
 }
 
+function updateMotionStepTextEffect(
+  ctx: InteractionsPanelContext,
+  sequenceId: string,
+  stepId: string,
+  textEffect: MotionSequenceTextEffect,
+): void {
+  ctx.state!.motionSequences = (ctx.state!.motionSequences ?? []).map((sequence) => {
+    if (sequence.id !== sequenceId) return sequence;
+    return {
+      ...sequence,
+      steps: sequence.steps.map((step) => {
+        if (step.id !== stepId) return step;
+        const next = { ...step };
+        if (textEffect === 'none') {
+          delete next.textEffect;
+        } else {
+          next.textEffect = textEffect;
+        }
+        return next;
+      }),
+    };
+  });
+}
+
 type EditableMotionNumber =
   | 'opacity'
   | 'translateX'
@@ -1755,6 +1781,7 @@ function renderFullMotionSequenceStep(
   });
   card.appendChild(field('Target type', targetType));
   renderMotionTargetDetail(ctx, card, sequence, step);
+  renderMotionTextEffectControl(ctx, card, sequence, step);
 
   renderMotionPropertyGroup(ctx, card, sequence, step, 'from');
   renderMotionPropertyGroup(ctx, card, sequence, step, 'to');
@@ -1795,6 +1822,21 @@ function renderFullMotionSequenceStep(
   card.appendChild(field('Easing', easing));
 
   host.appendChild(card);
+}
+
+function renderMotionTextEffectControl(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  sequence: MotionSequence,
+  step: MotionSequenceStep,
+): void {
+  if (step.target.type !== 'text-split') return;
+  const effect = selectInput([...MOTION_SEQUENCE_TEXT_EFFECTS], step.textEffect ?? 'none');
+  effect.addEventListener('change', () => {
+    const next = effect.value as MotionSequenceTextEffect;
+    mutate(ctx, () => updateMotionStepTextEffect(ctx, sequence.id, step.id, next));
+  });
+  card.appendChild(field('Text effect', effect));
 }
 
 function renderMotionTargetDetail(

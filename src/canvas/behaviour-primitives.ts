@@ -19,6 +19,7 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'fontVariationWidth',
   'fontVariationSlant',
 ] as const;
+export const MOTION_SEQUENCE_TEXT_EFFECTS = ['none', 'scramble'] as const;
 export const MOTION_SEQUENCE_REPEAT_MODES = ['restart', 'yoyo'] as const;
 export const MOTION_SEQUENCE_PLAYBACK_DIRECTIONS = ['normal', 'reverse'] as const;
 export const RICH_MOTION_KINDS = [
@@ -57,6 +58,7 @@ export type BehaviourTarget =
 export interface MotionSequenceStep {
   id: string;
   target: BehaviourTarget;
+  textEffect?: (typeof MOTION_SEQUENCE_TEXT_EFFECTS)[number];
   from?: Partial<Record<(typeof MOTION_SEQUENCE_PROPERTIES)[number], string | number>>;
   to: Partial<Record<(typeof MOTION_SEQUENCE_PROPERTIES)[number], string | number>>;
   durationMs: number;

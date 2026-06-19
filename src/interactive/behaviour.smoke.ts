@@ -839,6 +839,7 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
           {
             id: 'split-scroll-step',
             target: { type: 'text-split', elementId: 'impact-heading', unit: 'word' },
+            textEffect: 'scramble',
             from: { translateY: 24, opacity: 0 },
             to: { translateY: 0, opacity: 1 },
             durationMs: 100,
@@ -882,7 +883,10 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   const spans = heading.querySelectorAll('.opencanvas-text-split');
   assert(spans.length === 3, 'scroll text split must resolve every word span');
   assert(spans[0]!.style.opacity === '1', 'first split word must complete by mid scroll progress');
+  assert(spans[0]!.textContent === 'One ', 'completed scrambled split word must restore final text');
   assert(spans[1]!.style.opacity === '0.5', 'second split word must be halfway through its stagger at mid scroll progress');
+  assert(spans[1]!.textContent !== 'two ', 'halfway split word must render scrambled text');
+  assert(spans[1]!.textContent.length === 'two '.length, 'scrambled split word must preserve layout length');
   assert(spans[2]!.style.opacity === '0', 'third split word must not start before its stagger window');
 }
 

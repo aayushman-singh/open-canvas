@@ -102,6 +102,7 @@ function behaviourSplitTextTarget(el, unit) {
     var span = document.createElement('span');
     span.className = 'opencanvas-text-split';
     span.setAttribute('data-opencanvas-text-split-unit', unit);
+    span.setAttribute('data-opencanvas-text-split-final', parts[i]);
     span.setAttribute('aria-hidden', 'true');
     span.style.display = unit === 'line' ? 'block' : 'inline-block';
     span.textContent = parts[i];
@@ -110,6 +111,78 @@ function behaviourSplitTextTarget(el, unit) {
   }
   el.setAttribute('data-opencanvas-text-split', unit);
   return spans;
+}
+
+function behaviourMotionTextEffect(step) {
+  var effect = step.textEffect || 'none';
+  if (effect !== 'none' && effect !== 'scramble') {
+    behaviourFailure('motion-sequence-text-effect', { stepId: step.id, textEffect: step.textEffect }, new Error('unsupported text effect'));
+  }
+  if (effect !== 'none' && (!step.target || step.target.type !== 'text-split')) {
+    behaviourFailure('motion-sequence-text-effect-target', { stepId: step.id, target: step.target }, new Error('text effects require text-split targets'));
+  }
+  return effect;
+}
+
+function behaviourScrambleText(text, progress) {
+  var alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  var clamped = Math.max(0, Math.min(1, Number(progress) || 0));
+  if (clamped >= 1) return text;
+  var reveal = Math.floor(text.length * clamped);
+  var salt = Math.floor(clamped * 97);
+  var out = '';
+  for (var i = 0; i < text.length; i++) {
+    var ch = text.charAt(i);
+    if (/\s/.test(ch)) {
+      out += ch;
+    } else if (i < reveal) {
+      out += ch;
+    } else {
+      out += alphabet.charAt((text.charCodeAt(i) + i * 13 + salt) % alphabet.length);
+    }
+  }
+  return out;
+}
+
+function behaviourApplyTextEffect(node, effect, progress) {
+  if (effect === 'none') return;
+  if (effect !== 'scramble') {
+    behaviourFailure('motion-sequence-text-effect', { textEffect: effect }, new Error('unsupported text effect'));
+  }
+  var finalText = node.getAttribute('data-opencanvas-text-split-final');
+  if (finalText === null) {
+    behaviourFailure('motion-sequence-text-effect-target', {}, new Error('text effect target is missing split final text'));
+  }
+  node.textContent = behaviourScrambleText(finalText, progress);
+}
+
+function behaviourAnimateTextEffect(node, effect, delay, duration, direction) {
+  if (effect === 'none') return;
+  if (typeof requestAnimationFrame !== 'function') {
+    behaviourFailure('motion-sequence-text-effect-raf-missing', { textEffect: effect }, new Error('requestAnimationFrame unavailable'));
+  }
+  var start = 0;
+  var started = false;
+  var total = Math.max(0, Number(duration) || 0);
+  var wait = Math.max(0, Number(delay) || 0);
+  function tick(now) {
+    if (!start) start = now || 0;
+    var elapsed = Math.max(0, (now || 0) - start);
+    if (elapsed < wait) {
+      requestAnimationFrame(tick);
+      return;
+    }
+    if (!started) {
+      started = true;
+      start = (now || 0) - wait;
+      elapsed = wait;
+    }
+    var local = total > 0 ? Math.max(0, Math.min(1, (elapsed - wait) / total)) : 1;
+    var progress = direction === 'reverse' ? 1 - local : local;
+    behaviourApplyTextEffect(node, effect, progress);
+    if (local < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 }
 
 function behaviourNumeric(value, fallback) {
@@ -224,6 +297,10 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, p
   if (progress !== undefined && direction === 'reverse') {
     behaviourFailure('motion-sequence-playback-direction-scroll-scene', { playbackDirection: playbackDirection }, new Error('scroll-scene Motion Sequences cannot reverse playback'));
   }
+  var textEffect = behaviourMotionTextEffect(step);
+  if (textEffect !== 'none' && repeat) {
+    behaviourFailure('motion-sequence-text-effect-repeat', { stepId: step.id }, new Error('text effects are not supported on repeating Motion Sequences'));
+  }
   var stagger = step.staggerMs || 0;
   if (progress !== undefined) {
     var duration = Number(step.durationMs || 0);
@@ -238,6 +315,7 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, p
           ? Math.max(0, Math.min(1, (progress * total - i * stagger) / duration))
           : progress;
       behaviourApplyProps(targets[i], behaviourPropsAtProgress(from, to, localProgress));
+      behaviourApplyTextEffect(targets[i], textEffect, localProgress);
     }
     return;
   }
@@ -245,6 +323,7 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, p
   if (reducedMode === 'final-state') {
     for (var j = 0; j < targets.length; j++) {
       behaviourApplyProps(targets[j], to);
+      behaviourApplyTextEffect(targets[j], textEffect, 1);
     }
     return;
   }
@@ -278,6 +357,7 @@ function behaviourAnimateTargets(targets, step, reducedMode, progress, repeat, p
       return out;
     });
     node.animate(animKeyframes, options);
+    behaviourAnimateTextEffect(node, textEffect, options.delay, options.duration, direction);
   })(targets[k], k);
   }
 }

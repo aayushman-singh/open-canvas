@@ -215,6 +215,8 @@ assert(
   'panel must block layout transitions without a target element',
 );
 assert(panelSrc.includes('MOTION_SEQUENCE_TRIGGER_TYPES'), 'panel must use schema trigger types');
+assert(panelSrc.includes('MOTION_SEQUENCE_TEXT_EFFECTS'), 'panel must use schema text effect types');
+assert(panelSrc.includes('Text effect'), 'panel must expose text effect controls');
 assert(
   panelSrc.includes('LAYOUT_TRANSITION_INITIAL_STATES'),
   'panel must use layout transition initial state schema values',

@@ -515,10 +515,15 @@ Current state:
   character splitting. The visitor runtime generates presentational split spans
   with `aria-hidden="true"` and preserves the full semantic text on the host
   with `aria-label`.
+- **June 2026 update:** Motion Sequence steps can now apply a schema-owned
+  `textEffect = scramble` to text-split targets. The Interactions panel exposes
+  the effect catalog, validation rejects unsupported/non-text/repeating
+  relations, and the Runtime Hydrator applies deterministic scroll-scrubbed
+  scramble text while restoring final text at completion.
 
 User-visible miss:
 
-- Cannot yet reproduce advanced kinetic headlines, type scrambles, or arbitrary
+- Cannot yet reproduce arbitrary advanced kinetic headline systems or
   multi-step text timelines from a unified timeline canvas.
 
 Needed primitive:
@@ -526,8 +531,8 @@ Needed primitive:
 - Text Split targets as an explicit render mode: by character, word, or line,
   with semantic HTML preserved and the Motion Sequence targeting generated
   spans. Accessibility must define what screen readers see.
-- Remaining next wave: richer text-specific effects and visual multi-step
-  editing of split targets.
+- Remaining next wave: richer text-specific effects beyond deterministic
+  scramble and visual multi-step editing of split targets.
 
 ### 11. Rich Media / 3D / Shader Surfaces Are Missing
 
