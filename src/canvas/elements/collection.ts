@@ -244,6 +244,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
       : frameStyle;
   const entriesHtml = renderCollectionEntries(el, ctx, gallery);
   const progressHtml = renderCollectionGalleryProgress(el, gallery);
+  const keyboardAttrs = gallery?.mode === 'drag-slider' ? ` tabindex="0"` : '';
   return (
     `<div class="opencanvas-collection" data-opencanvas-interactive="collection"` +
     ` data-collection-display="${escapeAttr(displayAttr)}"` +
@@ -251,6 +252,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
     ` data-collection-slug="${slugAttr}"` +
     ` data-collection-folder="${folderAttr}"` +
     galleryAttrs +
+    keyboardAttrs +
     ` style="${escapeAttr(effectiveFrameStyle)}">${entriesHtml}${progressHtml}</div>`
   );
 }

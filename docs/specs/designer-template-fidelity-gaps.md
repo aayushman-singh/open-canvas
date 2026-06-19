@@ -409,8 +409,8 @@ Current state:
 
 User-visible miss:
 
-- Richer collection slider controls such as snap presets, keyboard paging, and
-  gallery navigation presets remain deferred beyond the drag-slider primitive.
+- Richer collection slider controls such as snap presets and gallery navigation
+  presets remain deferred beyond the drag-slider primitive.
 
 June 2026 update: Marquee can now bind to a same-section Collection element as
 a schema-owned ticker source (`title`, `excerpt`, or `all-text`) instead of
@@ -424,8 +424,9 @@ Yjs preserves the gallery-level policy.
 
 June 2026 update: Collection Gallery drag-slider can now show schema-owned
 progress dots. The renderer emits progress metadata and one dot per entry, the
-Runtime Hydrator keeps dots in sync with active-entry state, the inspector
-exposes a Show progress toggle, and validation/Yjs preserve the policy.
+Runtime Hydrator keeps dots in sync with active-entry state, progress dots can
+page the slider, keyboard arrows page the focused slider, the inspector exposes
+a Show progress toggle, and validation/Yjs preserve the policy.
 
 Needed primitive:
 

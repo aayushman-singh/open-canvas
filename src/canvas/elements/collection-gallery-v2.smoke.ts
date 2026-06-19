@@ -217,6 +217,10 @@ assert(
   dragSliderHtml.includes('data-opencanvas-collection-gallery-progress-dot="1"'),
   'renderer must emit one progress dot per materialized entry',
 );
+assert(
+  dragSliderHtml.includes('tabindex="0"'),
+  'renderer must make drag-slider gallery roots keyboard focusable',
+);
 
 const videoHoverCollection = makeCollection({
   gallery: {
@@ -392,6 +396,14 @@ const hydrateCollectionGalleries = makeHydrateCollectionGalleries();
   assert((root.listeners.pointerdown?.length ?? 0) === 1, 'drag-slider runtime must wire pointerdown');
   assert((root.listeners.pointermove?.length ?? 0) === 1, 'drag-slider runtime must wire pointermove');
   assert((root.listeners.pointerup?.length ?? 0) === 1, 'drag-slider runtime must wire pointerup');
+  assert((root.listeners.keydown?.length ?? 0) === 1, 'drag-slider runtime must wire keyboard paging');
+  assert((secondDot.listeners.click?.length ?? 0) === 1, 'drag-slider runtime must wire progress dot click');
+  secondDot.listeners.click![0]!({ preventDefault(): void {} });
+  assert(
+    root.props['--opencanvas-collection-slider-x'] === '-100.00px',
+    `progress dot click must move slider x to the second entry; got ${root.props['--opencanvas-collection-slider-x']}`,
+  );
+  assert(secondEntry.attrs['data-opencanvas-collection-entry-active'] === 'true', 'progress dot click must activate nearest entry');
   root.listeners.pointerdown![0]!({ clientX: 0, clientY: 0, preventDefault(): void {} });
   root.listeners.pointermove![0]!({ clientX: -120, clientY: 0, preventDefault(): void {} });
   root.listeners.pointerup![0]!({ clientX: -120, clientY: 0 });
@@ -403,6 +415,14 @@ const hydrateCollectionGalleries = makeHydrateCollectionGalleries();
   assert(root.attrs['data-opencanvas-collection-active-entry'] === '1', 'drag-slider must publish active entry index');
   assert(secondDot.attrs['data-opencanvas-collection-gallery-progress-active'] === 'true', 'drag-slider must activate nearest progress dot');
   assert(secondDot.attrs['aria-current'] === 'true', 'drag-slider progress dot must expose aria-current');
+  root.listeners.keydown![0]!({ key: 'ArrowLeft', preventDefault(): void {} });
+  const activeAfterArrow: string | undefined = root.attrs['data-opencanvas-collection-active-entry'];
+  assert(activeAfterArrow === '0', 'ArrowLeft must page to the previous entry');
+  const sliderAfterArrow: string | undefined = root.props['--opencanvas-collection-slider-x'];
+  assert(
+    sliderAfterArrow === '0.00px',
+    `ArrowLeft must move slider x to the previous entry; got ${sliderAfterArrow}`,
+  );
 }
 
 const inspectorSource = readFileSync(join(repoSrcDir, 'editor-client', 'element-inspector.ts'), 'utf8');

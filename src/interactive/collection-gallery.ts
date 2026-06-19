@@ -28,7 +28,7 @@ function cancelCollectionGalleryFrame(frameId) {
   }
   clearTimeout(frameId);
 }
-function wireCollectionGalleryDragSlider(galleryRoot, entries, axis, inertiaEnabled, activate) {
+function wireCollectionGalleryDragSlider(galleryRoot, entries, progressDots, axis, inertiaEnabled, activate) {
   if (!entries || entries.length === 0) return;
   var firstRect = entries[0].getBoundingClientRect();
   var span = axis === 'y' ? firstRect.height : firstRect.width;
@@ -49,6 +49,10 @@ function wireCollectionGalleryDragSlider(galleryRoot, entries, axis, inertiaEnab
     galleryRoot.style.setProperty('--opencanvas-collection-slider-y', y.toFixed(2) + 'px');
     var index = Math.max(0, Math.min(entries.length - 1, Math.round(Math.abs(offset) / span)));
     activate(entries[index]);
+  }
+  function moveToIndex(index) {
+    var clamped = Math.max(0, Math.min(entries.length - 1, Number(index) || 0));
+    setOffset(-span * clamped);
   }
   function stopInertia() {
     cancelCollectionGalleryFrame(frameId);
@@ -92,6 +96,22 @@ function wireCollectionGalleryDragSlider(galleryRoot, entries, axis, inertiaEnab
   }
   galleryRoot.addEventListener('pointerup', endDrag);
   galleryRoot.addEventListener('pointercancel', endDrag);
+  galleryRoot.addEventListener('keydown', function (ev) {
+    if (!ev) return;
+    if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowDown' && ev.key !== 'ArrowLeft' && ev.key !== 'ArrowUp') return;
+    if (typeof ev.preventDefault === 'function') ev.preventDefault();
+    var current = Number(galleryRoot.getAttribute('data-opencanvas-collection-active-entry') || '0');
+    var delta = ev.key === 'ArrowRight' || ev.key === 'ArrowDown' ? 1 : -1;
+    moveToIndex(current + delta);
+  });
+  for (var i = 0; i < progressDots.length; i++) {
+    (function (dot) {
+      dot.addEventListener('click', function (ev) {
+        if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+        moveToIndex(Number(dot.getAttribute('data-opencanvas-collection-gallery-progress-dot') || '0'));
+      });
+    })(progressDots[i]);
+  }
 }
 function hydrateCollectionGalleries(scope) {
   var root = scope || document;
@@ -182,7 +202,7 @@ function hydrateCollectionGalleries(scope) {
         })(entries[e]);
       }
       if (mode === 'drag-slider') {
-        wireCollectionGalleryDragSlider(galleryRoot, entries, sliderAxis, sliderInertia === 'true' && !(reduce && reducedMotion === 'instant'), activate);
+        wireCollectionGalleryDragSlider(galleryRoot, entries, progressDots, sliderAxis, sliderInertia === 'true' && !(reduce && reducedMotion === 'instant'), activate);
       }
     })(nodes[n]);
   }
