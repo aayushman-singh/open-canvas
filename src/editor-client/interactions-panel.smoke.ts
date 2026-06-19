@@ -95,6 +95,10 @@ equal(scroll.sequence.reducedMotion, 'final-state', 'scroll sequence reduced mot
 equal(scroll.sequence.steps[0]?.target.type, 'element', 'selected element becomes first target');
 
 const panelSrc = await Bun.file(new URL('./interactions-panel.ts', import.meta.url)).text();
+assert(panelSrc.includes('BehaviourLoadExperience'), 'panel must import behaviour load experience');
+assert(panelSrc.includes('Use designer enter moment'), 'panel must expose designer load mode');
+assert(panelSrc.includes('Create linked sequence'), 'panel must restore missing load-enter sequence');
+assert(panelSrc.includes('Linked load-enter Motion Sequence is missing'), 'panel must fail loudly for missing behaviour load sequence');
 assert(panelSrc.includes('renderScrollSceneControls'), 'panel must render scroll scene controls');
 assert(panelSrc.includes('ctx.state!.scrollScenes'), 'panel must mutate scroll scenes');
 assert(panelSrc.includes('ctx.state!.motionSequences'), 'panel must mutate linked motion sequences');

@@ -199,13 +199,17 @@ Current state:
 - The editor exposes this in the Interactions tab with preview.
 - Media elements use native loading behaviour where relevant, but no authored
   custom preloader content or progress-number choreography exists yet.
+- **June 2026 update:** the Interactions panel now exposes the richer
+  Behaviour Load Experience enter moment used by designer templates: editable
+  label, enter label, foreground/background colours, and a linked `load-enter`
+  Motion Sequence with a restore gate when the relation is missing.
 
 User-visible miss:
 
 - Cannot reproduce branded preloaders, progress numbers, logo draws, mask
   openings, media-readiness gates, or first-load page reveals.
-- Cannot choose whether a preloader runs once per session, per page, or only
-  before heavy media.
+- Cannot yet author custom progress numbers, logo draws, media-readiness maps,
+  or run policy for the Behaviour Load Experience model.
 
 Needed primitive:
 

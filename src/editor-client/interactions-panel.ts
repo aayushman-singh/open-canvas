@@ -7,6 +7,7 @@
 
 import type {
   InteractionTrigger,
+  BehaviourLoadExperience,
   PremiumLoadExperience,
   LoadExperienceGate,
   LoadExperiencePreset,
@@ -227,6 +228,52 @@ function activePageId(ctx: InteractionsPanelContext): string | null {
 function currentPremiumLoadExperience(state: EditableSite): PremiumLoadExperience {
   const load = state.loadExperience;
   return isPremiumLoadExperience(load) ? load : defaultLoadExperience();
+}
+
+function isBehaviourLoadExperience(
+  value: EditableSite['loadExperience'],
+): value is BehaviourLoadExperience {
+  return !!value && typeof value === 'object' && 'label' in value;
+}
+
+function loadEnterSequences(ctx: InteractionsPanelContext): MotionSequence[] {
+  return (ctx.state?.motionSequences ?? []).filter((sequence) => sequence.trigger.type === 'load-enter');
+}
+
+function defaultBehaviourLoadExperience(ctx: InteractionsPanelContext): BehaviourLoadExperience {
+  const existing = loadEnterSequences(ctx)[0];
+  return {
+    id: 'load-enter-main',
+    label: 'Enter',
+    enterLabel: 'Enter site',
+    background: '#050505',
+    foreground: '#ffffff',
+    sequenceId: existing?.id ?? 'load-enter-sequence',
+  };
+}
+
+function ensureLoadEnterSequence(ctx: InteractionsPanelContext, sequenceId: string): void {
+  if (!ctx.state) return;
+  if ((ctx.state.motionSequences ?? []).some((sequence) => sequence.id === sequenceId)) return;
+  ctx.state.motionSequences = [
+    ...(ctx.state.motionSequences ?? []),
+    {
+      id: sequenceId,
+      trigger: { type: 'load-enter' },
+      reducedMotion: 'final-state',
+      steps: [
+        {
+          id: sequenceId + '-site-in',
+          target: { type: 'site' },
+          from: { opacity: 0 },
+          to: { opacity: 1 },
+          durationMs: 260,
+          delayMs: 0,
+          easing: DEFAULT_EASING,
+        },
+      ],
+    },
+  ];
 }
 
 export function defaultScrollScene(
@@ -543,7 +590,26 @@ function updateScrollSequenceStep(
 function renderLoadControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
   if (!ctx.state) return;
   const wrap = section('Load Experience');
+  if (isBehaviourLoadExperience(ctx.state.loadExperience)) {
+    renderBehaviourLoadControls(ctx, wrap, ctx.state.loadExperience);
+    host.appendChild(wrap);
+    return;
+  }
   const load = isPremiumLoadExperience(ctx.state.loadExperience) ? ctx.state.loadExperience : undefined;
+
+  const designerMode = actionButton(
+    'Use designer enter moment',
+    'Switch to the behaviour Load Experience used by premium designer templates',
+  );
+  designerMode.addEventListener('click', () => {
+    mutate(ctx, () => {
+      const next = defaultBehaviourLoadExperience(ctx);
+      ensureLoadEnterSequence(ctx, next.sequenceId);
+      ctx.state!.loadExperience = next;
+    });
+    ctx.setStatus('Designer enter moment enabled', 'ok');
+  });
+  wrap.appendChild(designerMode);
 
   wrap.appendChild(
     checkbox(!!load?.enabled, 'Enable load screen', (checked) => {
@@ -627,6 +693,92 @@ function renderLoadControls(ctx: InteractionsPanelContext, host: HTMLElement): v
   });
 
   host.appendChild(wrap);
+}
+
+function renderBehaviourLoadControls(
+  ctx: InteractionsPanelContext,
+  wrap: HTMLElement,
+  load: BehaviourLoadExperience,
+): void {
+  const premiumMode = actionButton(
+    'Use preset load screen',
+    'Switch back to Load Experience v1 presets',
+  );
+  premiumMode.addEventListener('click', () => {
+    mutate(ctx, () => {
+      ctx.state!.loadExperience = defaultLoadExperience();
+    });
+    ctx.setStatus('Preset load screen enabled', 'ok');
+  });
+  wrap.appendChild(premiumMode);
+
+  const label = textInput(load.label, 'Brand or preloader label');
+  label.addEventListener('change', () => updateBehaviourLoadText(ctx, load, 'label', label));
+  wrap.appendChild(field('Label', label));
+
+  const enterLabel = textInput(load.enterLabel, 'Enter button label');
+  enterLabel.addEventListener('change', () =>
+    updateBehaviourLoadText(ctx, load, 'enterLabel', enterLabel),
+  );
+  wrap.appendChild(field('Enter label', enterLabel));
+
+  const background = textInput(load.background, '#050505');
+  background.addEventListener('change', () =>
+    updateBehaviourLoadText(ctx, load, 'background', background),
+  );
+  wrap.appendChild(field('Background', background));
+
+  const foreground = textInput(load.foreground, '#ffffff');
+  foreground.addEventListener('change', () =>
+    updateBehaviourLoadText(ctx, load, 'foreground', foreground),
+  );
+  wrap.appendChild(field('Foreground', foreground));
+
+  const sequences = loadEnterSequences(ctx);
+  const sequenceIds = sequences.map((sequence) => sequence.id);
+  if (sequenceIds.length > 0) {
+    const sequence = selectInput(sequenceIds, sequenceIds.includes(load.sequenceId) ? load.sequenceId : sequenceIds[0]!);
+    sequence.addEventListener('change', () => {
+      mutate(ctx, () => {
+        ctx.state!.loadExperience = { ...load, sequenceId: sequence.value };
+      });
+    });
+    wrap.appendChild(field('Enter sequence', sequence));
+  }
+
+  if (!sequenceIds.includes(load.sequenceId)) {
+    const missing = document.createElement('p');
+    missing.className = 'opencanvas-section-picker-empty';
+    missing.textContent = 'Linked load-enter Motion Sequence is missing. Validation blocks publish until it is restored.';
+    wrap.appendChild(missing);
+    const restore = compactButton('Create linked sequence', 'Create the missing load-enter sequence');
+    restore.addEventListener('click', () => {
+      mutate(ctx, () => ensureLoadEnterSequence(ctx, load.sequenceId));
+      ctx.setStatus('Load enter sequence created', 'ok');
+    });
+    wrap.appendChild(restore);
+  }
+
+  const preview = actionButton('Preview enter moment', 'Show the behaviour load experience in the editor');
+  preview.addEventListener('click', () => ctx.previewLoadExperience());
+  wrap.appendChild(preview);
+}
+
+function updateBehaviourLoadText(
+  ctx: InteractionsPanelContext,
+  load: BehaviourLoadExperience,
+  key: 'label' | 'enterLabel' | 'background' | 'foreground',
+  input: HTMLInputElement,
+): void {
+  const value = input.value.trim();
+  if (value.length === 0) {
+    ctx.setStatus('Load Experience ' + key + ' cannot be empty', 'error');
+    input.value = load[key];
+    return;
+  }
+  mutate(ctx, () => {
+    ctx.state!.loadExperience = { ...load, [key]: value };
+  });
 }
 
 function renderRouteControls(ctx: InteractionsPanelContext, host: HTMLElement): void {

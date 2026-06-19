@@ -10,6 +10,8 @@
   slice as addressed.
 - Added a Text Split Target inspector path for word/line/character targets,
   backed by Motion Sequence steps and explicit runtime accessibility handling.
+- Added Behaviour Load Experience editor controls for designer enter moments
+  and linked `load-enter` Motion Sequence recovery.
 
 ## Next
 
@@ -19,3 +21,5 @@
   preview and visitor output.
 - Add a full timeline editor for multiple steps, waits, repeats, and richer
   text-specific effects.
+- Add Behaviour Load Experience run policy, progress choreography, and
+  media-readiness gates.
