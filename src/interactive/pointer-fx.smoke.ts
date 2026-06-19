@@ -80,7 +80,13 @@ interface Rect {
   width: number;
   height: number;
 }
-type Listener = (ev: { clientX: number; clientY: number; pointerType?: string }) => void;
+type Listener = (ev: {
+  clientX: number;
+  clientY: number;
+  pointerId?: number;
+  pointerType?: string;
+  preventDefault?: () => void;
+}) => void;
 
 function makeStub(primitive: string, rect: Rect, extraAttrs: Record<string, string> = {}) {
   const attrs: Record<string, string> = {
@@ -90,6 +96,7 @@ function makeStub(primitive: string, rect: Rect, extraAttrs: Record<string, stri
   };
   const props: Record<string, string> = {};
   const listeners: Record<string, Listener[]> = {};
+  let capturedPointerId: number | null = null;
   const children: Array<{
     attrs: Record<string, string>;
     className: string;
@@ -131,6 +138,15 @@ function makeStub(primitive: string, rect: Rect, extraAttrs: Record<string, stri
     },
     addEventListener(t: string, fn: Listener): void {
       (listeners[t] ||= []).push(fn);
+    },
+    setPointerCapture(pointerId: number): void {
+      capturedPointerId = pointerId;
+    },
+    releasePointerCapture(pointerId: number): void {
+      if (capturedPointerId === pointerId) capturedPointerId = null;
+    },
+    get capturedPointerId(): number | null {
+      return capturedPointerId;
     },
     getBoundingClientRect(): Rect {
       return rect;
@@ -319,6 +335,27 @@ const hydratePointerFx = makeHydratePointerFx();
   assert(el.attrs['data-opencanvas-pointer-fx-touch-active'] === 'false', 'second touch toggle must clear touch-active state');
 }
 
+// -- 2k. drag-inertia publishes drag offset state -----------------------------
+{
+  const el = makeStub('drag-inertia', { left: 0, top: 0, width: 200, height: 100 }, {
+    'data-opencanvas-pointer-fx-drag-axis': 'x',
+    'data-opencanvas-pointer-fx-inertia': 'false',
+  });
+  hydratePointerFx({ querySelectorAll: () => [el] });
+  assert((el.listeners['pointerdown']?.length ?? 0) === 1, 'drag-inertia must wire pointerdown');
+  assert((el.listeners['pointermove']?.length ?? 0) === 1, 'drag-inertia must wire pointermove');
+  assert((el.listeners['pointerup']?.length ?? 0) === 1, 'drag-inertia must wire pointerup');
+  el.listeners['pointerdown']![0]!({ clientX: 10, clientY: 20, pointerId: 7, preventDefault(): void {} });
+  assert(el.attrs['data-opencanvas-pointer-fx-dragging'] === 'true', 'drag start must mark dragging state');
+  assert(el.capturedPointerId === 7, 'drag start must capture pointer when supported');
+  el.listeners['pointermove']![0]!({ clientX: 60, clientY: 90, pointerId: 7, preventDefault(): void {} });
+  assert(el.props['--opencanvas-drag-x'] === '50.00px', `drag x should be 50px; got ${el.props['--opencanvas-drag-x']}`);
+  assert(el.props['--opencanvas-drag-y'] === '0.00px', `x-axis drag must keep y at 0px; got ${el.props['--opencanvas-drag-y']}`);
+  el.listeners['pointerup']![0]!({ clientX: 60, clientY: 90, pointerId: 7 });
+  assert(el.attrs['data-opencanvas-pointer-fx-dragging'] === 'false', 'drag end must clear dragging state');
+  assert(el.capturedPointerId === null, 'drag end must release pointer capture when supported');
+}
+
 // -- 3. idempotence: re-run does not double-wire -----------------------------
 {
   const el = makeStub('spotlight', { left: 0, top: 0, width: 200, height: 100 });
@@ -345,6 +382,11 @@ const hydratePointerFx = makeHydratePointerFx();
   assert(
     POINTER_FX_RUNTIME_SRC.includes('data-opencanvas-pointer-fx-touch'),
     'pointer-fx runtime must read explicit touch activation metadata',
+  );
+  assert(
+    POINTER_FX_RUNTIME_SRC.includes('data-opencanvas-pointer-fx-drag-axis') &&
+      POINTER_FX_RUNTIME_SRC.includes('data-opencanvas-pointer-fx-inertia'),
+    'pointer-fx runtime must read explicit drag-inertia metadata',
   );
 }
 

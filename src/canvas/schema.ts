@@ -204,6 +204,7 @@ export const POINTER_FX_PRIMITIVES = [
   'pointer-parallax',
   'cursor-trail',
   'image-follow',
+  'drag-inertia',
 ] as const;
 export type PointerFxPrimitive = (typeof POINTER_FX_PRIMITIVES)[number];
 
@@ -212,6 +213,9 @@ export type PointerFxReducedMotionMode = (typeof POINTER_FX_REDUCED_MOTION_MODES
 
 export const POINTER_FX_TOUCH_ACTIVATION_MODES = ['none', 'tap', 'toggle'] as const;
 export type PointerFxTouchActivationMode = (typeof POINTER_FX_TOUCH_ACTIVATION_MODES)[number];
+
+export const POINTER_FX_DRAG_AXES = ['x', 'y', 'both'] as const;
+export type PointerFxDragAxis = (typeof POINTER_FX_DRAG_AXES)[number];
 
 export const NAV_THEME_TARGETS = ['transparent', 'light', 'dark', 'solid'] as const;
 export type NavThemeTarget = (typeof NAV_THEME_TARGETS)[number];
@@ -245,6 +249,8 @@ export interface PointerFxBehaviour {
   previewAssetId?: string;
   reducedMotion: PointerFxReducedMotionMode;
   touchActivation?: PointerFxTouchActivationMode;
+  dragAxis?: PointerFxDragAxis;
+  inertia?: boolean;
 }
 
 export const SCROLL_TRIGGER_MODES = ['on-load', 'on-scroll'] as const;

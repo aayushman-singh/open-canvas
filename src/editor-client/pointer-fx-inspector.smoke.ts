@@ -17,5 +17,10 @@ assert(inspectorSrc.includes('Preview asset id'), 'inspector must expose image-f
 assert(inspectorSrc.includes('previewAssetId'), 'inspector must save image-follow preview asset id');
 assert(inspectorSrc.includes('Touch activation'), 'inspector must expose touch activation control');
 assert(inspectorSrc.includes('touchActivation'), 'inspector must persist pointer-fx touch activation');
+assert(inspectorSrc.includes('drag-inertia'), 'inspector must expose drag-inertia primitive');
+assert(inspectorSrc.includes('Drag axis'), 'inspector must expose drag axis control');
+assert(inspectorSrc.includes('dragAxis'), 'inspector must persist pointer-fx drag axis');
+assert(inspectorSrc.includes('Inertia'), 'inspector must expose inertia control');
+assert(inspectorSrc.includes('inertia'), 'inspector must persist pointer-fx inertia');
 
 console.log('[pointer-fx-inspector:smoke] OK');

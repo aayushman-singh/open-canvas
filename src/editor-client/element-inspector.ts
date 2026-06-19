@@ -38,6 +38,7 @@ import {
   MARQUEE_COLLECTION_FIELDS,
   MARQUEE_REDUCED_MOTION_MODES,
   MOTION_PRESETS,
+  POINTER_FX_DRAG_AXES,
   POINTER_FX_PRIMITIVES,
   POINTER_FX_REDUCED_MOTION_MODES,
   POINTER_FX_TOUCH_ACTIVATION_MODES,
@@ -45,6 +46,7 @@ import {
   type MarqueeDirection,
   type MarqueeReducedMotionMode,
   type MotionPreset,
+  type PointerFxDragAxis,
   type PointerFxPrimitive,
   type PointerFxReducedMotionMode,
   type PointerFxTouchActivationMode,
@@ -680,6 +682,14 @@ function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): v
     } else {
       delete element.pointerFx!.previewAssetId;
     }
+    if (element.pointerFx!.primitive === 'drag-inertia') {
+      element.pointerFx!.touchActivation = 'none';
+      element.pointerFx!.dragAxis = element.pointerFx!.dragAxis ?? 'x';
+      element.pointerFx!.inertia = element.pointerFx!.inertia ?? true;
+    } else {
+      delete element.pointerFx!.dragAxis;
+      delete element.pointerFx!.inertia;
+    }
     ctx.rebuildElement(element.id);
     renderInspector(ctx);
     ctx.scheduleSave();
@@ -698,6 +708,28 @@ function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): v
       ctx.scheduleSave();
     });
     ctx.inspector.appendChild(field('Preview asset id', previewAsset));
+  }
+
+  if (element.pointerFx.primitive === 'drag-inertia') {
+    const dragAxis = selectInput(POINTER_FX_DRAG_AXES, element.pointerFx.dragAxis ?? 'x');
+    dragAxis.addEventListener('change', () => {
+      ctx.captureForUndo();
+      element.pointerFx!.dragAxis = dragAxis.value as PointerFxDragAxis;
+      ctx.rebuildElement(element.id);
+      ctx.scheduleSave();
+    });
+    ctx.inspector.appendChild(field('Drag axis', dragAxis));
+
+    const inertia = document.createElement('input');
+    inertia.type = 'checkbox';
+    inertia.checked = element.pointerFx.inertia !== false;
+    inertia.addEventListener('change', () => {
+      ctx.captureForUndo();
+      element.pointerFx!.inertia = inertia.checked;
+      ctx.rebuildElement(element.id);
+      ctx.scheduleSave();
+    });
+    ctx.inspector.appendChild(field('Inertia', inertia));
   }
 
   const touchActivation = selectInput(

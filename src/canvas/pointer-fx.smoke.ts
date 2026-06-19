@@ -103,6 +103,19 @@ function makeSite(): EditableSite {
                   touchActivation: 'toggle',
                 },
               },
+              {
+                id: 'drag-inertia-card',
+                type: 'container',
+                variant: 'glass',
+                box: { x: 780, y: 300, w: 180, h: 64, z: 8 },
+                pointerFx: {
+                  enabled: true,
+                  primitive: 'drag-inertia',
+                  reducedMotion: 'disabled',
+                  dragAxis: 'x',
+                  inertia: true,
+                },
+              },
             ],
           },
         ],
@@ -150,6 +163,12 @@ assert(
     decoded.pages[0]?.sections[0]?.elements[6]?.pointerFx?.touchActivation === 'toggle',
   'Yjs projection must preserve image-follow pointerFx config',
 );
+assert(
+  decoded.pages[0]?.sections[0]?.elements[7]?.pointerFx?.primitive === 'drag-inertia' &&
+    decoded.pages[0]?.sections[0]?.elements[7]?.pointerFx?.dragAxis === 'x' &&
+    decoded.pages[0]?.sections[0]?.elements[7]?.pointerFx?.inertia === true,
+  'Yjs projection must preserve drag-inertia pointerFx config',
+);
 
 const snapshot: PublishedSnapshot = {
   ...site,
@@ -188,8 +207,20 @@ assert(
   'renderer must emit image-follow pointer-fx primitive',
 );
 assert(
+  html.includes('data-opencanvas-pointer-fx="drag-inertia"'),
+  'renderer must emit drag-inertia pointer-fx primitive',
+);
+assert(
   html.includes('data-opencanvas-pointer-fx-preview-src="/assets/cursor-preview.webp"'),
   'renderer must emit image-follow preview asset src',
+);
+assert(
+  html.includes('data-opencanvas-pointer-fx-drag-axis="x"'),
+  'renderer must emit drag-inertia axis metadata',
+);
+assert(
+  html.includes('data-opencanvas-pointer-fx-inertia="true"'),
+  'renderer must emit drag-inertia inertia metadata',
 );
 assert(
   html.includes('data-opencanvas-pointer-fx-reduced-motion="disabled"'),
@@ -218,6 +249,8 @@ invalidElement.pointerFx = {
   primitive: 'magnet',
   reducedMotion: 'maybe',
   touchActivation: 'swipe',
+  dragAxis: 'diagonal',
+  inertia: 'yes',
 };
 const invalidResult = validateEditableSite(invalid);
 assert(!invalidResult.valid, 'invalid pointerFx config must fail validation');
@@ -232,6 +265,41 @@ assert(
 assert(
   invalidResult.errors.some((error) => error.includes('.pointerFx.touchActivation')),
   'invalid touch activation mode must be named',
+);
+assert(
+  invalidResult.errors.some((error) => error.includes('.pointerFx.dragAxis')),
+  'invalid drag axis must be named',
+);
+assert(
+  invalidResult.errors.some((error) => error.includes('.pointerFx.inertia')),
+  'invalid inertia flag must be named',
+);
+
+const unsupportedDragRelation = makeSite() as unknown as Record<string, unknown>;
+const unsupportedDragElement = (
+  (
+    (((unsupportedDragRelation.pages as unknown[])[0] as Record<string, unknown>).sections as unknown[])[0] as Record<
+      string,
+      unknown
+    >
+  ).elements as Record<string, unknown>[]
+)[0]!;
+unsupportedDragElement.pointerFx = {
+  enabled: true,
+  primitive: 'tilt',
+  reducedMotion: 'disabled',
+  dragAxis: 'x',
+  inertia: true,
+};
+const unsupportedDragResult = validateEditableSite(unsupportedDragRelation);
+assert(!unsupportedDragResult.valid, 'drag inertia fields on non-drag primitive must fail validation');
+assert(
+  unsupportedDragResult.errors.some((error) => error.includes('.pointerFx.dragAxis')),
+  'unsupported drag axis relation must be named',
+);
+assert(
+  unsupportedDragResult.errors.some((error) => error.includes('.pointerFx.inertia')),
+  'unsupported inertia relation must be named',
 );
 
 const invalidImageFollow = makeSite() as unknown as Record<string, unknown>;

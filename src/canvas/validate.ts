@@ -110,6 +110,7 @@ import {
   OVERLAY_TRIGGER_TYPES,
   OVERFLOW_VALUES,
   POINTER_FX_PRIMITIVES,
+  POINTER_FX_DRAG_AXES,
   POINTER_FX_REDUCED_MOTION_MODES,
   POINTER_FX_TOUCH_ACTIVATION_MODES,
   ROUTE_TRANSITION_MODES,
@@ -142,6 +143,7 @@ import {
   type MotionPreset,
   type OverlayTriggerType,
   type OverflowValue,
+  type PointerFxDragAxis,
   type PointerFxPrimitive,
   type PointerFxReducedMotionMode,
   type PointerFxTouchActivationMode,
@@ -840,6 +842,24 @@ function validatePointerFx(value: unknown, basePath: string, errors: string[]): 
       `${p}.touchActivation`,
       errors,
     );
+  }
+  if (value.primitive === 'drag-inertia') {
+    if (value.touchActivation !== undefined && value.touchActivation !== 'none') {
+      errors.push(`${p}.touchActivation must be none when primitive is drag-inertia`);
+    }
+    if (value.dragAxis !== undefined) {
+      assertOneOf<PointerFxDragAxis>(value.dragAxis, POINTER_FX_DRAG_AXES, `${p}.dragAxis`, errors);
+    }
+    if (value.inertia !== undefined && typeof value.inertia !== 'boolean') {
+      errors.push(`${p}.inertia must be a boolean when present`);
+    }
+  } else {
+    if (value.dragAxis !== undefined) {
+      errors.push(`${p}.dragAxis is only supported when primitive is drag-inertia`);
+    }
+    if (value.inertia !== undefined) {
+      errors.push(`${p}.inertia is only supported when primitive is drag-inertia`);
+    }
   }
 }
 

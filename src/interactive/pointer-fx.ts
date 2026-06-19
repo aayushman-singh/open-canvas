@@ -32,6 +32,8 @@
 //     pointer coordinates. CSS owns trail rendering and lifetime animation.
 //   - `image-follow` — appends one preview image from schema-owned asset
 //     metadata and positions it at pointer coordinates.
+//   - `drag-inertia` — publishes bounded drag offsets as CSS variables and can
+//     keep moving briefly after release when inertia is enabled.
 //
 // Scroll / entrance motion is deliberately NOT here — that stays with the
 // existing `motion.preset` + `data-scroll-trigger` system (ADR dec 4).
@@ -188,6 +190,91 @@ function wirePointerFxTouch(el, primitive, touchActivation, img) {
     }
   });
 }
+function schedulePointerFxDragFrame(callback) {
+  if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+    return window.requestAnimationFrame(callback);
+  }
+  return setTimeout(callback, 16);
+}
+function cancelPointerFxDragFrame(frameId) {
+  if (frameId === null || frameId === undefined) return;
+  if (typeof window !== 'undefined' && window.cancelAnimationFrame) {
+    window.cancelAnimationFrame(frameId);
+    return;
+  }
+  clearTimeout(frameId);
+}
+function wirePointerFxDragInertia(el, axis, inertiaEnabled) {
+  var dragging = false;
+  var lastX = 0;
+  var lastY = 0;
+  var currentX = 0;
+  var currentY = 0;
+  var velocityX = 0;
+  var velocityY = 0;
+  var frameId = null;
+  function setDrag(x, y) {
+    if (axis === 'x') y = 0;
+    if (axis === 'y') x = 0;
+    currentX = x;
+    currentY = y;
+    el.style.setProperty('--opencanvas-drag-x', currentX.toFixed(2) + 'px');
+    el.style.setProperty('--opencanvas-drag-y', currentY.toFixed(2) + 'px');
+  }
+  function stopInertia() {
+    cancelPointerFxDragFrame(frameId);
+    frameId = null;
+  }
+  function inertiaFrame() {
+    velocityX *= 0.92;
+    velocityY *= 0.92;
+    if (Math.abs(velocityX) < 0.1 && Math.abs(velocityY) < 0.1) {
+      frameId = null;
+      return;
+    }
+    setDrag(currentX + velocityX, currentY + velocityY);
+    frameId = schedulePointerFxDragFrame(inertiaFrame);
+  }
+  el.addEventListener('pointerdown', function (ev) {
+    if (!ev) return;
+    if (typeof ev.preventDefault === 'function') ev.preventDefault();
+    stopInertia();
+    dragging = true;
+    lastX = ev.clientX;
+    lastY = ev.clientY;
+    velocityX = 0;
+    velocityY = 0;
+    el.setAttribute('data-opencanvas-pointer-fx-dragging', 'true');
+    if (typeof el.setPointerCapture === 'function' && ev.pointerId !== undefined) {
+      el.setPointerCapture(ev.pointerId);
+    }
+  });
+  el.addEventListener('pointermove', function (ev) {
+    if (!dragging || !ev) return;
+    if (typeof ev.preventDefault === 'function') ev.preventDefault();
+    var dx = ev.clientX - lastX;
+    var dy = ev.clientY - lastY;
+    lastX = ev.clientX;
+    lastY = ev.clientY;
+    velocityX = axis === 'y' ? 0 : dx;
+    velocityY = axis === 'x' ? 0 : dy;
+    setDrag(currentX + dx, currentY + dy);
+  });
+  function endDrag(ev) {
+    if (!dragging) return;
+    dragging = false;
+    el.setAttribute('data-opencanvas-pointer-fx-dragging', 'false');
+    if (ev && typeof el.releasePointerCapture === 'function' && ev.pointerId !== undefined) {
+      el.releasePointerCapture(ev.pointerId);
+    }
+    if (inertiaEnabled) {
+      stopInertia();
+      frameId = schedulePointerFxDragFrame(inertiaFrame);
+    }
+  }
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
+}
 function hydratePointerFx(scope, options) {
   var nodes = (scope || document).querySelectorAll('[data-opencanvas-pointer-fx]');
   for (var i = 0; i < nodes.length; i++) {
@@ -196,11 +283,27 @@ function hydratePointerFx(scope, options) {
       var primitive = el.getAttribute('data-opencanvas-pointer-fx');
       var reducedMotion = el.getAttribute('data-opencanvas-pointer-fx-reduced-motion');
       var touchActivation = el.getAttribute('data-opencanvas-pointer-fx-touch') || 'none';
+      var rawDragAxis = el.getAttribute('data-opencanvas-pointer-fx-drag-axis');
+      var rawDragInertia = el.getAttribute('data-opencanvas-pointer-fx-inertia');
+      var dragAxis = rawDragAxis || 'both';
+      var dragInertia = rawDragInertia === null ? 'true' : rawDragInertia;
       if (reducedMotion !== 'disabled' && reducedMotion !== 'allow') {
         emitPointerFxFailure(el, 'invalid-reduced-motion', 'Pointer FX reduced-motion mode must be disabled or allow', reducedMotion);
       }
       if (touchActivation !== 'none' && touchActivation !== 'tap' && touchActivation !== 'toggle') {
         emitPointerFxFailure(el, 'invalid-touch-activation', 'Pointer FX touch activation must be none, tap, or toggle', touchActivation);
+      }
+      if (rawDragAxis !== null && rawDragAxis !== 'x' && rawDragAxis !== 'y' && rawDragAxis !== 'both') {
+        emitPointerFxFailure(el, 'invalid-drag-axis', 'Pointer FX drag axis must be x, y, or both', rawDragAxis);
+      }
+      if (rawDragInertia !== null && rawDragInertia !== 'true' && rawDragInertia !== 'false') {
+        emitPointerFxFailure(el, 'invalid-drag-inertia', 'Pointer FX inertia must be true or false', rawDragInertia);
+      }
+      if (primitive !== 'drag-inertia' && (rawDragAxis !== null || rawDragInertia !== null)) {
+        emitPointerFxFailure(el, 'unsupported-drag-relation', 'Pointer FX drag metadata is only supported for drag-inertia', primitive);
+      }
+      if (primitive === 'drag-inertia' && touchActivation !== 'none') {
+        emitPointerFxFailure(el, 'unsupported-drag-touch-relation', 'Pointer FX drag-inertia owns touch directly; touch activation must be none', touchActivation);
       }
       var reduce = pointerFxPrefersReducedMotion(options);
       if (reduce && reducedMotion === 'disabled') {
@@ -301,8 +404,10 @@ function hydratePointerFx(scope, options) {
         el.addEventListener('pointerleave', function () {
           img.setAttribute('data-opencanvas-pointer-image-follow-active', 'false');
         });
+      } else if (primitive === 'drag-inertia') {
+        wirePointerFxDragInertia(el, dragAxis, dragInertia === 'true');
       } else {
-        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, pointer-parallax, cursor-trail, or image-follow', primitive);
+        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, pointer-parallax, cursor-trail, image-follow, or drag-inertia', primitive);
       }
       wirePointerFxTouch(el, primitive, touchActivation, imageFollowNode);
     })(nodes[i]);

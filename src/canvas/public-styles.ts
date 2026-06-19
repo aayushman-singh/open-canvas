@@ -1128,7 +1128,8 @@ const variantCss = String.raw`
    reveal-mask publishes --opencanvas-reveal-x/y, applied here;
    pointer-parallax publishes --opencanvas-parallax-x/y, applied here;
    cursor-trail appends .opencanvas-pointer-trail spans rendered here;
-   image-follow appends .opencanvas-pointer-image-follow rendered here. */
+   image-follow appends .opencanvas-pointer-image-follow rendered here;
+   drag-inertia publishes --opencanvas-drag-x/y and a dragging state. */
 .opencanvas-element[data-opencanvas-pointer-fx="spotlight"]::before {
   content: "";
   position: absolute;
@@ -1226,6 +1227,24 @@ const variantCss = String.raw`
 .opencanvas-pointer-image-follow[data-opencanvas-pointer-image-follow-active="true"] {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
+}
+
+[data-opencanvas-pointer-fx="drag-inertia"] {
+  transform: translate3d(
+    var(--opencanvas-drag-x, 0px),
+    var(--opencanvas-drag-y, 0px),
+    0
+  );
+  transition: transform 120ms ease-out;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+}
+
+[data-opencanvas-pointer-fx="drag-inertia"][data-opencanvas-pointer-fx-dragging="true"] {
+  cursor: grabbing;
+  transition: none;
 }
 
 @keyframes opencanvas-pointer-trail {
