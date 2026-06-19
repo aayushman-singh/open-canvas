@@ -265,6 +265,50 @@ assert(
   `model-3d rich-motion snapshot must publish: ${model3dValidation.valid ? '' : model3dValidation.errors.join('; ')}`,
 );
 
+const shaderSceneState = structuredClone(goodSnapshot);
+shaderSceneState.pages[0]!.sections[0]!.elements[0] = {
+  ...shaderSceneState.pages[0]!.sections[0]!.elements[0],
+  assetRefId: 'motion-shader-field',
+} as unknown as typeof richMotionElement;
+(shaderSceneState as { richMotionAssets: unknown[] }).richMotionAssets = [
+  {
+    id: 'motion-shader-field',
+    kind: 'shader-scene',
+    preset: 'racing-lines',
+    alt: 'Abstract racing lines shader field',
+    colorA: '#C8FF1A',
+    colorB: '#111112',
+    speed: 0.8,
+    density: 0.7,
+    reducedMotion: 'static',
+  },
+];
+const shaderSceneValidation = validatePublishedSnapshot(shaderSceneState);
+assert(
+  shaderSceneValidation.valid,
+  `shader-scene rich-motion snapshot must publish: ${shaderSceneValidation.valid ? '' : shaderSceneValidation.errors.join('; ')}`,
+);
+
+const invalidShaderSceneState = structuredClone(shaderSceneState);
+(
+  (invalidShaderSceneState as { richMotionAssets: Array<Record<string, unknown>> })
+    .richMotionAssets[0]!
+).preset = 'owner-shader-code';
+(
+  (invalidShaderSceneState as { richMotionAssets: Array<Record<string, unknown>> })
+    .richMotionAssets[0]!
+).colorA = 'javascript:alert(1)';
+const invalidShaderSceneValidation = validatePublishedSnapshot(invalidShaderSceneState);
+assert(!invalidShaderSceneValidation.valid, 'invalid shader-scene metadata must fail publish validation');
+assert(
+  invalidShaderSceneValidation.errors.some((error) => error.includes('richMotionAssets[0].preset')),
+  `invalid shader scene failure must mention preset, got ${invalidShaderSceneValidation.valid ? '' : invalidShaderSceneValidation.errors.join('; ')}`,
+);
+assert(
+  invalidShaderSceneValidation.errors.some((error) => error.includes('richMotionAssets[0].colorA')),
+  `invalid shader scene failure must mention colorA, got ${invalidShaderSceneValidation.valid ? '' : invalidShaderSceneValidation.errors.join('; ')}`,
+);
+
 assert(
   typeof (RENDER_DISPATCH as Record<string, unknown>)['rich-motion'] === 'function',
   'RENDER_DISPATCH must register rich-motion',

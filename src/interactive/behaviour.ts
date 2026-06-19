@@ -420,6 +420,164 @@ function behaviourLoadModelViewerRuntime() {
   return behaviourModelViewerRuntimePromise;
 }
 
+function behaviourShaderColor(asset, value, role) {
+  var match = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.exec(String(value || ''));
+  if (!match) {
+    behaviourFailure('rich-motion-shader-color', { assetId: asset.id, role: role, value: value }, new Error('shader-scene color must be hex'));
+  }
+  var hex = match[1];
+  if (hex.length === 3) {
+    return [
+      parseInt(hex[0] + hex[0], 16) / 255,
+      parseInt(hex[1] + hex[1], 16) / 255,
+      parseInt(hex[2] + hex[2], 16) / 255
+    ];
+  }
+  return [
+    parseInt(hex.slice(0, 2), 16) / 255,
+    parseInt(hex.slice(2, 4), 16) / 255,
+    parseInt(hex.slice(4, 6), 16) / 255
+  ];
+}
+
+function behaviourShaderPresetIndex(asset) {
+  if (asset.preset === 'aurora-flow') return 0;
+  if (asset.preset === 'racing-lines') return 1;
+  if (asset.preset === 'particle-field') return 2;
+  behaviourFailure('rich-motion-shader-preset', { assetId: asset.id, preset: asset.preset }, new Error('unsupported shader-scene preset'));
+}
+
+function behaviourCompileShader(gl, type, source, asset) {
+  var shader = gl.createShader(type);
+  if (!shader) {
+    behaviourFailure('rich-motion-shader-program', { assetId: asset.id }, new Error('WebGL shader allocation failed'));
+  }
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    var info = gl.getShaderInfoLog(shader) || 'shader compile failed';
+    gl.deleteShader(shader);
+    behaviourFailure('rich-motion-shader-program', { assetId: asset.id, info: info }, new Error(info));
+  }
+  return shader;
+}
+
+function behaviourCreateShaderProgram(gl, asset) {
+  var vertexSource = 'attribute vec2 a_position; void main(){ gl_Position = vec4(a_position, 0.0, 1.0); }';
+  var fragmentSource = [
+    'precision mediump float;',
+    'uniform vec2 u_resolution;',
+    'uniform float u_time;',
+    'uniform float u_density;',
+    'uniform float u_preset;',
+    'uniform vec3 u_colorA;',
+    'uniform vec3 u_colorB;',
+    'void main(){',
+    'vec2 uv = gl_FragCoord.xy / max(u_resolution, vec2(1.0));',
+    'float v = 0.0;',
+    'if (u_preset < 0.5) {',
+    '  v = 0.5 + 0.5 * sin((uv.x * 5.0) + (uv.y * 3.0) + u_time);',
+    '} else if (u_preset < 1.5) {',
+    '  float lane = abs(sin((uv.y + uv.x * 0.18 + u_time * 0.28) * (12.0 + u_density * 28.0)));',
+    '  v = smoothstep(0.86, 1.0, lane);',
+    '} else {',
+    '  vec2 grid = fract(uv * (8.0 + u_density * 34.0) + vec2(u_time * 0.04, u_time * 0.02));',
+    '  float dotField = 1.0 - smoothstep(0.0, 0.18, length(grid - 0.5));',
+    '  v = dotField;',
+    '}',
+    'vec3 color = mix(u_colorB, u_colorA, clamp(v, 0.0, 1.0));',
+    'gl_FragColor = vec4(color, 1.0);',
+    '}'
+  ].join('');
+  var vertex = behaviourCompileShader(gl, gl.VERTEX_SHADER, vertexSource, asset);
+  var fragment = behaviourCompileShader(gl, gl.FRAGMENT_SHADER, fragmentSource, asset);
+  var program = gl.createProgram();
+  if (!program) {
+    behaviourFailure('rich-motion-shader-program', { assetId: asset.id }, new Error('WebGL program allocation failed'));
+  }
+  gl.attachShader(program, vertex);
+  gl.attachShader(program, fragment);
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    var info = gl.getProgramInfoLog(program) || 'shader link failed';
+    behaviourFailure('rich-motion-shader-program', { assetId: asset.id, info: info }, new Error(info));
+  }
+  return program;
+}
+
+function behaviourHydrateShaderScene(asset, root) {
+  var nodes = behaviourFindRichMotionNodes(root, asset.id);
+  if (!nodes.length) {
+    behaviourFailure('rich-motion-node-missing', { assetId: asset.id }, new Error('rich motion element not found'));
+  }
+  for (var n = 0; n < nodes.length; n++) {
+    var node = nodes[n];
+    if (node.getAttribute('data-opencanvas-shader-scene-hydrated') === 'true') continue;
+    try {
+      var canvas = behaviourFindRichMotionCanvas(node);
+      var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (!gl) {
+        behaviourFailure('rich-motion-shader-context', { assetId: asset.id }, new Error('WebGL context unavailable'));
+      }
+      var width = canvas.clientWidth || canvas.width;
+      var height = canvas.clientHeight || canvas.height;
+      if (!(width > 0) || !(height > 0)) {
+        behaviourFailure('rich-motion-shader-size', { assetId: asset.id, width: width, height: height }, new Error('shader-scene canvas has no drawable size'));
+      }
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+      var program = behaviourCreateShaderProgram(gl, asset);
+      var position = gl.getAttribLocation(program, 'a_position');
+      if (position < 0) {
+        behaviourFailure('rich-motion-shader-program', { assetId: asset.id }, new Error('shader position attribute missing'));
+      }
+      var buffer = gl.createBuffer();
+      if (!buffer) {
+        behaviourFailure('rich-motion-shader-program', { assetId: asset.id }, new Error('WebGL buffer allocation failed'));
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+      gl.useProgram(program);
+      gl.enableVertexAttribArray(position);
+      gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+      var resolution = gl.getUniformLocation(program, 'u_resolution');
+      var time = gl.getUniformLocation(program, 'u_time');
+      var density = gl.getUniformLocation(program, 'u_density');
+      var preset = gl.getUniformLocation(program, 'u_preset');
+      var colorA = gl.getUniformLocation(program, 'u_colorA');
+      var colorB = gl.getUniformLocation(program, 'u_colorB');
+      if (!resolution || !time || !density || !preset || !colorA || !colorB) {
+        behaviourFailure('rich-motion-shader-program', { assetId: asset.id }, new Error('shader uniforms missing'));
+      }
+      var rgbA = behaviourShaderColor(asset, asset.colorA, 'colorA');
+      var rgbB = behaviourShaderColor(asset, asset.colorB, 'colorB');
+      var presetIndex = behaviourShaderPresetIndex(asset);
+      var speed = typeof asset.speed === 'number' && isFinite(asset.speed) ? asset.speed : 1;
+      var dens = typeof asset.density === 'number' && isFinite(asset.density) ? asset.density : 0.5;
+      var reduce = behaviourPrefersReducedMotion() && asset.reducedMotion === 'static';
+      if (reduce) node.setAttribute('data-opencanvas-shader-scene-reduced', 'static');
+      var start = 0;
+      function draw(now) {
+        if (!start) start = now || 0;
+        var elapsed = reduce ? 0 : ((now || 0) - start) / 1000 * speed;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.uniform2f(resolution, canvas.width, canvas.height);
+        gl.uniform1f(time, elapsed);
+        gl.uniform1f(density, Math.max(0, Math.min(1, dens)));
+        gl.uniform1f(preset, presetIndex);
+        gl.uniform3f(colorA, rgbA[0], rgbA[1], rgbA[2]);
+        gl.uniform3f(colorB, rgbB[0], rgbB[1], rgbB[2]);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        if (!reduce) requestAnimationFrame(draw);
+      }
+      draw(0);
+      node.setAttribute('data-opencanvas-shader-scene-hydrated', 'true');
+    } catch (err) {
+      behaviourFailure('rich-motion-shader-init', { assetId: asset.id }, err || new Error('shader-scene init failed'));
+    }
+  }
+}
+
 function behaviourRiveEventName(eventName) {
   if (eventName === 'pointer-enter') return 'pointerenter';
   if (eventName === 'pointer-leave') return 'pointerleave';
@@ -1115,6 +1273,8 @@ function hydrateBehaviour(scope, options) {
       behaviourHydrateLottie(assets[a], root);
     } else if (assets[a].kind === 'model-3d') {
       behaviourHydrateModel3D(assets[a], root);
+    } else if (assets[a].kind === 'shader-scene') {
+      behaviourHydrateShaderScene(assets[a], root);
     } else {
       behaviourFailure('rich-motion-unsupported-kind', { assetId: assets[a].id, kind: assets[a].kind }, new Error('unsupported rich motion kind'));
     }

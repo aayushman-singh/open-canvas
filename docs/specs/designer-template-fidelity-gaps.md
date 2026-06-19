@@ -494,15 +494,22 @@ Current state:
   input, type, API, or scroll target cannot resolve. The Interactions panel
   exposes Rive asset metadata and input-binding controls for existing or
   manually added Rive assets.
+- **June 2026 update:** Rich Motion now includes a bounded `shader-scene`
+  kind for WebGL/canvas-class motion presets (`aurora-flow`, `racing-lines`,
+  `particle-field`). Owners choose preset, colours, speed, density, and
+  reduced-motion behaviour; the runtime owns the shader source and emits named
+  failures for missing WebGL context, invalid colours/presets, size, shader
+  program, or initialization errors.
 
 User-visible miss:
 
-- Can now reproduce basic Lottie/Rive/model surfaces plus Rive button and
+- Can now reproduce basic Lottie/Rive/model surfaces, Rive button and
   scroll-progress state-machine control when the underlying asset exposes the
-  named inputs.
-- Cannot yet reproduce arbitrary WebGL/Three.js scenes, shader distortion,
-  Spline-like embeds as editable first-class media, or canvas-based particle
-  fields.
+  named inputs, and bounded WebGL-style shader/particle fields from fixed
+  presets.
+- Cannot yet reproduce arbitrary WebGL/Three.js scenes, custom shader
+  distortion, Spline-like embeds as editable first-class media, or owner-coded
+  canvas particle systems.
 - `model-3d` covers bounded GLB-style product/helmet scenes, not custom shader
   pipelines or owner-authored Three.js code.
 - Rive input bindings are schema/runtime-owned and panel-editable, but
@@ -514,8 +521,8 @@ Needed primitive:
   blobs without defining asset type, playback controls, CSP, editor preview,
   reduced-motion handling, and publish-time failure behaviour.
 - Remaining next wave: rich-motion upload/asset picker UI, Rive/Lottie/model
-  events, custom shader/WebGL scene kind, CSP policy hardening, and production
-  management support for rich motion asset files.
+  events, custom shader authoring decision, CSP policy hardening, and
+  production management support for rich motion asset files.
 
 ### 12. Import Collapses Source Motion Too Aggressively
 

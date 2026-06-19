@@ -60,6 +60,8 @@ import {
   RICH_MOTION_KINDS,
   RIVE_INPUT_EVENTS,
   RIVE_INPUT_TYPES,
+  SHADER_SCENE_PRESETS,
+  SHADER_SCENE_REDUCED_MOTION_MODES,
   TEXT_SPLIT_UNITS,
 } from './behaviour-primitives.js';
 
@@ -3258,6 +3260,36 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           }
           return;
         }
+        if (asset.kind === 'shader-scene') {
+          assertOneOf(asset.preset, SHADER_SCENE_PRESETS, `${assetPath}.preset`, errors);
+          assertNonEmptyString(asset.alt, `${assetPath}.alt`, errors);
+          if (typeof asset.colorA !== 'string' || !INLINE_COLOR_HEX_RE.test(asset.colorA)) {
+            errors.push(`${assetPath}.colorA must be a hex colour (#RGB, #RRGGBB, or #RRGGBBAA)`);
+          }
+          if (typeof asset.colorB !== 'string' || !INLINE_COLOR_HEX_RE.test(asset.colorB)) {
+            errors.push(`${assetPath}.colorB must be a hex colour (#RGB, #RRGGBB, or #RRGGBBAA)`);
+          }
+          if (asset.speed !== undefined && (!isFiniteNumber(asset.speed) || asset.speed < 0 || asset.speed > 4)) {
+            errors.push(
+              `${assetPath}.speed must be a finite number between 0 and 4 when present (got ${describe(asset.speed)})`,
+            );
+          }
+          if (
+            asset.density !== undefined &&
+            (!isFiniteNumber(asset.density) || asset.density < 0 || asset.density > 1)
+          ) {
+            errors.push(
+              `${assetPath}.density must be a finite number between 0 and 1 when present (got ${describe(asset.density)})`,
+            );
+          }
+          assertOneOf(
+            asset.reducedMotion,
+            SHADER_SCENE_REDUCED_MOTION_MODES,
+            `${assetPath}.reducedMotion`,
+            errors,
+          );
+          return;
+        }
         if (!isAssetIdLike(asset.assetId)) {
           errors.push(
             `${assetPath}.assetId must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(asset.assetId)})`,
@@ -3853,7 +3885,8 @@ function validatePublishedRichMotionReferencesInElement(
       asset.kind !== 'image-sequence' &&
       asset.kind !== 'rive' &&
       asset.kind !== 'lottie' &&
-      asset.kind !== 'model-3d'
+      asset.kind !== 'model-3d' &&
+      asset.kind !== 'shader-scene'
     ) {
       errors.push(
         `${elementPath}.assetRefId failed publish-only field richMotion.assetRefId-resolves: ${asset.path}.kind ${JSON.stringify(asset.kind)} is not supported for published rich-motion elements`,

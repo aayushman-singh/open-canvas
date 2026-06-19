@@ -155,6 +155,9 @@ export function buildBehaviourPayload(
       }
       return modelAsset;
     }
+    if (asset.kind === 'shader-scene') {
+      return asset;
+    }
     return asset;
   });
   const navThemes = collectNavThemeRuntimes(snapshot);

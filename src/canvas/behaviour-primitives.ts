@@ -14,7 +14,9 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'clipPath',
   'filter',
 ] as const;
-export const RICH_MOTION_KINDS = ['image-sequence', 'rive', 'lottie', 'model-3d'] as const;
+export const RICH_MOTION_KINDS = ['image-sequence', 'rive', 'lottie', 'model-3d', 'shader-scene'] as const;
+export const SHADER_SCENE_PRESETS = ['aurora-flow', 'racing-lines', 'particle-field'] as const;
+export const SHADER_SCENE_REDUCED_MOTION_MODES = ['static', 'animate'] as const;
 export const RIVE_INPUT_TYPES = ['boolean', 'number', 'trigger'] as const;
 export const RIVE_INPUT_EVENTS = [
   'pointer-enter',
@@ -141,11 +143,24 @@ export interface Model3DRichMotionAsset {
   reducedMotion: 'static' | 'allow';
 }
 
+export interface ShaderSceneRichMotionAsset {
+  id: string;
+  kind: 'shader-scene';
+  preset: (typeof SHADER_SCENE_PRESETS)[number];
+  alt: string;
+  colorA: string;
+  colorB: string;
+  speed?: number;
+  density?: number;
+  reducedMotion: (typeof SHADER_SCENE_REDUCED_MOTION_MODES)[number];
+}
+
 export type RichMotionAsset =
   | ImageSequenceRichMotionAsset
   | RiveRichMotionAsset
   | LottieRichMotionAsset
-  | Model3DRichMotionAsset;
+  | Model3DRichMotionAsset
+  | ShaderSceneRichMotionAsset;
 
 export interface LoadExperience {
   id: string;
