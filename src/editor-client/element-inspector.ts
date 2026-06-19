@@ -763,6 +763,78 @@ function renderMarqueeInspector(ctx: EditorContext, element: CanvasElement): voi
   });
   ctx.inspector.appendChild(field('Speed (px/s)', speed));
 
+  const rows = document.createElement('input');
+  rows.type = 'number';
+  rows.min = '1';
+  rows.max = '6';
+  rows.step = '1';
+  rows.value = String(element.marquee.rows ?? 1);
+  rows.addEventListener('change', () => {
+    const n = Number(rows.value);
+    if (!Number.isInteger(n) || n < 1 || n > 6) {
+      ctx.setStatus('Marquee rows must be between 1 and 6', 'error');
+      rows.value = String(element.marquee!.rows ?? 1);
+      return;
+    }
+    ctx.captureForUndo();
+    if (n === 1) {
+      delete element.marquee!.rows;
+    } else {
+      element.marquee!.rows = n;
+    }
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Rows', rows));
+
+  const rowGap = document.createElement('input');
+  rowGap.type = 'number';
+  rowGap.min = '0';
+  rowGap.max = '200';
+  rowGap.step = '1';
+  rowGap.value = String(element.marquee.rowGapPx ?? 0);
+  rowGap.addEventListener('change', () => {
+    const n = Number(rowGap.value);
+    if (!Number.isFinite(n) || n < 0 || n > 200) {
+      ctx.setStatus('Marquee row gap must be between 0 and 200px', 'error');
+      rowGap.value = String(element.marquee!.rowGapPx ?? 0);
+      return;
+    }
+    ctx.captureForUndo();
+    if (n === 0) {
+      delete element.marquee!.rowGapPx;
+    } else {
+      element.marquee!.rowGapPx = n;
+    }
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Row gap (px)', rowGap));
+
+  const rowOffset = document.createElement('input');
+  rowOffset.type = 'number';
+  rowOffset.min = '0';
+  rowOffset.max = '100';
+  rowOffset.step = '1';
+  rowOffset.value = String(element.marquee.rowOffsetPercent ?? 50);
+  rowOffset.addEventListener('change', () => {
+    const n = Number(rowOffset.value);
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      ctx.setStatus('Marquee row offset must be between 0 and 100%', 'error');
+      rowOffset.value = String(element.marquee!.rowOffsetPercent ?? 50);
+      return;
+    }
+    ctx.captureForUndo();
+    if (n === 50) {
+      delete element.marquee!.rowOffsetPercent;
+    } else {
+      element.marquee!.rowOffsetPercent = n;
+    }
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Row offset (%)', rowOffset));
+
   const pause = document.createElement('input');
   pause.type = 'checkbox';
   pause.checked = element.marquee.pauseOnHover === true;

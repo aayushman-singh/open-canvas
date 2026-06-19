@@ -634,6 +634,27 @@ function validateMarquee(value: unknown, basePath: string, errors: string[]): vo
   if (value.pauseOnHover === true && value.hoverReverse === true) {
     errors.push(`${p}.hoverReverse cannot be true when pauseOnHover is true`);
   }
+  const rows = value.rows;
+  if (
+    rows !== undefined &&
+    (typeof rows !== 'number' || !Number.isInteger(rows) || rows < 1 || rows > 6)
+  ) {
+    errors.push(`${p}.rows must be an integer between 1 and 6 when present`);
+  }
+  const rowGapPx = value.rowGapPx;
+  if (
+    rowGapPx !== undefined &&
+    (!isFiniteNumber(rowGapPx) || rowGapPx < 0 || rowGapPx > 200)
+  ) {
+    errors.push(`${p}.rowGapPx must be a finite number between 0 and 200 when present`);
+  }
+  const rowOffsetPercent = value.rowOffsetPercent;
+  if (
+    rowOffsetPercent !== undefined &&
+    (!isFiniteNumber(rowOffsetPercent) || rowOffsetPercent < 0 || rowOffsetPercent > 100)
+  ) {
+    errors.push(`${p}.rowOffsetPercent must be a finite number between 0 and 100 when present`);
+  }
   assertOneOf<MarqueeReducedMotionMode>(
     value.reducedMotion,
     MARQUEE_REDUCED_MOTION_MODES,

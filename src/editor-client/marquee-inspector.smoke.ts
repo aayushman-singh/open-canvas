@@ -19,18 +19,28 @@ assert(
   'reduced-motion select must use schema modes',
 );
 assert(inspectorSrc.includes('speedPxPerSecond'), 'inspector must edit marquee speed');
+assert(inspectorSrc.includes('Rows'), 'inspector must edit marquee row count');
+assert(inspectorSrc.includes('rowOffsetPercent'), 'inspector must edit marquee row offset');
 assert(inspectorSrc.includes('pauseOnHover'), 'inspector must edit pause-on-hover');
 assert(
   wrapperSrc.includes('data-opencanvas-marquee-reduced-motion'),
   'editor wrapper must emit marquee reduced-motion metadata',
 );
+assert(
+  wrapperSrc.includes('data-opencanvas-marquee-rows'),
+  'editor wrapper must emit marquee row metadata',
+);
 assert(hydrateSrc.includes('function hydrateMarquees'), 'editor runtime must hydrate marquees');
+assert(
+  hydrateSrc.includes('data-opencanvas-marquee-lane'),
+  'editor runtime must hydrate marquee lanes',
+);
 assert(
   hydrateSrc.includes('opencanvas:marquee-failure'),
   'editor runtime must emit named marquee failure event',
 );
 assert(
-  hydrateSrc.indexOf('hydrateBehaviourPreview') < hydrateSrc.indexOf('hydrateMarquees(root)'),
+  hydrateSrc.indexOf('hydrateBehaviourPreview') < hydrateSrc.indexOf('hydrateMarquees(root, options)'),
   'editor marquee hydration must run after behaviour preview hydration',
 );
 

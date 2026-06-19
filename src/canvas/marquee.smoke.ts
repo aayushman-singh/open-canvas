@@ -52,6 +52,9 @@ const site = makeSite();
 site.pages[0]!.sections[0]!.elements[0]!.marquee!.edgeFade = true;
 site.pages[0]!.sections[0]!.elements[0]!.marquee!.pauseOnHover = false;
 site.pages[0]!.sections[0]!.elements[0]!.marquee!.hoverReverse = true;
+site.pages[0]!.sections[0]!.elements[0]!.marquee!.rows = 3;
+site.pages[0]!.sections[0]!.elements[0]!.marquee!.rowGapPx = 8;
+site.pages[0]!.sections[0]!.elements[0]!.marquee!.rowOffsetPercent = 33;
 const validation = validateEditableSite(site);
 assert(validation.valid, validation.valid ? 'valid marquee site should pass' : validation.errors.join('\n'));
 
@@ -67,6 +70,12 @@ assert(
 assert(
   decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.hoverReverse === true,
   'Yjs projection must preserve marquee hover reverse config',
+);
+assert(
+  decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.rows === 3 &&
+    decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.rowGapPx === 8 &&
+    decoded.pages[0]?.sections[0]?.elements[0]?.marquee?.rowOffsetPercent === 33,
+  'Yjs projection must preserve marquee multi-row config',
 );
 
 const snapshot: PublishedSnapshot = {
@@ -98,6 +107,12 @@ assert(
   html.includes('data-opencanvas-marquee-hover-reverse="true"'),
   'renderer must emit marquee hover reverse metadata',
 );
+assert(html.includes('data-opencanvas-marquee-rows="3"'), 'renderer must emit marquee row count');
+assert(html.includes('data-opencanvas-marquee-row-gap="8"'), 'renderer must emit marquee row gap');
+assert(
+  html.includes('data-opencanvas-marquee-row-offset="33"'),
+  'renderer must emit marquee row offset',
+);
 
 const invalidDirection = makeSite() as unknown as Record<string, unknown>;
 (
@@ -120,6 +135,9 @@ const invalidDirection = makeSite() as unknown as Record<string, unknown>;
       speedPxPerSecond: 0,
       edgeFade: 'yes',
       hoverReverse: 'yes',
+      rows: 0,
+      rowGapPx: -1,
+      rowOffsetPercent: 200,
       reducedMotion: 'maybe',
     },
   },
@@ -145,6 +163,18 @@ assert(
 assert(
   invalid.errors.some((error) => error.includes('.marquee.hoverReverse')),
   'invalid hover reverse flag must be named',
+);
+assert(
+  invalid.errors.some((error) => error.includes('.marquee.rows')),
+  'invalid row count must be named',
+);
+assert(
+  invalid.errors.some((error) => error.includes('.marquee.rowGapPx')),
+  'invalid row gap must be named',
+);
+assert(
+  invalid.errors.some((error) => error.includes('.marquee.rowOffsetPercent')),
+  'invalid row offset must be named',
 );
 
 const conflicting = makeSite() as unknown as Record<string, unknown>;

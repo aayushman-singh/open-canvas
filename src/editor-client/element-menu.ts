@@ -408,6 +408,20 @@ function applyCommonElementWrapperAttrs(wrapper: HTMLElement, element: CanvasEle
       'data-opencanvas-marquee-pause',
       String(element.marquee.pauseOnHover === true),
     );
+    wrapper.setAttribute(
+      'data-opencanvas-marquee-edge-fade',
+      String(element.marquee.edgeFade === true),
+    );
+    wrapper.setAttribute(
+      'data-opencanvas-marquee-hover-reverse',
+      String(element.marquee.hoverReverse === true),
+    );
+    wrapper.setAttribute('data-opencanvas-marquee-rows', String(element.marquee.rows ?? 1));
+    wrapper.setAttribute('data-opencanvas-marquee-row-gap', String(element.marquee.rowGapPx ?? 0));
+    wrapper.setAttribute(
+      'data-opencanvas-marquee-row-offset',
+      String(element.marquee.rowOffsetPercent ?? 50),
+    );
     wrapper.setAttribute('data-opencanvas-marquee-reduced-motion', element.marquee.reducedMotion);
   }
   if (element.pointerFx?.enabled === true) {

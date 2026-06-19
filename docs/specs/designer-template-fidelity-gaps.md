@@ -354,7 +354,7 @@ Current state:
 - **June 2026 update:** Marquee is no longer template-JSON-only. Any element
   can opt into a schema-owned continuous marquee with inspector controls,
   render metadata, editor/visitor Runtime Hydrator support, named failure
-  events, and explicit reduced-motion behaviour.
+  events, explicit reduced-motion behaviour, and multi-row phase staggering.
 - **June 2026 update:** Video Stream Hover is now first-class for video media.
   It is video-only, muted by contract for browser autoplay policy, focus-aware,
   reduced-motion-aware, and fails through `opencanvas:video-hover-failure`
@@ -373,8 +373,7 @@ User-visible miss:
 
 - Cannot reproduce drag/inertia sliders or hover-to-preview grids.
 - Cannot author touch-specific equivalents for mobile.
-- Marquee does not yet include multi-row staggering or collection-driven ticker
-  sources.
+- Marquee does not yet include collection-driven ticker sources.
 - Video Stream Hover does not yet support collection-gallery batch authoring.
 - Pointer FX does not yet include drag/inertia or touch-specific alternate
   gestures.

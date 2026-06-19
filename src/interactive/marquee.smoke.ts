@@ -40,6 +40,9 @@ const snapshot: PublishedSnapshot = {
                 speedPxPerSecond: 120,
                 pauseOnHover: false,
                 hoverReverse: true,
+                rows: 3,
+                rowGapPx: 6,
+                rowOffsetPercent: 40,
                 reducedMotion: 'slow',
               },
             },
@@ -63,6 +66,18 @@ assert(
   MARQUEE_RUNTIME_SRC.includes('data-opencanvas-marquee-hover-reverse'),
   'runtime must read hover-reverse metadata',
 );
+assert(
+  MARQUEE_RUNTIME_SRC.includes('data-opencanvas-marquee-rows'),
+  'runtime must read marquee row metadata',
+);
+assert(
+  MARQUEE_RUNTIME_SRC.includes('data-opencanvas-marquee-lane'),
+  'runtime must build marquee lanes for multi-row marquees',
+);
+assert(
+  MARQUEE_RUNTIME_SRC.includes('currentTime'),
+  'runtime must stagger marquee row animation phase',
+);
 assert(MARQUEE_RUNTIME_SRC.includes('playbackRate'), 'runtime must reverse marquee playback on hover');
 assert(
   MARQUEE_RUNTIME_SRC.includes("window.matchMedia('(prefers-reduced-motion: reduce)')"),
@@ -81,6 +96,7 @@ assert(
   html.includes('data-opencanvas-marquee-hover-reverse="true"'),
   'renderer must emit hover-reverse metadata for runtime',
 );
+assert(html.includes('data-opencanvas-marquee-rows="3"'), 'renderer must emit row metadata for runtime');
 const withRuntime = injectInteractiveRuntime(html, snapshot);
 assert(
   withRuntime.includes('data-opencanvas-interactive-runtime'),

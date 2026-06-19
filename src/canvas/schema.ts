@@ -215,6 +215,9 @@ export interface MarqueeBehaviour {
   pauseOnHover?: boolean;
   edgeFade?: boolean;
   hoverReverse?: boolean;
+  rows?: number;
+  rowGapPx?: number;
+  rowOffsetPercent?: number;
   reducedMotion: MarqueeReducedMotionMode;
 }
 

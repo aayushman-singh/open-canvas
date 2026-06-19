@@ -46,22 +46,49 @@ function readMarqueeConfig(el) {
   if (pauseOnHover && hoverReverse) {
     emitMarqueeFailure(el, 'hover-mode-conflict', 'Marquee cannot pause and reverse on hover at the same time', null);
   }
+  var rowsRaw = el.getAttribute('data-opencanvas-marquee-rows');
+  var rows = rowsRaw === null ? 1 : Number(rowsRaw);
+  if (!isFinite(rows) || Math.floor(rows) !== rows || rows < 1 || rows > 6) {
+    emitMarqueeFailure(el, 'invalid-rows', 'Marquee rows must be an integer between 1 and 6', rowsRaw);
+  }
+  var rowGapRaw = el.getAttribute('data-opencanvas-marquee-row-gap');
+  var rowGapPx = rowGapRaw === null ? 0 : Number(rowGapRaw);
+  if (!isFinite(rowGapPx) || rowGapPx < 0 || rowGapPx > 200) {
+    emitMarqueeFailure(el, 'invalid-row-gap', 'Marquee row gap must be between 0 and 200px', rowGapRaw);
+  }
+  var rowOffsetRaw = el.getAttribute('data-opencanvas-marquee-row-offset');
+  var rowOffsetPercent = rowOffsetRaw === null ? 50 : Number(rowOffsetRaw);
+  if (!isFinite(rowOffsetPercent) || rowOffsetPercent < 0 || rowOffsetPercent > 100) {
+    emitMarqueeFailure(el, 'invalid-row-offset', 'Marquee row offset must be between 0 and 100%', rowOffsetRaw);
+  }
   return {
     direction: direction,
     speed: speed,
     pauseOnHover: pauseOnHover,
     hoverReverse: hoverReverse,
+    rows: rows,
+    rowGapPx: rowGapPx,
+    rowOffsetPercent: rowOffsetPercent,
     reducedMotion: reducedMotion
   };
 }
-function wireMarqueeHover(el, animation, config) {
+function wireMarqueeHover(el, animations, config) {
   if (config.pauseOnHover) {
-    el.addEventListener('mouseenter', function(){ animation.pause(); });
-    el.addEventListener('mouseleave', function(){ animation.play(); });
+    el.addEventListener('mouseenter', function(){
+      for (var i = 0; i < animations.length; i++) animations[i].pause();
+    });
+    el.addEventListener('mouseleave', function(){
+      for (var i = 0; i < animations.length; i++) animations[i].play();
+    });
   } else if (config.hoverReverse) {
-    var normalPlaybackRate = animation.playbackRate || 1;
-    el.addEventListener('mouseenter', function(){ animation.playbackRate = -Math.abs(normalPlaybackRate); });
-    el.addEventListener('mouseleave', function(){ animation.playbackRate = Math.abs(normalPlaybackRate); });
+    var normalPlaybackRates = [];
+    for (var r = 0; r < animations.length; r++) normalPlaybackRates.push(animations[r].playbackRate || 1);
+    el.addEventListener('mouseenter', function(){
+      for (var i = 0; i < animations.length; i++) animations[i].playbackRate = -Math.abs(normalPlaybackRates[i] || 1);
+    });
+    el.addEventListener('mouseleave', function(){
+      for (var i = 0; i < animations.length; i++) animations[i].playbackRate = Math.abs(normalPlaybackRates[i] || 1);
+    });
   }
 }
 function isMarqueeEditorChrome(node) {
@@ -85,6 +112,30 @@ function stripMarqueeCloneInteractivity(node) {
     descendants[j].removeAttribute('id');
   }
 }
+function buildMarqueeLane(el, content, rowIndex) {
+  var lane = document.createElement('div');
+  lane.setAttribute('data-opencanvas-marquee-lane', String(rowIndex));
+  lane.style.display = 'flex';
+  lane.style.alignItems = 'stretch';
+  lane.style.width = 'max-content';
+  lane.style.minWidth = '100%';
+  lane.style.height = '100%';
+  lane.style.willChange = 'transform';
+  var rowContent = rowIndex === 0 ? content : content.cloneNode(true);
+  if (!rowContent || rowContent.nodeType !== 1) {
+    emitMarqueeFailure(el, 'row-clone-failed', 'Marquee row content clone did not produce an element', null);
+  }
+  if (rowIndex > 0) stripMarqueeCloneInteractivity(rowContent);
+  var clone = rowContent.cloneNode(true);
+  if (!clone || clone.nodeType !== 1) {
+    emitMarqueeFailure(el, 'clone-failed', 'Marquee content clone did not produce an element', null);
+  }
+  stripMarqueeCloneInteractivity(clone);
+  clone.style.pointerEvents = 'none';
+  lane.appendChild(rowContent);
+  lane.appendChild(clone);
+  return { lane: lane, content: rowContent };
+}
 function hydrateMarquees(scope, options) {
   var root = scope || document;
   var nodes = root.querySelectorAll('[data-opencanvas-marquee="true"]');
@@ -107,8 +158,12 @@ function hydrateMarquees(scope, options) {
     }
     var belt = document.createElement('div');
     belt.setAttribute('data-opencanvas-marquee-belt', 'true');
-    belt.style.display = 'flex';
+    belt.style.display = config.rows > 1 ? 'grid' : 'flex';
     belt.style.alignItems = 'stretch';
+    if (config.rows > 1) {
+      belt.style.gridTemplateRows = 'repeat(' + config.rows + ', minmax(0, 1fr))';
+      belt.style.rowGap = config.rowGapPx + 'px';
+    }
     belt.style.width = 'max-content';
     belt.style.minWidth = '100%';
     belt.style.height = '100%';
@@ -133,15 +188,17 @@ function hydrateMarquees(scope, options) {
     if (!content.firstChild) {
       emitMarqueeFailure(el, 'empty-content', 'Marquee element has no visual content to animate', null);
     }
-    var clone = content.cloneNode(true);
-    stripMarqueeCloneInteractivity(clone);
-    clone.style.pointerEvents = 'none';
-    belt.appendChild(content);
-    belt.appendChild(clone);
+    var lanes = [];
+    for (var rowIndex = 0; rowIndex < config.rows; rowIndex++) {
+      var lane = buildMarqueeLane(el, content, rowIndex);
+      lanes.push(lane);
+      belt.appendChild(lane.lane);
+    }
     el.appendChild(belt);
     for (var c = 0; c < chrome.length; c++) el.appendChild(chrome[c]);
     el.style.overflow = 'hidden';
-    var width = content.getBoundingClientRect ? content.getBoundingClientRect().width : 0;
+    var firstContent = lanes[0].content;
+    var width = firstContent.getBoundingClientRect ? firstContent.getBoundingClientRect().width : 0;
     if (!(width > 0)) width = content.scrollWidth || belt.scrollWidth / 2 || el.clientWidth || 0;
     if (!(width > 0)) {
       emitMarqueeFailure(el, 'zero-width', 'Marquee content width must be measurable', null);
@@ -150,8 +207,19 @@ function hydrateMarquees(scope, options) {
     var frames = config.direction === 'left'
       ? [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-' + width + 'px,0,0)' }]
       : [{ transform: 'translate3d(-' + width + 'px,0,0)' }, { transform: 'translate3d(0,0,0)' }];
-    var animation = belt.animate(frames, { duration: duration, iterations: Infinity, easing: 'linear' });
-    wireMarqueeHover(el, animation, config);
+    var animations = [];
+    for (var laneIndex = 0; laneIndex < lanes.length; laneIndex++) {
+      var animation = lanes[laneIndex].lane.animate(frames, { duration: duration, iterations: Infinity, easing: 'linear' });
+      if (laneIndex > 0 && config.rowOffsetPercent > 0) {
+        try {
+          animation.currentTime = duration * (((config.rowOffsetPercent / 100) * laneIndex) % 1);
+        } catch (err) {
+          emitMarqueeFailure(el, 'row-stagger-failed', 'Marquee row animation phase could not be staggered', err);
+        }
+      }
+      animations.push(animation);
+    }
+    wireMarqueeHover(el, animations, config);
     el.setAttribute('data-opencanvas-marquee-hydrated', 'true');
   }
 }

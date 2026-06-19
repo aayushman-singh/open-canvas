@@ -425,6 +425,9 @@ function readMarqueeConfig(el: HTMLElement): {
   speed: number;
   pauseOnHover: boolean;
   hoverReverse: boolean;
+  rows: number;
+  rowGapPx: number;
+  rowOffsetPercent: number;
   reducedMotion: 'static' | 'slow';
 } {
   const direction = el.getAttribute('data-opencanvas-marquee-direction');
@@ -455,34 +458,61 @@ function readMarqueeConfig(el: HTMLElement): {
       null,
     );
   }
+  const rowsRaw = el.getAttribute('data-opencanvas-marquee-rows');
+  const rows = rowsRaw === null ? 1 : Number(rowsRaw);
+  if (!Number.isFinite(rows) || !Number.isInteger(rows) || rows < 1 || rows > 6) {
+    failMarquee(el, 'invalid-rows', 'Marquee rows must be an integer between 1 and 6', rowsRaw);
+  }
+  const rowGapRaw = el.getAttribute('data-opencanvas-marquee-row-gap');
+  const rowGapPx = rowGapRaw === null ? 0 : Number(rowGapRaw);
+  if (!Number.isFinite(rowGapPx) || rowGapPx < 0 || rowGapPx > 200) {
+    failMarquee(el, 'invalid-row-gap', 'Marquee row gap must be between 0 and 200px', rowGapRaw);
+  }
+  const rowOffsetRaw = el.getAttribute('data-opencanvas-marquee-row-offset');
+  const rowOffsetPercent = rowOffsetRaw === null ? 50 : Number(rowOffsetRaw);
+  if (!Number.isFinite(rowOffsetPercent) || rowOffsetPercent < 0 || rowOffsetPercent > 100) {
+    failMarquee(
+      el,
+      'invalid-row-offset',
+      'Marquee row offset must be between 0 and 100%',
+      rowOffsetRaw,
+    );
+  }
   return {
     direction,
     speed,
     pauseOnHover,
     hoverReverse,
+    rows,
+    rowGapPx,
+    rowOffsetPercent,
     reducedMotion,
   };
 }
 
 function wireMarqueeHover(
   node: HTMLElement,
-  animation: Animation,
+  animations: Animation[],
   config: { pauseOnHover: boolean; hoverReverse: boolean },
 ): void {
   if (config.pauseOnHover) {
     node.addEventListener('mouseenter', () => {
-      animation.pause();
+      for (const animation of animations) animation.pause();
     });
     node.addEventListener('mouseleave', () => {
-      animation.play();
+      for (const animation of animations) animation.play();
     });
   } else if (config.hoverReverse) {
-    const normalPlaybackRate = animation.playbackRate || 1;
+    const normalPlaybackRates = animations.map((animation) => animation.playbackRate || 1);
     node.addEventListener('mouseenter', () => {
-      animation.playbackRate = -Math.abs(normalPlaybackRate);
+      for (let i = 0; i < animations.length; i++) {
+        animations[i]!.playbackRate = -Math.abs(normalPlaybackRates[i] ?? 1);
+      }
     });
     node.addEventListener('mouseleave', () => {
-      animation.playbackRate = Math.abs(normalPlaybackRate);
+      for (let i = 0; i < animations.length; i++) {
+        animations[i]!.playbackRate = Math.abs(normalPlaybackRates[i] ?? 1);
+      }
     });
   }
 }
@@ -510,6 +540,35 @@ function stripMarqueeCloneInteractivity(node: HTMLElement): void {
   }
 }
 
+function buildMarqueeLane(
+  node: HTMLElement,
+  content: HTMLElement,
+  rowIndex: number,
+): { lane: HTMLElement; content: HTMLElement } {
+  const lane = document.createElement('div');
+  lane.setAttribute('data-opencanvas-marquee-lane', String(rowIndex));
+  lane.style.display = 'flex';
+  lane.style.alignItems = 'stretch';
+  lane.style.width = 'max-content';
+  lane.style.minWidth = '100%';
+  lane.style.height = '100%';
+  lane.style.willChange = 'transform';
+  const rowContent = rowIndex === 0 ? content : content.cloneNode(true);
+  if (!(rowContent instanceof HTMLElement)) {
+    failMarquee(node, 'row-clone-failed', 'Marquee row content clone did not produce an element', null);
+  }
+  if (rowIndex > 0) stripMarqueeCloneInteractivity(rowContent);
+  const clone = rowContent.cloneNode(true);
+  if (!(clone instanceof HTMLElement)) {
+    failMarquee(node, 'clone-failed', 'Marquee content clone did not produce an HTMLElement', null);
+  }
+  stripMarqueeCloneInteractivity(clone);
+  clone.style.pointerEvents = 'none';
+  lane.appendChild(rowContent);
+  lane.appendChild(clone);
+  return { lane, content: rowContent };
+}
+
 function hydrateMarquees(scope: ParentNode, options: HydrateOptions = {}): void {
   const nodes = scope.querySelectorAll('[data-opencanvas-marquee="true"]');
   for (let i = 0; i < nodes.length; i++) {
@@ -532,8 +591,12 @@ function hydrateMarquees(scope: ParentNode, options: HydrateOptions = {}): void 
     }
     const belt = document.createElement('div');
     belt.setAttribute('data-opencanvas-marquee-belt', 'true');
-    belt.style.display = 'flex';
+    belt.style.display = config.rows > 1 ? 'grid' : 'flex';
     belt.style.alignItems = 'stretch';
+    if (config.rows > 1) {
+      belt.style.gridTemplateRows = 'repeat(' + String(config.rows) + ', minmax(0, 1fr))';
+      belt.style.rowGap = String(config.rowGapPx) + 'px';
+    }
     belt.style.width = 'max-content';
     belt.style.minWidth = '100%';
     belt.style.height = '100%';
@@ -558,18 +621,17 @@ function hydrateMarquees(scope: ParentNode, options: HydrateOptions = {}): void 
     if (!content.firstChild) {
       failMarquee(node, 'empty-content', 'Marquee element has no visual content to animate', null);
     }
-    const clone = content.cloneNode(true);
-    if (!(clone instanceof HTMLElement)) {
-      failMarquee(node, 'clone-failed', 'Marquee content clone did not produce an HTMLElement', null);
+    const lanes: Array<{ lane: HTMLElement; content: HTMLElement }> = [];
+    for (let rowIndex = 0; rowIndex < config.rows; rowIndex++) {
+      const lane = buildMarqueeLane(node, content, rowIndex);
+      lanes.push(lane);
+      belt.appendChild(lane.lane);
     }
-    stripMarqueeCloneInteractivity(clone);
-    clone.style.pointerEvents = 'none';
-    belt.appendChild(content);
-    belt.appendChild(clone);
     node.appendChild(belt);
     for (const child of chrome) node.appendChild(child);
     node.style.overflow = 'hidden';
-    let width = content.getBoundingClientRect().width;
+    const firstContent = lanes[0]!.content;
+    let width = firstContent.getBoundingClientRect().width;
     if (!(width > 0)) width = content.scrollWidth || belt.scrollWidth / 2 || node.clientWidth || 0;
     if (!(width > 0)) {
       failMarquee(node, 'zero-width', 'Marquee content width must be measurable', null);
@@ -579,12 +641,28 @@ function hydrateMarquees(scope: ParentNode, options: HydrateOptions = {}): void 
       config.direction === 'left'
         ? [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-' + width + 'px,0,0)' }]
         : [{ transform: 'translate3d(-' + width + 'px,0,0)' }, { transform: 'translate3d(0,0,0)' }];
-    const animation = belt.animate(frames, {
-      duration,
-      iterations: Infinity,
-      easing: 'linear',
-    });
-    wireMarqueeHover(node, animation, config);
+    const animations: Animation[] = [];
+    for (let laneIndex = 0; laneIndex < lanes.length; laneIndex++) {
+      const animation = lanes[laneIndex]!.lane.animate(frames, {
+        duration,
+        iterations: Infinity,
+        easing: 'linear',
+      });
+      if (laneIndex > 0 && config.rowOffsetPercent > 0) {
+        try {
+          animation.currentTime = duration * (((config.rowOffsetPercent / 100) * laneIndex) % 1);
+        } catch (err: unknown) {
+          failMarquee(
+            node,
+            'row-stagger-failed',
+            'Marquee row animation phase could not be staggered',
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+      animations.push(animation);
+    }
+    wireMarqueeHover(node, animations, config);
     node.setAttribute('data-opencanvas-marquee-hydrated', 'true');
   }
 }
