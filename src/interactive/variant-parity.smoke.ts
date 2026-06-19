@@ -41,6 +41,7 @@ const POINTER_FX_TOKENS = [
   '--opencanvas-reveal-y',
   '--opencanvas-parallax-x',
   '--opencanvas-parallax-y',
+  'opencanvas-pointer-trail',
   'data-opencanvas-pointer-fx',
   'data-opencanvas-pfx-hydrated',
   'spotlight',
@@ -49,6 +50,7 @@ const POINTER_FX_TOKENS = [
   'cursor-follow',
   'reveal-mask',
   'pointer-parallax',
+  'cursor-trail',
 ];
 
 for (const token of POINTER_FX_TOKENS) {
@@ -98,6 +100,13 @@ assert(
 assert(
   visitorPointerFx.includes('* -18') && editorMirror.includes('* -18'),
   'pointer-parallax factor (-18) must match between visitor fragment and editor mirror',
+);
+
+// Cursor-trail node lifetime must match so editor preview and published pages
+// shed trail nodes at the same cadence.
+assert(
+  visitorPointerFx.includes('560') && editorMirror.includes('560'),
+  'cursor-trail lifetime (560ms) must match between visitor fragment and editor mirror',
 );
 
 console.log('[variant-parity:smoke] OK');

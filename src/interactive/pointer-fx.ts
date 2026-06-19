@@ -28,6 +28,8 @@
 //   - `pointer-parallax` — publishes `--opencanvas-parallax-x` /
 //     `--opencanvas-parallax-y` as small inverse px translations from centre.
 //     CSS owns the transform; the runtime only publishes pointer state.
+//   - `cursor-trail` — appends short-lived `opencanvas-pointer-trail` spans at
+//     pointer coordinates. CSS owns trail rendering and lifetime animation.
 //
 // Scroll / entrance motion is deliberately NOT here — that stays with the
 // existing `motion.preset` + `data-scroll-trigger` system (ADR dec 4).
@@ -60,6 +62,26 @@ function pointerFxPrefersReducedMotion(options) {
   if (options && options.reducedMotion === 'reduce') return true;
   if (options && options.reducedMotion === 'no-preference') return false;
   return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+function appendPointerTrail(el, ev) {
+  var r = el.getBoundingClientRect();
+  if (!(r.width > 0) || !(r.height > 0)) return;
+  var px = ((ev.clientX - r.left) / r.width) * 100;
+  var py = ((ev.clientY - r.top) / r.height) * 100;
+  var doc = el.ownerDocument || (typeof document !== 'undefined' ? document : null);
+  if (!doc || typeof doc.createElement !== 'function' || typeof el.appendChild !== 'function') {
+    emitPointerFxFailure(el, 'trail-dom-missing', 'Pointer FX cursor-trail requires DOM append support', null);
+  }
+  var trail = doc.createElement('span');
+  trail.className = 'opencanvas-pointer-trail';
+  trail.setAttribute('aria-hidden', 'true');
+  trail.style.left = px.toFixed(2) + '%';
+  trail.style.top = py.toFixed(2) + '%';
+  el.appendChild(trail);
+  setTimeout(function () {
+    if (trail && typeof trail.remove === 'function') trail.remove();
+    else if (trail && trail.parentNode && typeof trail.parentNode.removeChild === 'function') trail.parentNode.removeChild(trail);
+  }, 560);
 }
 function hydratePointerFx(scope, options) {
   var nodes = (scope || document).querySelectorAll('[data-opencanvas-pointer-fx]');
@@ -156,8 +178,12 @@ function hydratePointerFx(scope, options) {
           el.style.setProperty('--opencanvas-parallax-x', '0px');
           el.style.setProperty('--opencanvas-parallax-y', '0px');
         });
+      } else if (primitive === 'cursor-trail') {
+        el.addEventListener('pointermove', function (ev) {
+          appendPointerTrail(el, ev);
+        });
       } else {
-        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, or pointer-parallax', primitive);
+        emitPointerFxFailure(el, 'invalid-primitive', 'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, pointer-parallax, or cursor-trail', primitive);
       }
     })(nodes[i]);
   }

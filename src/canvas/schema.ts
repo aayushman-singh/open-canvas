@@ -188,6 +188,7 @@ export const POINTER_FX_PRIMITIVES = [
   'cursor-follow',
   'reveal-mask',
   'pointer-parallax',
+  'cursor-trail',
 ] as const;
 export type PointerFxPrimitive = (typeof POINTER_FX_PRIMITIVES)[number];
 

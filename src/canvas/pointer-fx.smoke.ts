@@ -78,6 +78,17 @@ function makeSite(): EditableSite {
                   reducedMotion: 'disabled',
                 },
               },
+              {
+                id: 'cursor-trail-card',
+                type: 'container',
+                variant: 'glass',
+                box: { x: 340, y: 300, w: 180, h: 64, z: 6 },
+                pointerFx: {
+                  enabled: true,
+                  primitive: 'cursor-trail',
+                  reducedMotion: 'disabled',
+                },
+              },
             ],
           },
         ],
@@ -111,6 +122,10 @@ assert(
   decoded.pages[0]?.sections[0]?.elements[4]?.pointerFx?.primitive === 'pointer-parallax',
   'Yjs projection must preserve pointer-parallax pointerFx config',
 );
+assert(
+  decoded.pages[0]?.sections[0]?.elements[5]?.pointerFx?.primitive === 'cursor-trail',
+  'Yjs projection must preserve cursor-trail pointerFx config',
+);
 
 const snapshot: PublishedSnapshot = {
   ...site,
@@ -139,6 +154,10 @@ assert(
 assert(
   html.includes('data-opencanvas-pointer-fx="pointer-parallax"'),
   'renderer must emit pointer-parallax pointer-fx primitive',
+);
+assert(
+  html.includes('data-opencanvas-pointer-fx="cursor-trail"'),
+  'renderer must emit cursor-trail pointer-fx primitive',
 );
 assert(
   html.includes('data-opencanvas-pointer-fx-reduced-motion="disabled"'),

@@ -1126,7 +1126,8 @@ const variantCss = String.raw`
    magnetic publishes --opencanvas-magnetic-x/y, applied generically here;
    cursor-follow publishes --opencanvas-cursor-follow-x/y, applied here;
    reveal-mask publishes --opencanvas-reveal-x/y, applied here;
-   pointer-parallax publishes --opencanvas-parallax-x/y, applied here. */
+   pointer-parallax publishes --opencanvas-parallax-x/y, applied here;
+   cursor-trail appends .opencanvas-pointer-trail spans rendered here. */
 .opencanvas-element[data-opencanvas-pointer-fx="spotlight"]::before {
   content: "";
   position: absolute;
@@ -1185,6 +1186,32 @@ const variantCss = String.raw`
   );
   transition: transform 180ms ease-out;
   will-change: transform;
+}
+
+[data-opencanvas-pointer-fx="cursor-trail"] {
+  overflow: hidden;
+}
+
+.opencanvas-pointer-trail {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: color-mix(in oklab, var(--opencanvas-kit-accent, currentColor) 42%, transparent);
+  transform: translate(-50%, -50%) scale(0.65);
+  animation: opencanvas-pointer-trail 560ms ease-out forwards;
+}
+
+@keyframes opencanvas-pointer-trail {
+  0% {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(0.65);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.4);
+  }
 }
 
 [data-opencanvas-route-container] {

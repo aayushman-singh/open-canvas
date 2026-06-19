@@ -89,8 +89,35 @@ function makeStub(primitive: string, rect: Rect) {
   };
   const props: Record<string, string> = {};
   const listeners: Record<string, Listener[]> = {};
+  const children: Array<{
+    attrs: Record<string, string>;
+    className: string;
+    removed: boolean;
+    style: Record<string, string>;
+    remove(): void;
+    setAttribute(k: string, v: string): void;
+  }> = [];
+  const ownerDocument = {
+    createElement(): (typeof children)[number] {
+      const child = {
+        attrs: {} as Record<string, string>,
+        className: '',
+        removed: false,
+        style: {} as Record<string, string>,
+        remove(): void {
+          child.removed = true;
+        },
+        setAttribute(k: string, v: string): void {
+          child.attrs[k] = v;
+        },
+      };
+      return child;
+    },
+  };
   const el = {
     attrs,
+    children,
+    ownerDocument,
     props,
     listeners,
     getAttribute(k: string): string | null {
@@ -104,6 +131,10 @@ function makeStub(primitive: string, rect: Rect) {
     },
     getBoundingClientRect(): Rect {
       return rect;
+    },
+    appendChild(child: (typeof children)[number]): (typeof children)[number] {
+      children.push(child);
+      return child;
     },
     style: {
       setProperty(k: string, v: string): void {
@@ -220,6 +251,20 @@ const hydratePointerFx = makeHydratePointerFx();
   el.listeners['pointerleave']![0]!({ clientX: 0, clientY: 0 });
   assert(el.props['--opencanvas-parallax-x'] === '0px', 'pointerleave recentres parallax-x to 0px');
   assert(el.props['--opencanvas-parallax-y'] === '0px', 'pointerleave recentres parallax-y to 0px');
+}
+
+// -- 2g. cursor-trail appends trail nodes at pointer position -----------------
+{
+  const el = makeStub('cursor-trail', { left: 0, top: 0, width: 200, height: 100 });
+  hydratePointerFx({ querySelectorAll: () => [el] });
+  el.listeners['pointermove']![0]!({ clientX: 50, clientY: 25 });
+  assert(el.children.length === 1, 'cursor-trail pointermove must append one trail node');
+  assert(
+    el.children[0]!.className === 'opencanvas-pointer-trail',
+    `cursor-trail node class drifted: ${el.children[0]!.className}`,
+  );
+  assert(el.children[0]!.style.left === '25.00%', `trail left should be 25%; got ${el.children[0]!.style.left}`);
+  assert(el.children[0]!.style.top === '25.00%', `trail top should be 25%; got ${el.children[0]!.style.top}`);
 }
 
 // -- 3. idempotence: re-run does not double-wire -----------------------------

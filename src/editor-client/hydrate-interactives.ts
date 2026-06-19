@@ -580,15 +580,35 @@ function hydratePointerFx(scope: ParentNode, options: HydrateOptions = {}): void
         el.style.setProperty('--opencanvas-parallax-x', '0px');
         el.style.setProperty('--opencanvas-parallax-y', '0px');
       });
+    } else if (primitive === 'cursor-trail') {
+      el.addEventListener('pointermove', (ev: PointerEvent): void => {
+        appendPointerTrail(el, ev);
+      });
     } else {
       failPointerFx(
         el,
         'invalid-primitive',
-        'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, or pointer-parallax',
+        'Pointer FX primitive must be spotlight, tilt, magnetic, cursor-follow, reveal-mask, pointer-parallax, or cursor-trail',
         primitive,
       );
     }
   }
+}
+
+function appendPointerTrail(el: HTMLElement, ev: PointerEvent): void {
+  const r = el.getBoundingClientRect();
+  if (!(r.width > 0) || !(r.height > 0)) return;
+  const px = ((ev.clientX - r.left) / r.width) * 100;
+  const py = ((ev.clientY - r.top) / r.height) * 100;
+  const trail = el.ownerDocument.createElement('span');
+  trail.className = 'opencanvas-pointer-trail';
+  trail.setAttribute('aria-hidden', 'true');
+  trail.style.left = px.toFixed(2) + '%';
+  trail.style.top = py.toFixed(2) + '%';
+  el.appendChild(trail);
+  setTimeout(() => {
+    trail.remove();
+  }, 560);
 }
 
 function failPointerFx(
