@@ -2204,6 +2204,46 @@ function renderBehaviourLoadControls(
   });
   wrap.appendChild(field('Progress label', progressLabel));
 
+  const readinessAssets = textInput(
+    load.mediaReadiness?.assetIds.join(', ') ?? '',
+    'asset-id, poster-id',
+  );
+  readinessAssets.addEventListener('change', () => {
+    const raw = readinessAssets.value.trim();
+    if (raw.length === 0) {
+      updateBehaviourLoadReadiness(ctx, undefined);
+      return;
+    }
+    const assetIds = raw.split(',').map((assetId) => assetId.trim());
+    const invalid = assetIds.find((assetId) => assetId.length === 0 || /\s/.test(assetId));
+    if (invalid !== undefined) {
+      ctx.setStatus('Media readiness asset ids cannot be empty or contain whitespace', 'error');
+      readinessAssets.value = load.mediaReadiness?.assetIds.join(', ') ?? '';
+      return;
+    }
+    updateBehaviourLoadReadiness(ctx, {
+      assetIds,
+      timeoutMs: load.mediaReadiness?.timeoutMs ?? 8000,
+    });
+  });
+  wrap.appendChild(field('Media readiness assets', readinessAssets));
+
+  const readinessTimeout = numberInput(load.mediaReadiness?.timeoutMs ?? 8000, 0, 30000, 100);
+  readinessTimeout.disabled = !load.mediaReadiness;
+  readinessTimeout.addEventListener('change', () => {
+    const value = Number(readinessTimeout.value);
+    if (!Number.isFinite(value) || value < 0 || value > 30000) {
+      ctx.setStatus('Media readiness timeout must be 0-30000ms', 'error');
+      readinessTimeout.value = String(load.mediaReadiness?.timeoutMs ?? 8000);
+      return;
+    }
+    updateBehaviourLoadReadiness(ctx, {
+      assetIds: load.mediaReadiness?.assetIds ?? [],
+      timeoutMs: value,
+    });
+  });
+  wrap.appendChild(field('Media readiness timeout', readinessTimeout));
+
   const sequences = loadEnterSequences(ctx);
   const sequenceIds = sequences.map((sequence) => sequence.id);
   if (sequenceIds.length > 0) {
@@ -2246,6 +2286,23 @@ function updateBehaviourLoadProgress(
       delete next.progress;
     } else {
       next.progress = progress;
+    }
+    ctx.state!.loadExperience = next;
+  });
+}
+
+function updateBehaviourLoadReadiness(
+  ctx: InteractionsPanelContext,
+  mediaReadiness: BehaviourLoadExperience['mediaReadiness'] | undefined,
+): void {
+  mutate(ctx, () => {
+    const current = ctx.state!.loadExperience;
+    if (!isBehaviourLoadExperience(current)) return;
+    const next: BehaviourLoadExperience = { ...current };
+    if (mediaReadiness === undefined) {
+      delete next.mediaReadiness;
+    } else {
+      next.mediaReadiness = mediaReadiness;
     }
     ctx.state!.loadExperience = next;
   });

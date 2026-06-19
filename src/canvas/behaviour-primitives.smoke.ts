@@ -76,6 +76,10 @@ function buildValidState(): EditableSite & Record<string, unknown> {
         durationMs: 900,
         label: 'Loading',
       },
+      mediaReadiness: {
+        assetIds: ['hero-video', 'hero-poster'],
+        timeoutMs: 2000,
+      },
       sequenceId: 'sequence-load',
     },
     motionSequences: [
@@ -198,6 +202,14 @@ expectInvalid(invalidLoadProgress, 'loadExperience.progress.label', 'load progre
 const invalidLoadRunPolicy = structuredClone(validState);
 (invalidLoadRunPolicy.loadExperience as { runPolicy: string }).runPolicy = 'sometimes';
 expectInvalid(invalidLoadRunPolicy, 'loadExperience.runPolicy', 'load run policy');
+
+const invalidLoadReadiness = structuredClone(validState);
+(invalidLoadReadiness.loadExperience as { mediaReadiness: Record<string, unknown> }).mediaReadiness = {
+  assetIds: [''],
+  timeoutMs: -1,
+};
+expectInvalid(invalidLoadReadiness, 'loadExperience.mediaReadiness.assetIds[0]', 'load readiness asset');
+expectInvalid(invalidLoadReadiness, 'loadExperience.mediaReadiness.timeoutMs', 'load readiness timeout');
 
 const unsupportedProperty = structuredClone(validState);
 (

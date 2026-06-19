@@ -273,13 +273,16 @@ Current state:
   policy for `every-visit` or `once-per-session`. The runtime uses
   `sessionStorage` only for the session policy and fails loudly when storage is
   unavailable instead of silently replaying or skipping.
+- **June 2026 update:** Behaviour Load Experience now has owner-authored media
+  readiness maps. The renderer emits explicit asset URLs and timeout metadata,
+  the Behaviour runtime waits on same-origin fetches, blocks premature enter,
+  and emits named readiness failures for missing URLs, fetch errors, or timeout.
 
 User-visible miss:
 
 - Cannot reproduce branded preloaders, progress numbers, logo draws, mask
   openings, media-readiness gates, or first-load page reveals.
-- Cannot yet author logo draws or media-readiness maps for the Behaviour Load
-  Experience model.
+- Cannot yet author logo draws for the Behaviour Load Experience model.
 
 Needed primitive:
 

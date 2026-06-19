@@ -232,9 +232,11 @@ class StubWindow {
   innerHeight = 900;
   scrollToCalls = 0;
   sessionStorage = new StubSessionStorage();
+  fetchCalls: string[] = [];
   listeners = new Map<string, Listener[]>();
   rafQueue: Array<() => void> = [];
   intervals: Array<() => void> = [];
+  timeouts: Array<() => void> = [];
 
   addEventListener(type: string, listener: Listener): void {
     const list = this.listeners.get(type) ?? [];
@@ -283,6 +285,17 @@ class StubWindow {
   }
   clearInterval(): void {
     this.intervals = [];
+  }
+  setTimeout(fn: () => void): number {
+    this.timeouts.push(fn);
+    return this.timeouts.length;
+  }
+  clearTimeout(): void {
+    this.timeouts = [];
+  }
+  fetch(input: string): Promise<{ ok: boolean; status: number }> {
+    this.fetchCalls.push(String(input));
+    return Promise.resolve({ ok: true, status: 200 });
   }
   matchMedia(): { matches: boolean } {
     return { matches: false };
@@ -426,6 +439,10 @@ function baseSnapshot(): PublishedSnapshot {
         durationMs: 900,
         label: 'Loading',
       },
+      mediaReadiness: {
+        assetIds: ['hero-video', 'hero-poster'],
+        timeoutMs: 2000,
+      },
       sequenceId: 'load-sequence',
     },
     motionSequences: [
@@ -509,6 +526,14 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   const enter = new StubElement('button');
   enter.setAttribute('data-opencanvas-load-enter', '');
   load.appendChild(enter);
+  const readinessMatch = html.match(/data-opencanvas-load-readiness-urls="([^"]*)"/);
+  if (readinessMatch?.[1]) {
+    load.setAttribute('data-opencanvas-load-readiness-urls', readinessMatch[1]);
+  }
+  const timeoutMatch = html.match(/data-opencanvas-load-readiness-timeout-ms="([^"]*)"/);
+  if (timeoutMatch?.[1]) {
+    load.setAttribute('data-opencanvas-load-readiness-timeout-ms', timeoutMatch[1]);
+  }
   const progress = new StubElement('div');
   progress.setAttribute('data-opencanvas-load-progress', 'bar-number');
   const progressNumber = new StubElement('span');
@@ -560,6 +585,10 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
     'rendered load experience must emit behaviour load run policy',
   );
   assert(
+    html.includes('data-opencanvas-load-readiness-urls="/assets/hero-video /assets/hero-poster"'),
+    'rendered load experience must emit media readiness asset urls',
+  );
+  assert(
     html.includes('data-opencanvas-load-progress-number'),
     'rendered load experience must include progress number node',
   );
@@ -575,8 +604,18 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
     BEHAVIOUR_RUNTIME_SRC.includes('load-run-policy-storage-unavailable'),
     'behaviour runtime must fail loudly when once-per-session storage is unavailable',
   );
+  assert(
+    BEHAVIOUR_RUNTIME_SRC.includes('behaviourHydrateLoadReadiness'),
+    'behaviour runtime must hydrate load media readiness',
+  );
+  assert(
+    BEHAVIOUR_RUNTIME_SRC.includes('load-readiness-timeout'),
+    'behaviour runtime must fail loudly when media readiness times out',
+  );
   mountRenderedHtml(doc, html);
   runBehaviour(doc, win, StubImage);
+  await Promise.resolve();
+  await Promise.resolve();
   const load = doc.querySelector('[data-opencanvas-load-experience="load-main"]');
   assert(load !== null, 'load experience node must exist');
   assert(
@@ -588,6 +627,14 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
       'data-opencanvas-load-progress-hydrated',
     ) === 'true',
     'load progress choreography must be marked hydrated',
+  );
+  assert(
+    win.fetchCalls.join('|') === '/assets/hero-video|/assets/hero-poster',
+    'load media readiness must fetch every authored asset url',
+  );
+  assert(
+    load.getAttribute('data-opencanvas-load-readiness') === 'ready',
+    'load media readiness must mark the load experience ready',
   );
   load.querySelector('[data-opencanvas-load-enter]')?.dispatchEvent(makeEvent('click'));
   assert(

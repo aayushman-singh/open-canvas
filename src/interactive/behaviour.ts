@@ -1113,8 +1113,12 @@ function behaviourHydrateLoadExperience(load, payload, root) {
   }
   var enter = node.querySelector('[data-opencanvas-load-enter]');
   var sequence = behaviourFindSequence(payload, load.sequenceId);
+  var readiness = behaviourHydrateLoadReadiness(node, load, enter);
   var finishProgress = behaviourHydrateLoadProgress(node, load);
   function dismiss() {
+    if (!readiness.ready) {
+      behaviourFailure('load-readiness-pending', { loadExperienceId: load.id }, new Error('load media readiness is still pending'));
+    }
     behaviourMarkLoadExperienceSeen(load);
     finishProgress();
     node.setAttribute('data-opencanvas-load-hidden', 'true');
@@ -1129,6 +1133,69 @@ function behaviourHydrateLoadExperience(load, payload, root) {
       dismiss();
     });
   }
+}
+
+function behaviourHydrateLoadReadiness(node, load, enter) {
+  var readiness = load.mediaReadiness;
+  if (!readiness) return { ready: true };
+  var urlsAttr = node.getAttribute('data-opencanvas-load-readiness-urls');
+  if (!urlsAttr) {
+    behaviourFailure('load-readiness-urls-missing', { loadExperienceId: load.id }, new Error('load readiness urls missing'));
+  }
+  var urls = urlsAttr.split(/\s+/).filter(Boolean);
+  if (!urls.length || urls.length !== readiness.assetIds.length) {
+    behaviourFailure('load-readiness-url-count', { loadExperienceId: load.id, expected: readiness.assetIds.length, actual: urls.length }, new Error('load readiness url count mismatch'));
+  }
+  var timeoutAttr = node.getAttribute('data-opencanvas-load-readiness-timeout-ms');
+  var timeoutMs = timeoutAttr === null ? Number(readiness.timeoutMs) : Number(timeoutAttr);
+  if (!isFinite(timeoutMs) || timeoutMs < 0 || timeoutMs > 30000) {
+    behaviourFailure('load-readiness-timeout-invalid', { loadExperienceId: load.id, timeoutMs: timeoutAttr }, new Error('invalid load readiness timeout'));
+  }
+  if (typeof window.fetch !== 'function') {
+    behaviourFailure('load-readiness-fetch-unavailable', { loadExperienceId: load.id }, new Error('fetch unavailable for load readiness'));
+  }
+  var state = { ready: false };
+  var done = false;
+  var remaining = urls.length;
+  var timeoutId = null;
+  node.setAttribute('data-opencanvas-load-readiness', 'pending');
+  if (enter) enter.setAttribute('disabled', 'true');
+  function finishReady() {
+    if (done) return;
+    done = true;
+    state.ready = true;
+    if (timeoutId !== null && typeof window.clearTimeout === 'function') window.clearTimeout(timeoutId);
+    node.setAttribute('data-opencanvas-load-readiness', 'ready');
+    if (enter) enter.removeAttribute('disabled');
+  }
+  function failReady(code, url, cause) {
+    if (done) return;
+    done = true;
+    behaviourFailure(code, { loadExperienceId: load.id, url: url }, cause instanceof Error ? cause : new Error(String(cause)));
+  }
+  if (timeoutMs > 0) {
+    if (typeof window.setTimeout !== 'function') {
+      behaviourFailure('load-readiness-timeout-unavailable', { loadExperienceId: load.id }, new Error('setTimeout unavailable for load readiness'));
+    }
+    timeoutId = window.setTimeout(function(){
+      failReady('load-readiness-timeout', null, new Error('load readiness timed out'));
+    }, timeoutMs);
+  }
+  for (var i = 0; i < urls.length; i++) {
+    (function(url){
+      window.fetch(url).then(function(response){
+        if (!response || response.ok !== true) {
+          failReady('load-readiness-fetch-failed', url, new Error('load readiness fetch failed'));
+          return;
+        }
+        remaining -= 1;
+        if (remaining === 0) finishReady();
+      }, function(err){
+        failReady('load-readiness-fetch-rejected', url, err);
+      });
+    })(urls[i]);
+  }
+  return state;
 }
 
 function behaviourLoadRunPolicy(load) {

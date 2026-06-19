@@ -2961,6 +2961,36 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           }
         }
       }
+      if (state.loadExperience.mediaReadiness !== undefined) {
+        if (!isRecord(state.loadExperience.mediaReadiness)) {
+          errors.push('loadExperience.mediaReadiness must be an object when present');
+        } else {
+          const assetIds = state.loadExperience.mediaReadiness.assetIds;
+          if (!Array.isArray(assetIds) || assetIds.length === 0) {
+            errors.push('loadExperience.mediaReadiness.assetIds must be a non-empty array');
+          } else {
+            assetIds.forEach((assetId, index) => {
+              if (
+                typeof assetId !== 'string' ||
+                assetId.length === 0 ||
+                assetId !== assetId.trim() ||
+                /\s/.test(assetId)
+              ) {
+                errors.push(
+                  `loadExperience.mediaReadiness.assetIds[${String(index)}] must be a non-empty asset id without whitespace`,
+                );
+              }
+            });
+          }
+          if (
+            !isFiniteNumber(state.loadExperience.mediaReadiness.timeoutMs) ||
+            state.loadExperience.mediaReadiness.timeoutMs < 0 ||
+            state.loadExperience.mediaReadiness.timeoutMs > 30000
+          ) {
+            errors.push('loadExperience.mediaReadiness.timeoutMs must be a finite number between 0 and 30000');
+          }
+        }
+      }
     } else if (!('enabled' in state.loadExperience)) {
       errors.push(
         'loadExperience must be a premium load experience (enabled/preset) or behaviour load chrome (label/sequenceId)',

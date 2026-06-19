@@ -211,6 +211,10 @@ export interface LoadExperience {
     durationMs: number;
     label?: string;
   };
+  mediaReadiness?: {
+    assetIds: string[];
+    timeoutMs: number;
+  };
   sequenceId: string;
 }
 
