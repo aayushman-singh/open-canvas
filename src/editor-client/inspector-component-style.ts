@@ -51,6 +51,8 @@ const STYLE_META: Record<string, Record<string, ComponentStyleMeta>> = {
     fontSize: { section: 'Typography', label: 'Size', min: 8, max: 48, placeholder: 'inherit' },
     fontWeight: { section: 'Typography', label: 'Weight' },
     letterSpacing: { section: 'Typography', label: 'Letter spacing', min: 0, max: 20, step: 0.1, placeholder: '0' },
+    paddingX: { section: 'Layout', label: 'Padding X', min: 0, max: 96, placeholder: '16' },
+    paddingY: { section: 'Layout', label: 'Padding Y', min: 0, max: 64, placeholder: '0' },
     iconGap: { section: 'Icon', label: 'Gap', min: 0, max: 64, placeholder: '8' },
   },
   formStyle: {

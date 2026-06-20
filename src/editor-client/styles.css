@@ -2582,6 +2582,10 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   width: 100%;
   height: 100%;
   padding: var(--opencanvas-kit-action-padding, 0 16px);
+  padding-left: var(--opencanvas-action-padding-x);
+  padding-right: var(--opencanvas-action-padding-x);
+  padding-top: var(--opencanvas-action-padding-y);
+  padding-bottom: var(--opencanvas-action-padding-y);
   border: 0 solid transparent;
   border-color: var(--opencanvas-action-border-color, transparent);
   border-width: var(--opencanvas-action-border-width, 0);

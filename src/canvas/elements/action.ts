@@ -57,6 +57,8 @@ export interface ActionStyle {
   fontSize?: number;
   fontWeight?: 'normal' | 'medium' | 'bold';
   letterSpacing?: number;
+  paddingX?: number;
+  paddingY?: number;
   iconGap?: number;
 }
 

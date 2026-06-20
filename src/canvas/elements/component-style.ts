@@ -43,6 +43,8 @@ export const ACTION_STYLE_FIELDS = [
   { key: 'fontSize', kind: 'numberPx', cssVar: '--opencanvas-action-font-size' },
   { key: 'fontWeight', kind: 'fontWeight', cssVar: '--opencanvas-action-font-weight' },
   { key: 'letterSpacing', kind: 'numberPx', cssVar: '--opencanvas-action-letter-spacing' },
+  { key: 'paddingX', kind: 'numberPx', cssVar: '--opencanvas-action-padding-x' },
+  { key: 'paddingY', kind: 'numberPx', cssVar: '--opencanvas-action-padding-y' },
   { key: 'iconGap', kind: 'numberPx', cssVar: '--opencanvas-action-gap' },
 ] as const satisfies readonly ComponentStyleFieldDef[];
 export const FORM_STYLE_FIELDS = [

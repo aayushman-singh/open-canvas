@@ -195,6 +195,8 @@ function expectRoundTrip(state: EditableSite, label: string): void {
     withStyle(action(), 'actionStyle', {
       borderColor: '#ffcc00',
       borderWidth: 3,
+      paddingX: 24,
+      paddingY: 12,
     }),
     withStyle(tabs(), 'tabsStyle', {
       activeTabBackgroundColor: '#abcdef',
@@ -249,6 +251,14 @@ function expectRoundTrip(state: EditableSite, label: string): void {
     'actionStyle must emit modeled border width on the wrapper',
   );
   assert(
+    html.includes('--opencanvas-action-padding-x:24px'),
+    'actionStyle must emit modeled horizontal padding on the wrapper',
+  );
+  assert(
+    html.includes('--opencanvas-action-padding-y:12px'),
+    'actionStyle must emit modeled vertical padding on the wrapper',
+  );
+  assert(
     canvasPublishedStyles.includes('border-color: var(--opencanvas-action-border-color'),
     'public styles must consume modeled action border color',
   );
@@ -257,12 +267,28 @@ function expectRoundTrip(state: EditableSite, label: string): void {
     'public styles must consume modeled action border width',
   );
   assert(
+    canvasPublishedStyles.includes('padding-left: var(--opencanvas-action-padding-x'),
+    'public styles must consume modeled action horizontal padding',
+  );
+  assert(
+    canvasPublishedStyles.includes('padding-top: var(--opencanvas-action-padding-y'),
+    'public styles must consume modeled action vertical padding',
+  );
+  assert(
     canvasEditorStyles.includes('border-color: var(--opencanvas-action-border-color'),
     'editor styles must consume modeled action border color',
   );
   assert(
     canvasEditorStyles.includes('border-width: var(--opencanvas-action-border-width'),
     'editor styles must consume modeled action border width',
+  );
+  assert(
+    canvasEditorStyles.includes('padding-left: var(--opencanvas-action-padding-x'),
+    'editor styles must consume modeled action horizontal padding',
+  );
+  assert(
+    canvasEditorStyles.includes('padding-top: var(--opencanvas-action-padding-y'),
+    'editor styles must consume modeled action vertical padding',
   );
   assert(
     html.includes('--opencanvas-tabs-active-tab-bg:#abcdef'),
@@ -434,6 +460,20 @@ expectInvalid(
   'pinnedStyle',
   'modeled actionStyle border key duplicated in pinnedStyle',
 );
+expectInvalid(
+  siteWith([
+    withStyle(
+      {
+        ...action(),
+        pinnedStyle: { '--opencanvas-action-padding-x': '16px' },
+      },
+      'actionStyle',
+      { paddingX: 20 },
+    ),
+  ]),
+  'pinnedStyle',
+  'modeled actionStyle padding key duplicated in pinnedStyle',
+);
 
 
 {
@@ -474,6 +514,11 @@ expectInvalid(
     JSON.stringify(actionAgentToolSpec.parsePatch({ actionStyle: { borderWidth: 2 } })) ===
       JSON.stringify({ actionStyle: { borderWidth: 2 } }),
     'action agent patch must preserve modeled border width',
+  );
+  assert(
+    JSON.stringify(actionAgentToolSpec.parsePatch({ actionStyle: { paddingX: 18 } })) ===
+      JSON.stringify({ actionStyle: { paddingX: 18 } }),
+    'action agent patch must preserve modeled padding',
   );
 }
 
