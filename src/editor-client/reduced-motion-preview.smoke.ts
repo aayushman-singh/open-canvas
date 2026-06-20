@@ -5,6 +5,8 @@
 // visitor rehydrate calls; it must not fake window.matchMedia or silently drift
 // from published runtime semantics.
 
+import { RUNTIME_ENTRY_SRC } from '../interactive/runtime.js';
+
 declare const Bun: {
   file(input: URL): { text(): Promise<string> };
 };
@@ -13,13 +15,16 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[reduced-motion-preview:smoke] ${message}`);
 }
 
+function compactSource(value: string): string {
+  return value.replace(/\s+/g, '');
+}
+
 const editorContext = await Bun.file(new URL('./editor-context.ts', import.meta.url)).text();
 const indexSource = await Bun.file(new URL('./index.ts', import.meta.url)).text();
 const runtimeHelpers = await Bun.file(new URL('./runtime-helpers.ts', import.meta.url)).text();
 const renderSource = await Bun.file(new URL('./render.ts', import.meta.url)).text();
 const editorHydrator = await Bun.file(new URL('./hydrate-interactives.ts', import.meta.url)).text();
 const behaviourPreview = await Bun.file(new URL('./hydrate-behaviour.ts', import.meta.url)).text();
-const visitorRuntime = await Bun.file(new URL('../interactive/runtime.ts', import.meta.url)).text();
 const visitorBehaviour = await Bun.file(new URL('../interactive/behaviour.ts', import.meta.url)).text();
 const visitorMarquee = await Bun.file(new URL('../interactive/marquee.ts', import.meta.url)).text();
 const visitorPointerFx = await Bun.file(new URL('../interactive/pointer-fx.ts', import.meta.url)).text();
@@ -47,12 +52,15 @@ assert(
     renderSource.includes('reducedMotion: ctx.reducedMotionPreview'),
   'renderAll must stamp preview metadata and pass reducedMotion to Runtime Hydrator',
 );
+const compactEditorHydrator = compactSource(editorHydrator);
 assert(
   editorHydrator.includes("reducedMotion?: 'no-preference' | 'reduce';") &&
-    editorHydrator.includes('hydratePointerFx(root, options)') &&
-    editorHydrator.includes('hydrateMarquees(root, options)') &&
-    editorHydrator.includes('hydrateVideoHoverStreams(root, options)') &&
-    editorHydrator.includes('hydrateBehaviourPreview(root, options.behaviourState, options.behaviourAssetBasePath, options.reducedMotion)'),
+    compactEditorHydrator.includes(compactSource('hydratePointerFx(root, options)')) &&
+    compactEditorHydrator.includes(compactSource('hydrateMarquees(root, options)')) &&
+    compactEditorHydrator.includes(compactSource('hydrateVideoHoverStreams(root, options)')) &&
+    compactEditorHydrator.includes(
+      compactSource('hydrateBehaviourPreview(root, options.behaviourState, options.behaviourAssetBasePath, options.reducedMotion'),
+    ),
   'editor Runtime Hydrator must route reducedMotion to every reduced-motion-aware preview runtime',
 );
 assert(
@@ -60,10 +68,10 @@ assert(
   'behaviour preview must execute the visitor behaviour runtime with the editor reduced-motion option',
 );
 assert(
-  visitorRuntime.includes('hydratePointerFx(root, options || {})') &&
-    visitorRuntime.includes('hydrateBehaviour(rootScope, options || {})') &&
-    visitorRuntime.includes('hydrateMarquees(rootScope, options || {})') &&
-    visitorRuntime.includes('hydrateVideoHoverStreams(rootScope, options || {})'),
+  RUNTIME_ENTRY_SRC.includes('hydratePointerFx(root, options || {})') &&
+    RUNTIME_ENTRY_SRC.includes('hydrateBehaviour(rootScope, options || {})') &&
+    RUNTIME_ENTRY_SRC.includes('hydrateMarquees(rootScope, options || {})') &&
+    RUNTIME_ENTRY_SRC.includes('hydrateVideoHoverStreams(rootScope, options || {})'),
   'visitor Runtime Hydrator must pass options through parity hydration paths',
 );
 assert(

@@ -5,8 +5,16 @@
 // such as Overlays, Load Experience, and Route Transition remain covered by
 // their own runtime smokes plus the named window.__opencanvasHydrate boundary.
 
+export type RuntimeHydratorSurfaceId =
+  | 'interactive:accordion'
+  | 'interactive:carousel'
+  | 'document:pointer-fx'
+  | 'behaviour:preview'
+  | 'document:marquee'
+  | 'document:video-hover';
+
 export interface RuntimeHydratorSurface {
-  id: string;
+  id: RuntimeHydratorSurfaceId;
   visitorCall: string;
   editorCall: string;
 }

@@ -29,6 +29,7 @@
 //     visitor runtime's contract.
 
 import type { EditableSite } from '../canvas/schema.js';
+import type { RuntimeHydratorSurfaceId } from '../interactive/runtime-hydrator-surfaces.js';
 import { hydrateBehaviourPreview } from './hydrate-behaviour.js';
 
 export interface HydrateOptions {
@@ -56,6 +57,37 @@ declare global {
   }
 }
 
+export const EDITOR_REGISTRY: Record<
+  RuntimeHydratorSurfaceId,
+  (root: ParentNode, options: HydrateOptions) => void
+> = {
+  'interactive:accordion': (wrapper) => {
+    if (wrapper instanceof HTMLElement) hydrateAccordion(wrapper);
+  },
+  'interactive:carousel': (wrapper) => {
+    if (wrapper instanceof HTMLElement) hydrateCarousel(wrapper);
+  },
+  'document:pointer-fx': (root, options) => {
+    hydratePointerFx(root, options);
+  },
+  'behaviour:preview': (root, options) => {
+    if (options.behaviourState && options.behaviourAssetBasePath) {
+      hydrateBehaviourPreview(
+        root,
+        options.behaviourState,
+        options.behaviourAssetBasePath,
+        options.reducedMotion,
+      );
+    }
+  },
+  'document:marquee': (root, options) => {
+    hydrateMarquees(root, options);
+  },
+  'document:video-hover': (root, options) => {
+    hydrateVideoHoverStreams(root, options);
+  },
+};
+
 /**
  * Editor Runtime Hydrator boundary. Visitor pages expose the same
  * window.__opencanvasHydrate name from src/interactive/runtime.ts; the editor
@@ -81,6 +113,20 @@ export function runEditorRuntimeHydrator(
   hydrate(root, options);
 }
 
+function dispatchRequiredSurface(
+  id: RuntimeHydratorSurfaceId,
+  root: ParentNode,
+  options: HydrateOptions,
+): void {
+  const dispatch = EDITOR_REGISTRY[id];
+  if (!dispatch) {
+    const msg = `[hydrateInteractives] Required hydration surface "${id}" is missing from EDITOR_REGISTRY.`;
+    console.error(msg);
+    throw new Error(msg);
+  }
+  dispatch(root, options);
+}
+
 /**
  * Walk `root` (any element subtree, typically the editor's canvas-root)
  * and hydrate every `[data-opencanvas-interactive]` element that is not
@@ -100,10 +146,14 @@ export function hydrateInteractives(
     if (wrapper.getAttribute('data-opencanvas-hydrated') === 'true') continue;
     wrapper.setAttribute('data-opencanvas-hydrated', 'true');
     const kind = wrapper.getAttribute('data-opencanvas-interactive');
-    if (kind === 'carousel') {
-      hydrateCarousel(wrapper);
-    } else if (kind === 'accordion') {
-      hydrateAccordion(wrapper);
+    const surfaceId = `interactive:${kind}`;
+    const registryView = EDITOR_REGISTRY as Record<
+      string,
+      ((root: ParentNode, opts: HydrateOptions) => void) | undefined
+    >;
+    const dispatch = registryView[surfaceId];
+    if (dispatch) {
+      dispatch(wrapper, options);
     } else {
       // Unknown interactive kind. Per the no-fallback rule, log loudly so
       // a future interactive added without a TS hydrator surfaces here
@@ -118,19 +168,15 @@ export function hydrateInteractives(
     }
   }
   if (!options.skipPopups) {
+    // Popups are visitor-only chrome and not listed in the shared surface catalog.
     hydratePopups(root);
   }
-  // ADR 0066 dec 4 — pointer-fx is a document-wide pass keyed on the
-  // [data-opencanvas-pointer-fx] attribute (not a data-opencanvas-interactive
-  // dispatch arm), mirroring hydratePointerFx in `./pointer-fx.ts` so the
-  // editor preview reacts to the cursor exactly as the published site does.
-  hydratePointerFx(root, options);
-  if (options.behaviourState && options.behaviourAssetBasePath) {
-    hydrateBehaviourPreview(root, options.behaviourState, options.behaviourAssetBasePath, options.reducedMotion);
-  }
-  hydrateMarquees(root, options);
+  // Shared non-interactive document/behavior surfaces
+  dispatchRequiredSurface('document:pointer-fx', root, options);
+  dispatchRequiredSurface('behaviour:preview', root, options);
+  dispatchRequiredSurface('document:marquee', root, options);
   hydrateCollectionSearches(root, options);
-  hydrateVideoHoverStreams(root, options);
+  dispatchRequiredSurface('document:video-hover', root, options);
 }
 
 function prefersReducedMotion(options: HydrateOptions): boolean {

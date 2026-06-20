@@ -14,10 +14,46 @@
 // rewrite the document on the fly (live-publish broadcast in
 // `src/routes/public.ts`) re-hydrate cleanly.
 
-export const RUNTIME_ENTRY_SRC = String.raw`
+import {
+  RUNTIME_HYDRATOR_SURFACES,
+  type RuntimeHydratorSurfaceId,
+} from './runtime-hydrator-surfaces.js';
+
+function requireSurface(id: RuntimeHydratorSurfaceId): string {
+  const surface = RUNTIME_HYDRATOR_SURFACES.find((s) => s.id === id);
+  if (!surface) {
+    throw new Error(
+      `[runtime.ts] Required hydration surface "${id}" is missing from RUNTIME_HYDRATOR_SURFACES manifest.`,
+    );
+  }
+  return surface.visitorCall;
+}
+
+const interactives = RUNTIME_HYDRATOR_SURFACES.filter((s) => s.id.startsWith('interactive:'));
+const nonInteractives = RUNTIME_HYDRATOR_SURFACES.filter(
+  (s) => !s.id.startsWith('interactive:') && s.id !== 'document:pointer-fx',
+);
+
+const visitorInteractiveDispatch = interactives
+  .map((s, idx) => {
+    const kind = s.id.replace('interactive:', '');
+    const cond = idx === 0 ? 'if' : 'else if';
+    return `    ${cond} (kind === '${kind}') {
+      ${s.visitorCall};
+    }`;
+  })
+  .join('\n');
+
+const visitorNonInteractiveDispatch = nonInteractives
+  .map((s) => {
+    return `  ${s.visitorCall};`;
+  })
+  .join('\n');
+
+export const RUNTIME_ENTRY_SRC = `
 function hydratePremiumInteractions(scope, options) {
   var root = scope || document;
-  hydratePointerFx(root, options || {});
+  ${requireSurface('document:pointer-fx')};
   if (typeof window === 'undefined') return;
   if (typeof hydrateOverlays === 'function') hydrateOverlays(root, options || {});
   if (typeof hydrateLoadExperience === 'function') hydrateLoadExperience(root, options || {});
@@ -31,11 +67,7 @@ function hydrateAll(scope, options) {
     if (root.getAttribute('data-opencanvas-hydrated') === 'true') continue;
     root.setAttribute('data-opencanvas-hydrated', 'true');
     var kind = root.getAttribute('data-opencanvas-interactive');
-    if (kind === 'accordion') {
-      hydrateAccordion(root);
-    } else if (kind === 'carousel') {
-      hydrateCarousel(root);
-    }
+${visitorInteractiveDispatch}
   }
   // ADR 0066 dec 4 — pointer-fx is a document-wide pass keyed on the
   // [data-opencanvas-pointer-fx] attribute, NOT a per-interactive-root dispatch
@@ -45,9 +77,7 @@ function hydrateAll(scope, options) {
   hydratePremiumInteractions(rootScope, options || {});
   hydrateCollectionGalleries(rootScope);
   hydrateEmbedDrillIns(rootScope);
-  hydrateBehaviour(rootScope, options || {});
-  hydrateMarquees(rootScope, options || {});
-  hydrateVideoHoverStreams(rootScope, options || {});
+${visitorNonInteractiveDispatch}
 }
 if (typeof window !== 'undefined') window.__opencanvasHydrate = hydrateAll;
 if (document.readyState === 'loading') {

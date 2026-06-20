@@ -781,6 +781,14 @@ Current state:
   in `RUNTIME_HYDRATOR_SURFACES`, and the parity smoke checks every manifest
   entry against both dispatchers. Adding a shared surface without both runtime
   paths now fails CI instead of relying on reviewer memory.
+- **June 2026 update (Unified Registry Slice):** Partially unified the visitor
+  and editor hydration dispatch layers under a shared, registry-backed model.
+  Editor hydration in `src/editor-client/hydrate-interactives.ts` now dispatches
+  dynamically via a typed `EDITOR_REGISTRY` mapping of
+  `RUNTIME_HYDRATOR_SURFACES`. Visitor hydration in `src/interactive/runtime.ts`
+  generates its dispatch loop dynamically from the exact same surface list,
+  eliminating duplicate dispatch code paths, though the underlying visitor
+  string fragments and TS editor adapters remain separate implementation nodes.
 
 User-visible miss:
 
@@ -792,9 +800,10 @@ User-visible miss:
 Needed primitive:
 
 - One interaction runtime source that can be consumed by both visitor output
-  and editor preview.
-- Remaining next wave: move individual runtime adapters behind generated or
-  shared modules so parity is implementation-shared, not only manifest-gated.
+  and editor preview. The shared registry mapping slice in
+  `RUNTIME_HYDRATOR_SURFACES` and `EDITOR_REGISTRY` partially resolves this by
+  sharing dispatch/registry layers; underlying visitor string fragments and TS
+  editor adapters remain separate implementation nodes.
 
 ### 14. Motion Authoring UX Is Too Thin
 

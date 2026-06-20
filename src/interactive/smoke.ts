@@ -121,6 +121,9 @@ class StubElement {
   // error and we throw loudly so the smoke surfaces the drift immediately.
   matchesSelector(selector: string): boolean {
     const trimmed = selector.trim();
+    if (trimmed.includes(',')) {
+      return trimmed.split(',').some((sub) => this.matchesSelector(sub));
+    }
     if (trimmed.startsWith('.')) {
       const className = trimmed.slice(1);
       return this.className.split(/\s+/).includes(className);

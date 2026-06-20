@@ -1,6 +1,8 @@
 export {};
 
 import { RUNTIME_HYDRATOR_SURFACES } from '../interactive/runtime-hydrator-surfaces.js';
+import { EDITOR_REGISTRY } from './hydrate-interactives.js';
+import { RUNTIME_ENTRY_SRC } from '../interactive/runtime.js';
 
 declare const Bun: {
   file(input: URL): { text(): Promise<string> };
@@ -10,9 +12,12 @@ function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error('[runtime-hydrator-parity:smoke] ' + message);
 }
 
+function compactSource(value: string): string {
+  return value.replace(/\s+/g, '');
+}
+
 const editorHydrateSrc = await Bun.file(new URL('./hydrate-interactives.ts', import.meta.url)).text();
 const editorRenderSrc = await Bun.file(new URL('./render.ts', import.meta.url)).text();
-const visitorRuntimeSrc = await Bun.file(new URL('../interactive/runtime.ts', import.meta.url)).text();
 const publicRouteSrc = await Bun.file(new URL('../routes/public.ts', import.meta.url)).text();
 const routeTransitionSrc = await Bun.file(new URL('../interactive/route-transition.ts', import.meta.url)).text();
 const packageSrc = await Bun.file(new URL('../../package.json', import.meta.url)).text();
@@ -21,17 +26,21 @@ assert(RUNTIME_HYDRATOR_SURFACES.length >= 6, 'Runtime Hydrator surface manifest
 
 for (const surface of RUNTIME_HYDRATOR_SURFACES) {
   assert(
-    visitorRuntimeSrc.includes(surface.visitorCall),
+    surface.id in EDITOR_REGISTRY,
+    `editor registry must map surface ${surface.id} in EDITOR_REGISTRY`,
+  );
+  assert(
+    RUNTIME_ENTRY_SRC.includes(surface.visitorCall),
     `visitor runtime must dispatch manifest surface ${surface.id} via ${surface.visitorCall}`,
   );
   assert(
-    editorHydrateSrc.includes(surface.editorCall),
+    compactSource(editorHydrateSrc).includes(compactSource(surface.editorCall)),
     `editor hydrator must dispatch manifest surface ${surface.id} via ${surface.editorCall}`,
   );
 }
 
 assert(
-  visitorRuntimeSrc.includes('window.__opencanvasHydrate = hydrateAll'),
+  RUNTIME_ENTRY_SRC.includes('window.__opencanvasHydrate = hydrateAll'),
   'visitor runtime must expose the named Runtime Hydrator',
 );
 assert(
