@@ -241,6 +241,10 @@ Current state:
   schema-owned step properties for clip-path reveals, variable font axes, and
   SVG stroke dash choreography beside the timeline instead of requiring a
   separate field-level pass.
+- **June 2026 update:** Timeline quick properties now expose target binding
+  controls beside the timeline: target type, page, section, element id, and
+  text-split unit all write the same schema-owned `MotionSequenceStep.target`
+  shape as the detailed editor.
 
 User-visible miss:
 
@@ -794,14 +798,15 @@ Current state:
 - Full Motion Sequence cards include a Timeline overview with visual bars,
   target lanes, snap handles, scrub preview, draggable start-time bars for step
   start/duration, and timeline-adjacent quick property controls for opacity,
-  transform, and filter values.
+  transform, filter values, advanced properties, and target binding.
 
 User-visible miss:
 
 - Template authors can inspect, scrub, reposition, resize, and edit common
-  transform/opacity/filter properties directly beside the timeline overview.
-- Long sequences still require field-level editing for advanced properties,
-  target binding, easing, repeat, and detailed timing changes.
+  transform/opacity/filter properties and target binding directly beside the
+  timeline overview.
+- Long sequences still require field-level editing for repeat and some detailed
+  timing changes.
 
 Needed primitive:
 

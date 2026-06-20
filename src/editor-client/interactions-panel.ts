@@ -51,6 +51,7 @@ import type {
   VideoStreamRichMotionAsset,
 } from '../canvas/behaviour-primitives.js';
 import {
+  BEHAVIOUR_TARGET_TYPES,
   LAYOUT_TRANSITION_INITIAL_STATES,
   LAYOUT_TRANSITION_REDUCED_MOTION_MODES,
   BEHAVIOUR_LOAD_RUN_POLICIES,
@@ -2395,6 +2396,8 @@ function renderMotionSequenceTimelinePropertyEditor(
     const grid = document.createElement('div');
     grid.className = 'opencanvas-motion-timeline-property-grid';
 
+    renderMotionSequenceTimelineTargetEditor(ctx, grid, sequence, step);
+
     const quickDuration = numberInput(step.durationMs, 0, 10000, 10);
     quickDuration.addEventListener('change', () =>
       updateMotionStepFinite(ctx, sequence.id, step, 'durationMs', quickDuration, 0, 10000),
@@ -2492,6 +2495,91 @@ function renderMotionSequenceTimelinePropertyEditor(
   }
 
   wrap.appendChild(panel);
+}
+
+function renderMotionSequenceTimelineTargetEditor(
+  ctx: InteractionsPanelContext,
+  grid: HTMLElement,
+  sequence: MotionSequence,
+  step: MotionSequenceStep,
+): void {
+  const targetType = selectInput([...BEHAVIOUR_TARGET_TYPES], step.target.type);
+  targetType.addEventListener('change', () => {
+    mutate(ctx, () =>
+      updateScrollSequenceStep(ctx, sequence.id, step.id, {
+        target: defaultMotionTargetForType(ctx, targetType.value),
+      }),
+    );
+  });
+  grid.appendChild(field('Quick target type', targetType));
+
+  if (step.target.type === 'page') {
+    const pageIds = ctx.state?.pages.map((page) => page.id) ?? [];
+    const page = selectInput(
+      pageIds,
+      pageIds.includes(step.target.pageId) ? step.target.pageId : pageIds[0] ?? step.target.pageId,
+    );
+    page.addEventListener('change', () => {
+      mutate(ctx, () =>
+        updateScrollSequenceStep(ctx, sequence.id, step.id, {
+          target: { type: 'page', pageId: page.value },
+        }),
+      );
+    });
+    grid.appendChild(field('Quick target page', page));
+    return;
+  }
+
+  if (step.target.type === 'section') {
+    const sectionIds = activePageSections(ctx).map((sectionItem) => sectionItem.id);
+    const section = selectInput(
+      sectionIds,
+      sectionIds.includes(step.target.sectionId) ? step.target.sectionId : sectionIds[0] ?? step.target.sectionId,
+    );
+    section.addEventListener('change', () => {
+      mutate(ctx, () =>
+        updateScrollSequenceStep(ctx, sequence.id, step.id, {
+          target: { type: 'section', sectionId: section.value },
+        }),
+      );
+    });
+    grid.appendChild(field('Quick target section', section));
+    return;
+  }
+
+  if (step.target.type === 'element' || step.target.type === 'text-split') {
+    const target = step.target;
+    const elementId = textInput(target.elementId, 'Element id');
+    elementId.addEventListener('change', () => {
+      const value = elementId.value.trim();
+      if (value.length === 0) {
+        ctx.setStatus('Motion Sequence target element cannot be empty', 'error');
+        elementId.value = target.elementId;
+        return;
+      }
+      mutate(ctx, () =>
+        updateScrollSequenceStep(ctx, sequence.id, step.id, {
+          target:
+            target.type === 'text-split'
+              ? { ...target, elementId: value }
+              : { type: 'element', elementId: value },
+        }),
+      );
+    });
+    grid.appendChild(field('Quick target element', elementId));
+
+    if (target.type === 'text-split') {
+      const unit = selectInput([...TEXT_SPLIT_UNITS], target.unit);
+      unit.addEventListener('change', () => {
+        mutate(ctx, () =>
+          updateScrollSequenceStep(ctx, sequence.id, step.id, {
+            target: { ...target, unit: unit.value as (typeof TEXT_SPLIT_UNITS)[number] },
+          }),
+        );
+      });
+      grid.appendChild(field('Quick split unit', unit));
+    }
+  }
 }
 
 function wireMotionSequenceTimelineDrag(

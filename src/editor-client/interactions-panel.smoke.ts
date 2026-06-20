@@ -251,6 +251,11 @@ assert(
   panelSrc.includes('data-opencanvas-motion-timeline-property-editor'),
   'panel must expose timeline property editor metadata',
 );
+assert(panelSrc.includes('Quick target type'), 'panel must edit target type from the timeline');
+assert(panelSrc.includes('Quick target page'), 'panel must edit target page from the timeline');
+assert(panelSrc.includes('Quick target section'), 'panel must edit target section from the timeline');
+assert(panelSrc.includes('Quick target element'), 'panel must edit target element from the timeline');
+assert(panelSrc.includes('Quick split unit'), 'panel must edit split unit from the timeline');
 assert(panelSrc.includes('Quick from opacity'), 'panel must edit from opacity from the timeline');
 assert(panelSrc.includes('Quick to filter'), 'panel must edit to filter from the timeline');
 assert(panelSrc.includes('Quick from clip path'), 'panel must edit from clip path from the timeline');
