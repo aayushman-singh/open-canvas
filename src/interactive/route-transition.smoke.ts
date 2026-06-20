@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
-import type { PublishedSnapshot } from '../canvas/schema.js';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  ROUTE_TRANSITION_MODES,
+  type EditableSite,
+  type PublishedSnapshot,
+} from '../canvas/schema.js';
 import { renderCanvasSnapshot } from '../canvas/render.js';
+import { validateEditableSite } from '../canvas/validate.js';
 import { ROUTE_TRANSITION_RUNTIME_SRC } from './route-transition.js';
 import { injectInteractiveRuntime, snapshotNeedsInteractiveRuntime } from './inject.js';
 
@@ -42,6 +50,67 @@ assert.ok(runtime.includes('shared-elements-api'));
 assert.ok(runtime.includes('shared-elements-resolve'));
 assert.ok(runtime.includes('data-opencanvas-route-shared-elements'));
 
+const routeModeSite: EditableSite = {
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'home',
+      slug: 'home',
+      title: 'Home',
+      width: 1200,
+      sections: [
+        {
+          id: 'body',
+          recipeId: 'custom',
+          name: 'Body',
+          height: 320,
+          elements: [],
+        },
+      ],
+    },
+  ],
+  routeTransition: {
+    id: 'route-crossfade',
+    enabled: true,
+    mode: 'crossfade',
+    durationMs: 260,
+    easing: 'ease-in-out',
+  },
+};
+assert.ok(
+  (ROUTE_TRANSITION_MODES as readonly string[]).includes('crossfade'),
+  'route transition modes must expose crossfade for editor controls',
+);
+assert.ok(
+  (ROUTE_TRANSITION_MODES as readonly string[]).includes('mask'),
+  'route transition modes must expose mask for editor controls',
+);
+const validRouteMode = validateEditableSite(routeModeSite);
+assert.equal(
+  validRouteMode.valid,
+  true,
+  validRouteMode.valid ? undefined : validRouteMode.errors.join('\n'),
+);
+const maskSnapshot: PublishedSnapshot = {
+  ...snapshot,
+  routeTransition: {
+    id: 'route-mask',
+    enabled: true,
+    mode: 'mask',
+    durationMs: 320,
+    easing: 'cubic-bezier(.76,0,.24,1)',
+  },
+};
+const maskHtml = renderCanvasSnapshot(maskSnapshot, '/assets', 'site-mask', { turnstileSiteKey: 'test-key' });
+assert.ok(maskHtml.includes('data-opencanvas-route-mode="mask"'));
+assert.ok(runtime.includes('data-opencanvas-route-view-mode'));
+const publicStyles = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../canvas/public-styles.ts'),
+  'utf8',
+);
+assert.ok(publicStyles.includes('::view-transition-old(opencanvas-site)'));
+assert.ok(publicStyles.includes('data-opencanvas-route-view-mode="mask"'));
+
 interface StubEvent {
   type: string;
   detail?: unknown;
@@ -66,6 +135,19 @@ class StubStyle {
   opacity = '';
   transform = '';
   transition = '';
+  properties = new Map<string, string>();
+
+  setProperty(name: string, value: string): void {
+    this.properties.set(name, value);
+  }
+
+  removeProperty(name: string): void {
+    this.properties.delete(name);
+  }
+
+  getPropertyValue(name: string): string {
+    return this.properties.get(name) ?? '';
+  }
 }
 
 class StubElement {
@@ -178,12 +260,15 @@ class StubElement {
 }
 
 class StubDocument {
+  documentElement = new StubElement('html');
   body = new StubElement('body');
   listeners = new Map<string, Listener[]>();
   routeFailureEvents: Array<{ type: string; detail?: unknown }> = [];
+  viewTransitionCalls = 0;
+  viewTransitionModes: Array<string | null> = [];
 
   constructor() {
-    this.body.appendChild(new StubElement('html'));
+    this.body.appendChild(this.documentElement);
   }
 
   addEventListener(type: string, listener: Listener): void {
@@ -215,6 +300,13 @@ class StubDocument {
       event.currentTarget = this;
       fn(event);
     }
+  }
+
+  startViewTransition(callback: () => void): { finished: Promise<void> } {
+    this.viewTransitionCalls += 1;
+    this.viewTransitionModes.push(this.documentElement.getAttribute('data-opencanvas-route-view-mode'));
+    callback();
+    return { finished: Promise.resolve() };
   }
 }
 
@@ -395,6 +487,13 @@ function makeContainer(): StubElement {
   return container;
 }
 
+function makeRouteLink(container: StubElement): StubElement {
+  const link = new StubElement('a');
+  link.setAttribute('href', '/about');
+  container.appendChild(link);
+  return link;
+}
+
 function snapshotRouteAttrs(container: StubElement): Record<string, string | null> {
   const out: Record<string, string | null> = {};
   for (const name of ROUTE_ATTRS) {
@@ -420,9 +519,7 @@ async function testHydrationFailureRestoresCurrentPage(): Promise<void> {
   const beforeAttrs = snapshotRouteAttrs(container);
   doc.body.appendChild(container);
 
-  const link = new StubElement('a');
-  link.setAttribute('href', '/about');
-  container.appendChild(link);
+  const link = makeRouteLink(container);
 
   runRouteTransition(doc, win);
   win.hydrateShouldThrow = true;
@@ -459,9 +556,7 @@ async function testFetchFailureUsesFetchPhase(): Promise<void> {
   const win = new StubWindow();
   const container = makeContainer();
   doc.body.appendChild(container);
-  const link = new StubElement('a');
-  link.setAttribute('href', '/about');
-  container.appendChild(link);
+  const link = makeRouteLink(container);
 
   const failingWin = win;
   failingWin.fetch = () => {
@@ -482,9 +577,7 @@ async function testParseFailureUsesParsePhase(): Promise<void> {
   const win = new StubWindow();
   const container = makeContainer();
   doc.body.appendChild(container);
-  const link = new StubElement('a');
-  link.setAttribute('href', '/about');
-  container.appendChild(link);
+  const link = makeRouteLink(container);
 
   win.fetch = () => {
     win.fetchCalls += 1;
@@ -512,9 +605,7 @@ async function testOutgoingAnimationFailureEmitsAnimatePhase(): Promise<void> {
   const beforeAttrs = snapshotRouteAttrs(container);
   doc.body.appendChild(container);
 
-  const link = new StubElement('a');
-  link.setAttribute('href', '/about');
-  container.appendChild(link);
+  const link = makeRouteLink(container);
 
   const motionCalls: Array<{ sequenceId: string }> = [];
   let outgoingMotionThrows = true;
@@ -564,9 +655,7 @@ async function testIncomingAnimationFailureRestoresCurrentPage(): Promise<void> 
   const beforeAttrs = snapshotRouteAttrs(container);
   doc.body.appendChild(container);
 
-  const link = new StubElement('a');
-  link.setAttribute('href', '/about');
-  container.appendChild(link);
+  const link = makeRouteLink(container);
 
   const nextWithIncomingSequence = `<!DOCTYPE html><html><body><main data-opencanvas-route-container data-opencanvas-route-transition="route-next" data-opencanvas-route-mode="fade" data-opencanvas-route-duration-ms="120" data-opencanvas-route-easing="ease" data-opencanvas-route-incoming-sequence="in-fade"><div id="next-page">Next Page</div></main></body></html>`;
   win.fetch = () => {
@@ -623,10 +712,60 @@ async function testIncomingAnimationFailureRestoresCurrentPage(): Promise<void> 
   assert.equal(win.fetchCalls, 2, 'busy must reset so a later navigation can run');
 }
 
+async function testCrossfadeModeUsesViewTransitionApi(): Promise<void> {
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const container = makeContainer();
+  container.setAttribute('data-opencanvas-route-mode', 'crossfade');
+  doc.body.appendChild(container);
+  const link = makeRouteLink(container);
+
+  runRouteTransition(doc, win);
+  doc.dispatchClick(link);
+  await flushRouteTransition();
+
+  assert.equal(doc.viewTransitionCalls, 1, 'crossfade route mode must run through View Transition API');
+  assert.deepEqual(doc.viewTransitionModes, ['crossfade']);
+  assert.equal(win.fetchCalls, 1, 'crossfade route mode must fetch the target page once');
+  assert.equal(win.hydrateCalls, 1, 'crossfade route mode must hydrate the swapped page');
+  assert.equal(win.history.pushStateCalls, 1, 'crossfade route mode must advance history after swap');
+  assert.equal(container.getAttribute('data-opencanvas-route-state'), null);
+  assert.equal(doc.documentElement.getAttribute('data-opencanvas-route-view-mode'), null);
+  assert.equal(doc.documentElement.style.getPropertyValue('--opencanvas-route-duration'), '');
+}
+
+async function testMaskModeFailsWithoutViewTransitionApi(): Promise<void> {
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const container = makeContainer();
+  container.setAttribute('data-opencanvas-route-mode', 'mask');
+  doc.body.appendChild(container);
+  const link = makeRouteLink(container);
+  (doc as unknown as { startViewTransition?: unknown }).startViewTransition = undefined;
+
+  runRouteTransition(doc, win);
+  doc.dispatchClick(link);
+  await flushRouteTransition();
+
+  assert.equal(win.fetchCalls, 0, 'mask mode must not fetch when required transition API is missing');
+  assert.equal(win.history.pushStateCalls, 0, 'mask mode failure must not advance history');
+  assert.equal(doc.routeFailureEvents.length, 1, 'mask mode API failure must emit one failure event');
+  const failure = doc.routeFailureEvents[0]?.detail as {
+    phase?: string;
+    transitionId?: string;
+    href?: string;
+  };
+  assert.equal(failure.phase, 'view-transition-api');
+  assert.equal(failure.transitionId, 'route-main');
+  assert.equal(failure.href, 'http://localhost/about');
+}
+
 await testHydrationFailureRestoresCurrentPage();
 await testFetchFailureUsesFetchPhase();
 await testParseFailureUsesParsePhase();
 await testOutgoingAnimationFailureEmitsAnimatePhase();
 await testIncomingAnimationFailureRestoresCurrentPage();
+await testCrossfadeModeUsesViewTransitionApi();
+await testMaskModeFailsWithoutViewTransitionApi();
 
 console.log('[route-transition:smoke] OK');

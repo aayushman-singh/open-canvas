@@ -1446,6 +1446,51 @@ const variantCss = String.raw`
 [data-opencanvas-route-mode="wipe"][data-opencanvas-route-state="outgoing"] {
   clip-path: inset(0 100% 0 0);
 }
+html[data-opencanvas-route-view-mode="crossfade"]::view-transition-old(opencanvas-site),
+html[data-opencanvas-route-view-mode="crossfade"]::view-transition-new(opencanvas-site) {
+  animation-duration: var(--opencanvas-route-duration, 260ms);
+  animation-timing-function: var(--opencanvas-route-easing, ease-in-out);
+}
+html[data-opencanvas-route-view-mode="crossfade"]::view-transition-old(opencanvas-site) {
+  animation-name: opencanvas-route-crossfade-out;
+}
+html[data-opencanvas-route-view-mode="crossfade"]::view-transition-new(opencanvas-site) {
+  animation-name: opencanvas-route-crossfade-in;
+}
+html[data-opencanvas-route-view-mode="mask"]::view-transition-old(opencanvas-site),
+html[data-opencanvas-route-view-mode="mask"]::view-transition-new(opencanvas-site) {
+  animation-duration: var(--opencanvas-route-duration, 320ms);
+  animation-timing-function: var(--opencanvas-route-easing, cubic-bezier(.76,0,.24,1));
+}
+html[data-opencanvas-route-view-mode="mask"]::view-transition-old(opencanvas-site) {
+  animation-name: opencanvas-route-mask-out;
+}
+html[data-opencanvas-route-view-mode="mask"]::view-transition-new(opencanvas-site) {
+  animation-name: opencanvas-route-mask-in;
+}
+@keyframes opencanvas-route-crossfade-out {
+  from { opacity: 1; filter: blur(0); }
+  to { opacity: 0; filter: blur(10px); }
+}
+@keyframes opencanvas-route-crossfade-in {
+  from { opacity: 0; filter: blur(10px); }
+  to { opacity: 1; filter: blur(0); }
+}
+@keyframes opencanvas-route-mask-out {
+  from { clip-path: inset(0 0 0 0 round 0); opacity: 1; }
+  to { clip-path: inset(0 0 0 100% round 28px); opacity: 0.72; }
+}
+@keyframes opencanvas-route-mask-in {
+  from { clip-path: inset(0 100% 0 0 round 28px); opacity: 0.72; }
+  to { clip-path: inset(0 0 0 0 round 0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-opencanvas-route-view-mode]::view-transition-old(opencanvas-site),
+  html[data-opencanvas-route-view-mode]::view-transition-new(opencanvas-site) {
+    animation-duration: 1ms;
+    animation-name: opencanvas-route-crossfade-in;
+  }
+}
 
 [data-opencanvas-overlays-root] {
   position: fixed;

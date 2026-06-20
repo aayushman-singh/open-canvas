@@ -363,8 +363,14 @@ Current state:
 - Public navigation is multi-page HTML routing.
 - The live-update script swaps snapshot HTML via `innerHTML` and now calls the
   Runtime Hydrator after the swap.
-- `routeTransition` can enable fade, slide, or wipe transitions with
-  outgoing/incoming Motion Sequence Lite hooks.
+- `routeTransition` can enable fade, slide, wipe, crossfade, or mask
+  transitions with outgoing/incoming Motion Sequence Lite hooks.
+- **June 2026 update:** `crossfade` and `mask` route modes are schema-owned
+  `routeTransition.mode` values exposed through the existing editor dropdown.
+  The renderer emits the mode, the Route Transition runtime runs those modes
+  through the browser View Transition API, and missing API support emits
+  `opencanvas:route-transition-failed` with `phase: view-transition-api`
+  instead of silently degrading to fade.
 - **June 2026 update:** `routeTransition.sharedElements` stores owner-authored
   source/target element mappings and a view-transition name. The renderer emits
   `data-opencanvas-route-shared-elements`, the Runtime Hydrator applies View
@@ -376,8 +382,11 @@ User-visible miss:
 
 - Can now reproduce same-origin shared-element transitions between list/detail
   pages when both pages expose the mapped element ids.
-- Cannot animate between template pages with masks, wipes, crossfades, or
-  continuity of the clicked card/image/title.
+- Can now animate between template pages with fade, slide, wipe, crossfade,
+  mask, and mapped shared-element handoffs.
+- Cannot yet express richer geometry policies such as multi-element FLIP
+  continuity of the clicked card/image/title when the pages do not expose
+  explicit shared-element mappings.
 - Cannot guarantee interactive runtime hydration after page-state swaps.
 
 Needed primitive:

@@ -290,7 +290,7 @@ export type LoadExperienceRunPolicy = (typeof LOAD_EXPERIENCE_RUN_POLICIES)[numb
 export const LOAD_EXPERIENCE_GATES = ['document-ready', 'fonts-ready', 'hero-media-ready'] as const;
 export type LoadExperienceGate = (typeof LOAD_EXPERIENCE_GATES)[number];
 
-export const ROUTE_TRANSITION_MODES = ['fade', 'slide', 'wipe'] as const;
+export const ROUTE_TRANSITION_MODES = ['fade', 'slide', 'wipe', 'crossfade', 'mask'] as const;
 export type RouteTransitionMode = (typeof ROUTE_TRANSITION_MODES)[number];
 
 export const MOTION_SEQUENCE_LITE_EFFECTS = ['fade', 'slide', 'scale', 'wipe', 'blur'] as const;

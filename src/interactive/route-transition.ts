@@ -85,6 +85,27 @@ function hydrateRouteTransition(scope, options) {
       else container.setAttribute(attrs[i], value);
     }
   }
+  function usesViewTransitionMode(mode) {
+    return mode === 'crossfade' || mode === 'mask';
+  }
+  function applyRouteViewMode(mode) {
+    var rootElement = document.documentElement;
+    if (!rootElement || !rootElement.style || typeof rootElement.setAttribute !== 'function') {
+      var rootErr = new Error('route transition root element unavailable');
+      rootErr.phase = 'view-transition-root';
+      throw rootErr;
+    }
+    rootElement.setAttribute('data-opencanvas-route-view-mode', mode);
+    rootElement.style.setProperty('--opencanvas-route-duration', String(duration) + 'ms');
+    rootElement.style.setProperty('--opencanvas-route-easing', easing);
+  }
+  function clearRouteViewMode() {
+    var rootElement = document.documentElement;
+    if (!rootElement || !rootElement.style || typeof rootElement.removeAttribute !== 'function') return;
+    rootElement.removeAttribute('data-opencanvas-route-view-mode');
+    rootElement.style.removeProperty('--opencanvas-route-duration');
+    rootElement.style.removeProperty('--opencanvas-route-easing');
+  }
   function swapContainerTo(next, url, historyMode) {
     container.innerHTML = next.innerHTML;
     copyRouteAttrs(next);
@@ -113,6 +134,8 @@ function hydrateRouteTransition(scope, options) {
       return;
     }
     var routeAttrs = ['data-opencanvas-route-transition','data-opencanvas-route-mode','data-opencanvas-route-duration-ms','data-opencanvas-route-easing','data-opencanvas-route-shared-elements','data-opencanvas-route-outgoing-sequence','data-opencanvas-route-incoming-sequence'];
+    var mode = container.getAttribute('data-opencanvas-route-mode') || 'fade';
+    var viewTransitionMode = usesViewTransitionMode(mode);
     var outgoingSequence = container.getAttribute('data-opencanvas-route-outgoing-sequence');
     var swapped = false;
     var prevHtml = '';
@@ -137,6 +160,7 @@ function hydrateRouteTransition(scope, options) {
     function failTransition(phase, err) {
       restoreSwap();
       container.removeAttribute('data-opencanvas-route-state');
+      clearRouteViewMode();
       busy = false;
       if (!err || err.reported !== true) {
         routeFailure(id, phase, { href: url.href, error: String(err && err.message ? err.message : err) });
@@ -182,6 +206,10 @@ function hydrateRouteTransition(scope, options) {
       window.scrollTo(0, 0);
       swapped = false;
     }
+    if (viewTransitionMode && !document.startViewTransition) {
+      failTransition('view-transition-api', new Error('View Transition API unavailable for route mode ' + mode));
+      return;
+    }
     if (!shared.length) {
       if (outgoingSequence && typeof runMotionSequenceLite === 'function') {
         try {
@@ -191,10 +219,12 @@ function hydrateRouteTransition(scope, options) {
           return;
         }
       }
-      container.style.transition = 'opacity ' + duration + 'ms ' + easing + ', transform ' + duration + 'ms ' + easing + ', clip-path ' + duration + 'ms ' + easing;
-      container.setAttribute('data-opencanvas-route-state', 'outgoing');
+      if (!viewTransitionMode) {
+        container.style.transition = 'opacity ' + duration + 'ms ' + easing + ', transform ' + duration + 'ms ' + easing + ', clip-path ' + duration + 'ms ' + easing;
+        container.setAttribute('data-opencanvas-route-state', 'outgoing');
+      }
     }
-    (shared.length ? Promise.resolve() : wait(duration)).then(function(){
+    ((shared.length || viewTransitionMode) ? Promise.resolve() : wait(duration)).then(function(){
       return fetch(url.href, { credentials: 'same-origin' });
     }).then(function(resp){
       if (!resp.ok) {
@@ -211,16 +241,18 @@ function hydrateRouteTransition(scope, options) {
         parseErr.phase = 'parse';
         throw parseErr;
       }
-      if (shared.length) {
+      if (shared.length || viewTransitionMode) {
         if (!document.startViewTransition) {
-          var apiErr = new Error('View Transition API unavailable for shared route elements');
-          apiErr.phase = 'shared-elements-api';
+          var apiErr = new Error(shared.length ? 'View Transition API unavailable for shared route elements' : 'View Transition API unavailable for route mode ' + mode);
+          apiErr.phase = shared.length ? 'shared-elements-api' : 'view-transition-api';
           throw apiErr;
         }
-        var applied = applySharedElements(shared, next);
+        var applied = shared.length ? applySharedElements(shared, next) : [];
+        if (viewTransitionMode) applyRouteViewMode(mode);
         var transition = document.startViewTransition(function(){ applyNext(next); });
         return transition.finished.then(function(){ busy = false; }).catch(function(err){ throw err; }).finally(function(){
           for (var a = 0; a < applied.length; a++) applied[a].style.viewTransitionName = '';
+          clearRouteViewMode();
         });
       }
       applyNext(next);
