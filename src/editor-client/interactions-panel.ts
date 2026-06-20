@@ -24,6 +24,7 @@ import type {
   OverlayChromePreset,
   OverlayClosePlacement,
   OverlayDismissal,
+  OverlayLayoutPreset,
   OverlayPresentationMode,
   OverlayScope,
   OverlayTriggerType,
@@ -79,6 +80,7 @@ import {
   OVERLAY_BACKDROP_STYLES,
   OVERLAY_CHROME_PRESETS,
   OVERLAY_CLOSE_PLACEMENTS,
+  OVERLAY_LAYOUT_PRESETS,
   OVERLAY_PRESENTATION_MODES,
   OVERLAY_TRIGGER_TYPES,
   ROUTE_TRANSITION_MODES,
@@ -152,6 +154,7 @@ export function defaultOverlay(id: string, name: string, pageId: string): Overla
       chrome: 'standard',
       backdrop: 'dim',
       closePlacement: 'top-right',
+      layout: 'centered',
       choreography: 'none',
       reducedMotion: 'instant',
     },
@@ -4253,6 +4256,7 @@ function renderOverlayCard(
           chrome: overlay.presentation?.chrome ?? 'standard',
           backdrop: overlay.presentation?.backdrop ?? 'dim',
           closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          layout: overlay.presentation?.layout ?? 'centered',
           choreography: overlay.presentation?.choreography ?? 'none',
           reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
         },
@@ -4271,6 +4275,7 @@ function renderOverlayCard(
           chrome: chrome.value as OverlayChromePreset,
           backdrop: overlay.presentation?.backdrop ?? 'dim',
           closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          layout: overlay.presentation?.layout ?? 'centered',
           choreography: overlay.presentation?.choreography ?? 'none',
           reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
         },
@@ -4289,6 +4294,7 @@ function renderOverlayCard(
           chrome: overlay.presentation?.chrome ?? 'standard',
           backdrop: backdrop.value as OverlayBackdropStyle,
           closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          layout: overlay.presentation?.layout ?? 'centered',
           choreography: overlay.presentation?.choreography ?? 'none',
           reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
         },
@@ -4310,6 +4316,7 @@ function renderOverlayCard(
           chrome: overlay.presentation?.chrome ?? 'standard',
           backdrop: overlay.presentation?.backdrop ?? 'dim',
           closePlacement: closePlacement.value as OverlayClosePlacement,
+          layout: overlay.presentation?.layout ?? 'centered',
           choreography: overlay.presentation?.choreography ?? 'none',
           reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
         },
@@ -4317,6 +4324,25 @@ function renderOverlayCard(
     });
   });
   card.appendChild(field('Close placement', closePlacement));
+
+  const layout = selectInput(OVERLAY_LAYOUT_PRESETS, overlay.presentation?.layout ?? 'centered');
+  layout.addEventListener('change', () => {
+    mutate(ctx, () => {
+      ctx.state!.overlays![index] = {
+        ...overlay,
+        presentation: {
+          mode: overlay.presentation?.mode ?? 'modal',
+          chrome: overlay.presentation?.chrome ?? 'standard',
+          backdrop: overlay.presentation?.backdrop ?? 'dim',
+          closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          layout: layout.value as OverlayLayoutPreset,
+          choreography: overlay.presentation?.choreography ?? 'none',
+          reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
+        },
+      };
+    });
+  });
+  card.appendChild(field('Layout preset', layout));
 
   const choreography = selectInput(
     OVERLAY_CHOREOGRAPHY_PRESETS,
@@ -4331,6 +4357,7 @@ function renderOverlayCard(
           chrome: overlay.presentation?.chrome ?? 'standard',
           backdrop: overlay.presentation?.backdrop ?? 'dim',
           closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          layout: overlay.presentation?.layout ?? 'centered',
           choreography: choreography.value as OverlayChoreographyPreset,
           reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
         },
@@ -4352,6 +4379,7 @@ function renderOverlayCard(
           chrome: overlay.presentation?.chrome ?? 'standard',
           backdrop: overlay.presentation?.backdrop ?? 'dim',
           closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          layout: overlay.presentation?.layout ?? 'centered',
           choreography: overlay.presentation?.choreography ?? 'none',
           reducedMotion: reducedMotion.value as OverlayChoreographyReducedMotionMode,
         },

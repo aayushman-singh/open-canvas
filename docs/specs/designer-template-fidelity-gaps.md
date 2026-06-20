@@ -429,19 +429,22 @@ Current state:
   `product-tour` mode. It provides a named tour-card presentation surface with
   validation, render metadata, Runtime Hydrator allow-listing, and public styles;
   multi-step tour state remains a future schema relation rather than custom JS.
+- **June 2026 update:** Overlay presentation now includes bounded layout
+  presets: `centered`, `split-rail`, and `mega-menu-grid`. Renderer/editor
+  preview emit explicit layout metadata and styling hooks, the Runtime Hydrator
+  rejects stale layout values with a named `overlay-layout` failure, and the
+  Interactions panel exposes the owner control.
 
 User-visible miss:
 
 - Can now style modal/fullscreen chrome from a bounded Template-owned catalog
   and publish lightbox, command-palette, or product-tour overlay presentations.
-- Richer entrance/exit variants, multi-step tour state, and menu choreography
-  presets are still missing.
+- Richer entrance/exit variants and multi-step tour state are still missing.
 
 Needed primitive:
 
-- Next wave: reusable chrome styles, close-button placement presets, backdrop
-  variants, lightbox/gallery/product-tour presets, iframe drill-in contracts,
-  and richer open/close sequences.
+- Next wave: multi-step tour state, iframe drill-in contracts, richer nested
+  overlay-canvas editing affordances, and richer open/close sequences.
 
 ### 6. Pointer, Hover, And Cursor Effects Are Too Narrow
 
@@ -921,7 +924,7 @@ adding disconnected one-off runtimes.
 
 Status: addressed for the schema-owned fullscreen menu presentation and choreography slices. Owners can set an Overlay presentation to `fullscreen-menu`, choose bounded choreography presets (`none`, `stagger-rise`, `mask-sweep`, `slide-stack`), set explicit choreography reduced-motion behaviour, keep authoring the content through the existing `Overlay.content` Canvas Section, preview it from the Interactions panel, and publish explicit overlay presentation/content-canvas/choreography metadata consumed by the Runtime Hydrator. Unsupported presentation or choreography modes now fail validation instead of degrading to modal behaviour.
 
-Intentional deferral: richer nested overlay-canvas editing affordances and overlay-specific layout presets remain outside this slice; Motion Sequence Lite can still animate the overlay surface/backdrop for custom sequencing. A later chrome slice added bounded overlay chrome/backdrop/close placement presets without introducing raw CSS blobs.
+Intentional deferral: richer nested overlay-canvas editing affordances remain outside this slice; Motion Sequence Lite can still animate the overlay surface/backdrop for custom sequencing. Later chrome and layout slices added bounded overlay chrome/backdrop/close placement and layout presets without introducing raw CSS blobs.
 
 ### 18. Collection Gallery v2 Hover Reveal Detail
 

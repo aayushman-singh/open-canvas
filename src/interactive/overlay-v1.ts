@@ -36,6 +36,11 @@ function hydrateOverlays(scope, options) {
         overlayFailure(id, 'overlay-close-placement', { closePlacement: closePlacement });
         return;
       }
+      var layout = overlay.getAttribute('data-opencanvas-overlay-layout') || 'centered';
+      if (layout !== 'centered' && layout !== 'split-rail' && layout !== 'mega-menu-grid') {
+        overlayFailure(id, 'overlay-layout', { layout: layout });
+        return;
+      }
       var choreography = overlay.getAttribute('data-opencanvas-overlay-choreography') || 'none';
       if (choreography !== 'none' && choreography !== 'stagger-rise' && choreography !== 'mask-sweep' && choreography !== 'slide-stack') {
         overlayFailure(id, 'overlay-choreography', { choreography: choreography });

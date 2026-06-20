@@ -1619,6 +1619,36 @@ html[data-opencanvas-route-view-mode="mask"]::view-transition-new(opencanvas-sit
     var(--opencanvas-kit-panel, #ffffff);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32), 0 0 0 1px color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 28%, transparent);
 }
+.opencanvas-overlay[data-opencanvas-overlay-layout="split-rail"][data-opencanvas-overlay-open] {
+  place-items: stretch;
+}
+.opencanvas-overlay[data-opencanvas-overlay-layout="split-rail"] .opencanvas-overlay-surface {
+  width: min(100vw, 1320px);
+  min-height: min(100vh, 860px);
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  overflow: auto;
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 28%, transparent) 0 32%, transparent 32%),
+    radial-gradient(circle at 18% 24%, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 22%, transparent), transparent 34%),
+    var(--opencanvas-kit-bg, #0c0c0d);
+}
+.opencanvas-overlay[data-opencanvas-overlay-layout="mega-menu-grid"][data-opencanvas-overlay-open] {
+  place-items: stretch;
+  padding: clamp(16px, 3vw, 48px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-layout="mega-menu-grid"] .opencanvas-overlay-surface {
+  width: min(100%, 1440px);
+  min-height: min(92vh, 920px);
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  overflow: auto;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 16%, transparent), transparent 42%),
+    linear-gradient(180deg, color-mix(in oklab, var(--opencanvas-kit-bg, #0c0c0d) 92%, transparent), var(--opencanvas-kit-bg, #0c0c0d));
+}
 .opencanvas-overlay--fullscreen-menu .opencanvas-overlay-close {
   top: 24px;
   right: 24px;

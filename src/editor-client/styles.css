@@ -4572,6 +4572,36 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   border-radius: 0;
   box-shadow: inset 0 0 0 10px color-mix(in oklab, var(--opencanvas-bg-panel) 84%, transparent);
 }
+.opencanvas-overlay[data-opencanvas-overlay-layout="split-rail"][data-opencanvas-overlay-open] {
+  place-items: stretch;
+}
+.opencanvas-overlay[data-opencanvas-overlay-layout="split-rail"] .opencanvas-overlay-surface {
+  width: min(100vw, 1320px);
+  min-height: min(100vh, 860px);
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  overflow: auto;
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--opencanvas-accent) 28%, transparent) 0 32%, transparent 32%),
+    radial-gradient(circle at 18% 24%, color-mix(in oklab, var(--opencanvas-accent) 22%, transparent), transparent 34%),
+    var(--opencanvas-bg-panel);
+}
+.opencanvas-overlay[data-opencanvas-overlay-layout="mega-menu-grid"][data-opencanvas-overlay-open] {
+  place-items: stretch;
+  padding: clamp(16px, 3vw, 48px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-layout="mega-menu-grid"] .opencanvas-overlay-surface {
+  width: min(100%, 1440px);
+  min-height: min(92vh, 920px);
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  overflow: auto;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--opencanvas-accent) 16%, transparent), transparent 42%),
+    linear-gradient(180deg, color-mix(in oklab, var(--opencanvas-bg-panel) 92%, transparent), var(--opencanvas-bg-panel));
+}
 .opencanvas-overlay-close {
   position: absolute;
   top: 12px;

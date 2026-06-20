@@ -348,6 +348,7 @@ function ensureEditorOverlayPreviewShell(ctx: EditorContext, overlay: Overlay): 
   const chrome = overlay.presentation?.chrome ?? 'standard';
   const backdropStyle = overlay.presentation?.backdrop ?? 'dim';
   const closePlacement = overlay.presentation?.closePlacement ?? 'top-right';
+  const layout = overlay.presentation?.layout ?? 'centered';
   const choreography = overlay.presentation?.choreography ?? 'none';
   const reducedMotion = overlay.presentation?.reducedMotion ?? 'instant';
   const shell = document.createElement('div');
@@ -355,10 +356,14 @@ function ensureEditorOverlayPreviewShell(ctx: EditorContext, overlay: Overlay): 
     presentation === 'fullscreen-menu'
       ? 'opencanvas-overlay opencanvas-overlay--fullscreen-menu opencanvas-overlay--chrome-' +
         chrome +
+        ' opencanvas-overlay--layout-' +
+        layout +
         ' opencanvas-overlay--choreography-' +
         choreography
       : 'opencanvas-overlay opencanvas-overlay--chrome-' +
         chrome +
+        ' opencanvas-overlay--layout-' +
+        layout +
         ' opencanvas-overlay--choreography-' +
         choreography;
   shell.setAttribute('data-opencanvas-overlay', overlay.id);
@@ -366,6 +371,7 @@ function ensureEditorOverlayPreviewShell(ctx: EditorContext, overlay: Overlay): 
   shell.setAttribute('data-opencanvas-overlay-chrome', chrome);
   shell.setAttribute('data-opencanvas-overlay-backdrop-style', backdropStyle);
   shell.setAttribute('data-opencanvas-overlay-close-placement', closePlacement);
+  shell.setAttribute('data-opencanvas-overlay-layout', layout);
   shell.setAttribute('data-opencanvas-overlay-choreography', choreography);
   shell.setAttribute('data-opencanvas-overlay-reduced-motion', reducedMotion);
   shell.setAttribute('data-opencanvas-overlay-trigger-type', overlay.trigger.type);

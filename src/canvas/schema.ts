@@ -273,6 +273,8 @@ export const OVERLAY_BACKDROP_STYLES = ['dim', 'blur', 'solid'] as const;
 export type OverlayBackdropStyle = (typeof OVERLAY_BACKDROP_STYLES)[number];
 export const OVERLAY_CLOSE_PLACEMENTS = ['top-right', 'top-left', 'inside'] as const;
 export type OverlayClosePlacement = (typeof OVERLAY_CLOSE_PLACEMENTS)[number];
+export const OVERLAY_LAYOUT_PRESETS = ['centered', 'split-rail', 'mega-menu-grid'] as const;
+export type OverlayLayoutPreset = (typeof OVERLAY_LAYOUT_PRESETS)[number];
 export const OVERLAY_CHOREOGRAPHY_PRESETS = ['none', 'stagger-rise', 'mask-sweep', 'slide-stack'] as const;
 export type OverlayChoreographyPreset = (typeof OVERLAY_CHOREOGRAPHY_PRESETS)[number];
 export const OVERLAY_CHOREOGRAPHY_REDUCED_MOTION_MODES = ['instant', 'fade'] as const;
@@ -284,6 +286,7 @@ export interface OverlayPresentation {
   chrome?: OverlayChromePreset;
   backdrop?: OverlayBackdropStyle;
   closePlacement?: OverlayClosePlacement;
+  layout?: OverlayLayoutPreset;
   choreography?: OverlayChoreographyPreset;
   reducedMotion?: OverlayChoreographyReducedMotionMode;
 }

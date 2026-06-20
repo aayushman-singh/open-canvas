@@ -9,6 +9,7 @@ import { OVERLAY_RUNTIME_SRC } from '../interactive/overlay-v1.js';
 import {
   OVERLAY_CHOREOGRAPHY_PRESETS,
   OVERLAY_CHOREOGRAPHY_REDUCED_MOTION_MODES,
+  OVERLAY_LAYOUT_PRESETS,
   type EditableSite,
   type Overlay,
   type PublishedSnapshot,
@@ -26,6 +27,7 @@ const fullscreenOverlay = {
     chrome: 'glass-panel',
     backdrop: 'blur',
     closePlacement: 'top-left',
+    layout: 'split-rail',
     choreography: 'stagger-rise',
     reducedMotion: 'instant',
   },
@@ -113,6 +115,14 @@ assert.ok(
   (OVERLAY_CHOREOGRAPHY_REDUCED_MOTION_MODES as readonly string[]).includes('instant'),
   'schema must expose explicit overlay choreography reduced-motion modes',
 );
+assert.ok(
+  (OVERLAY_LAYOUT_PRESETS as readonly string[]).includes('split-rail'),
+  'schema must expose split-rail overlay layout preset',
+);
+assert.ok(
+  (OVERLAY_LAYOUT_PRESETS as readonly string[]).includes('mega-menu-grid'),
+  'schema must expose mega-menu-grid overlay layout preset',
+);
 
 const lightboxSnapshot = structuredClone(snapshot) as PublishedSnapshot;
 (lightboxSnapshot.overlays![0] as unknown as { presentation: { mode: string; chrome: string } }).presentation.mode =
@@ -197,6 +207,16 @@ assert.ok(
   `validation error must name overlay reduced-motion path, got ${invalidReducedMotionResult.valid ? 'ok' : invalidReducedMotionResult.errors.join(' | ')}`,
 );
 
+const invalidLayout = structuredClone(snapshot) as PublishedSnapshot;
+(invalidLayout.overlays![0] as unknown as { presentation: { layout: string } }).presentation.layout =
+  'owner-css-grid';
+const invalidLayoutResult = validatePublishedSnapshot(invalidLayout);
+assert.equal(invalidLayoutResult.valid, false, 'unsupported overlay layout preset must fail validation');
+assert.ok(
+  invalidLayoutResult.errors.some((error) => error.includes('overlays[0].presentation.layout')),
+  `validation error must name overlay layout path, got ${invalidLayoutResult.valid ? 'ok' : invalidLayoutResult.errors.join(' | ')}`,
+);
+
 const html = renderCanvasSnapshot(snapshot, '/assets', 'overlay-v2-site', { turnstileSiteKey: 'test-key' });
 assert.ok(
   html.includes('data-opencanvas-overlay-presentation="fullscreen-menu"'),
@@ -215,6 +235,10 @@ assert.ok(
   'renderer must emit overlay close placement metadata',
 );
 assert.ok(
+  html.includes('data-opencanvas-overlay-layout="split-rail"'),
+  'renderer must emit overlay layout metadata',
+);
+assert.ok(
   html.includes('data-opencanvas-overlay-choreography="stagger-rise"'),
   'renderer must emit overlay choreography metadata',
 );
@@ -229,6 +253,7 @@ assert.ok(
 assert.ok(html.includes('data-opencanvas-overlay-surface'), 'renderer must keep overlay surface hydration target');
 assert.ok(html.includes('opencanvas-overlay--fullscreen-menu'), 'renderer must expose fullscreen menu styling hook');
 assert.ok(html.includes('opencanvas-overlay--chrome-glass-panel'), 'renderer must expose overlay chrome styling hook');
+assert.ok(html.includes('opencanvas-overlay--layout-split-rail'), 'renderer must expose overlay layout styling hook');
 assert.ok(
   html.includes('opencanvas-overlay--choreography-stagger-rise'),
   'renderer must expose overlay choreography styling hook',
@@ -287,6 +312,11 @@ assert.equal(
   'Yjs projection must preserve overlay choreography preset',
 );
 assert.equal(
+  roundTrip.overlays?.[0]?.presentation?.layout,
+  'split-rail',
+  'Yjs projection must preserve overlay layout preset',
+);
+assert.equal(
   roundTrip.overlays?.[0]?.presentation?.reducedMotion,
   'instant',
   'Yjs projection must preserve overlay choreography reduced-motion policy',
@@ -305,6 +335,10 @@ assert.ok(
   'overlay runtime must read choreography metadata',
 );
 assert.ok(
+  OVERLAY_RUNTIME_SRC.includes('data-opencanvas-overlay-layout'),
+  'overlay runtime must read layout metadata',
+);
+assert.ok(
   OVERLAY_RUNTIME_SRC.includes('data-opencanvas-overlay-reduced-motion'),
   'overlay runtime must read choreography reduced-motion metadata',
 );
@@ -315,6 +349,10 @@ assert.ok(
 assert.ok(
   OVERLAY_RUNTIME_SRC.includes('overlay-choreography'),
   'overlay runtime must emit named choreography failure events',
+);
+assert.ok(
+  OVERLAY_RUNTIME_SRC.includes('overlay-layout'),
+  'overlay runtime must emit named layout failure events',
 );
 assert.ok(
   OVERLAY_RUNTIME_SRC.includes('data-opencanvas-overlay-choreography-active'),
@@ -332,10 +370,19 @@ assert.ok(
   OVERLAY_RUNTIME_SRC.includes("presentation !== 'product-tour'"),
   'overlay runtime must explicitly allow product-tour presentation',
 );
+assert.ok(
+  OVERLAY_RUNTIME_SRC.includes("layout !== 'split-rail'"),
+  'overlay runtime must explicitly allow split-rail layout',
+);
+assert.ok(
+  OVERLAY_RUNTIME_SRC.includes("layout !== 'mega-menu-grid'"),
+  'overlay runtime must explicitly allow mega-menu-grid layout',
+);
 
 const interactionsPanel = readFileSync(join(thisDir, '../editor-client/interactions-panel.ts'), 'utf8');
 assert.ok(interactionsPanel.includes('OVERLAY_PRESENTATION_MODES'), 'editor panel must expose overlay presentation modes');
 assert.ok(interactionsPanel.includes('OVERLAY_CHROME_PRESETS'), 'editor panel must expose overlay chrome presets');
+assert.ok(interactionsPanel.includes('OVERLAY_LAYOUT_PRESETS'), 'editor panel must expose overlay layout presets');
 assert.ok(
   interactionsPanel.includes('OVERLAY_CHOREOGRAPHY_PRESETS'),
   'editor panel must expose overlay choreography presets',
@@ -347,6 +394,7 @@ assert.ok(
 assert.ok(interactionsPanel.includes('Presentation'), 'editor panel must label overlay presentation controls');
 assert.ok(interactionsPanel.includes('Backdrop style'), 'editor panel must label overlay backdrop controls');
 assert.ok(interactionsPanel.includes('Close placement'), 'editor panel must label overlay close placement controls');
+assert.ok(interactionsPanel.includes('Layout preset'), 'editor panel must label overlay layout controls');
 assert.ok(interactionsPanel.includes('Choreography'), 'editor panel must label overlay choreography controls');
 assert.ok(
   interactionsPanel.includes('Choreography reduced motion'),
@@ -362,6 +410,10 @@ assert.ok(
 assert.ok(
   editorIndex.includes('data-opencanvas-overlay-choreography'),
   'editor preview shell must emit overlay choreography metadata',
+);
+assert.ok(
+  editorIndex.includes('data-opencanvas-overlay-layout'),
+  'editor preview shell must emit overlay layout metadata',
 );
 
 const publicStyles = readFileSync(join(thisDir, 'public-styles.ts'), 'utf8');
@@ -384,6 +436,14 @@ assert.ok(
 assert.ok(
   publicStyles.includes('data-opencanvas-overlay-chrome="glass-panel"'),
   'public styles must include overlay chrome preset rules',
+);
+assert.ok(
+  publicStyles.includes('data-opencanvas-overlay-layout="split-rail"'),
+  'public styles must include split-rail overlay layout rules',
+);
+assert.ok(
+  publicStyles.includes('data-opencanvas-overlay-layout="mega-menu-grid"'),
+  'public styles must include mega-menu-grid overlay layout rules',
 );
 assert.ok(
   publicStyles.includes('data-opencanvas-overlay-choreography="stagger-rise"'),
@@ -409,8 +469,16 @@ assert.ok(
   'editor generated styles must mirror overlay choreography rules',
 );
 assert.ok(
+  editorStylesBuild.includes('data-opencanvas-overlay-layout="split-rail"'),
+  'editor generated styles must mirror overlay layout rules',
+);
+assert.ok(
   editorStylesCss.includes('data-opencanvas-overlay-choreography="stagger-rise"'),
   'editor CSS must mirror overlay choreography rules',
+);
+assert.ok(
+  editorStylesCss.includes('data-opencanvas-overlay-layout="split-rail"'),
+  'editor CSS must mirror overlay layout rules',
 );
 
 console.log('[overlay-v2:smoke] OK');

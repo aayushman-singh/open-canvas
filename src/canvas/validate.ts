@@ -114,6 +114,7 @@ import {
   OVERLAY_CHOREOGRAPHY_REDUCED_MOTION_MODES,
   OVERLAY_CHROME_PRESETS,
   OVERLAY_CLOSE_PLACEMENTS,
+  OVERLAY_LAYOUT_PRESETS,
   MEDIA_KINDS,
   MOTION_SEQUENCE_LITE_EFFECTS,
   MOTION_SEQUENCE_LITE_TARGET_TYPES,
@@ -2815,6 +2816,14 @@ function validateOverlays(site: Record<string, unknown>, errors: string[]): void
             presentationRecord.closePlacement,
             OVERLAY_CLOSE_PLACEMENTS,
             `${basePath}.presentation.closePlacement`,
+            errors,
+          );
+        }
+        if (presentationRecord.layout !== undefined) {
+          assertOneOf(
+            presentationRecord.layout,
+            OVERLAY_LAYOUT_PRESETS,
+            `${basePath}.presentation.layout`,
             errors,
           );
         }
