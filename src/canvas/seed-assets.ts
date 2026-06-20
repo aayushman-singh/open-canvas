@@ -130,6 +130,17 @@ const RAYDOTSH_PYCASTER = {
   sourcePath: 'raydotsh-pycaster.png.b64',
 };
 
+const RAYDOTSH_FAVICON = {
+  contentHash: 'f9dac453bbd3c381ec5f44a448cee0058b4c707a2b62b335ef93257bd27fe20b',
+  r2Key: 'assets/f9dac453bbd3c381ec5f44a448cee005.png',
+  mediaType: 'image/png',
+  kind: 'image' as const,
+  width: 785,
+  height: 727,
+  byteSize: 3508,
+  sourcePath: 'raydotsh-favicon.png.b64',
+};
+
 const RAYDOTSH_BOOK_A_LITTLE_LIFE = {
   contentHash: 'e79d2d3ebb4dd6868f02a77ca306591055d1a248c0d4c266472470c02509b9f8',
   r2Key: 'assets/e79d2d3ebb4dd6868f02a77ca3065910.png',
@@ -443,6 +454,10 @@ export const SEED_ASSET_REGISTRY: Record<string, SeedAsset> = {
   'seed-raydotsh-pycaster': {
     ...RAYDOTSH_PYCASTER,
     alt: 'Pycaster project screenshot from the Raydotsh portfolio source site',
+  },
+  'seed-raydotsh-favicon': {
+    ...RAYDOTSH_FAVICON,
+    alt: 'Raydotsh source favicon',
   },
   'seed-raydotsh-book-a-little-life': {
     ...RAYDOTSH_BOOK_A_LITTLE_LIFE,

@@ -28,6 +28,8 @@ import type {
   CanvasSection,
   EditableSite,
   EditableSiteStyleKit,
+  RouteTransition,
+  SiteScrollBehavior,
   StyleKit,
   StyleKitPreset,
 } from '../canvas/schema.js';
@@ -57,9 +59,12 @@ export interface TemplateSeed {
   headerRef?: SectionInstanceRef;
   footerRef?: SectionInstanceRef;
   loadExperience?: LoadExperience;
+  routeTransition?: RouteTransition;
   motionSequences?: MotionSequence[];
   scrollScenes?: ScrollScene[];
   richMotionAssets?: RichMotionAsset[];
+  faviconAssetId?: string;
+  scrollBehavior?: SiteScrollBehavior;
   pages: TemplatePage[];
 }
 
@@ -962,6 +967,15 @@ export const raydotshPortfolioTemplate: TemplateSeed = {
   customStyleKit: RAYDOTSH_KIT,
   headerRef: { sectionId: 'raydotsh-template-header-v1', instanceId: 'raydotshheader' },
   footerRef: { sectionId: 'raydotsh-template-footer-v1', instanceId: 'raydotshfooter' },
+  faviconAssetId: 'seed-raydotsh-favicon',
+  scrollBehavior: { smooth: true, paddingTop: 80 },
+  routeTransition: {
+    id: 'raydotsh-route-transition',
+    enabled: true,
+    mode: 'fade',
+    durationMs: 220,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+  },
   pages: [
     {
       id: 'page-raydotsh-home',
@@ -1086,12 +1100,17 @@ export function instantiateTemplate(templateId: string): EditableSite {
   if (seed.headerRef) state.header = resolveRef(seed.headerRef);
   if (seed.footerRef) state.footer = resolveRef(seed.footerRef);
   const loadExperience = cloneTemplateField(seed.loadExperience);
+  const routeTransition = cloneTemplateField(seed.routeTransition);
   const motionSequences = cloneTemplateField(seed.motionSequences);
   const scrollScenes = cloneTemplateField(seed.scrollScenes);
   const richMotionAssets = cloneTemplateField(seed.richMotionAssets);
+  const scrollBehavior = cloneTemplateField(seed.scrollBehavior);
   if (loadExperience !== undefined) state.loadExperience = loadExperience;
+  if (routeTransition !== undefined) state.routeTransition = routeTransition;
   if (motionSequences !== undefined) state.motionSequences = motionSequences;
   if (scrollScenes !== undefined) state.scrollScenes = scrollScenes;
   if (richMotionAssets !== undefined) state.richMotionAssets = richMotionAssets;
+  if (seed.faviconAssetId !== undefined) state.faviconAssetId = seed.faviconAssetId;
+  if (scrollBehavior !== undefined) state.scrollBehavior = scrollBehavior;
   return state;
 }

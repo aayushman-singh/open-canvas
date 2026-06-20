@@ -97,6 +97,16 @@ assert(
 );
 
 const state = instantiateTemplate('raydotsh-portfolio');
+assert(state.scrollBehavior?.paddingTop === 80, 'Raydotsh anchors should land below fixed nav');
+assert(
+  state.routeTransition?.enabled === true,
+  'Raydotsh books route should use route transition metadata',
+);
+assert(
+  state.faviconAssetId === 'seed-raydotsh-favicon',
+  'Raydotsh should bind the source favicon seed asset',
+);
+
 const editValidation = validateEditableSite(state);
 assert(editValidation.valid, editValidation.valid ? '' : editValidation.errors.join('\n'));
 
@@ -118,9 +128,10 @@ const html = injectInteractiveRuntime(
   snapshot,
 );
 
-const sourceAssetIds = [
+const registeredSourceAssetIds = [
   'seed-raydotsh-yoru',
   'seed-raydotsh-pycaster',
+  'seed-raydotsh-favicon',
   'seed-raydotsh-book-a-little-life',
   'seed-raydotsh-book-pride-and-prejudice',
   'seed-raydotsh-book-dracula',
@@ -132,8 +143,14 @@ const sourceAssetIds = [
   'seed-raydotsh-book-man-called-ove',
   'seed-raydotsh-book-red-trainers',
 ];
-for (const assetId of sourceAssetIds) {
+for (const assetId of registeredSourceAssetIds) {
   assert(getSeedAsset(assetId) !== null, `${assetId} should be registered as a seed asset`);
+}
+
+const renderedSourceAssetIds = registeredSourceAssetIds.filter(
+  (assetId) => assetId !== 'seed-raydotsh-favicon',
+);
+for (const assetId of renderedSourceAssetIds) {
   assert(html.includes(`/assets/${assetId}`), `rendered template should reference ${assetId}`);
 }
 
