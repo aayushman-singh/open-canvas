@@ -15,9 +15,14 @@
 // degraded mode — it is the correct output for a snapshot that does not need
 // responsive scaling.
 
-import type { CanvasElement, PublishedSnapshot } from '../schema.js';
+import type { CanvasElement, CanvasSection, PublishedSnapshot } from '../schema.js';
 
-import { buildResponsiveCssBody, wrapInStyleBlock } from './css.js';
+import { PHONE_MAX_PX, TABLET_MAX_PX } from './breakpoints.js';
+import {
+  buildResponsiveCssBody,
+  buildResponsiveVariantCssBody,
+  wrapInStyleBlock,
+} from './css.js';
 import { resolveSnapshotLayout } from './translate.js';
 
 export { resolveElementBox, scaleFactor } from './translate.js';
@@ -58,8 +63,10 @@ export function renderResponsiveCss(snapshot: PublishedSnapshot): string {
   if (cached !== undefined) return cached;
   const layouts = resolveSnapshotLayout(snapshot);
   const hasOverride = snapshotHasResponsiveOverride(snapshot);
-  const body = buildResponsiveCssBody(layouts, hasOverride);
-  const result = wrapInStyleBlock(body);
+  const hasVariants = snapshotHasResponsiveLayoutVariants(snapshot);
+  const variantCss = hasVariants ? buildResponsiveVariantCssBody() : '';
+  const body = buildResponsiveCssBody(layouts, hasOverride, variantCss);
+  const result = wrapInStyleBlock(body) + (hasVariants ? renderResponsiveVariantRuntimeScript() : '');
   responsiveCssCache.set(snapshot, result);
   return result;
 }
@@ -86,8 +93,38 @@ function sectionHasResponsiveOverride(section: { elements: CanvasElement[] }): b
   return false;
 }
 
+function snapshotHasResponsiveLayoutVariants(snapshot: PublishedSnapshot): boolean {
+  if (snapshot.header !== undefined && sectionHasResponsiveLayoutVariants(snapshot.header)) return true;
+  if (snapshot.footer !== undefined && sectionHasResponsiveLayoutVariants(snapshot.footer)) return true;
+  for (const page of snapshot.pages) {
+    for (const section of page.sections) {
+      if (sectionHasResponsiveLayoutVariants(section)) return true;
+    }
+  }
+  return false;
+}
+
+function sectionHasResponsiveLayoutVariants(section: CanvasSection): boolean {
+  return Array.isArray(section.responsiveVariants) && section.responsiveVariants.length > 0;
+}
+
 function elementHasResponsiveOverride(element: CanvasElement): boolean {
   const r = element.responsive;
   if (r === undefined) return false;
   return r.tablet !== undefined || r.phone !== undefined;
+}
+
+function renderResponsiveVariantRuntimeScript(): string {
+  const script =
+    "(function(){var selector='[data-opencanvas-responsive-active]';" +
+    "if(typeof window.matchMedia!=='function'){console.error('[opencanvas-responsive-variants] matchMedia unavailable');throw new Error('responsive variant runtime requires matchMedia');}" +
+    `var tablet=window.matchMedia('(max-width: ${String(TABLET_MAX_PX)}px)');` +
+    `var phone=window.matchMedia('(max-width: ${String(PHONE_MAX_PX)}px)');` +
+    "function current(){return phone.matches?'phone':tablet.matches?'tablet':'desktop'}" +
+    "function setActive(node,active){if(active){node.hidden=false;node.removeAttribute('hidden');node.removeAttribute('aria-hidden');node.inert=false;node.removeAttribute('inert')}else{node.hidden=true;node.setAttribute('hidden','');node.setAttribute('aria-hidden','true');node.inert=true;node.setAttribute('inert','')}}" +
+    "function apply(){var bp=current();var nodes=document.querySelectorAll(selector);for(var i=0;i<nodes.length;i++){var node=nodes[i];var active=(' '+(node.getAttribute('data-opencanvas-responsive-active')||'')+' ').indexOf(' '+bp+' ')>=0;setActive(node,active)}};" +
+    "tablet.addEventListener('change',apply);phone.addEventListener('change',apply);" +
+    "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',apply,{once:true})}else{apply()}" +
+    "})();";
+  return `<script data-opencanvas-responsive-variant-runtime>${script}</script>`;
 }

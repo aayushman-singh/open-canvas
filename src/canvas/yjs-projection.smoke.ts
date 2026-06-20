@@ -377,6 +377,20 @@ const syntheticSection: CanvasSection = {
   // section-accent-border.smoke.ts.
   accentBorder: { type: 'glow', color: '#ff8800', radius: 48, spread: 8 },
   entrance: 'fade-up',
+  responsiveVariants: [
+    {
+      id: 'synthetic-projects-desktop',
+      breakpoint: 'desktop',
+      contentSourceId: 'synthetic-projects',
+      elementIds: ['el-text', 'el-media'],
+    },
+    {
+      id: 'synthetic-projects-phone',
+      breakpoint: 'phone',
+      contentSourceId: 'synthetic-projects',
+      elementIds: ['el-action'],
+    },
+  ],
   elements: syntheticElements,
 };
 

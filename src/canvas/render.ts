@@ -40,6 +40,10 @@ import {
   styleFromEntries,
 } from './elements/render-utils.js';
 import { renderResponsiveCss } from './responsive/index.js';
+import {
+  responsiveVariantMemberships,
+  type ResponsiveVariantMembership,
+} from './responsive/variants.js';
 import { resolveActionHref } from './action-href.js';
 import { getStyleKitPreset, resolveStyleKitWithCustom } from './style-kits.js';
 
@@ -306,7 +310,27 @@ function applyContainerTint(
   };
 }
 
-function buildElementCommonAttrs(element: CanvasElement, tintAttr: string, ctx: ElementRenderCtx): string {
+function responsiveVariantAttrs(membership: ResponsiveVariantMembership | undefined): string {
+  if (membership === undefined) return '';
+  const active = membership.activeBreakpoints.join(' ');
+  const inertAttrs = membership.activeBreakpoints.includes('desktop')
+    ? ''
+    : ' hidden aria-hidden="true" inert';
+  return (
+    ` data-opencanvas-responsive-variant="${escapeAttr(membership.variantId)}"` +
+    ` data-opencanvas-responsive-source="${escapeAttr(membership.contentSourceId)}"` +
+    ` data-opencanvas-responsive-breakpoint="${escapeAttr(membership.breakpoint)}"` +
+    ` data-opencanvas-responsive-active="${escapeAttr(active)}"` +
+    inertAttrs
+  );
+}
+
+function buildElementCommonAttrs(
+  element: CanvasElement,
+  tintAttr: string,
+  ctx: ElementRenderCtx,
+  responsiveMembership?: ResponsiveVariantMembership,
+): string {
   const motionAttrs =
     !ctx.motionPresetsCompiled && element.motion !== undefined
       ? ` data-motion-preset="${escapeAttr(element.motion.preset)}" data-motion-delay-ms="${escapeAttr(String(element.motion.delayMs ?? 0))}"`
@@ -322,21 +346,26 @@ function buildElementCommonAttrs(element: CanvasElement, tintAttr: string, ctx: 
   const ariaAttrs = buildAriaWrapperAttrs(element);
   const variant = variantAttr(element);
   const esAttrs = buildElementStyleDataAttrs(element.elementStyle);
+  const responsiveAttrs = responsiveVariantAttrs(responsiveMembership);
   // ADR 0050 dec 2 — anchor ids emit as DOM id="..." on the wrapper.
   // Validator enforces the strict charset, so escapeAttr is belt-and-braces.
   const idAttr =
     typeof element.anchorId === 'string' && element.anchorId.length > 0
       ? ` id="${escapeAttr(element.anchorId)}"`
       : '';
-  return `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${marqueeAttrs}${pointerFxAttrs}${ariaAttrs}${esAttrs}`;
+  return `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${marqueeAttrs}${pointerFxAttrs}${ariaAttrs}${esAttrs}${responsiveAttrs}`;
 }
 
-function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
+function renderElement(
+  element: CanvasElement,
+  ctx: ElementRenderCtx,
+  responsiveMembership?: ResponsiveVariantMembership,
+): string {
   const inner = renderElementBody(element, ctx);
   let wrapperStyle = buildElementWrapperStyle(element, ctx.assetBasePath);
   const tinted = applyContainerTint(element, ctx, wrapperStyle);
   wrapperStyle = tinted.wrapperStyle;
-  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr, ctx);
+  const commonAttrs = buildElementCommonAttrs(element, tinted.tintAttr, ctx, responsiveMembership);
 
   // ADR 0051 dec 5 — container with linkHref emits the outer wrapper as
   // <a href="…"> instead of <div>. Every other attribute, the inner body
@@ -477,8 +506,15 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   // contract: whatever order elements appear in the array is the order DOM
   // emits them, which is what assistive tech reads. Owner-side reorder tools
   // (T5.7) are the Owner's lever for changing it independent of visual z/x/y.
+  const responsiveMemberships = responsiveVariantMemberships(section);
   const elementsHtml = section.elements
-    .map((element) => renderElement(resolveCollectionMarqueeText(element, section.elements), ctx))
+    .map((element) =>
+      renderElement(
+        resolveCollectionMarqueeText(element, section.elements),
+        ctx,
+        responsiveMemberships.get(element.id),
+      ),
+    )
     .join('');
   const roleAttr =
     section.role && section.role !== 'body'

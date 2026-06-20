@@ -10,7 +10,8 @@
 import fixture from '../fixtures/home.json' with { type: 'json' };
 import { renderCanvasSnapshot } from '../render.js';
 import { pickStyleKitField } from '../schema.js';
-import type { EditableSite, PublishedSnapshot } from '../schema.js';
+import type { CanvasSection, EditableSite, PublishedSnapshot } from '../schema.js';
+import { validateEditableSite } from '../validate.js';
 
 import { renderResponsiveCss } from './index.js';
 import { PHONE_DESIGN_WIDTH, scaleFactor } from './translate.js';
@@ -126,10 +127,10 @@ assert(
   `sanity check: hero-heading phone width should be ≈156px (got ${String(matchedWidth)})`,
 );
 
-// --- Assertion 5: no <script> substring anywhere in the wrapped output -----
+// --- Assertion 5: no responsive runtime without layout variants -------------
 assert(
-  !html.toLowerCase().includes('<script'),
-  'expected zero <script> substring in rendered HTML (responsive layer is pure CSS)',
+  !renderResponsiveCss(snapshot).toLowerCase().includes('<script'),
+  'expected responsive box overrides to stay pure CSS when no layout variants are present',
 );
 
 // --- Assertion 6: empty-snapshot path returns '' ---------------------------
@@ -305,5 +306,164 @@ assert(
   footerOnlyResult.includes('[data-opencanvas-element="footer-credit"] { display: none !important; }'),
   'expected footer-credit display:none rule to appear in the emitted CSS when override lives in snapshot.footer',
 );
+
+// --- Assertion 10: section responsive variants select alternate child trees ---
+function makeVariantSection(): CanvasSection {
+  return {
+    id: 'raydotsh-projects-section',
+    recipeId: 'feature-grid',
+    name: 'Projects',
+    height: 720,
+    responsiveVariants: [
+      {
+        id: 'raydotsh-projects-desktop',
+        breakpoint: 'desktop',
+        contentSourceId: 'raydotsh-projects',
+        elementIds: ['raydotsh-spotlight-card', 'raydotsh-project-grid'],
+      },
+      {
+        id: 'raydotsh-projects-phone',
+        breakpoint: 'phone',
+        contentSourceId: 'raydotsh-projects',
+        elementIds: ['raydotsh-mobile-project-list'],
+      },
+    ],
+    elements: [
+      {
+        id: 'raydotsh-spotlight-card',
+        type: 'shape',
+        box: { x: 80, y: 80, w: 520, h: 260, z: 1 },
+        variant: 'rect',
+      },
+      {
+        id: 'raydotsh-project-grid',
+        type: 'shape',
+        box: { x: 640, y: 80, w: 620, h: 420, z: 1 },
+        variant: 'rect',
+      },
+      {
+        id: 'raydotsh-mobile-project-list',
+        type: 'shape',
+        box: { x: 24, y: 80, w: 327, h: 520, z: 1 },
+        variant: 'rect',
+      },
+    ],
+  } as unknown as CanvasSection;
+}
+
+function makeVariantEditable(section: CanvasSection = makeVariantSection()): EditableSite {
+  return {
+    styleKit: 'charcoal',
+    pages: [
+      {
+        id: 'raydotsh-responsive-page',
+        slug: 'responsive-variants',
+        title: 'Responsive Variants',
+        width: 1440,
+        sections: [section],
+      },
+    ],
+  };
+}
+
+const variantEditable = makeVariantEditable();
+const variantValidation = validateEditableSite(variantEditable);
+const variantErrors = variantValidation.valid ? [] : variantValidation.errors;
+assert(
+  variantValidation.valid,
+  `expected responsive variant fixture to validate: ${variantErrors.join('; ')}`,
+);
+const variantSnapshot: PublishedSnapshot = {
+  version: 1,
+  publishedAt: '2026-06-20T00:00:00.000Z',
+  styleKit: 'charcoal',
+  pages: variantEditable.pages,
+};
+const variantHtml = renderCanvasSnapshot(variantSnapshot, '/assets', 'variant-site', {
+  turnstileSiteKey: 'turnstile-test-key',
+});
+assert(
+  variantHtml.includes('data-opencanvas-responsive-variant="raydotsh-projects-desktop"'),
+  'expected desktop variant elements to carry variant metadata',
+);
+assert(
+  variantHtml.includes('data-opencanvas-responsive-active="desktop tablet"'),
+  'expected desktop variant to remain active at tablet when no tablet variant exists',
+);
+assert(
+  /data-opencanvas-element="raydotsh-mobile-project-list"[^>]*data-opencanvas-responsive-active="phone"[^>]*hidden[^>]*aria-hidden="true"[^>]*inert/.test(
+    variantHtml,
+  ),
+  'expected phone-only variant element to render inert on desktop',
+);
+assert(
+  variantHtml.includes('[data-opencanvas-responsive-active] { display: none !important; }'),
+  'expected responsive variant CSS to hide inactive variant elements',
+);
+assert(
+  variantHtml.includes(
+    '[data-opencanvas-responsive-active~="phone"] { display: block !important; }',
+  ),
+  'expected responsive variant CSS to show phone-active variant elements at the phone breakpoint',
+);
+assert(
+  variantHtml.includes('data-opencanvas-responsive-variant-runtime'),
+  'expected responsive variant runtime to update hidden/aria-hidden/inert on breakpoint changes',
+);
+
+function expectVariantInvalid(section: CanvasSection, fragment: string, label: string): void {
+  const result = validateEditableSite(makeVariantEditable(section));
+  if (result.valid) {
+    throw new Error(`${label}: expected validation failure`);
+  }
+  assert(
+    result.errors.some((error: string) => error.includes(fragment)),
+    `${label}: expected error containing ${fragment}, got ${JSON.stringify(result.errors)}`,
+  );
+}
+
+const duplicateVariantId = structuredClone(makeVariantSection());
+(
+  duplicateVariantId as CanvasSection & {
+    responsiveVariants: Array<{ id: string }>;
+  }
+).responsiveVariants[1]!.id = 'raydotsh-projects-desktop';
+expectVariantInvalid(duplicateVariantId, 'responsiveVariants[1].id', 'duplicate variant id');
+
+const duplicateBreakpoint = structuredClone(makeVariantSection());
+(
+  duplicateBreakpoint as CanvasSection & {
+    responsiveVariants: Array<{ breakpoint: string }>;
+  }
+).responsiveVariants[1]!.breakpoint = 'desktop';
+expectVariantInvalid(
+  duplicateBreakpoint,
+  'responsiveVariants[1].breakpoint',
+  'duplicate breakpoint per content source',
+);
+
+const missingElement = structuredClone(makeVariantSection());
+(
+  missingElement as CanvasSection & {
+    responsiveVariants: Array<{ elementIds: string[] }>;
+  }
+).responsiveVariants[1]!.elementIds = ['missing-mobile-list'];
+expectVariantInvalid(missingElement, 'responsiveVariants[1].elementIds[0]', 'missing element id');
+
+const missingDesktop = structuredClone(makeVariantSection());
+(
+  missingDesktop as CanvasSection & {
+    responsiveVariants: Array<{ breakpoint: string }>;
+  }
+).responsiveVariants[0]!.breakpoint = 'tablet';
+expectVariantInvalid(missingDesktop, 'contentSourceId "raydotsh-projects"', 'missing desktop variant');
+
+const emptyPhoneVariant = structuredClone(makeVariantSection());
+(
+  emptyPhoneVariant as CanvasSection & {
+    responsiveVariants: Array<{ elementIds: string[] }>;
+  }
+).responsiveVariants[1]!.elementIds = [];
+expectVariantInvalid(emptyPhoneVariant, 'phone', 'all variants hidden at phone');
 
 console.log('[responsive:smoke] OK');

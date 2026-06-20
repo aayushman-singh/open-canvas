@@ -13,6 +13,10 @@ import type { MediaElement } from '../canvas/elements/media.js';
 import type { SidebarCommandSpec } from '../canvas/elements/sidebar-spec.js';
 import type { Tab } from '../canvas/elements/tabs.js';
 import type { CanvasElement, CanvasPage, CanvasSection, EditableSite } from '../canvas/schema.js';
+import {
+  responsiveVariantMemberships,
+  type ResponsiveVariantMembership,
+} from '../canvas/responsive/variants.js';
 import type { FindElementResult } from './editor-context-types.js';
 import type {
   DomContext,
@@ -699,6 +703,24 @@ function buildSectionToolbar(ctx: Pick<EditorContext, never>, section: CanvasSec
   return bar;
 }
 
+function applyResponsiveVariantMembership(
+  node: HTMLElement,
+  membership: ResponsiveVariantMembership | undefined,
+): void {
+  if (membership === undefined) return;
+  node.setAttribute('data-opencanvas-responsive-variant', membership.variantId);
+  node.setAttribute('data-opencanvas-responsive-source', membership.contentSourceId);
+  node.setAttribute('data-opencanvas-responsive-breakpoint', membership.breakpoint);
+  node.setAttribute('data-opencanvas-responsive-active', membership.activeBreakpoints.join(' '));
+  if (!membership.activeBreakpoints.includes('desktop')) {
+    node.hidden = true;
+    node.setAttribute('hidden', '');
+    node.setAttribute('aria-hidden', 'true');
+    node.inert = true;
+    node.setAttribute('inert', '');
+  }
+}
+
 export function buildSectionNodeImpl(
   ctx: BuildSectionNodeContext,
   section: CanvasSection,
@@ -715,8 +737,12 @@ export function buildSectionNodeImpl(
   node.style.width = pageWidth + 'px';
   node.style.height = section.height + 'px';
   if (ctx.selectedSectionId === section.id) node.setAttribute('data-selected', 'true');
+  const responsiveMemberships = responsiveVariantMemberships(section);
   for (let i = 0; i < section.elements.length; i++) {
-    node.appendChild(ctx.buildElementNode(section.elements[i]!));
+    const element = section.elements[i]!;
+    const child = ctx.buildElementNode(element);
+    applyResponsiveVariantMembership(child, responsiveMemberships.get(element.id));
+    node.appendChild(child);
   }
   node.appendChild(buildSectionToolbar(ctx, section));
   const grip = document.createElement('div');

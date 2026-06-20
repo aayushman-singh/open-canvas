@@ -406,7 +406,42 @@ const stubWindow = {
               slug: 'home',
               title: 'Home',
               width: 1440,
-              sections: [],
+              sections: [
+                {
+                  id: 'section-responsive',
+                  recipeId: 'feature-grid',
+                  name: 'Responsive',
+                  height: 480,
+                  responsiveVariants: [
+                    {
+                      id: 'editor-responsive-desktop',
+                      breakpoint: 'desktop',
+                      contentSourceId: 'editor-responsive',
+                      elementIds: ['editor-desktop-card'],
+                    },
+                    {
+                      id: 'editor-responsive-phone',
+                      breakpoint: 'phone',
+                      contentSourceId: 'editor-responsive',
+                      elementIds: ['editor-phone-card'],
+                    },
+                  ],
+                  elements: [
+                    {
+                      id: 'editor-desktop-card',
+                      type: 'shape',
+                      box: { x: 80, y: 80, w: 480, h: 240, z: 1 },
+                      variant: 'rect',
+                    },
+                    {
+                      id: 'editor-phone-card',
+                      type: 'shape',
+                      box: { x: 24, y: 80, w: 327, h: 280, z: 1 },
+                      variant: 'rect',
+                    },
+                  ],
+                },
+              ],
             },
           ],
         },
