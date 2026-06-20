@@ -24,6 +24,7 @@ export const MOTION_SEQUENCE_TEXT_EFFECTS = [
   'none',
   'scramble',
   'mask-reveal',
+  'typewriter',
   'blur-reveal',
   'wave-rise',
 ] as const;

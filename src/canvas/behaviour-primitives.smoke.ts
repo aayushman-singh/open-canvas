@@ -123,6 +123,14 @@ function buildValidState(): EditableSite & Record<string, unknown> {
             durationMs: 280,
           },
           {
+            id: 'step-text-typewriter',
+            target: { type: 'text-split', elementId: 'tab-copy', unit: 'word' },
+            textEffect: 'typewriter',
+            from: { opacity: 0 },
+            to: { opacity: 1 },
+            durationMs: 420,
+          },
+          {
             id: 'step-text-blur',
             target: { type: 'text-split', elementId: 'tab-copy', unit: 'word' },
             textEffect: 'blur-reveal',
@@ -213,6 +221,10 @@ assert(
 assert(
   (MOTION_SEQUENCE_TEXT_EFFECTS as readonly string[]).includes('wave-rise'),
   'motion text effects must include wave-rise',
+);
+assert(
+  (MOTION_SEQUENCE_TEXT_EFFECTS as readonly string[]).includes('typewriter'),
+  'motion text effects must include typewriter',
 );
 expectValid(validState, 'valid behaviour primitive state');
 

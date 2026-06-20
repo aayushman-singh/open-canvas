@@ -116,7 +116,7 @@ function behaviourSplitTextTarget(el, unit) {
 
 function behaviourMotionTextEffect(step) {
   var effect = step.textEffect || 'none';
-  if (effect !== 'none' && effect !== 'scramble' && effect !== 'mask-reveal' && effect !== 'blur-reveal' && effect !== 'wave-rise') {
+  if (effect !== 'none' && effect !== 'scramble' && effect !== 'mask-reveal' && effect !== 'typewriter' && effect !== 'blur-reveal' && effect !== 'wave-rise') {
     behaviourFailure('motion-sequence-text-effect', { stepId: step.id, textEffect: step.textEffect }, new Error('unsupported text effect'));
   }
   if (effect !== 'none' && (!step.target || step.target.type !== 'text-split')) {
@@ -147,7 +147,7 @@ function behaviourScrambleText(text, progress) {
 
 function behaviourApplyTextEffect(node, effect, progress) {
   if (effect === 'none') return;
-  if (effect !== 'scramble' && effect !== 'mask-reveal' && effect !== 'blur-reveal' && effect !== 'wave-rise') {
+  if (effect !== 'scramble' && effect !== 'mask-reveal' && effect !== 'typewriter' && effect !== 'blur-reveal' && effect !== 'wave-rise') {
     behaviourFailure('motion-sequence-text-effect', { textEffect: effect }, new Error('unsupported text effect'));
   }
   var finalText = node.getAttribute('data-opencanvas-text-split-final');
@@ -157,6 +157,13 @@ function behaviourApplyTextEffect(node, effect, progress) {
   node.setAttribute('data-opencanvas-text-effect', effect);
   if (effect === 'scramble') {
     node.textContent = behaviourScrambleText(finalText, progress);
+    return;
+  }
+  if (effect === 'typewriter') {
+    var typedProgress = Math.max(0, Math.min(1, Number(progress) || 0));
+    var typedLength = Math.floor(finalText.length * typedProgress);
+    node.textContent = finalText.slice(0, typedLength);
+    node.setAttribute('data-opencanvas-typewriter-reduced-motion', 'full-text');
     return;
   }
   node.textContent = finalText;

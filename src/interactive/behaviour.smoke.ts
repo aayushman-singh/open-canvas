@@ -1095,7 +1095,72 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   );
 }
 
-// (8) scroll scene horizontal track translates with scene progress
+// (8) scroll scene typewriter text effect reveals the authored text in order
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'typewriter-scroll',
+        trigger: { type: 'scroll-scene', scrollSceneId: 'typewriter-scene' },
+        steps: [
+          {
+            id: 'typewriter-scroll-step',
+            target: { type: 'text-split', elementId: 'raydotsh-hero-title', unit: 'word' },
+            textEffect: 'typewriter',
+            from: { opacity: 0 },
+            to: { opacity: 1 },
+            durationMs: 100,
+          },
+        ],
+      },
+    ],
+    scrollScenes: [
+      {
+        id: 'typewriter-scene',
+        sectionId: 'section-hero',
+        sequenceId: 'typewriter-scroll',
+        pinTarget: { type: 'section', sectionId: 'section-hero' },
+        startOffsetPx: 0,
+        endOffsetPx: 800,
+      },
+    ],
+    richMotionAssets: [],
+  });
+  doc.body.appendChild(script);
+  const section = new StubElement('section');
+  section.setAttribute('data-opencanvas-section', 'section-hero');
+  const heading = new StubElement('div');
+  heading.setAttribute('data-opencanvas-element', 'raydotsh-hero-title');
+  const headingText = new StubElement('div');
+  headingText.className = 'opencanvas-text';
+  headingText.textContent = 'rehana';
+  heading.appendChild(headingText);
+  section.appendChild(heading);
+  doc.body.appendChild(section);
+  section.getBoundingClientRect = (): { top: number; left: number; width: number; height: number } => ({
+    top: 100 - win.scrollY,
+    left: 0,
+    width: 1200,
+    height: 800,
+  });
+  runBehaviour(doc, win, StubImage);
+  win.scrollY = 500;
+  win.dispatchScroll();
+  const spans = heading.querySelectorAll('.opencanvas-text-split');
+  assert(spans.length === 1, 'typewriter text effect must resolve the target word');
+  assert(
+    spans[0]!.getAttribute('data-opencanvas-text-effect') === 'typewriter',
+    'typewriter text effect must mark split spans',
+  );
+  assert(spans[0]!.textContent === 'reh', 'typewriter text effect must reveal text in order');
+}
+
+// (9) scroll scene horizontal track translates with scene progress
 {
   const doc = new StubDocument();
   const win = new StubWindow();
