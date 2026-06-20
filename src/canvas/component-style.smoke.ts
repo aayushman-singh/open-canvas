@@ -220,6 +220,8 @@ function expectRoundTrip(state: EditableSite, label: string): void {
       slotGap: 18,
       linkColor: '#f7f1df',
       linkHoverColor: '#c8ff1a',
+      activeLinkColor: '#101820',
+      activeLinkBackgroundColor: '#c8ff1a',
       linkPaddingX: 16,
       linkPaddingY: 7,
       siteTitleFontSize: 22,
@@ -333,6 +335,14 @@ function expectRoundTrip(state: EditableSite, label: string): void {
     'navStyle must emit modeled link horizontal padding on the wrapper',
   );
   assert(
+    html.includes('--opencanvas-nav-link-active-color:#101820'),
+    'navStyle must emit modeled active link color on the wrapper',
+  );
+  assert(
+    html.includes('--opencanvas-nav-link-active-bg:#c8ff1a'),
+    'navStyle must emit modeled active link background on the wrapper',
+  );
+  assert(
     html.includes('--opencanvas-nav-primary-radius:999px'),
     'navStyle must emit modeled primary CTA radius on the wrapper',
   );
@@ -343,6 +353,10 @@ function expectRoundTrip(state: EditableSite, label: string): void {
   assert(
     canvasPublishedStyles.includes('padding: var(--opencanvas-nav-link-pad-y'),
     'public styles must consume modeled nav link padding',
+  );
+  assert(
+    canvasPublishedStyles.includes('[data-opencanvas-nav-link-active="true"]'),
+    'public styles must consume active nav link metadata',
   );
   assert(
     canvasEditorStyles.includes('background: var(--opencanvas-nav-bg'),

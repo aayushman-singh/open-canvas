@@ -42,7 +42,7 @@ import type {
 } from '../canvas/elements/flow-container.js';
 import type { FormElement } from '../canvas/elements/form.js';
 import { formPointerFx } from '../canvas/elements/form.js';
-import type { NavElement } from '../canvas/elements/nav.js';
+import { navLinkIsActive, type NavElement } from '../canvas/elements/nav.js';
 import type { RichMotionElement } from '../canvas/elements/rich-motion.js';
 import type { TableElement } from '../canvas/elements/table.js';
 
@@ -97,7 +97,7 @@ export type BuildTableBodyContext = Pick<EditorContext, never>;
 // ADR 0064 — private nav-link anchor helper routes internal clicks
 // through `ctx.goToHrefOnCanvas`. Single-verb surface; no canonical
 // alias owns it, so an inline `Pick` declares the contract honestly.
-export type BuildNavLinkAnchorContext = Pick<EditorContext, 'goToHrefOnCanvas'>;
+export type BuildNavLinkAnchorContext = Pick<EditorContext, 'currentPage' | 'goToHrefOnCanvas'>;
 
 // ADR 0064 — nav preview composes the logo URL from `ctx.siteBase` and
 // reuses the link helper's `goToHrefOnCanvas` verb for every nav-link +
@@ -590,6 +590,10 @@ function buildNavLinkAnchor(
     resolvedHref = '/' + resolvedHref;
   }
   a.setAttribute('href', resolvedHref.length > 0 ? resolvedHref : '#');
+  if (navLinkIsActive({ href: resolvedHref, kind }, ctx.currentPage()?.slug)) {
+    a.setAttribute('data-opencanvas-nav-link-active', 'true');
+    a.setAttribute('aria-current', 'page');
+  }
   if (kind === 'external') {
     a.setAttribute('target', '_blank');
     a.setAttribute('rel', 'noopener');

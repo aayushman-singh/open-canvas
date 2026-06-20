@@ -204,6 +204,10 @@ html, body {
 .opencanvas-nav-link:hover {
   color: var(--opencanvas-nav-link-hover-color, var(--opencanvas-kit-accent, var(--kit-accent, currentColor)));
 }
+.opencanvas-nav-link[data-opencanvas-nav-link-active="true"] {
+  color: var(--opencanvas-nav-link-active-color, var(--opencanvas-nav-link-hover-color, var(--opencanvas-kit-accent, var(--kit-accent, currentColor))));
+  background: var(--opencanvas-nav-link-active-bg, transparent);
+}
 .opencanvas-nav {
   gap: 4px;
   position: relative;

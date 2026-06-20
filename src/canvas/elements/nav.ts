@@ -60,6 +60,8 @@ export interface NavStyle {
   slotGap?: number;
   linkColor?: string;
   linkHoverColor?: string;
+  activeLinkColor?: string;
+  activeLinkBackgroundColor?: string;
   linkPaddingX?: number;
   linkPaddingY?: number;
   siteTitleColor?: string;
@@ -98,6 +100,29 @@ export interface NavElement extends Omit<BaseElement, 'sticky'> {
 export interface NavRenderCtx {
   styleKit: string;
   assetBasePath: string;
+  pageSlug?: string;
+}
+
+export function navCurrentPathForPageSlug(pageSlug: string | undefined): string | null {
+  if (typeof pageSlug !== 'string' || pageSlug.length === 0) return null;
+  const clean = pageSlug.replace(/^\/+/, '').replace(/\/+$/, '');
+  if (clean === '' || clean === 'index') return '/';
+  return `/${clean}`;
+}
+
+function normaliseNavPath(path: string): string {
+  const clean = path.split('#')[0]!.split('?')[0]!.replace(/\/+$/, '');
+  return clean === '' ? '/' : clean;
+}
+
+export function navLinkIsActive(
+  link: { href: string; kind: string },
+  pageSlug: string | undefined,
+): boolean {
+  if (link.kind !== 'internal') return false;
+  const currentPath = navCurrentPathForPageSlug(pageSlug);
+  if (currentPath === null) return false;
+  return normaliseNavPath(navLinkHref({ label: '', href: link.href, kind: 'internal' })) === currentPath;
 }
 
 /**
@@ -113,12 +138,15 @@ export function navLinkHref(link: NavLink): string {
 }
 
 /** Build a single `<a>` for one NavLink, fully escaped. */
-function renderNavLink(link: NavLink): string {
+function renderNavLink(link: NavLink, pageSlug: string | undefined): string {
   const href = navLinkHref(link);
   const target = link.kind === 'external' ? ' target="_blank" rel="noopener noreferrer"' : '';
+  const active = navLinkIsActive(link, pageSlug)
+    ? ' data-opencanvas-nav-link-active="true" aria-current="page"'
+    : '';
   return (
     `<a class="opencanvas-nav-link" data-opencanvas-nav-link-kind="${escapeAttr(link.kind)}" ` +
-    `href="${escapeAttr(href)}"${target}>` +
+    `href="${escapeAttr(href)}"${active}${target}>` +
     `${escapeHtml(link.label)}` +
     `</a>`
   );
@@ -138,15 +166,21 @@ function renderNavSiteTitle(siteTitle: string | undefined): string {
 }
 
 /** Build the trailing CTA — empty when no primaryAction is set. */
-function renderNavPrimaryAction(primaryAction: NavLink | undefined): string {
+function renderNavPrimaryAction(
+  primaryAction: NavLink | undefined,
+  pageSlug: string | undefined,
+): string {
   if (primaryAction === undefined) return '';
   const href = navLinkHref(primaryAction);
   const target =
     primaryAction.kind === 'external' ? ' target="_blank" rel="noopener noreferrer"' : '';
+  const active = navLinkIsActive(primaryAction, pageSlug)
+    ? ' data-opencanvas-nav-link-active="true" aria-current="page"'
+    : '';
   return (
     `<a class="opencanvas-nav-primary-action" ` +
     `data-opencanvas-nav-link-kind="${escapeAttr(primaryAction.kind)}" ` +
-    `href="${escapeAttr(href)}"${target}>` +
+    `href="${escapeAttr(href)}"${active}${target}>` +
     `${escapeHtml(primaryAction.label)}` +
     `</a>`
   );
@@ -160,8 +194,8 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
 
   const logoHtml = renderNavLogo(el.logoAssetId, ctx.assetBasePath);
   const siteTitleHtml = renderNavSiteTitle(el.siteTitle);
-  const linksHtml = el.links.map(renderNavLink).join('');
-  const primaryActionHtml = renderNavPrimaryAction(el.primaryAction);
+  const linksHtml = el.links.map((link) => renderNavLink(link, ctx.pageSlug)).join('');
+  const primaryActionHtml = renderNavPrimaryAction(el.primaryAction, ctx.pageSlug);
 
   const navStyleEntries: Array<[string, string]> = [];
   if (el.sticky) {

@@ -62,6 +62,8 @@ const STYLE_META: Record<string, Record<string, ComponentStyleMeta>> = {
     slotGap: { section: 'Layout', label: 'Slot gap', min: 0, max: 96, placeholder: '4' },
     linkColor: { section: 'Links', label: 'Color', swatchDefault: '#111111' },
     linkHoverColor: { section: 'Links', label: 'Hover color', swatchDefault: '#c8ff1a' },
+    activeLinkColor: { section: 'Links', label: 'Active color', swatchDefault: '#111111' },
+    activeLinkBackgroundColor: { section: 'Links', label: 'Active background', swatchDefault: '#c8ff1a' },
     linkPaddingX: { section: 'Links', label: 'Padding X', min: 0, max: 64, placeholder: '12' },
     linkPaddingY: { section: 'Links', label: 'Padding Y', min: 0, max: 40, placeholder: '6' },
     siteTitleColor: { section: 'Wordmark', label: 'Color', swatchDefault: '#111111' },

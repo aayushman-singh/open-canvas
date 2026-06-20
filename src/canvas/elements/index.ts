@@ -251,6 +251,7 @@ export const RENDER_DISPATCH: RenderDispatch = {
     renderNav(el, {
       styleKit: ctx.styleKit,
       assetBasePath: ctx.assetBasePath,
+      pageSlug: ctx.pageSlug,
     }),
   collection: (el, ctx) =>
     renderCollection(el, {

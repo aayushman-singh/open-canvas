@@ -818,8 +818,8 @@ User-visible miss:
 
 - Owners can now reproduce designer-site nav inversion across scroll regions
   without custom JavaScript.
-- Remaining next wave: richer token catalog, per-nav style recipes, active-link
-  theme coupling, and visual preview controls for reduced-motion media queries.
+- Remaining next wave: richer token catalog, per-nav style recipes, and visual
+  preview controls for reduced-motion media queries.
 
 Needed primitive:
 

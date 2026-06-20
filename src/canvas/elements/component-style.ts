@@ -315,6 +315,12 @@ export const NAV_STYLE_FIELDS = [
   { key: 'slotGap', kind: 'numberPx', cssVar: '--opencanvas-nav-slot-gap' },
   { key: 'linkColor', kind: 'string', cssVar: '--opencanvas-nav-link-color' },
   { key: 'linkHoverColor', kind: 'string', cssVar: '--opencanvas-nav-link-hover-color' },
+  { key: 'activeLinkColor', kind: 'string', cssVar: '--opencanvas-nav-link-active-color' },
+  {
+    key: 'activeLinkBackgroundColor',
+    kind: 'string',
+    cssVar: '--opencanvas-nav-link-active-bg',
+  },
   { key: 'linkPaddingX', kind: 'numberPx', cssVar: '--opencanvas-nav-link-pad-x' },
   { key: 'linkPaddingY', kind: 'numberPx', cssVar: '--opencanvas-nav-link-pad-y' },
   { key: 'siteTitleColor', kind: 'string', cssVar: '--opencanvas-nav-title-color' },

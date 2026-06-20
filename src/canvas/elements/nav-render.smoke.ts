@@ -29,6 +29,10 @@
 
 import { renderNav, type NavElement, type NavLayout } from './nav.js';
 
+declare const Bun: {
+  file(input: URL): { text(): Promise<string> };
+};
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[nav-render:smoke] ${message}`);
 }
@@ -141,6 +145,34 @@ assert(
 assert(
   !leftRight.includes('data-slot="center"'),
   `layout=left-right must NOT emit data-slot="center"; got ${leftRight}`,
+);
+
+const activeAbout = renderNav(buildNav({ layout: 'left-right' }), { ...CTX, pageSlug: 'about' });
+assert(
+  activeAbout.includes('href="/about" data-opencanvas-nav-link-active="true" aria-current="page"'),
+  `current page must mark the matching nav link active; got ${activeAbout}`,
+);
+assert(
+  !activeAbout.includes('href="/" data-opencanvas-nav-link-active="true"'),
+  `current page must not mark non-matching nav links active; got ${activeAbout}`,
+);
+
+const activeHome = renderNav(buildNav({ layout: 'left-right' }), { ...CTX, pageSlug: 'index' });
+assert(
+  activeHome.includes('href="/" data-opencanvas-nav-link-active="true" aria-current="page"'),
+  `index page must mark the root nav link active; got ${activeHome}`,
+);
+
+const bodyBuildersSrc = await Bun.file(
+  new URL('../../editor-client/body-builders-data.ts', import.meta.url),
+).text();
+assert(
+  bodyBuildersSrc.includes('data-opencanvas-nav-link-active'),
+  'editor nav preview must emit the same active-link metadata',
+);
+assert(
+  bodyBuildersSrc.includes('aria-current'),
+  'editor nav preview must emit aria-current for the active link',
 );
 
 console.log(
