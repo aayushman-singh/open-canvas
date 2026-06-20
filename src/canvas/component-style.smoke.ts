@@ -19,9 +19,11 @@ import type {
 } from './elements/index.js';
 import { renderCanvasSnapshot } from './render.js';
 import { canvasPublishedStyles } from './public-styles.js';
+import { canvasEditorStyles } from '../editor-client/styles-build.js';
 import { validateEditableSite } from './validate.js';
 import { decodeYDoc, encodeYDoc } from './yjs-projection.js';
 import { accordionAgentToolSpec } from './elements/accordion.js';
+import { actionAgentToolSpec } from './elements/action.js';
 import { carouselAgentToolSpec } from './elements/carousel.js';
 import { collectionAgentToolSpec } from './elements/collection.js';
 import { formAgentToolSpec } from './elements/form.js';
@@ -190,6 +192,10 @@ function expectRoundTrip(state: EditableSite, label: string): void {
       headerBackgroundColor: '#123456',
       bodyFontSize: 17,
     }),
+    withStyle(action(), 'actionStyle', {
+      borderColor: '#ffcc00',
+      borderWidth: 3,
+    }),
     withStyle(tabs(), 'tabsStyle', {
       activeTabBackgroundColor: '#abcdef',
       activeTabFontWeight: 'bold',
@@ -233,6 +239,30 @@ function expectRoundTrip(state: EditableSite, label: string): void {
   assert(
     html.includes('--opencanvas-accordion-body-font-size:17px'),
     'accordionStyle must emit body font size as px',
+  );
+  assert(
+    html.includes('--opencanvas-action-border-color:#ffcc00'),
+    'actionStyle must emit modeled border color on the wrapper',
+  );
+  assert(
+    html.includes('--opencanvas-action-border-width:3px'),
+    'actionStyle must emit modeled border width on the wrapper',
+  );
+  assert(
+    canvasPublishedStyles.includes('border-color: var(--opencanvas-action-border-color'),
+    'public styles must consume modeled action border color',
+  );
+  assert(
+    canvasPublishedStyles.includes('border-width: var(--opencanvas-action-border-width'),
+    'public styles must consume modeled action border width',
+  );
+  assert(
+    canvasEditorStyles.includes('border-color: var(--opencanvas-action-border-color'),
+    'editor styles must consume modeled action border color',
+  );
+  assert(
+    canvasEditorStyles.includes('border-width: var(--opencanvas-action-border-width'),
+    'editor styles must consume modeled action border width',
   );
   assert(
     html.includes('--opencanvas-tabs-active-tab-bg:#abcdef'),
@@ -390,6 +420,20 @@ expectInvalid(
   'pinnedStyle',
   'modeled actionStyle key duplicated in pinnedStyle',
 );
+expectInvalid(
+  siteWith([
+    withStyle(
+      {
+        ...action(),
+        pinnedStyle: { '--opencanvas-action-border-color': '#000000' },
+      },
+      'actionStyle',
+      { borderColor: '#ffffff' },
+    ),
+  ]),
+  'pinnedStyle',
+  'modeled actionStyle border key duplicated in pinnedStyle',
+);
 
 
 {
@@ -425,6 +469,11 @@ expectInvalid(
       collectionAgentToolSpec.parsePatch({ collectionStyle: { cardImageRadius: 12 } }),
     ) === JSON.stringify({ collectionStyle: { cardImageRadius: 12 } }),
     'collection agent patch must preserve collectionStyle',
+  );
+  assert(
+    JSON.stringify(actionAgentToolSpec.parsePatch({ actionStyle: { borderWidth: 2 } })) ===
+      JSON.stringify({ actionStyle: { borderWidth: 2 } }),
+    'action agent patch must preserve modeled border width',
   );
 }
 

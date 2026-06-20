@@ -34,6 +34,8 @@ export interface ComponentStyleSpec {
 export const ACTION_STYLE_FIELDS = [
   { key: 'backgroundColor', kind: 'string', cssVar: '--opencanvas-action-bg' },
   { key: 'color', kind: 'string', cssVar: '--opencanvas-action-color' },
+  { key: 'borderColor', kind: 'string', cssVar: '--opencanvas-action-border-color' },
+  { key: 'borderWidth', kind: 'numberPx', cssVar: '--opencanvas-action-border-width' },
   { key: 'borderRadius', kind: 'numberPx', cssVar: '--opencanvas-action-radius' },
   { key: 'shadow', kind: 'string', cssVar: '--opencanvas-action-shadow' },
   { key: 'fontFamily', kind: 'fontFamily', cssVar: '--opencanvas-action-font-family' },

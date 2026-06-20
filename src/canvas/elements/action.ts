@@ -48,6 +48,8 @@ export type ActionBehavior = { type: 'copy'; value: string };
 export interface ActionStyle {
   backgroundColor?: string;
   color?: string;
+  borderColor?: string;
+  borderWidth?: number;
   borderRadius?: number;
   shadow?: string;
   fontFamily?: 'inherit' | 'kit-display' | 'kit-body' | 'kit-mono' | 'custom';

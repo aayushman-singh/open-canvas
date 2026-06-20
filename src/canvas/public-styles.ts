@@ -102,6 +102,8 @@ html, body {
   height: 100%;
   padding: var(--opencanvas-kit-action-padding, 0 16px);
   border: 0 solid transparent;
+  border-color: var(--opencanvas-action-border-color, transparent);
+  border-width: var(--opencanvas-action-border-width, 0);
   border-radius: var(--opencanvas-action-radius, var(--opencanvas-kit-action-radius, 8px));
   background: var(--opencanvas-action-bg, var(--opencanvas-kit-accent, var(--kit-accent, currentColor)));
   color: var(--opencanvas-action-color, var(--opencanvas-kit-accent-text, var(--kit-bg, #fff)));

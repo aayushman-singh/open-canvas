@@ -932,6 +932,6 @@ Intentional deferral: this does not reintroduce legacy popup-section click wirin
 
 ### 20. Component Style Wave 2 — Action Buttons
 
-Status: addressed for the Action button slice. `ActionElement` now owns sparse `actionStyle` fields for modeled button chrome, the generic Component Style inspector exposes the controls, validator gates unknown fields and pinnedStyle conflicts, Yjs preserves the object, agent patches can set it, and style-kit action variants consume the modeled variables so ActionStyle wins without raw CSS.
+Status: addressed for the Action button slice. `ActionElement` now owns sparse `actionStyle` fields for modeled button chrome, including explicit border color/width shorthand, the generic Component Style inspector exposes the controls, validator gates unknown fields and pinnedStyle conflicts, Yjs preserves the object, agent patches can set it, and style-kit action variants consume the modeled variables so ActionStyle wins without raw CSS.
 
-Intentional deferral: NavStyle, compound padding controls, and modeled border shorthand remain separate slices. This wave deliberately avoids widening pinnedStyle or adding arbitrary owner CSS.
+Intentional deferral: NavStyle and compound padding controls remain separate slices. This wave deliberately avoids widening pinnedStyle or adding arbitrary owner CSS.

@@ -42,6 +42,8 @@ const STYLE_META: Record<string, Record<string, ComponentStyleMeta>> = {
   actionStyle: {
     backgroundColor: { section: 'Button', label: 'Background', swatchDefault: '#111111' },
     color: { section: 'Button', label: 'Text color', swatchDefault: '#ffffff' },
+    borderColor: { section: 'Button', label: 'Border color', swatchDefault: '#222222' },
+    borderWidth: { section: 'Button', label: 'Border width', min: 0, max: 8, placeholder: '0' },
     borderRadius: { section: 'Button', label: 'Radius', min: 0, max: 999, placeholder: '8' },
     shadow: { section: 'Button', label: 'Shadow', placeholder: '0 8px 24px rgba(0,0,0,.2)' },
     fontFamily: { section: 'Typography', label: 'Font' },
