@@ -11,6 +11,7 @@ function assert(condition: boolean, message: string): asserts condition {
 const inspectorSrc = await Bun.file(new URL('./element-inspector.ts', import.meta.url)).text();
 const wrapperSrc = await Bun.file(new URL('./element-menu.ts', import.meta.url)).text();
 const hydrateSrc = await Bun.file(new URL('./hydrate-interactives.ts', import.meta.url)).text();
+const sharedMarqueeSrc = await Bun.file(new URL('../interactive/marquee.ts', import.meta.url)).text();
 
 assert(inspectorSrc.includes('renderMarqueeInspector'), 'element inspector must render marquee controls');
 assert(inspectorSrc.includes('MARQUEE_DIRECTIONS'), 'direction select must use schema directions');
@@ -33,14 +34,21 @@ assert(
   wrapperSrc.includes('data-opencanvas-marquee-rows'),
   'editor wrapper must emit marquee row metadata',
 );
-assert(hydrateSrc.includes('function hydrateMarquees'), 'editor runtime must hydrate marquees');
 assert(
-  hydrateSrc.includes('data-opencanvas-marquee-lane'),
-  'editor runtime must hydrate marquee lanes',
+  hydrateSrc.includes("import { hydrateMarquees } from '../interactive/marquee.js';"),
+  'editor runtime must import the shared marquee hydrator',
 );
 assert(
-  hydrateSrc.includes('opencanvas:marquee-failure'),
-  'editor runtime must emit named marquee failure event',
+  !hydrateSrc.includes('function hydrateMarquees('),
+  'editor runtime must not define a local marquee hydrator',
+);
+assert(
+  sharedMarqueeSrc.includes('data-opencanvas-marquee-lane'),
+  'shared marquee adapter must hydrate marquee lanes',
+);
+assert(
+  sharedMarqueeSrc.includes('opencanvas:marquee-failure'),
+  'shared marquee adapter must emit named marquee failure event',
 );
 assert(
   hydrateSrc.indexOf('hydrateBehaviourPreview') < hydrateSrc.indexOf('hydrateMarquees(root, options)'),

@@ -2,7 +2,7 @@ import type { PublishedSnapshot } from '../canvas/schema.js';
 import { renderCanvasSnapshot } from '../canvas/render.js';
 import { injectInteractiveRuntime, snapshotNeedsInteractiveRuntime } from './inject.js';
 import { INTERACTIVE_RUNTIME_SRC } from './build.js';
-import { MARQUEE_RUNTIME_SRC } from './marquee.js';
+import { MARQUEE_RUNTIME_SRC, hydrateMarquees, isMarqueeEditorChrome } from './marquee.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error('[marquee-runtime:smoke] ' + message);
@@ -54,9 +54,41 @@ const snapshot: PublishedSnapshot = {
 };
 
 assert(snapshotNeedsInteractiveRuntime(snapshot), 'marquee must request interactive runtime');
+
+assert(
+  isMarqueeEditorChrome({ nodeType: 1, className: 'element-menu-trigger', hasAttribute: () => false }),
+  'editor chrome matcher must detect element menu trigger class token',
+);
+assert(
+  isMarqueeEditorChrome({ nodeType: 1, className: 'shell resize-handle active', hasAttribute: () => false }),
+  'editor chrome matcher must detect resize handle class token',
+);
+assert(
+  !isMarqueeEditorChrome({ nodeType: 1, className: 'not-an-element-menu-trigger', hasAttribute: () => false }),
+  'editor chrome matcher must not match partial class names',
+);
+assert(
+  isMarqueeEditorChrome({ nodeType: 1, className: '', hasAttribute: (name: string) => name === 'data-resize-handle' }),
+  'editor chrome matcher must detect resize handle attribute',
+);
+
+const hydrateMarqueesSource = hydrateMarquees.toString();
+assert(
+  MARQUEE_RUNTIME_SRC.includes(hydrateMarqueesSource),
+  'visitor runtime source must include the exported marquee hydrator implementation',
+);
+assert(
+  hydrateMarqueesSource.includes('data-opencanvas-marquee-hydrated'),
+  'exported marquee hydrator must own the hydration marker logic',
+);
 assert(
   MARQUEE_RUNTIME_SRC.includes('opencanvas:marquee-failure'),
   'runtime must emit named failure event',
+);
+assert(
+  !MARQUEE_RUNTIME_SRC.includes("typeof laneObj.lane.animate === 'function'") &&
+    !MARQUEE_RUNTIME_SRC.includes('typeof laneObj.lane.animate === "function"'),
+  'runtime must fail loudly instead of silently skipping lane animation creation',
 );
 assert(
   MARQUEE_RUNTIME_SRC.includes('data-opencanvas-marquee-belt'),
@@ -80,7 +112,8 @@ assert(
 );
 assert(MARQUEE_RUNTIME_SRC.includes('playbackRate'), 'runtime must reverse marquee playback on hover');
 assert(
-  MARQUEE_RUNTIME_SRC.includes("window.matchMedia('(prefers-reduced-motion: reduce)')"),
+  MARQUEE_RUNTIME_SRC.includes("window.matchMedia('(prefers-reduced-motion: reduce)')") ||
+    MARQUEE_RUNTIME_SRC.includes('window.matchMedia("(prefers-reduced-motion: reduce)")'),
   'runtime must branch on reduced-motion explicitly',
 );
 assert(INTERACTIVE_RUNTIME_SRC.includes('function hydrateMarquees'), 'bundle must include marquee hydrator');

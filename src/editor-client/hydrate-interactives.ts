@@ -2,16 +2,17 @@
 //
 // TS-native counterpart to the visitor IIFE runtime. The visitor receives
 // an inline <script> built from `RUNTIME_ENTRY_SRC + CAROUSEL_RUNTIME_SRC +
-// ACCORDION_RUNTIME_SRC + POPUP_RUNTIME_SRC` (see
+// ACCORDION_RUNTIME_SRC + POPUP_RUNTIME_SRC + MARQUEE_RUNTIME_SRC` (see
 // `src/interactive/build.ts`). The editor — whose DOM is constructed by
 // `body-builders-data.ts` rather than a pre-rendered snapshot — calls
 // `hydrateInteractives()` to mount the SAME behaviour on its live DOM.
-// The functions below mirror the runtime fragments line-by-line.
+// Most functions below mirror the runtime fragments line-by-line, while
+// marquee is imported from the shared adapter in `src/interactive/marquee.ts`.
 //
-// Why this lives here and not under `src/interactive/`: the visitor-side
-// modules in `src/interactive/` ship as JS source strings (vanilla ES5,
-// no DOM types pulled in) so the root tsconfig's worker-typed compile
-// stays tight. This module reaches for the DOM directly, which only the
+// Why this lives here and not under `src/interactive/` (except for marquee):
+// the visitor-side modules in `src/interactive/` ship as JS source strings
+// (vanilla ES5, no DOM types pulled in) so the root tsconfig's worker-typed
+// compile stays tight. This module reaches for the DOM directly, which only the
 // `editor-client` tsconfig allows (`lib: ["DOM", ...]`).
 //
 // Editor-vs-visitor contract differences:
@@ -31,6 +32,7 @@
 import type { EditableSite } from '../canvas/schema.js';
 import type { RuntimeHydratorSurfaceId } from '../interactive/runtime-hydrator-surfaces.js';
 import { hydrateBehaviourPreview } from './hydrate-behaviour.js';
+import { hydrateMarquees } from '../interactive/marquee.js';
 
 export interface HydrateOptions {
   /** When true, popup sections (`[data-opencanvas-popup="true"]`) are
@@ -752,268 +754,7 @@ function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Marquee — mirrors MARQUEE_RUNTIME_SRC in `src/interactive/marquee.ts`.
-// ---------------------------------------------------------------------------
 
-function failMarquee(el: HTMLElement, code: string, message: string, cause: string | null): never {
-  const detail = {
-    code,
-    message,
-    elementId: el.getAttribute('data-opencanvas-element'),
-    cause,
-  };
-  window.dispatchEvent(new CustomEvent('opencanvas:marquee-failure', { detail }));
-  console.error('[opencanvas marquee] ' + message, detail);
-  throw new Error('[opencanvas marquee] ' + message);
-}
-
-function readMarqueeConfig(el: HTMLElement): {
-  direction: 'left' | 'right';
-  speed: number;
-  pauseOnHover: boolean;
-  hoverReverse: boolean;
-  rows: number;
-  rowGapPx: number;
-  rowOffsetPercent: number;
-  reducedMotion: 'static' | 'slow';
-} {
-  const direction = el.getAttribute('data-opencanvas-marquee-direction');
-  if (direction !== 'left' && direction !== 'right') {
-    failMarquee(el, 'invalid-direction', 'Marquee direction must be left or right', direction);
-  }
-  const speedRaw = el.getAttribute('data-opencanvas-marquee-speed');
-  const speed = speedRaw === null ? Number.NaN : Number(speedRaw);
-  if (!Number.isFinite(speed) || speed <= 0) {
-    failMarquee(el, 'invalid-speed', 'Marquee speed must be a finite number > 0', speedRaw);
-  }
-  const reducedMotion = el.getAttribute('data-opencanvas-marquee-reduced-motion');
-  if (reducedMotion !== 'static' && reducedMotion !== 'slow') {
-    failMarquee(
-      el,
-      'invalid-reduced-motion',
-      'Marquee reduced-motion mode must be static or slow',
-      reducedMotion,
-    );
-  }
-  const pauseOnHover = el.getAttribute('data-opencanvas-marquee-pause') === 'true';
-  const hoverReverse = el.getAttribute('data-opencanvas-marquee-hover-reverse') === 'true';
-  if (pauseOnHover && hoverReverse) {
-    failMarquee(
-      el,
-      'hover-mode-conflict',
-      'Marquee cannot pause and reverse on hover at the same time',
-      null,
-    );
-  }
-  const rowsRaw = el.getAttribute('data-opencanvas-marquee-rows');
-  const rows = rowsRaw === null ? 1 : Number(rowsRaw);
-  if (!Number.isFinite(rows) || !Number.isInteger(rows) || rows < 1 || rows > 6) {
-    failMarquee(el, 'invalid-rows', 'Marquee rows must be an integer between 1 and 6', rowsRaw);
-  }
-  const rowGapRaw = el.getAttribute('data-opencanvas-marquee-row-gap');
-  const rowGapPx = rowGapRaw === null ? 0 : Number(rowGapRaw);
-  if (!Number.isFinite(rowGapPx) || rowGapPx < 0 || rowGapPx > 200) {
-    failMarquee(el, 'invalid-row-gap', 'Marquee row gap must be between 0 and 200px', rowGapRaw);
-  }
-  const rowOffsetRaw = el.getAttribute('data-opencanvas-marquee-row-offset');
-  const rowOffsetPercent = rowOffsetRaw === null ? 50 : Number(rowOffsetRaw);
-  if (!Number.isFinite(rowOffsetPercent) || rowOffsetPercent < 0 || rowOffsetPercent > 100) {
-    failMarquee(
-      el,
-      'invalid-row-offset',
-      'Marquee row offset must be between 0 and 100%',
-      rowOffsetRaw,
-    );
-  }
-  return {
-    direction,
-    speed,
-    pauseOnHover,
-    hoverReverse,
-    rows,
-    rowGapPx,
-    rowOffsetPercent,
-    reducedMotion,
-  };
-}
-
-function wireMarqueeHover(
-  node: HTMLElement,
-  animations: Animation[],
-  config: { pauseOnHover: boolean; hoverReverse: boolean },
-): void {
-  if (config.pauseOnHover) {
-    node.addEventListener('mouseenter', () => {
-      for (const animation of animations) animation.pause();
-    });
-    node.addEventListener('mouseleave', () => {
-      for (const animation of animations) animation.play();
-    });
-  } else if (config.hoverReverse) {
-    const normalPlaybackRates = animations.map((animation) => animation.playbackRate || 1);
-    node.addEventListener('mouseenter', () => {
-      for (let i = 0; i < animations.length; i++) {
-        animations[i]!.playbackRate = -Math.abs(normalPlaybackRates[i] ?? 1);
-      }
-    });
-    node.addEventListener('mouseleave', () => {
-      for (let i = 0; i < animations.length; i++) {
-        animations[i]!.playbackRate = Math.abs(normalPlaybackRates[i] ?? 1);
-      }
-    });
-  }
-}
-
-function isMarqueeEditorChrome(node: ChildNode): boolean {
-  if (!(node instanceof HTMLElement)) return false;
-  return (
-    node.classList.contains('element-menu-trigger') ||
-    node.classList.contains('resize-handle') ||
-    node.hasAttribute('data-resize-handle')
-  );
-}
-
-function stripMarqueeCloneInteractivity(node: HTMLElement): void {
-  node.removeAttribute('id');
-  node.setAttribute('aria-hidden', 'true');
-  node.inert = true;
-  const focusables = node.querySelectorAll('a,button,input,select,textarea,[tabindex]');
-  for (let i = 0; i < focusables.length; i++) {
-    focusables[i]?.setAttribute('tabindex', '-1');
-  }
-  const descendants = node.querySelectorAll('[id]');
-  for (let i = 0; i < descendants.length; i++) {
-    descendants[i]?.removeAttribute('id');
-  }
-}
-
-function buildMarqueeLane(
-  node: HTMLElement,
-  content: HTMLElement,
-  rowIndex: number,
-): { lane: HTMLElement; content: HTMLElement } {
-  const lane = document.createElement('div');
-  lane.setAttribute('data-opencanvas-marquee-lane', String(rowIndex));
-  lane.style.display = 'flex';
-  lane.style.alignItems = 'stretch';
-  lane.style.width = 'max-content';
-  lane.style.minWidth = '100%';
-  lane.style.height = '100%';
-  lane.style.willChange = 'transform';
-  const rowContent = rowIndex === 0 ? content : content.cloneNode(true);
-  if (!(rowContent instanceof HTMLElement)) {
-    failMarquee(node, 'row-clone-failed', 'Marquee row content clone did not produce an element', null);
-  }
-  if (rowIndex > 0) stripMarqueeCloneInteractivity(rowContent);
-  const clone = rowContent.cloneNode(true);
-  if (!(clone instanceof HTMLElement)) {
-    failMarquee(node, 'clone-failed', 'Marquee content clone did not produce an HTMLElement', null);
-  }
-  stripMarqueeCloneInteractivity(clone);
-  clone.style.pointerEvents = 'none';
-  lane.appendChild(rowContent);
-  lane.appendChild(clone);
-  return { lane, content: rowContent };
-}
-
-function hydrateMarquees(scope: ParentNode, options: HydrateOptions = {}): void {
-  const nodes = scope.querySelectorAll('[data-opencanvas-marquee="true"]');
-  for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i];
-    if (!(node instanceof HTMLElement)) continue;
-    if (node.getAttribute('data-opencanvas-marquee-hydrated') === 'true') continue;
-    const config = readMarqueeConfig(node);
-    const reduce = prefersReducedMotion(options);
-    if (reduce && config.reducedMotion === 'static') {
-      node.setAttribute('data-opencanvas-marquee-hydrated', 'true');
-      node.setAttribute('data-opencanvas-marquee-reduced', 'static');
-      continue;
-    }
-    if (typeof node.animate !== 'function') {
-      failMarquee(node, 'missing-waapi', 'Marquee requires Element.animate support', null);
-    }
-    if (reduce && config.reducedMotion === 'slow') {
-      config.speed = Math.max(1, config.speed / 4);
-      node.setAttribute('data-opencanvas-marquee-reduced', 'slow');
-    }
-    const belt = document.createElement('div');
-    belt.setAttribute('data-opencanvas-marquee-belt', 'true');
-    belt.style.display = config.rows > 1 ? 'grid' : 'flex';
-    belt.style.alignItems = 'stretch';
-    if (config.rows > 1) {
-      belt.style.gridTemplateRows = 'repeat(' + String(config.rows) + ', minmax(0, 1fr))';
-      belt.style.rowGap = String(config.rowGapPx) + 'px';
-    }
-    belt.style.width = 'max-content';
-    belt.style.minWidth = '100%';
-    belt.style.height = '100%';
-    belt.style.willChange = 'transform';
-    const content = document.createElement('div');
-    content.setAttribute('data-opencanvas-marquee-content', 'true');
-    content.style.display = 'inline-flex';
-    content.style.alignItems = 'center';
-    content.style.flex = '0 0 auto';
-    content.style.minWidth = '100%';
-    content.style.height = '100%';
-    const chrome: ChildNode[] = [];
-    while (node.firstChild) {
-      const child = node.firstChild;
-      node.removeChild(child);
-      if (isMarqueeEditorChrome(child)) {
-        chrome.push(child);
-      } else {
-        content.appendChild(child);
-      }
-    }
-    if (!content.firstChild) {
-      failMarquee(node, 'empty-content', 'Marquee element has no visual content to animate', null);
-    }
-    const lanes: Array<{ lane: HTMLElement; content: HTMLElement }> = [];
-    for (let rowIndex = 0; rowIndex < config.rows; rowIndex++) {
-      const lane = buildMarqueeLane(node, content, rowIndex);
-      lanes.push(lane);
-      belt.appendChild(lane.lane);
-    }
-    node.appendChild(belt);
-    for (const child of chrome) node.appendChild(child);
-    node.style.overflow = 'hidden';
-    const firstContent = lanes[0]!.content;
-    let width = firstContent.getBoundingClientRect().width;
-    if (!(width > 0)) width = content.scrollWidth || belt.scrollWidth / 2 || node.clientWidth || 0;
-    if (!(width > 0)) {
-      failMarquee(node, 'zero-width', 'Marquee content width must be measurable', null);
-    }
-    const duration = Math.max(100, Math.round((width / config.speed) * 1000));
-    const frames =
-      config.direction === 'left'
-        ? [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-' + width + 'px,0,0)' }]
-        : [{ transform: 'translate3d(-' + width + 'px,0,0)' }, { transform: 'translate3d(0,0,0)' }];
-    const animations: Animation[] = [];
-    for (let laneIndex = 0; laneIndex < lanes.length; laneIndex++) {
-      const animation = lanes[laneIndex]!.lane.animate(frames, {
-        duration,
-        iterations: Infinity,
-        easing: 'linear',
-      });
-      if (laneIndex > 0 && config.rowOffsetPercent > 0) {
-        try {
-          animation.currentTime = duration * (((config.rowOffsetPercent / 100) * laneIndex) % 1);
-        } catch (err: unknown) {
-          failMarquee(
-            node,
-            'row-stagger-failed',
-            'Marquee row animation phase could not be staggered',
-            err instanceof Error ? err.message : String(err),
-          );
-        }
-      }
-      animations.push(animation);
-    }
-    wireMarqueeHover(node, animations, config);
-    node.setAttribute('data-opencanvas-marquee-hydrated', 'true');
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Pointer-fx — mirrors POINTER_FX_RUNTIME_SRC in `src/interactive/pointer-fx.ts`.

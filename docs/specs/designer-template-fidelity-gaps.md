@@ -100,9 +100,7 @@ Open Canvas has real motion and interaction primitives already:
 - **June 2026 update:** element-level Marquee is now schema-owned. The
   element inspector can enable direction, speed, pause-on-hover, hover-reverse,
   and explicit reduced-motion mode plus an edge-fade mask; renderer/editor
-  wrappers emit `data-opencanvas-marquee*` metadata; the Runtime Hydrator
-  duplicates the visual track and animates it in visitor and editor contexts;
-  validator/Yjs/smokes cover the contract.
+  wrappers emit `data-opencanvas-marquee*` metadata; Marquee is the first shared-source Runtime Hydrator adapter: editor preview imports the typed implementation from `src/interactive/marquee.ts`, while published pages receive `MARQUEE_RUNTIME_SRC` generated from those same functions.
 - **June 2026 update:** video media elements can now opt into Video Stream
   Hover. The media inspector exposes play-on-hover/focus mode and explicit
   reduced-motion behaviour plus pointer scrub; renderer emits

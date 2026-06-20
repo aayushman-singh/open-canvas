@@ -6,15 +6,97 @@
 // Malformed authored attributes dispatch `opencanvas:marquee-failure` and
 // throw instead of silently degrading.
 
-export const MARQUEE_RUNTIME_SRC = String.raw`
-function emitMarqueeFailure(el, code, message, cause) {
-  var detail = {
+export interface MarqueeRuntimeOptions {
+  reducedMotion?: 'no-preference' | 'reduce';
+}
+
+export interface MarqueeStyle {
+  display: string;
+  alignItems: string;
+  width: string;
+  minWidth: string;
+  height: string;
+  willChange: string;
+  gridTemplateRows?: string;
+  rowGap?: string;
+  pointerEvents?: string;
+  overflow?: string;
+  flex?: string;
+}
+
+export interface MarqueeElement {
+  nodeType: number;
+  getAttribute(name: string): string | null;
+  setAttribute(name: string, value: string): void;
+  removeAttribute(name: string): void;
+  querySelectorAll(selector: string): MarqueeElementList;
+  querySelector(selector: string): MarqueeElement | null;
+  appendChild(node: MarqueeElement): MarqueeElement;
+  removeChild(node: MarqueeElement): MarqueeElement;
+  closest(selector: string): MarqueeElement | null;
+  addEventListener(type: string, listener: (ev: Record<string, unknown>) => void): void;
+  getBoundingClientRect?(): { width: number };
+  animate?(keyframes: Record<string, string>[], options: Record<string, string | number>): MarqueeAnimation;
+  style: MarqueeStyle;
+  firstChild: MarqueeElement | null;
+  classList?: {
+    contains(token: string): boolean;
+  };
+  inert?: boolean;
+  className?: string;
+  scrollWidth?: number;
+  clientWidth?: number;
+  cloneNode(deep?: boolean): MarqueeElement;
+}
+
+export interface MarqueeElementList {
+  length: number;
+  [index: number]: MarqueeElement | undefined;
+}
+
+export interface MarqueeAnimation {
+  currentTime?: number | null;
+  playbackRate?: number;
+  pause(): void;
+  play(): void;
+}
+
+export interface MarqueeDocument {
+  createElement(tagName: string): MarqueeElement;
+  querySelectorAll(selectors: string): MarqueeElementList;
+}
+
+export interface MarqueeWindow {
+  dispatchEvent(event: Record<string, unknown>): boolean;
+  matchMedia(query: string): { matches: boolean };
+}
+
+export interface MarqueeCustomEvent {
+  detail: unknown;
+}
+
+declare const document: MarqueeDocument;
+declare const window: MarqueeWindow;
+declare const CustomEvent: new (typeArg: string, eventInitDict?: { detail: unknown }) => Record<string, unknown>;
+
+// Local narrow structural types to satisfy root compiler without DOM library
+export interface ParentNode {
+  querySelectorAll(selectors: string): MarqueeElementList;
+}
+
+export function emitMarqueeFailure(
+  el: { getAttribute?(name: string): string | null } | null,
+  code: string,
+  message: string,
+  cause: unknown
+): never {
+  const detail = {
     code: code,
     message: message,
-    elementId: el && el.getAttribute ? el.getAttribute('data-opencanvas-element') : null,
-    cause: cause ? String(cause && cause.message ? cause.message : cause) : null
+    elementId: el && typeof el.getAttribute === 'function' ? el.getAttribute('data-opencanvas-element') : null,
+    cause: cause ? String((cause as Record<string, unknown>) && (cause as Record<string, unknown>).message ? (cause as Record<string, unknown>).message : cause) : null
   };
-  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     window.dispatchEvent(new CustomEvent('opencanvas:marquee-failure', { detail: detail }));
   }
   if (typeof console !== 'undefined' && typeof console.error === 'function') {
@@ -22,42 +104,53 @@ function emitMarqueeFailure(el, code, message, cause) {
   }
   throw new Error('[opencanvas marquee] ' + message);
 }
-function marqueePrefersReducedMotion(options) {
+
+export function marqueePrefersReducedMotion(options?: MarqueeRuntimeOptions): boolean {
   if (options && options.reducedMotion === 'reduce') return true;
   if (options && options.reducedMotion === 'no-preference') return false;
-  return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
-function readMarqueeConfig(el) {
-  var direction = el.getAttribute('data-opencanvas-marquee-direction');
+
+export function readMarqueeConfig(el: MarqueeElement): {
+  direction: 'left' | 'right';
+  speed: number;
+  pauseOnHover: boolean;
+  hoverReverse: boolean;
+  rows: number;
+  rowGapPx: number;
+  rowOffsetPercent: number;
+  reducedMotion: 'static' | 'slow';
+} {
+  const direction = el.getAttribute('data-opencanvas-marquee-direction');
   if (direction !== 'left' && direction !== 'right') {
     emitMarqueeFailure(el, 'invalid-direction', 'Marquee direction must be left or right', direction);
   }
-  var speedRaw = el.getAttribute('data-opencanvas-marquee-speed');
-  var speed = speedRaw === null ? NaN : Number(speedRaw);
+  const speedRaw = el.getAttribute('data-opencanvas-marquee-speed');
+  const speed = speedRaw === null ? NaN : Number(speedRaw);
   if (!isFinite(speed) || speed <= 0) {
     emitMarqueeFailure(el, 'invalid-speed', 'Marquee speed must be a finite number > 0', speedRaw);
   }
-  var reducedMotion = el.getAttribute('data-opencanvas-marquee-reduced-motion');
+  const reducedMotion = el.getAttribute('data-opencanvas-marquee-reduced-motion');
   if (reducedMotion !== 'static' && reducedMotion !== 'slow') {
     emitMarqueeFailure(el, 'invalid-reduced-motion', 'Marquee reduced-motion mode must be static or slow', reducedMotion);
   }
-  var pauseOnHover = el.getAttribute('data-opencanvas-marquee-pause') === 'true';
-  var hoverReverse = el.getAttribute('data-opencanvas-marquee-hover-reverse') === 'true';
+  const pauseOnHover = el.getAttribute('data-opencanvas-marquee-pause') === 'true';
+  const hoverReverse = el.getAttribute('data-opencanvas-marquee-hover-reverse') === 'true';
   if (pauseOnHover && hoverReverse) {
     emitMarqueeFailure(el, 'hover-mode-conflict', 'Marquee cannot pause and reverse on hover at the same time', null);
   }
-  var rowsRaw = el.getAttribute('data-opencanvas-marquee-rows');
-  var rows = rowsRaw === null ? 1 : Number(rowsRaw);
+  const rowsRaw = el.getAttribute('data-opencanvas-marquee-rows');
+  const rows = rowsRaw === null ? 1 : Number(rowsRaw);
   if (!isFinite(rows) || Math.floor(rows) !== rows || rows < 1 || rows > 6) {
     emitMarqueeFailure(el, 'invalid-rows', 'Marquee rows must be an integer between 1 and 6', rowsRaw);
   }
-  var rowGapRaw = el.getAttribute('data-opencanvas-marquee-row-gap');
-  var rowGapPx = rowGapRaw === null ? 0 : Number(rowGapRaw);
+  const rowGapRaw = el.getAttribute('data-opencanvas-marquee-row-gap');
+  const rowGapPx = rowGapRaw === null ? 0 : Number(rowGapRaw);
   if (!isFinite(rowGapPx) || rowGapPx < 0 || rowGapPx > 200) {
     emitMarqueeFailure(el, 'invalid-row-gap', 'Marquee row gap must be between 0 and 200px', rowGapRaw);
   }
-  var rowOffsetRaw = el.getAttribute('data-opencanvas-marquee-row-offset');
-  var rowOffsetPercent = rowOffsetRaw === null ? 50 : Number(rowOffsetRaw);
+  const rowOffsetRaw = el.getAttribute('data-opencanvas-marquee-row-offset');
+  const rowOffsetPercent = rowOffsetRaw === null ? 50 : Number(rowOffsetRaw);
   if (!isFinite(rowOffsetPercent) || rowOffsetPercent < 0 || rowOffsetPercent > 100) {
     emitMarqueeFailure(el, 'invalid-row-offset', 'Marquee row offset must be between 0 and 100%', rowOffsetRaw);
   }
@@ -72,48 +165,73 @@ function readMarqueeConfig(el) {
     reducedMotion: reducedMotion
   };
 }
-function wireMarqueeHover(el, animations, config) {
+
+export function wireMarqueeHover(el: MarqueeElement, animations: MarqueeAnimation[], config: { pauseOnHover: boolean; hoverReverse: boolean }): void {
   if (config.pauseOnHover) {
     el.addEventListener('mouseenter', function(){
-      for (var i = 0; i < animations.length; i++) animations[i].pause();
+      for (let i = 0; i < animations.length; i++) {
+        const anim = animations[i];
+        if (anim) anim.pause();
+      }
     });
     el.addEventListener('mouseleave', function(){
-      for (var i = 0; i < animations.length; i++) animations[i].play();
+      for (let i = 0; i < animations.length; i++) {
+        const anim = animations[i];
+        if (anim) anim.play();
+      }
     });
   } else if (config.hoverReverse) {
-    var normalPlaybackRates = [];
-    for (var r = 0; r < animations.length; r++) normalPlaybackRates.push(animations[r].playbackRate || 1);
+    const normalPlaybackRates: number[] = [];
+    for (let r = 0; r < animations.length; r++) {
+      const anim = animations[r];
+      normalPlaybackRates.push(anim ? anim.playbackRate || 1 : 1);
+    }
     el.addEventListener('mouseenter', function(){
-      for (var i = 0; i < animations.length; i++) animations[i].playbackRate = -Math.abs(normalPlaybackRates[i] || 1);
+      for (let i = 0; i < animations.length; i++) {
+        const anim = animations[i];
+        if (anim) {
+          anim.playbackRate = -Math.abs(normalPlaybackRates[i] || 1);
+        }
+      }
     });
     el.addEventListener('mouseleave', function(){
-      for (var i = 0; i < animations.length; i++) animations[i].playbackRate = Math.abs(normalPlaybackRates[i] || 1);
+      for (let i = 0; i < animations.length; i++) {
+        const anim = animations[i];
+        if (anim) {
+          anim.playbackRate = Math.abs(normalPlaybackRates[i] || 1);
+        }
+      }
     });
   }
 }
-function isMarqueeEditorChrome(node) {
+
+export function isMarqueeEditorChrome(node: { nodeType: number; className?: string; hasAttribute?(name: string): boolean } | null): boolean {
   if (!node || node.nodeType !== 1) return false;
-  var el = node;
-  var cls = typeof el.className === 'string' ? el.className : '';
-  return cls.indexOf('element-menu-trigger') >= 0 || cls.indexOf('resize-handle') >= 0 || el.hasAttribute('data-resize-handle');
+  const el = node;
+  const cls = typeof el.className === 'string' ? el.className : '';
+  return /(^|\s)element-menu-trigger(\s|$)/.test(cls) || /(^|\s)resize-handle(\s|$)/.test(cls) || (typeof el.hasAttribute === 'function' && el.hasAttribute('data-resize-handle'));
 }
-function stripMarqueeCloneInteractivity(node) {
+
+export function stripMarqueeCloneInteractivity(node: MarqueeElement | null): void {
   if (!node || node.nodeType !== 1) return;
-  var el = node;
+  const el = node;
   el.removeAttribute('id');
   el.setAttribute('aria-hidden', 'true');
   if ('inert' in el) el.inert = true;
-  var focusables = el.querySelectorAll('a,button,input,select,textarea,[tabindex]');
-  for (var i = 0; i < focusables.length; i++) {
-    focusables[i].setAttribute('tabindex', '-1');
+  const focusables = el.querySelectorAll('a,button,input,select,textarea,[tabindex]');
+  for (let i = 0; i < focusables.length; i++) {
+    const item = focusables[i];
+    if (item) item.setAttribute('tabindex', '-1');
   }
-  var descendants = el.querySelectorAll('[id]');
-  for (var j = 0; j < descendants.length; j++) {
-    descendants[j].removeAttribute('id');
+  const descendants = el.querySelectorAll('[id]');
+  for (let j = 0; j < descendants.length; j++) {
+    const item = descendants[j];
+    if (item) item.removeAttribute('id');
   }
 }
-function buildMarqueeLane(el, content, rowIndex) {
-  var lane = document.createElement('div');
+
+export function buildMarqueeLane(el: MarqueeElement, content: MarqueeElement, rowIndex: number): { lane: MarqueeElement, content: MarqueeElement } {
+  const lane = document.createElement('div');
   lane.setAttribute('data-opencanvas-marquee-lane', String(rowIndex));
   lane.style.display = 'flex';
   lane.style.alignItems = 'stretch';
@@ -121,12 +239,12 @@ function buildMarqueeLane(el, content, rowIndex) {
   lane.style.minWidth = '100%';
   lane.style.height = '100%';
   lane.style.willChange = 'transform';
-  var rowContent = rowIndex === 0 ? content : content.cloneNode(true);
+  const rowContent = rowIndex === 0 ? content : content.cloneNode(true);
   if (!rowContent || rowContent.nodeType !== 1) {
     emitMarqueeFailure(el, 'row-clone-failed', 'Marquee row content clone did not produce an element', null);
   }
   if (rowIndex > 0) stripMarqueeCloneInteractivity(rowContent);
-  var clone = rowContent.cloneNode(true);
+  const clone = rowContent.cloneNode(true);
   if (!clone || clone.nodeType !== 1) {
     emitMarqueeFailure(el, 'clone-failed', 'Marquee content clone did not produce an element', null);
   }
@@ -136,14 +254,16 @@ function buildMarqueeLane(el, content, rowIndex) {
   lane.appendChild(clone);
   return { lane: lane, content: rowContent };
 }
-function hydrateMarquees(scope, options) {
-  var root = scope || document;
-  var nodes = root.querySelectorAll('[data-opencanvas-marquee="true"]');
-  for (var i = 0; i < nodes.length; i++) {
-    var el = nodes[i];
+
+export function hydrateMarquees(scope: ParentNode, options: MarqueeRuntimeOptions = {}): void {
+  const root = scope || document;
+  const nodes = root.querySelectorAll('[data-opencanvas-marquee="true"]');
+  for (let i = 0; i < nodes.length; i++) {
+    const el = nodes[i];
+    if (!el) continue;
     if (el.getAttribute('data-opencanvas-marquee-hydrated') === 'true') continue;
-    var config = readMarqueeConfig(el);
-    var reduce = marqueePrefersReducedMotion(options);
+    const config = readMarqueeConfig(el);
+    const reduce = marqueePrefersReducedMotion(options);
     if (reduce && config.reducedMotion === 'static') {
       el.setAttribute('data-opencanvas-marquee-hydrated', 'true');
       el.setAttribute('data-opencanvas-marquee-reduced', 'static');
@@ -156,7 +276,7 @@ function hydrateMarquees(scope, options) {
       config.speed = Math.max(1, config.speed / 4);
       el.setAttribute('data-opencanvas-marquee-reduced', 'slow');
     }
-    var belt = document.createElement('div');
+    const belt = document.createElement('div');
     belt.setAttribute('data-opencanvas-marquee-belt', 'true');
     belt.style.display = config.rows > 1 ? 'grid' : 'flex';
     belt.style.alignItems = 'stretch';
@@ -168,16 +288,16 @@ function hydrateMarquees(scope, options) {
     belt.style.minWidth = '100%';
     belt.style.height = '100%';
     belt.style.willChange = 'transform';
-    var content = document.createElement('div');
+    const content = document.createElement('div');
     content.setAttribute('data-opencanvas-marquee-content', 'true');
     content.style.display = 'inline-flex';
     content.style.alignItems = 'center';
     content.style.flex = '0 0 auto';
     content.style.minWidth = '100%';
     content.style.height = '100%';
-    var chrome = [];
+    const chrome: MarqueeElement[] = [];
     while (el.firstChild) {
-      var child = el.firstChild;
+      const child = el.firstChild;
       el.removeChild(child);
       if (isMarqueeEditorChrome(child)) {
         chrome.push(child);
@@ -188,28 +308,40 @@ function hydrateMarquees(scope, options) {
     if (!content.firstChild) {
       emitMarqueeFailure(el, 'empty-content', 'Marquee element has no visual content to animate', null);
     }
-    var lanes = [];
-    for (var rowIndex = 0; rowIndex < config.rows; rowIndex++) {
-      var lane = buildMarqueeLane(el, content, rowIndex);
+    const lanes: Array<{ lane: MarqueeElement, content: MarqueeElement }> = [];
+    for (let rowIndex = 0; rowIndex < config.rows; rowIndex++) {
+      const lane = buildMarqueeLane(el, content, rowIndex);
       lanes.push(lane);
       belt.appendChild(lane.lane);
     }
     el.appendChild(belt);
-    for (var c = 0; c < chrome.length; c++) el.appendChild(chrome[c]);
+    for (let c = 0; c < chrome.length; c++) {
+      const child = chrome[c];
+      if (child) el.appendChild(child);
+    }
     el.style.overflow = 'hidden';
-    var firstContent = lanes[0].content;
-    var width = firstContent.getBoundingClientRect ? firstContent.getBoundingClientRect().width : 0;
-    if (!(width > 0)) width = content.scrollWidth || belt.scrollWidth / 2 || el.clientWidth || 0;
+    const firstContent = lanes[0] ? lanes[0].content : null;
+    let width = firstContent && firstContent.getBoundingClientRect ? firstContent.getBoundingClientRect().width : 0;
+    if (!(width > 0)) {
+      width = content.scrollWidth || (belt.scrollWidth ? belt.scrollWidth / 2 : 0);
+    }
+    if (!(width > 0)) {
+      width = el.clientWidth || 0;
+    }
     if (!(width > 0)) {
       emitMarqueeFailure(el, 'zero-width', 'Marquee content width must be measurable', null);
     }
-    var duration = Math.max(100, Math.round(width / config.speed * 1000));
-    var frames = config.direction === 'left'
+    const duration = Math.max(100, Math.round(width / config.speed * 1000));
+    const frames = config.direction === 'left'
       ? [{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(-' + width + 'px,0,0)' }]
       : [{ transform: 'translate3d(-' + width + 'px,0,0)' }, { transform: 'translate3d(0,0,0)' }];
-    var animations = [];
-    for (var laneIndex = 0; laneIndex < lanes.length; laneIndex++) {
-      var animation = lanes[laneIndex].lane.animate(frames, { duration: duration, iterations: Infinity, easing: 'linear' });
+    const animations: MarqueeAnimation[] = [];
+    for (let laneIndex = 0; laneIndex < lanes.length; laneIndex++) {
+      const laneObj = lanes[laneIndex];
+      if (!laneObj || typeof laneObj.lane.animate !== 'function') {
+        emitMarqueeFailure(el, 'missing-waapi', 'Marquee requires Element.animate support', null);
+      }
+      const animation = laneObj.lane.animate(frames, { duration: duration, iterations: Infinity, easing: 'linear' });
       if (laneIndex > 0 && config.rowOffsetPercent > 0) {
         try {
           animation.currentTime = duration * (((config.rowOffsetPercent / 100) * laneIndex) % 1);
@@ -223,4 +355,16 @@ function hydrateMarquees(scope, options) {
     el.setAttribute('data-opencanvas-marquee-hydrated', 'true');
   }
 }
-`;
+
+export const MARQUEE_RUNTIME_SRC = [
+  emitMarqueeFailure,
+  marqueePrefersReducedMotion,
+  readMarqueeConfig,
+  wireMarqueeHover,
+  isMarqueeEditorChrome,
+  stripMarqueeCloneInteractivity,
+  buildMarqueeLane,
+  hydrateMarquees,
+]
+  .map((fn) => fn.toString())
+  .join('\n');
