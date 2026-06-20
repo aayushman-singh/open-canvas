@@ -310,6 +310,7 @@ export const COLLECTION_STYLE_FIELDS = [
 ] as const satisfies readonly ComponentStyleFieldDef[];
 
 export const NAV_STYLE_FIELDS = [
+  { key: 'recipe', kind: 'string' },
   { key: 'backgroundColor', kind: 'string', cssVar: '--opencanvas-nav-bg' },
   { key: 'color', kind: 'string', cssVar: '--opencanvas-nav-color' },
   { key: 'slotGap', kind: 'numberPx', cssVar: '--opencanvas-nav-slot-gap' },

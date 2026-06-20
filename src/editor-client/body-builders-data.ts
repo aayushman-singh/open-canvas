@@ -42,7 +42,7 @@ import type {
 } from '../canvas/elements/flow-container.js';
 import type { FormElement } from '../canvas/elements/form.js';
 import { formPointerFx } from '../canvas/elements/form.js';
-import { navLinkIsActive, type NavElement } from '../canvas/elements/nav.js';
+import { navLinkIsActive, navStyleRecipe, type NavElement } from '../canvas/elements/nav.js';
 import type { RichMotionElement } from '../canvas/elements/rich-motion.js';
 import type { TableElement } from '../canvas/elements/table.js';
 
@@ -626,10 +626,12 @@ export function buildNavBodyImpl(ctx: BuildNavBodyContext, element: NavElement):
   // with no slot structure, which is why layout / siteTitle / primaryAction /
   // logo changes never reflected live in the editor.
   const nav = document.createElement('nav');
-  nav.className = 'opencanvas-nav';
+  const recipe = navStyleRecipe(element.navStyle?.recipe);
+  nav.className = recipe ? 'opencanvas-nav opencanvas-nav--recipe-' + recipe : 'opencanvas-nav';
   const layout = element.layout === 'left-right' ? 'left-right' : 'left-center-right';
   nav.setAttribute('data-opencanvas-nav-layout', layout);
   nav.setAttribute('data-opencanvas-nav-sticky', element.sticky ? 'true' : 'false');
+  if (recipe) nav.setAttribute('data-opencanvas-nav-style-recipe', recipe);
   if (element.themeOnScroll?.enabled === true) {
     nav.setAttribute('data-opencanvas-nav-theme-root', element.id);
     nav.setAttribute('data-opencanvas-nav-theme-default', element.themeOnScroll.defaultTheme);

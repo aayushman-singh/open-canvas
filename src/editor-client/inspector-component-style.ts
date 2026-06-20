@@ -57,6 +57,7 @@ const STYLE_META: Record<string, Record<string, ComponentStyleMeta>> = {
     iconGap: { section: 'Icon', label: 'Gap', min: 0, max: 64, placeholder: '8' },
   },
   navStyle: {
+    recipe: { section: 'Surface', label: 'Recipe', placeholder: 'glass-float | race-strip | editorial-tabs' },
     backgroundColor: { section: 'Surface', label: 'Background', swatchDefault: '#ffffff' },
     color: { section: 'Surface', label: 'Text color', swatchDefault: '#111111' },
     slotGap: { section: 'Layout', label: 'Slot gap', min: 0, max: 96, placeholder: '4' },

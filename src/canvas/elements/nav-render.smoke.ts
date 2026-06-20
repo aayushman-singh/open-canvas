@@ -163,6 +163,16 @@ assert(
   `index page must mark the root nav link active; got ${activeHome}`,
 );
 
+const recipeHtml = renderNav(buildNav({ navStyle: { recipe: 'race-strip' } }), CTX);
+assert(
+  recipeHtml.includes('data-opencanvas-nav-style-recipe="race-strip"'),
+  `nav style recipe must emit explicit render metadata; got ${recipeHtml}`,
+);
+assert(
+  recipeHtml.includes('opencanvas-nav--recipe-race-strip'),
+  `nav style recipe must emit styling hook; got ${recipeHtml}`,
+);
+
 const bodyBuildersSrc = await Bun.file(
   new URL('../../editor-client/body-builders-data.ts', import.meta.url),
 ).text();
@@ -173,6 +183,14 @@ assert(
 assert(
   bodyBuildersSrc.includes('aria-current'),
   'editor nav preview must emit aria-current for the active link',
+);
+assert(
+  bodyBuildersSrc.includes('data-opencanvas-nav-style-recipe'),
+  'editor nav preview must emit the same nav style recipe metadata',
+);
+assert(
+  bodyBuildersSrc.includes('opencanvas-nav--recipe-'),
+  'editor nav preview must emit nav style recipe styling hooks',
 );
 
 console.log(

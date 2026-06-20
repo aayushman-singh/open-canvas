@@ -2326,6 +2326,34 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   background: var(--opencanvas-nav-bg, transparent);
   color: var(--opencanvas-nav-color, inherit);
 }
+.opencanvas-nav[data-opencanvas-nav-style-recipe="glass-float"] {
+  padding: 8px 14px;
+  border: 1px solid color-mix(in oklab, currentColor 16%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--opencanvas-nav-bg, var(--opencanvas-kit-panel, #ffffff)) 72%, transparent);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(18px) saturate(1.16);
+}
+.opencanvas-nav[data-opencanvas-nav-style-recipe="race-strip"] {
+  padding: 0 18px;
+  border-block: 2px solid var(--opencanvas-kit-accent, currentColor);
+  background:
+    linear-gradient(90deg, var(--opencanvas-kit-accent, currentColor) 0 8px, transparent 8px),
+    var(--opencanvas-nav-bg, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.opencanvas-nav[data-opencanvas-nav-style-recipe="editorial-tabs"] {
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in oklab, currentColor 18%, transparent);
+  background: var(--opencanvas-nav-bg, transparent);
+}
+.opencanvas-nav[data-opencanvas-nav-style-recipe="editorial-tabs"] .opencanvas-nav-link {
+  border-radius: 999px;
+}
+.opencanvas-nav[data-opencanvas-nav-style-recipe="editorial-tabs"] .opencanvas-nav-link[data-opencanvas-nav-link-active="true"] {
+  background: var(--opencanvas-nav-link-active-bg, color-mix(in oklab, var(--opencanvas-kit-accent, currentColor) 18%, transparent));
+}
 .opencanvas-nav-slot {
   display: flex;
   align-items: center;

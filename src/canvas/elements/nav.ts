@@ -53,8 +53,11 @@ export interface NavLink {
 
 export const NAV_LAYOUTS = ['left-center-right', 'left-right'] as const;
 export type NavLayout = (typeof NAV_LAYOUTS)[number];
+export const NAV_STYLE_RECIPES = ['glass-float', 'race-strip', 'editorial-tabs'] as const;
+export type NavStyleRecipe = (typeof NAV_STYLE_RECIPES)[number];
 
 export interface NavStyle {
+  recipe?: NavStyleRecipe;
   backgroundColor?: string;
   color?: string;
   slotGap?: number;
@@ -70,6 +73,13 @@ export interface NavStyle {
   primaryBackgroundColor?: string;
   primaryColor?: string;
   primaryBorderRadius?: number;
+}
+
+export function navStyleRecipe(value: unknown): NavStyleRecipe | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') throw new Error('navStyle.recipe must be a string when present');
+  if ((NAV_STYLE_RECIPES as readonly string[]).includes(value)) return value as NavStyleRecipe;
+  throw new Error('unsupported navStyle.recipe: ' + value);
 }
 
 export interface NavElement extends Omit<BaseElement, 'sticky'> {
@@ -196,6 +206,9 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
   const siteTitleHtml = renderNavSiteTitle(el.siteTitle);
   const linksHtml = el.links.map((link) => renderNavLink(link, ctx.pageSlug)).join('');
   const primaryActionHtml = renderNavPrimaryAction(el.primaryAction, ctx.pageSlug);
+  const recipe = navStyleRecipe(el.navStyle?.recipe);
+  const recipeClass = recipe ? ` opencanvas-nav--recipe-${escapeAttr(recipe)}` : '';
+  const recipeAttr = recipe ? ` data-opencanvas-nav-style-recipe="${escapeAttr(recipe)}"` : '';
 
   const navStyleEntries: Array<[string, string]> = [];
   if (el.sticky) {
@@ -238,8 +251,8 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
       : `<div class="opencanvas-nav-slot" data-slot="primary">${primaryActionHtml}</div>`;
 
   return (
-    `<nav class="opencanvas-nav" data-opencanvas-nav-layout="${escapeAttr(el.layout)}" ` +
-    `data-opencanvas-nav-sticky="${el.sticky ? 'true' : 'false'}"${navThemeAttrs} ` +
+    `<nav class="opencanvas-nav${recipeClass}" data-opencanvas-nav-layout="${escapeAttr(el.layout)}" ` +
+    `data-opencanvas-nav-sticky="${el.sticky ? 'true' : 'false'}"${recipeAttr}${navThemeAttrs} ` +
     `style="${navStyle}">` +
     `${leftSlot}${linksSlot}${primarySlot}` +
     `</nav>`

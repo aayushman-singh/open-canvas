@@ -46,7 +46,13 @@ import {
   type FlowJustify,
   type FlowLayoutMode,
 } from './elements/flow-container.js';
-import { NAV_LAYOUTS, NAV_LINK_KINDS, type NavLayout, type NavLinkKind } from './elements/nav.js';
+import {
+  NAV_LAYOUTS,
+  NAV_LINK_KINDS,
+  NAV_STYLE_RECIPES,
+  type NavLayout,
+  type NavLinkKind,
+} from './elements/nav.js';
 import {
   ACCORDION_STYLE_SPEC,
   ACTION_STYLE_SPEC,
@@ -2202,6 +2208,15 @@ function validateElement(
         errors,
         element.pinnedStyle,
       );
+      const navStyle = element.navStyle as Record<string, unknown> | undefined;
+      if (navStyle?.recipe !== undefined) {
+        assertOneOf(
+          navStyle.recipe,
+          NAV_STYLE_RECIPES,
+          `${basePath}.navStyle.recipe`,
+          errors,
+        );
+      }
       assertOneOf<NavLayout>(element.layout, NAV_LAYOUTS, `${basePath}.layout`, errors);
       if (typeof element.sticky !== 'boolean') {
         errors.push(`${basePath}.sticky must be a boolean (got ${describe(element.sticky)})`);

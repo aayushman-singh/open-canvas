@@ -820,13 +820,18 @@ Current state:
   of letting malformed scroll-theme relations publish.
 - The section inspector exposes the target selector; the nav inspector exposes
   enable/default-theme/reduced-motion controls.
+- **June 2026 update:** Nav Component Style now includes bounded recipe
+  presets (`glass-float`, `race-strip`, `editorial-tabs`). The recipe is stored
+  as schema-owned `navStyle.recipe`, validation rejects unsupported values,
+  renderer/editor preview emit explicit metadata and class hooks, and visitor
+  and editor CSS share the same recipe selectors.
 
 User-visible miss:
 
 - Owners can now reproduce designer-site nav inversion across scroll regions
   without custom JavaScript.
-- Remaining next wave: richer token catalog, per-nav style recipes, and visual
-  preview controls for reduced-motion media queries.
+- Remaining next wave: richer token catalog and visual preview controls for
+  reduced-motion media queries.
 
 Needed primitive:
 

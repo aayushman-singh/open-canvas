@@ -28,7 +28,7 @@ import { actionAgentToolSpec } from './elements/action.js';
 import { carouselAgentToolSpec } from './elements/carousel.js';
 import { collectionAgentToolSpec } from './elements/collection.js';
 import { formAgentToolSpec } from './elements/form.js';
-import { navAgentToolSpec } from './elements/nav.js';
+import { NAV_STYLE_RECIPES, navAgentToolSpec } from './elements/nav.js';
 import { tabsAgentToolSpec } from './elements/tabs.js';
 
 const TURNSTILE = 'turnstile-test-key';
@@ -215,6 +215,7 @@ function expectRoundTrip(state: EditableSite, label: string): void {
       paddingY: 12,
     }),
     withStyle(nav(), 'navStyle', {
+      recipe: 'glass-float',
       backgroundColor: '#101820',
       color: '#f7f1df',
       slotGap: 18,
@@ -343,6 +344,14 @@ function expectRoundTrip(state: EditableSite, label: string): void {
     'navStyle must emit modeled active link background on the wrapper',
   );
   assert(
+    html.includes('data-opencanvas-nav-style-recipe="glass-float"'),
+    'navStyle recipe must emit published nav recipe metadata',
+  );
+  assert(
+    html.includes('opencanvas-nav--recipe-glass-float'),
+    'navStyle recipe must emit published nav recipe styling hook',
+  );
+  assert(
     html.includes('--opencanvas-nav-primary-radius:999px'),
     'navStyle must emit modeled primary CTA radius on the wrapper',
   );
@@ -359,8 +368,24 @@ function expectRoundTrip(state: EditableSite, label: string): void {
     'public styles must consume active nav link metadata',
   );
   assert(
+    canvasPublishedStyles.includes('data-opencanvas-nav-style-recipe="glass-float"'),
+    'public styles must include glass-float nav recipe rules',
+  );
+  assert(
+    canvasPublishedStyles.includes('data-opencanvas-nav-style-recipe="race-strip"'),
+    'public styles must include race-strip nav recipe rules',
+  );
+  assert(
+    canvasPublishedStyles.includes('data-opencanvas-nav-style-recipe="editorial-tabs"'),
+    'public styles must include editorial-tabs nav recipe rules',
+  );
+  assert(
     canvasEditorStyles.includes('background: var(--opencanvas-nav-bg'),
     'editor styles must consume modeled nav background',
+  );
+  assert(
+    canvasEditorStyles.includes('data-opencanvas-nav-style-recipe="glass-float"'),
+    'editor styles must mirror nav recipe rules',
   );
   assert(
     canvasEditorStyles.includes('padding: var(--opencanvas-nav-link-pad-y'),
@@ -561,6 +586,15 @@ expectInvalid(
 );
 expectInvalid(
   siteWith([
+    withStyle(nav(), 'navStyle', {
+      recipe: 'owner-css',
+    }),
+  ]),
+  '.navStyle.recipe',
+  'unknown navStyle recipe',
+);
+expectInvalid(
+  siteWith([
     withStyle(
       {
         ...nav(),
@@ -574,6 +608,15 @@ expectInvalid(
   'modeled navStyle key duplicated in pinnedStyle',
 );
 
+
+{
+  assert(
+    (NAV_STYLE_RECIPES as readonly string[]).includes('glass-float') &&
+      (NAV_STYLE_RECIPES as readonly string[]).includes('race-strip') &&
+      (NAV_STYLE_RECIPES as readonly string[]).includes('editorial-tabs'),
+    'schema must expose bounded nav style recipes',
+  );
+}
 
 {
   const patch = accordionAgentToolSpec.parsePatch({
@@ -623,6 +666,11 @@ expectInvalid(
     JSON.stringify(navAgentToolSpec.parsePatch({ navStyle: { slotGap: 14 } })) ===
       JSON.stringify({ navStyle: { slotGap: 14 } }),
     'nav agent patch must preserve navStyle',
+  );
+  assert(
+    JSON.stringify(navAgentToolSpec.parsePatch({ navStyle: { recipe: 'race-strip' } })) ===
+      JSON.stringify({ navStyle: { recipe: 'race-strip' } }),
+    'nav agent patch must preserve navStyle recipe',
   );
 }
 
