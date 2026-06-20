@@ -48,30 +48,42 @@ function behaviourFindScrollScene(payload, scrollSceneId) {
   behaviourFailure('behaviour-scroll-scene-missing', { scrollSceneId: scrollSceneId }, new Error('scroll scene not found'));
 }
 
-function behaviourResolveTarget(target, root) {
+function behaviourResolveTarget(target, root, context) {
   root = root || document;
+  var failureContext = Object.assign({}, context || {}, { target: target });
   if (target.type === 'site') return [document.documentElement];
   if (target.type === 'page') {
     var page = root.querySelector('[data-opencanvas-page="' + target.pageId + '"]');
-    if (!page) behaviourFailure('behaviour-target-missing', { target: target }, new Error('page target not found'));
+    if (!page) behaviourFailure('behaviour-target-missing', failureContext, new Error('page target not found'));
     return [page];
   }
   if (target.type === 'section') {
     var section = root.querySelector('[data-opencanvas-section="' + target.sectionId + '"]');
-    if (!section) behaviourFailure('behaviour-target-missing', { target: target }, new Error('section target not found'));
+    if (!section) behaviourFailure('behaviour-target-missing', failureContext, new Error('section target not found'));
     return [section];
   }
   if (target.type === 'element') {
     var element = root.querySelector('[data-opencanvas-element="' + target.elementId + '"]');
-    if (!element) behaviourFailure('behaviour-target-missing', { target: target }, new Error('element target not found'));
+    if (!element) behaviourFailure('behaviour-target-missing', failureContext, new Error('element target not found'));
     return [element];
+  }
+  if (target.type === 'children-of') {
+    var host = root.querySelector('[data-opencanvas-element="' + target.elementId + '"]');
+    if (!host) behaviourFailure('motion-sequence-target-resolution', failureContext, new Error('children-of host target not found'));
+    var descendants = host.querySelectorAll('[data-opencanvas-element]');
+    var children = [];
+    for (var i = 0; i < descendants.length; i++) {
+      if (descendants[i] !== host) children.push(descendants[i]);
+    }
+    if (children.length === 0) behaviourFailure('motion-sequence-target-resolution', failureContext, new Error('children-of target resolved no child elements'));
+    return children;
   }
   if (target.type === 'text-split') {
     var textEl = root.querySelector('[data-opencanvas-element="' + target.elementId + '"]');
-    if (!textEl) behaviourFailure('behaviour-target-missing', { target: target }, new Error('text-split target not found'));
+    if (!textEl) behaviourFailure('behaviour-target-missing', failureContext, new Error('text-split target not found'));
     return behaviourSplitTextTarget(textEl, target.unit);
   }
-  behaviourFailure('behaviour-target-unknown', { target: target }, new Error('unknown behaviour target type'));
+  behaviourFailure('behaviour-target-unknown', failureContext, new Error('unknown behaviour target type'));
 }
 
 function behaviourTextHost(node) {
@@ -414,7 +426,7 @@ function behaviourRunSequence(sequence, root, reducedMode, progress) {
         behaviourFailure('motion-sequence-start-at', { sequenceId: sequence.id, stepId: step.id, startAtMs: step.startAtMs }, new Error('startAtMs must be a finite number >= 0'));
       }
     }
-    var targets = behaviourResolveTarget(step.target, root);
+    var targets = behaviourResolveTarget(step.target, root, { sequenceId: sequence.id, stepId: step.id });
     behaviourAnimateTargets(
       targets,
       step,
@@ -435,7 +447,7 @@ function behaviourApplyStepFromStates(sequence, root) {
   var steps = sequence.steps || [];
   for (var i = 0; i < steps.length; i++) {
     var step = steps[i];
-    var targets = behaviourResolveTarget(step.target, root);
+    var targets = behaviourResolveTarget(step.target, root, { sequenceId: sequence.id, stepId: step.id });
     var from = step.from || {};
     for (var j = 0; j < targets.length; j++) {
       behaviourApplyProps(targets[j], from);

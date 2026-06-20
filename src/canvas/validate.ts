@@ -3246,6 +3246,7 @@ interface BehaviourTargetIndex {
   pageIds: Set<string>;
   sectionIds: Map<string, number>;
   elementIds: Map<string, number>;
+  compoundElementIds: Map<string, number>;
   textElementIds: Map<string, number>;
 }
 
@@ -3259,12 +3260,16 @@ function collectBehaviourTargetIndex(state: Record<string, unknown>): BehaviourT
     pageIds: new Set<string>(),
     sectionIds: new Map<string, number>(),
     elementIds: new Map<string, number>(),
+    compoundElementIds: new Map<string, number>(),
     textElementIds: new Map<string, number>(),
   };
 
   const visitElementTree = (element: unknown): void => {
     if (!isRecord(element)) return;
     bumpIdCount(index.elementIds, element.id);
+    if (element.type === 'flow-container' || element.type === 'tabs' || element.type === 'collection') {
+      bumpIdCount(index.compoundElementIds, element.id);
+    }
     if (element.type === 'text') {
       bumpIdCount(index.textElementIds, element.id);
     }
@@ -3399,6 +3404,15 @@ function validateBehaviourTarget(
       break;
     case 'element':
       resolveIndexedId(index.elementIds, value.elementId, `${path}.elementId`, 'element', errors);
+      break;
+    case 'children-of':
+      resolveIndexedId(
+        index.compoundElementIds,
+        value.elementId,
+        `${path}.elementId`,
+        'compound element',
+        errors,
+      );
       break;
     case 'text-split':
       resolveIndexedId(
@@ -3675,6 +3689,9 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
             );
           }
           validateBehaviourTarget(step.target, `${stepPath}.target`, errors, targetIndex);
+          if (isRecord(step.target) && step.target.type === 'children-of' && sequence.reducedMotion === undefined) {
+            errors.push(`${sequencePath}.reducedMotion is required when a Motion Sequence targets children-of`);
+          }
           if (step.textEffect !== undefined) {
             const textEffectValid = assertOneOf(
               step.textEffect,

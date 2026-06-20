@@ -60,6 +60,60 @@ function buildValidState(): EditableSite & Record<string, unknown> {
                   },
                 ],
               },
+              {
+                id: 'project-card-grid',
+                type: 'flow-container',
+                box: { x: 520, y: 0, w: 600, h: 240, z: 1 },
+                layout: {
+                  mode: 'grid',
+                  columns: 3,
+                  gap: { row: 24, column: 24 },
+                  padding: { top: 0, right: 0, bottom: 0, left: 0 },
+                  align: 'stretch',
+                  justify: 'start',
+                },
+                items: [
+                  {
+                    id: 'project-card-one-item',
+                    element: {
+                      id: 'project-card-one',
+                      type: 'text',
+                      box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+                      content: [{ text: 'Project one' }],
+                      role: 'body',
+                      fontSize: 18,
+                      fontWeight: 400,
+                      align: 'left',
+                    },
+                  },
+                  {
+                    id: 'project-card-two-item',
+                    element: {
+                      id: 'project-card-two',
+                      type: 'text',
+                      box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+                      content: [{ text: 'Project two' }],
+                      role: 'body',
+                      fontSize: 18,
+                      fontWeight: 400,
+                      align: 'left',
+                    },
+                  },
+                  {
+                    id: 'project-card-three-item',
+                    element: {
+                      id: 'project-card-three',
+                      type: 'text',
+                      box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+                      content: [{ text: 'Project three' }],
+                      role: 'body',
+                      fontSize: 18,
+                      fontWeight: 400,
+                      align: 'left',
+                    },
+                  },
+                ],
+              },
             ],
           },
         ],
@@ -158,6 +212,21 @@ function buildValidState(): EditableSite & Record<string, unknown> {
             target: { type: 'element', elementId: 'tab-copy' },
             to: { translateX: 12, filter: 'blur(0px)' },
             durationMs: 280,
+          },
+        ],
+      },
+      {
+        id: 'sequence-child-reveal',
+        trigger: { type: 'section-enter', sectionId: 'section-hero' },
+        reducedMotion: 'final-state',
+        steps: [
+          {
+            id: 'step-project-cards',
+            target: { type: 'children-of', elementId: 'project-card-grid' },
+            from: { opacity: 0, translateY: 20 },
+            to: { opacity: 1, translateY: 0 },
+            durationMs: 600,
+            staggerMs: 100,
           },
         ],
       },
@@ -399,6 +468,26 @@ expectInvalid(
   textEffectOnElement,
   'motionSequences[0].steps[0].textEffect',
   'text effect target guard',
+);
+
+const childrenOfNonCompound = structuredClone(validState);
+(
+  (childrenOfNonCompound.motionSequences as { steps: { target: { elementId: string } }[] }[])[2]!
+    .steps[0]!
+).target.elementId = 'tab-copy';
+expectInvalid(
+  childrenOfNonCompound,
+  'motionSequences[2].steps[0].target.elementId',
+  'children-of target compound guard',
+);
+
+const childrenOfMissingReducedMotion = structuredClone(validState);
+delete (childrenOfMissingReducedMotion.motionSequences as { reducedMotion?: string }[])[2]!
+  .reducedMotion;
+expectInvalid(
+  childrenOfMissingReducedMotion,
+  'motionSequences[2].reducedMotion',
+  'children-of reduced motion guard',
 );
 
 console.log('[behaviour-primitives:smoke] OK');

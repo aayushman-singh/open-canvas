@@ -1,4 +1,11 @@
-export const BEHAVIOUR_TARGET_TYPES = ['site', 'page', 'section', 'element', 'text-split'] as const;
+export const BEHAVIOUR_TARGET_TYPES = [
+  'site',
+  'page',
+  'section',
+  'element',
+  'children-of',
+  'text-split',
+] as const;
 export const TEXT_SPLIT_UNITS = ['word', 'line', 'char'] as const;
 export const MOTION_SEQUENCE_TRIGGER_TYPES = [
   'load-enter',
@@ -62,6 +69,7 @@ export type BehaviourTarget =
   | { type: 'page'; pageId: string }
   | { type: 'section'; sectionId: string }
   | { type: 'element'; elementId: string }
+  | { type: 'children-of'; elementId: string }
   | { type: 'text-split'; elementId: string; unit: 'word' | 'line' | 'char' };
 
 export interface MotionSequenceStep {
