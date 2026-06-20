@@ -253,6 +253,10 @@ assert(
 );
 assert(panelSrc.includes('Quick from opacity'), 'panel must edit from opacity from the timeline');
 assert(panelSrc.includes('Quick to filter'), 'panel must edit to filter from the timeline');
+assert(panelSrc.includes('Quick from clip path'), 'panel must edit from clip path from the timeline');
+assert(panelSrc.includes('Quick to variable font weight'), 'panel must edit variable font weight from the timeline');
+assert(panelSrc.includes('Quick from stroke dash array'), 'panel must edit stroke dash array from the timeline');
+assert(panelSrc.includes('Quick to stroke dash offset'), 'panel must edit stroke dash offset from the timeline');
 assert(panelSrc.includes('Quick duration (ms)'), 'panel must edit duration beside the timeline');
 assert(panelSrc.includes('Quick delay (ms)'), 'panel must edit delay beside the timeline');
 assert(panelSrc.includes('Quick stagger (ms)'), 'panel must edit stagger beside the timeline');

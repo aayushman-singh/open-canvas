@@ -237,12 +237,16 @@ Current state:
   timing/easing plus `from`/`to` opacity, transform, and filter values beside
   the visual timeline, using the same schema-owned Motion Sequence step fields
   as the detailed form.
+- **June 2026 update:** Timeline quick properties now also expose advanced
+  schema-owned step properties for clip-path reveals, variable font axes, and
+  SVG stroke dash choreography beside the timeline instead of requiring a
+  separate field-level pass.
 
 User-visible miss:
 
 - Cannot yet edit every advanced property through a direct-manipulation
-  timeline canvas; uncommon properties and detailed target controls remain in
-  the field-level editor.
+  timeline canvas; detailed target controls and multi-step visual choreography
+  remain in the field-level editor.
 
 Needed primitive:
 
@@ -250,8 +254,8 @@ Needed primitive:
   properties, duration, easing, delay, stagger, and completion behaviour.
 - Validation must reject unsupported targets/properties instead of silently
   dropping steps.
-- Remaining next wave: richer property affordances beyond the quick timeline
-  controls.
+- Remaining next wave: richer direct-manipulation timeline affordances for
+  multi-step visual choreography and detailed target editing.
 
 ### 2. Scroll Motion Is Triggered, Not Scrubbed
 

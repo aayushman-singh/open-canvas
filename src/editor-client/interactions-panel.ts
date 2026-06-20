@@ -2357,6 +2357,28 @@ function renderMotionSequenceTimelinePropertyEditor(
   title.className = 'opencanvas-motion-timeline-label';
   title.textContent = 'Timeline quick properties';
   panel.appendChild(title);
+  const quickNumberLabels: Partial<Record<EditableMotionNumber, { from: string; to: string }>> = {
+    fontVariationWeight: {
+      from: 'Quick from variable font weight',
+      to: 'Quick to variable font weight',
+    },
+    fontVariationWidth: {
+      from: 'Quick from variable font width',
+      to: 'Quick to variable font width',
+    },
+    fontVariationSlant: {
+      from: 'Quick from variable font slant',
+      to: 'Quick to variable font slant',
+    },
+    strokeDasharray: {
+      from: 'Quick from stroke dash array',
+      to: 'Quick to stroke dash array',
+    },
+    strokeDashoffset: {
+      from: 'Quick from stroke dash offset',
+      to: 'Quick to stroke dash offset',
+    },
+  };
 
   for (let index = 0; index < sequence.steps.length; index++) {
     const step = sequence.steps[index]!;
@@ -2412,21 +2434,43 @@ function renderMotionSequenceTimelinePropertyEditor(
     );
     grid.appendChild(field('Quick to opacity', toOpacity));
 
-    for (const key of ['translateX', 'translateY', 'scale', 'rotate'] as const) {
+    for (const key of [
+      'translateX',
+      'translateY',
+      'scale',
+      'rotate',
+      'fontVariationWeight',
+      'fontVariationWidth',
+      'fontVariationSlant',
+      'strokeDasharray',
+      'strokeDashoffset',
+    ] as const) {
       const spec = MOTION_NUMBER_FIELDS.find((item) => item.key === key);
-      if (!spec) continue;
+      if (!spec) throw new Error('Motion Sequence number field spec missing for ' + key);
       const fromInput = optionalNumberInput(motionNumberValue(step.from, key), spec.min, spec.max, spec.step);
       fromInput.addEventListener('change', () =>
         updateMotionStepProperty(ctx, sequence.id, step, 'from', key, fromInput, spec.min, spec.max),
       );
-      grid.appendChild(field('Quick from ' + spec.label.toLowerCase(), fromInput));
+      grid.appendChild(field(quickNumberLabels[key]?.from ?? 'Quick from ' + spec.label.toLowerCase(), fromInput));
 
       const toInput = optionalNumberInput(motionNumberValue(step.to, key), spec.min, spec.max, spec.step);
       toInput.addEventListener('change', () =>
         updateMotionStepProperty(ctx, sequence.id, step, 'to', key, toInput, spec.min, spec.max),
       );
-      grid.appendChild(field('Quick to ' + spec.label.toLowerCase(), toInput));
+      grid.appendChild(field(quickNumberLabels[key]?.to ?? 'Quick to ' + spec.label.toLowerCase(), toInput));
     }
+
+    const fromClipPath = optionalMotionTextInput(motionTextValue(step.from, 'clipPath'), 'inset(100% 0 0 0)');
+    fromClipPath.addEventListener('change', () =>
+      updateMotionStepTextProperty(ctx, sequence.id, step, 'from', 'clipPath', fromClipPath),
+    );
+    grid.appendChild(field('Quick from clip path', fromClipPath));
+
+    const toClipPath = optionalMotionTextInput(motionTextValue(step.to, 'clipPath'), 'inset(0 0 0 0)');
+    toClipPath.addEventListener('change', () =>
+      updateMotionStepTextProperty(ctx, sequence.id, step, 'to', 'clipPath', toClipPath),
+    );
+    grid.appendChild(field('Quick to clip path', toClipPath));
 
     const fromFilter = optionalMotionTextInput(motionTextValue(step.from, 'filter'), 'blur(8px)');
     fromFilter.addEventListener('change', () =>
