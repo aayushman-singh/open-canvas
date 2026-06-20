@@ -2321,11 +2321,15 @@ body[data-placement-active="true"] .opencanvas-section-slot {
    all reflect live in the editor canvas. Without these rules the slot divs
    would stack at default block flow and layout changes would do nothing
    visible. */
-.opencanvas-nav { gap: 4px; }
+.opencanvas-nav {
+  gap: 4px;
+  background: var(--opencanvas-nav-bg, transparent);
+  color: var(--opencanvas-nav-color, inherit);
+}
 .opencanvas-nav-slot {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--opencanvas-nav-slot-gap, 4px);
 }
 .opencanvas-nav-slot[data-slot="right"] { margin-left: auto; }
 .opencanvas-nav-slot[data-slot="center"] {
@@ -2339,14 +2343,14 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   margin-left: 8px;
 }
 .opencanvas-nav-link {
-  color: inherit;
+  color: var(--opencanvas-nav-link-color, inherit);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
-  padding: 6px 12px;
+  padding: var(--opencanvas-nav-link-pad-y, 6px) var(--opencanvas-nav-link-pad-x, 12px);
 }
 .opencanvas-nav-link:hover {
-  color: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
+  color: var(--opencanvas-nav-link-hover-color, var(--opencanvas-kit-accent, var(--kit-accent, currentColor)));
 }
 .opencanvas-nav-logo {
   height: 28px;
@@ -2354,18 +2358,18 @@ body[data-placement-active="true"] .opencanvas-section-slot {
 }
 .opencanvas-nav-site-title {
   font-family: var(--opencanvas-kit-font-display, var(--opencanvas-kit-font-body, inherit));
-  font-size: 18px;
-  font-weight: 700;
-  color: inherit;
+  font-size: var(--opencanvas-nav-title-font-size, 18px);
+  font-weight: var(--opencanvas-nav-title-font-weight, 700);
+  color: var(--opencanvas-nav-title-color, inherit);
   letter-spacing: -0.01em;
 }
 .opencanvas-nav-primary-action {
   display: inline-flex;
   align-items: center;
   padding: var(--opencanvas-kit-action-padding, 8px 16px);
-  border-radius: var(--opencanvas-kit-action-radius, 8px);
-  background: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
-  color: var(--opencanvas-kit-accent-text, var(--kit-bg, #fff));
+  border-radius: var(--opencanvas-nav-primary-radius, var(--opencanvas-kit-action-radius, 8px));
+  background: var(--opencanvas-nav-primary-bg, var(--opencanvas-kit-accent, var(--kit-accent, currentColor)));
+  color: var(--opencanvas-nav-primary-color, var(--opencanvas-kit-accent-text, var(--kit-bg, #fff)));
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;

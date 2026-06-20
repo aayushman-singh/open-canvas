@@ -54,6 +54,7 @@ import {
   COLLECTION_STYLE_SPEC,
   COMPONENT_STYLE_FONT_WEIGHTS,
   FORM_STYLE_SPEC,
+  NAV_STYLE_SPEC,
   TABS_STYLE_SPEC,
   type ComponentStyleSpec,
 } from './elements/component-style.js';
@@ -2193,6 +2194,13 @@ function validateElement(
       break;
     }
     case 'nav': {
+      validateComponentStyleObject(
+        element.navStyle,
+        NAV_STYLE_SPEC,
+        basePath,
+        errors,
+        element.pinnedStyle,
+      );
       assertOneOf<NavLayout>(element.layout, NAV_LAYOUTS, `${basePath}.layout`, errors);
       if (typeof element.sticky !== 'boolean') {
         errors.push(`${basePath}.sticky must be a boolean (got ${describe(element.sticky)})`);

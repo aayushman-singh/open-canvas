@@ -23,9 +23,12 @@
 // Failure mode preserved: silent-skip on invalid pinnedStyle keys/values
 // (the allowlist filter is the only safe rejection path — throwing here
 // would surface the validate.ts contract to the Owner mid-edit). All
-// other paths short-circuit on the absence of elementStyle / pinnedStyle.
+// elementStyle still short-circuits when absent. The pinned-style path must
+// continue through to Component Style even when there is no pinnedStyle object
+// so modeled CSS variables preview the same way they publish.
 
 import type { CanvasElement, PositionedBox } from '../canvas/schema.js';
+import { componentStyleEntriesForElement } from '../canvas/elements/component-style.js';
 
 import type { EditorContext } from './editor-context.js';
 
@@ -71,13 +74,17 @@ export function applyPinnedStyleImpl(
   wrapper: HTMLElement,
   element: CanvasElement,
 ): void {
-  if (!element.pinnedStyle) return;
-  for (const key of Object.keys(element.pinnedStyle)) {
-    if (!/^[a-zA-Z-]+$/.test(key)) continue;
-    const value = element.pinnedStyle[key];
-    if (typeof value !== 'string') continue;
-    if (value.indexOf(';') >= 0 || value.indexOf(':') >= 0) continue;
-    if (value.indexOf('{') >= 0 || value.indexOf('}') >= 0) continue;
+  if (element.pinnedStyle) {
+    for (const key of Object.keys(element.pinnedStyle)) {
+      if (!/^[a-zA-Z-]+$/.test(key)) continue;
+      const value = element.pinnedStyle[key];
+      if (typeof value !== 'string') continue;
+      if (value.indexOf(';') >= 0 || value.indexOf(':') >= 0) continue;
+      if (value.indexOf('{') >= 0 || value.indexOf('}') >= 0) continue;
+      wrapper.style.setProperty(key, value);
+    }
+  }
+  for (const [key, value] of componentStyleEntriesForElement(element)) {
     wrapper.style.setProperty(key, value);
   }
 }

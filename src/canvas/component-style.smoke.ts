@@ -16,6 +16,7 @@ import type {
   CarouselElement,
   CollectionElement,
   FormElement,
+  NavElement,
 } from './elements/index.js';
 import { renderCanvasSnapshot } from './render.js';
 import { canvasPublishedStyles } from './public-styles.js';
@@ -27,6 +28,7 @@ import { actionAgentToolSpec } from './elements/action.js';
 import { carouselAgentToolSpec } from './elements/carousel.js';
 import { collectionAgentToolSpec } from './elements/collection.js';
 import { formAgentToolSpec } from './elements/form.js';
+import { navAgentToolSpec } from './elements/nav.js';
 import { tabsAgentToolSpec } from './elements/tabs.js';
 
 const TURNSTILE = 'turnstile-test-key';
@@ -104,6 +106,20 @@ function collection(overrides: Partial<CollectionElement> = {}): CollectionEleme
     collectionSlug: 'blog',
     display: 'card',
     sort: 'date-desc',
+    ...overrides,
+  };
+}
+
+function nav(overrides: Partial<NavElement> = {}): NavElement {
+  return {
+    id: 'el-nav',
+    type: 'nav',
+    box: { x: 0, y: 0, w: 960, h: 72, z: 1 },
+    links: [{ label: 'Home', href: '/', kind: 'internal' }],
+    layout: 'left-right',
+    sticky: false,
+    siteTitle: 'Velocity',
+    primaryAction: { label: 'Shop', href: '/shop', kind: 'internal' },
     ...overrides,
   };
 }
@@ -198,6 +214,20 @@ function expectRoundTrip(state: EditableSite, label: string): void {
       paddingX: 24,
       paddingY: 12,
     }),
+    withStyle(nav(), 'navStyle', {
+      backgroundColor: '#101820',
+      color: '#f7f1df',
+      slotGap: 18,
+      linkColor: '#f7f1df',
+      linkHoverColor: '#c8ff1a',
+      linkPaddingX: 16,
+      linkPaddingY: 7,
+      siteTitleFontSize: 22,
+      siteTitleFontWeight: 'bold',
+      primaryBackgroundColor: '#c8ff1a',
+      primaryColor: '#101820',
+      primaryBorderRadius: 999,
+    }),
     withStyle(tabs(), 'tabsStyle', {
       activeTabBackgroundColor: '#abcdef',
       activeTabFontWeight: 'bold',
@@ -289,6 +319,38 @@ function expectRoundTrip(state: EditableSite, label: string): void {
   assert(
     canvasEditorStyles.includes('padding-top: var(--opencanvas-action-padding-y'),
     'editor styles must consume modeled action vertical padding',
+  );
+  assert(
+    html.includes('--opencanvas-nav-bg:#101820'),
+    'navStyle must emit modeled nav background on the wrapper',
+  );
+  assert(
+    html.includes('--opencanvas-nav-slot-gap:18px'),
+    'navStyle must emit modeled slot gap on the wrapper',
+  );
+  assert(
+    html.includes('--opencanvas-nav-link-pad-x:16px'),
+    'navStyle must emit modeled link horizontal padding on the wrapper',
+  );
+  assert(
+    html.includes('--opencanvas-nav-primary-radius:999px'),
+    'navStyle must emit modeled primary CTA radius on the wrapper',
+  );
+  assert(
+    canvasPublishedStyles.includes('background: var(--opencanvas-nav-bg'),
+    'public styles must consume modeled nav background',
+  );
+  assert(
+    canvasPublishedStyles.includes('padding: var(--opencanvas-nav-link-pad-y'),
+    'public styles must consume modeled nav link padding',
+  );
+  assert(
+    canvasEditorStyles.includes('background: var(--opencanvas-nav-bg'),
+    'editor styles must consume modeled nav background',
+  );
+  assert(
+    canvasEditorStyles.includes('padding: var(--opencanvas-nav-link-pad-y'),
+    'editor styles must consume modeled nav link padding',
   );
   assert(
     html.includes('--opencanvas-tabs-active-tab-bg:#abcdef'),
@@ -474,6 +536,29 @@ expectInvalid(
   'pinnedStyle',
   'modeled actionStyle padding key duplicated in pinnedStyle',
 );
+expectInvalid(
+  siteWith([
+    withStyle(nav(), 'navStyle', {
+      mystery: 'nope',
+    }),
+  ]),
+  '.navStyle.mystery',
+  'unknown navStyle key',
+);
+expectInvalid(
+  siteWith([
+    withStyle(
+      {
+        ...nav(),
+        pinnedStyle: { '--opencanvas-nav-bg': '#000000' },
+      },
+      'navStyle',
+      { backgroundColor: '#ffffff' },
+    ),
+  ]),
+  'pinnedStyle',
+  'modeled navStyle key duplicated in pinnedStyle',
+);
 
 
 {
@@ -519,6 +604,11 @@ expectInvalid(
     JSON.stringify(actionAgentToolSpec.parsePatch({ actionStyle: { paddingX: 18 } })) ===
       JSON.stringify({ actionStyle: { paddingX: 18 } }),
     'action agent patch must preserve modeled padding',
+  );
+  assert(
+    JSON.stringify(navAgentToolSpec.parsePatch({ navStyle: { slotGap: 14 } })) ===
+      JSON.stringify({ navStyle: { slotGap: 14 } }),
+    'nav agent patch must preserve navStyle',
   );
 }
 

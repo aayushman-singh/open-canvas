@@ -309,6 +309,26 @@ export const COLLECTION_STYLE_FIELDS = [
   },
 ] as const satisfies readonly ComponentStyleFieldDef[];
 
+export const NAV_STYLE_FIELDS = [
+  { key: 'backgroundColor', kind: 'string', cssVar: '--opencanvas-nav-bg' },
+  { key: 'color', kind: 'string', cssVar: '--opencanvas-nav-color' },
+  { key: 'slotGap', kind: 'numberPx', cssVar: '--opencanvas-nav-slot-gap' },
+  { key: 'linkColor', kind: 'string', cssVar: '--opencanvas-nav-link-color' },
+  { key: 'linkHoverColor', kind: 'string', cssVar: '--opencanvas-nav-link-hover-color' },
+  { key: 'linkPaddingX', kind: 'numberPx', cssVar: '--opencanvas-nav-link-pad-x' },
+  { key: 'linkPaddingY', kind: 'numberPx', cssVar: '--opencanvas-nav-link-pad-y' },
+  { key: 'siteTitleColor', kind: 'string', cssVar: '--opencanvas-nav-title-color' },
+  { key: 'siteTitleFontSize', kind: 'numberPx', cssVar: '--opencanvas-nav-title-font-size' },
+  { key: 'siteTitleFontWeight', kind: 'fontWeight', cssVar: '--opencanvas-nav-title-font-weight' },
+  {
+    key: 'primaryBackgroundColor',
+    kind: 'string',
+    cssVar: '--opencanvas-nav-primary-bg',
+  },
+  { key: 'primaryColor', kind: 'string', cssVar: '--opencanvas-nav-primary-color' },
+  { key: 'primaryBorderRadius', kind: 'numberPx', cssVar: '--opencanvas-nav-primary-radius' },
+] as const satisfies readonly ComponentStyleFieldDef[];
+
 export const ACTION_STYLE_SPEC: ComponentStyleSpec = {
   styleKey: 'actionStyle',
   fields: ACTION_STYLE_FIELDS,
@@ -333,6 +353,10 @@ export const COLLECTION_STYLE_SPEC: ComponentStyleSpec = {
   styleKey: 'collectionStyle',
   fields: COLLECTION_STYLE_FIELDS,
 };
+export const NAV_STYLE_SPEC: ComponentStyleSpec = {
+  styleKey: 'navStyle',
+  fields: NAV_STYLE_FIELDS,
+};
 
 export const COMPONENT_STYLE_SPECS = [
   ACTION_STYLE_SPEC,
@@ -341,6 +365,7 @@ export const COMPONENT_STYLE_SPECS = [
   TABS_STYLE_SPEC,
   CAROUSEL_STYLE_SPEC,
   COLLECTION_STYLE_SPEC,
+  NAV_STYLE_SPEC,
 ] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -539,6 +564,12 @@ export function componentStyleEntriesForElement(element: CanvasElement): Array<[
     return componentStyleCssEntries(
       COLLECTION_STYLE_SPEC,
       element.collectionStyle as Record<string, unknown> | undefined,
+    );
+  }
+  if (element.type === 'nav') {
+    return componentStyleCssEntries(
+      NAV_STYLE_SPEC,
+      element.navStyle as Record<string, unknown> | undefined,
     );
   }
   return [];

@@ -158,6 +158,7 @@ import {
   CAROUSEL_STYLE_SPEC,
   COLLECTION_STYLE_SPEC,
   FORM_STYLE_SPEC,
+  NAV_STYLE_SPEC,
   TABS_STYLE_SPEC,
   type ComponentStyleSpec,
 } from './elements/component-style.js';
@@ -689,6 +690,9 @@ function encodeNavElement(el: NavElement): Y.Map<unknown> {
     theme.set('defaultTheme', el.themeOnScroll.defaultTheme);
     theme.set('reducedMotion', el.themeOnScroll.reducedMotion);
     out.set('themeOnScroll', theme);
+  }
+  if (el.navStyle !== undefined) {
+    out.set('navStyle', encodeComponentStyle(el.navStyle as Record<string, unknown>, NAV_STYLE_SPEC));
   }
   return out;
 }
@@ -1579,6 +1583,13 @@ function decodeNavElement(map: Y.Map<unknown>, base: BaseElement): NavElement {
       defaultTheme: theme.get('defaultTheme') as NonNullable<NavElement['themeOnScroll']>['defaultTheme'],
       reducedMotion: theme.get('reducedMotion') as NonNullable<NavElement['themeOnScroll']>['reducedMotion'],
     };
+  }
+  if (map.has('navStyle')) {
+    const navStyle = decodeComponentStyle(
+      map.get('navStyle') as Y.Map<unknown>,
+      NAV_STYLE_SPEC,
+    ) as NonNullable<NavElement['navStyle']>;
+    el.navStyle = navStyle;
   }
   return el;
 }

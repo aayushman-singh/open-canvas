@@ -9,7 +9,10 @@ import { actionInspectorSpec } from '../canvas/elements/action.js';
 import { accordionInspectorSpec } from '../canvas/elements/accordion.js';
 import { carouselInspectorSpec } from '../canvas/elements/carousel.js';
 import { formInspectorSpec } from '../canvas/elements/form.js';
+import type { NavElement } from '../canvas/elements/nav.js';
+import { navInspectorSpec } from '../canvas/elements/nav.js';
 import { tabsInspectorSpec } from '../canvas/elements/tabs.js';
+import { applyPinnedStyleImpl } from './style-apply.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(`[inspector-component-style:smoke] ${message}`);
@@ -154,6 +157,10 @@ assert(
   hasComponentStyleMount(tabsInspectorSpec.fields),
   'tabs inspector spec must expose Component Style',
 );
+assert(
+  hasComponentStyleMount(navInspectorSpec.fields),
+  'nav inspector spec must expose Component Style',
+);
 
 const { mountComponentStyle } = await import('./inspector-component-style.js');
 
@@ -223,6 +230,20 @@ function makeCollection(overrides: Partial<CollectionElement> = {}): CollectionE
     display: 'card',
     sort: 'date-desc',
     entries: [],
+    ...overrides,
+  };
+}
+
+function makeNav(overrides: Partial<NavElement> = {}): NavElement {
+  return {
+    id: 'nav-1',
+    type: 'nav',
+    box: { x: 0, y: 0, w: 960, h: 72, z: 1 },
+    links: [{ label: 'Home', href: '/', kind: 'internal' }],
+    layout: 'left-right',
+    sticky: false,
+    siteTitle: 'Velocity',
+    primaryAction: { label: 'Shop', href: '/shop', kind: 'internal' },
     ...overrides,
   };
 }
@@ -322,6 +343,40 @@ function control(host: StubNode, key: string): StubNode {
   );
   assert(log.rebuildCalls.join(',') === 'collection-1', 'setting a collection field must rebuild the element');
   assert(log.saveCalls === 1, 'setting a collection field must schedule one save');
+}
+
+{
+  const nav = makeNav();
+  const host = makeStubNode('div');
+  const { ctx, log } = makeCtx();
+  mountComponentStyle(ctx, nav, host as unknown as HTMLElement);
+
+  const input = control(host, 'slotGap');
+  input.value = '14';
+  input.dispatchEvent('change');
+
+  assert(nav.navStyle?.slotGap === 14, 'typing nav slot gap must set navStyle.slotGap');
+  assert(log.rebuildCalls.join(',') === 'nav-1', 'setting a nav field must rebuild the element');
+  assert(log.saveCalls === 1, 'setting a nav field must schedule one save');
+}
+
+{
+  const nav = makeNav({ navStyle: { backgroundColor: '#101820' } });
+  const applied: Record<string, string> = {};
+  const wrapper = {
+    style: {
+      setProperty(key: string, value: string): void {
+        applied[key] = value;
+      },
+    },
+  } as unknown as HTMLElement;
+
+  applyPinnedStyleImpl({ siteBase: '' }, wrapper, nav);
+
+  assert(
+    applied['--opencanvas-nav-bg'] === '#101820',
+    'editor wrapper style application must mirror navStyle variables',
+  );
 }
 
 if (savedDocument === undefined) {

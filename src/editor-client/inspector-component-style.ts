@@ -14,6 +14,7 @@ import {
   COLLECTION_STYLE_SPEC,
   COMPONENT_STYLE_FONT_WEIGHTS,
   FORM_STYLE_SPEC,
+  NAV_STYLE_SPEC,
   TABS_STYLE_SPEC,
   type ComponentStyleFieldDef,
   type ComponentStyleSpec,
@@ -54,6 +55,21 @@ const STYLE_META: Record<string, Record<string, ComponentStyleMeta>> = {
     paddingX: { section: 'Layout', label: 'Padding X', min: 0, max: 96, placeholder: '16' },
     paddingY: { section: 'Layout', label: 'Padding Y', min: 0, max: 64, placeholder: '0' },
     iconGap: { section: 'Icon', label: 'Gap', min: 0, max: 64, placeholder: '8' },
+  },
+  navStyle: {
+    backgroundColor: { section: 'Surface', label: 'Background', swatchDefault: '#ffffff' },
+    color: { section: 'Surface', label: 'Text color', swatchDefault: '#111111' },
+    slotGap: { section: 'Layout', label: 'Slot gap', min: 0, max: 96, placeholder: '4' },
+    linkColor: { section: 'Links', label: 'Color', swatchDefault: '#111111' },
+    linkHoverColor: { section: 'Links', label: 'Hover color', swatchDefault: '#c8ff1a' },
+    linkPaddingX: { section: 'Links', label: 'Padding X', min: 0, max: 64, placeholder: '12' },
+    linkPaddingY: { section: 'Links', label: 'Padding Y', min: 0, max: 40, placeholder: '6' },
+    siteTitleColor: { section: 'Wordmark', label: 'Color', swatchDefault: '#111111' },
+    siteTitleFontSize: { section: 'Wordmark', label: 'Size', min: 8, max: 48, placeholder: '18' },
+    siteTitleFontWeight: { section: 'Wordmark', label: 'Weight' },
+    primaryBackgroundColor: { section: 'Primary action', label: 'Background', swatchDefault: '#c8ff1a' },
+    primaryColor: { section: 'Primary action', label: 'Text color', swatchDefault: '#111111' },
+    primaryBorderRadius: { section: 'Primary action', label: 'Radius', min: 0, max: 999, placeholder: '8' },
   },
   formStyle: {
     fontFamily: { section: 'Typography', label: 'Font' },
@@ -357,6 +373,7 @@ function specForElement(element: CanvasElement): ComponentStyleSpec | null {
   if (element.type === 'tabs') return TABS_STYLE_SPEC;
   if (element.type === 'carousel') return CAROUSEL_STYLE_SPEC;
   if (element.type === 'collection') return COLLECTION_STYLE_SPEC;
+  if (element.type === 'nav') return NAV_STYLE_SPEC;
   return null;
 }
 
@@ -366,6 +383,7 @@ function currentVariant(element: CanvasElement): string {
   if (element.type === 'accordion') return element.variant ?? 'list';
   if (element.type === 'tabs') return element.variant ?? 'classic';
   if (element.type === 'carousel') return element.variant ?? 'classic';
+  if (element.type === 'nav') return element.layout;
   if (element.type === 'collection') return element.display ?? 'card';
   return '';
 }

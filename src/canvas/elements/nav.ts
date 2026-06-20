@@ -36,6 +36,11 @@ import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
 import type { BaseElement, NavThemeOnScroll } from '../schema.js';
 import { escapeAttr, escapeHtml, styleFromEntries } from './render-utils.js';
+import {
+  NAV_STYLE_SPEC,
+  componentStylePatchProperty,
+  parseComponentStylePatchValue,
+} from './component-style.js';
 
 export const NAV_LINK_KINDS = ['internal', 'external', 'anchor'] as const;
 export type NavLinkKind = (typeof NAV_LINK_KINDS)[number];
@@ -48,6 +53,22 @@ export interface NavLink {
 
 export const NAV_LAYOUTS = ['left-center-right', 'left-right'] as const;
 export type NavLayout = (typeof NAV_LAYOUTS)[number];
+
+export interface NavStyle {
+  backgroundColor?: string;
+  color?: string;
+  slotGap?: number;
+  linkColor?: string;
+  linkHoverColor?: string;
+  linkPaddingX?: number;
+  linkPaddingY?: number;
+  siteTitleColor?: string;
+  siteTitleFontSize?: number;
+  siteTitleFontWeight?: 'normal' | 'medium' | 'bold';
+  primaryBackgroundColor?: string;
+  primaryColor?: string;
+  primaryBorderRadius?: number;
+}
 
 export interface NavElement extends Omit<BaseElement, 'sticky'> {
   type: 'nav';
@@ -71,6 +92,7 @@ export interface NavElement extends Omit<BaseElement, 'sticky'> {
   layout: NavLayout;
   sticky: boolean;
   themeOnScroll?: NavThemeOnScroll;
+  navStyle?: NavStyle;
 }
 
 export interface NavRenderCtx {
@@ -214,6 +236,7 @@ export const navInspectorSpec: InspectorSpec = {
       defaultValue: 'left-right',
     },
     { kind: 'checkbox', label: 'Sticky', path: 'sticky' },
+    { kind: 'custom-mount', name: 'component-style' },
     { kind: 'custom-mount', name: 'nav-theme-on-scroll' },
     {
       kind: 'text',
@@ -290,6 +313,7 @@ export const navAgentToolSpec: AgentToolSpec = {
       },
       required: ['enabled', 'defaultTheme', 'reducedMotion'],
     },
+    navStyle: componentStylePatchProperty(NAV_STYLE_SPEC),
     primaryAction: {
       type: 'object',
       description:
@@ -329,6 +353,9 @@ export const navAgentToolSpec: AgentToolSpec = {
         throw new Error('themeOnScroll must be an object');
       }
       patch.themeOnScroll = args.themeOnScroll;
+    }
+    if (args.navStyle !== undefined) {
+      patch.navStyle = parseComponentStylePatchValue(args.navStyle, NAV_STYLE_SPEC);
     }
     if (args.primaryAction !== undefined) {
       if (typeof args.primaryAction !== 'object' || args.primaryAction === null) {
