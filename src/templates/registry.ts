@@ -293,6 +293,186 @@ const VELOCITY_KIT: StyleKitPreset = {
   },
 };
 
+const RAYDOTSH_KIT: StyleKitPreset = {
+  bg: '#0a192f',
+  panel: '#112240',
+  text: '#ccd6f6',
+  muted: '#8892b0',
+  accent: '#64ffda',
+  accentText: '#020c1b',
+  fontFamilyDisplay: "'NTR', 'Inter', system-ui, -apple-system, sans-serif",
+  fontFamilyBody: "'NTR', 'Inter', system-ui, -apple-system, sans-serif",
+  fontFamilyMono: "'Source Code Pro', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
+  headingScale: 1.08,
+  bodyScale: 1,
+  labelScale: 0.86,
+  lineHeight: 1.5,
+  radius: '4px',
+  borderWidth: '1px',
+  shadow: '0 10px 30px rgba(2, 12, 27, 0.42)',
+  surfaceVariants: {
+    flat: {
+      background: '#0a192f',
+      shadow: 'none',
+    },
+    raised: {
+      background: '#112240',
+      border: '1px solid rgba(100, 255, 218, 0.18)',
+      shadow: '0 10px 30px rgba(2, 12, 27, 0.42)',
+      radius: '4px',
+    },
+    glass: {
+      background: 'rgba(17, 34, 64, 0.72)',
+      border: '1px solid rgba(100, 255, 218, 0.18)',
+      shadow: '0 8px 28px rgba(2, 12, 27, 0.36)',
+      radius: '4px',
+    },
+    outlined: {
+      background: 'transparent',
+      border: '1px solid rgba(136, 146, 176, 0.35)',
+      radius: '4px',
+    },
+    sticker: {
+      background: '#112240',
+      border: '1px solid rgba(100, 255, 218, 0.30)',
+      shadow: '4px 4px 0 rgba(100, 255, 218, 0.65)',
+      radius: '4px',
+    },
+    'editorial-frame': {
+      background: 'transparent',
+      border: '1px solid #64ffda',
+      radius: '0px',
+    },
+    'soft-panel': {
+      background: '#172a45',
+      shadow: '0 1px 0 rgba(204, 214, 246, 0.04) inset',
+    },
+  },
+  shapeFill: '#64ffda',
+  shapeStroke: '#233554',
+  shapeStrokeWidth: '1px',
+  actionRadius: '4px',
+  actionPadding: '12px 24px',
+  actionVariants: {
+    solid: {
+      background: '#64ffda',
+      color: '#020c1b',
+      weight: 700,
+      borderRadius: '4px',
+      boxShadow: '0 8px 24px rgba(100, 255, 218, 0.18)',
+    },
+    outline: {
+      background: 'transparent',
+      color: '#64ffda',
+      border: '1px solid #64ffda',
+      weight: 600,
+      borderRadius: '4px',
+    },
+    ghost: {
+      background: 'transparent',
+      color: '#ccd6f6',
+      weight: 500,
+      borderRadius: '4px',
+      padding: '8px 12px',
+    },
+    pill: {
+      background: '#112240',
+      color: '#64ffda',
+      weight: 600,
+      border: '1px solid rgba(100, 255, 218, 0.30)',
+      borderRadius: '999px',
+      padding: '6px 14px',
+      letterSpacing: '0.06em',
+    },
+    glass: {
+      background: 'rgba(17, 34, 64, 0.72)',
+      color: '#ccd6f6',
+      border: '1px solid rgba(100, 255, 218, 0.20)',
+      backdropFilter: 'blur(12px)',
+      borderRadius: '4px',
+    },
+    brutalist: {
+      background: '#ffd166',
+      color: '#020c1b',
+      border: '2px solid #ffd166',
+      weight: 800,
+      borderRadius: '0px',
+      boxShadow: '4px 4px 0 #64ffda',
+    },
+    underline: {
+      background: 'transparent',
+      color: '#64ffda',
+      textDecoration: 'underline',
+      borderRadius: '0px',
+      padding: '0',
+    },
+  },
+  motionDurationMs: 420,
+  motionEasing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+  motionPresets: {
+    none: {},
+    'fade-up': {
+      transform: 'translateY(16px)',
+      opacity: 0,
+    },
+    'fade-down': {
+      transform: 'translateY(-16px)',
+      opacity: 0,
+    },
+    'fade-in': {
+      opacity: 0,
+    },
+    'fade-right': {
+      transform: 'translateX(-16px)',
+      opacity: 0,
+    },
+    'slide-left': {
+      transform: 'translateX(24px)',
+      opacity: 0,
+    },
+    'slide-up': {
+      transform: 'translateY(24px)',
+    },
+    'slide-right': {
+      transform: 'translateX(-24px)',
+    },
+    'scale-in': {
+      transform: 'scale(0.94)',
+      opacity: 0,
+    },
+    'zoom-out': {
+      transform: 'scale(1.06)',
+      opacity: 0,
+    },
+    'blur-in': {
+      opacity: 0,
+    },
+    'rotate-in': {
+      transform: 'rotate(-3deg) scale(0.96)',
+      opacity: 0,
+    },
+    'flip-in': {
+      transform: 'perspective(600px) rotateY(90deg)',
+      opacity: 0,
+    },
+    'bounce-in': {
+      transform: 'scale(0.72)',
+      opacity: 0,
+    },
+    'stagger-children': {
+      transform: 'translateY(10px)',
+      opacity: 0,
+      delayMs: 50,
+    },
+    'slow-drift': {
+      transform: 'translateY(0px)',
+    },
+    'parallax-soft': {
+      transform: 'translateY(8px)',
+    },
+  },
+};
+
 export const velocityAthleteTemplate: TemplateSeed = {
   id: 'velocity-athlete',
   name: 'Velocity Athlete',
@@ -773,6 +953,52 @@ export const portfolioShowcaseTemplate: TemplateSeed = {
   ],
 };
 
+export const raydotshPortfolioTemplate: TemplateSeed = {
+  id: 'raydotsh-portfolio',
+  name: 'Raydotsh Portfolio',
+  tagline:
+    'A mint-on-navy personal portfolio for writers and builders, with a software showcase and reading-list page.',
+  styleKit: 'custom',
+  customStyleKit: RAYDOTSH_KIT,
+  headerRef: { sectionId: 'raydotsh-template-header-v1', instanceId: 'raydotshheader' },
+  footerRef: { sectionId: 'raydotsh-template-footer-v1', instanceId: 'raydotshfooter' },
+  pages: [
+    {
+      id: 'page-raydotsh-home',
+      slug: 'index',
+      title: 'Rehana Rahman - Content Strategist & Copywriter',
+      width: 1440,
+      description:
+        'Freelance content strategist and copywriter in Bengaluru, writing for founders, operators, and builders.',
+      pageBackground: '#0a192f',
+      entranceAnimation: 'fade-up',
+      scrollTriggerMode: 'on-scroll',
+      sectionGap: 0,
+      bodyRefs: [
+        { sectionId: 'raydotsh-template-hero-v1', instanceId: 'raydotshhero' },
+        { sectionId: 'raydotsh-template-about-v1', instanceId: 'raydotshabout' },
+        { sectionId: 'raydotsh-template-experience-v1', instanceId: 'raydotshexperience' },
+        { sectionId: 'raydotsh-template-software-v1', instanceId: 'raydotshsoftware' },
+        { sectionId: 'raydotsh-template-books-v1', instanceId: 'raydotshbooks' },
+      ],
+    },
+    {
+      id: 'page-raydotsh-books',
+      slug: 'books',
+      title: 'Reading List - Rehana Rahman',
+      width: 1440,
+      description: 'Books and manga from the Raydotsh portfolio reading list.',
+      pageBackground: '#0a192f',
+      entranceAnimation: 'fade-up',
+      scrollTriggerMode: 'on-scroll',
+      sectionGap: 0,
+      bodyRefs: [
+        { sectionId: 'raydotsh-template-books-gallery-v1', instanceId: 'raydotshbooksgallery' },
+      ],
+    },
+  ],
+};
+
 export const allTemplateSeeds: ReadonlyArray<TemplateSeed> = [
   starterTemplate,
   launchTemplate,
@@ -783,6 +1009,7 @@ export const allTemplateSeeds: ReadonlyArray<TemplateSeed> = [
   violetLaunchTemplate,
   apogeeShowcaseTemplate,
   portfolioShowcaseTemplate,
+  raydotshPortfolioTemplate,
   velocityAthleteTemplate,
 ];
 

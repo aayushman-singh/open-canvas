@@ -1,0 +1,94 @@
+{
+  "baseSlug": "raydotsh-template-header",
+  "category": "header",
+  "name": "Navigation",
+  "description": "Raydotsh Portfolio header - fixed navy navigation with mint links and contact action.",
+  "recipeId": "custom",
+  "headingPreview": "Rehana",
+  "sectionData": {
+    "id": "raydotsh-header",
+    "recipeId": "custom",
+    "name": "Navigation",
+    "height": 82,
+    "elements": [
+      {
+        "id": "raydotsh-header-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 82,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "rgba(10, 25, 47, 0.92)",
+          "backdrop-filter": "blur(10px)",
+          "border-bottom": "1px solid #233554"
+        }
+      },
+      {
+        "id": "raydotsh-header-nav",
+        "type": "nav",
+        "box": {
+          "x": 72,
+          "y": 0,
+          "w": 1296,
+          "h": 82,
+          "z": 2
+        },
+        "siteTitle": "Rehana",
+        "links": [
+          {
+            "label": "Home",
+            "href": "/#intro",
+            "kind": "external"
+          },
+          {
+            "label": "About",
+            "href": "/#about",
+            "kind": "external"
+          },
+          {
+            "label": "Experience",
+            "href": "/#experience",
+            "kind": "external"
+          },
+          {
+            "label": "Software",
+            "href": "/#projects",
+            "kind": "external"
+          },
+          {
+            "label": "Books",
+            "href": "books",
+            "kind": "internal"
+          }
+        ],
+        "primaryAction": {
+          "label": "Say hi",
+          "href": "mailto:rehanarahman004@gmail.com",
+          "kind": "external"
+        },
+        "layout": "left-center-right",
+        "sticky": true,
+        "navStyle": {
+          "backgroundColor": "transparent",
+          "slotGap": 26,
+          "linkColor": "#ccd6f6",
+          "linkHoverColor": "#64ffda",
+          "activeLinkColor": "#64ffda",
+          "siteTitleColor": "#ccd6f6",
+          "siteTitleFontSize": 20,
+          "siteTitleFontWeight": "bold",
+          "primaryBackgroundColor": "#64ffda",
+          "primaryColor": "#020c1b",
+          "primaryBorderRadius": 4
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "raydotsh-portfolio"
+}

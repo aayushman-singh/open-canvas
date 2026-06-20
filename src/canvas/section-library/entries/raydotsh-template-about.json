@@ -1,0 +1,318 @@
+{
+  "baseSlug": "raydotsh-template-about",
+  "category": "features",
+  "name": "About",
+  "description": "Raydotsh Portfolio about section - long-form copy, skills, and portrait placeholder.",
+  "recipeId": "custom",
+  "headingPreview": "/ about me",
+  "sectionData": {
+    "id": "raydotsh-about",
+    "recipeId": "custom",
+    "name": "About",
+    "height": 720,
+    "anchorId": "about",
+    "backgroundEffect": "none",
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "raydotsh-about-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 720,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#0a192f"
+        }
+      },
+      {
+        "id": "raydotsh-about-title",
+        "type": "text",
+        "box": {
+          "x": 220,
+          "y": 82,
+          "w": 330,
+          "h": 76,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "/ about me"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 46,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#ccd6f6"
+        }
+      },
+      {
+        "id": "raydotsh-about-rule",
+        "type": "shape",
+        "box": {
+          "x": 520,
+          "y": 121,
+          "w": 360,
+          "h": 1,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "#233554"
+        }
+      },
+      {
+        "id": "raydotsh-about-body",
+        "type": "text",
+        "box": {
+          "x": 220,
+          "y": 176,
+          "w": 650,
+          "h": 204,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "I am currently a freelance content strategist and copywriter, working with founders across AI/SaaS, Web3, fintech, and devtools. I help them build content that sounds like a person wrote it, because one did.\n\nPreviously I've worked on content and growth for early-stage companies and bootstrapped founders across India and internationally."
+          }
+        ],
+        "role": "body",
+        "fontSize": 22,
+        "fontWeight": 400,
+        "align": "left",
+        "lineHeight": 1.45,
+        "textWrap": "pretty",
+        "pinnedStyle": {
+          "color": "#8892b0",
+          "white-space": "pre-line"
+        }
+      },
+      {
+        "id": "raydotsh-about-skills-label",
+        "type": "text",
+        "box": {
+          "x": 220,
+          "y": 418,
+          "w": 480,
+          "h": 38,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Some things I work with regularly:"
+          }
+        ],
+        "role": "body",
+        "fontSize": 21,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#a8b2d1"
+        }
+      },
+      {
+        "id": "raydotsh-skill-content-strategy",
+        "type": "text",
+        "box": {
+          "x": 230,
+          "y": 474,
+          "w": 280,
+          "h": 34,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "> Content Strategy"
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#8892b0"
+        }
+      },
+      {
+        "id": "raydotsh-skill-copywriting",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 474,
+          "w": 260,
+          "h": 34,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "> Copywriting"
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#8892b0"
+        }
+      },
+      {
+        "id": "raydotsh-skill-social",
+        "type": "text",
+        "box": {
+          "x": 230,
+          "y": 514,
+          "w": 300,
+          "h": 34,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "> Social Media Ghostwriting"
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#8892b0"
+        }
+      },
+      {
+        "id": "raydotsh-skill-newsletter",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 514,
+          "w": 260,
+          "h": 34,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "> Newsletter Writing"
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#8892b0"
+        }
+      },
+      {
+        "id": "raydotsh-skill-launches",
+        "type": "text",
+        "box": {
+          "x": 230,
+          "y": 554,
+          "w": 280,
+          "h": 34,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "> Launch Campaigns"
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#8892b0"
+        }
+      },
+      {
+        "id": "raydotsh-about-free-time",
+        "type": "text",
+        "box": {
+          "x": 220,
+          "y": 616,
+          "w": 650,
+          "h": 60,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "In my free time, I'm nerdy about tech, love literary fiction, and watch anime. Oh, I run a newsletter too."
+          }
+        ],
+        "role": "body",
+        "fontSize": 21,
+        "fontWeight": 400,
+        "align": "left",
+        "lineHeight": 1.35,
+        "textWrap": "pretty",
+        "pinnedStyle": {
+          "color": "#8892b0"
+        }
+      },
+      {
+        "id": "raydotsh-about-image-frame",
+        "type": "container",
+        "box": {
+          "x": 980,
+          "y": 184,
+          "w": 280,
+          "h": 380,
+          "z": 1,
+          "rotation": 2
+        },
+        "variant": "outlined",
+        "elementStyle": {
+          "backgroundColor": "#112240",
+          "borderColor": "#233554",
+          "borderWidth": 1,
+          "borderRadius": 10,
+          "boxShadow": "6px 13px 23px rgba(0, 0, 0, 0.36)"
+        }
+      },
+      {
+        "id": "raydotsh-about-image",
+        "type": "media",
+        "box": {
+          "x": 996,
+          "y": 200,
+          "w": 248,
+          "h": 348,
+          "z": 2,
+          "rotation": 2
+        },
+        "mediaKind": "image",
+        "assetId": "seed-raydotsh-yoru",
+        "alt": "Rehana portrait illustration from the Raydotsh portfolio source site",
+        "fit": "cover",
+        "elementStyle": {
+          "borderRadius": 8,
+          "opacity": 1
+        }
+      },
+      {
+        "id": "raydotsh-about-mint-line",
+        "type": "shape",
+        "box": {
+          "x": 1268,
+          "y": 222,
+          "w": 4,
+          "h": 300,
+          "z": 3
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "#64ffda"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "raydotsh-portfolio"
+}

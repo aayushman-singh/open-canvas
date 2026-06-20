@@ -13,39 +13,23 @@ import { injectInteractiveRuntime } from '../../interactive/inject';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
 import { customTemplate, site } from '../../db/schema';
-import { allTemplateSeeds, getTemplateSeed, instantiateTemplate, type TemplateSeed } from '../../templates/registry';
+import {
+  allTemplateSeeds,
+  getTemplateSeed,
+  instantiateTemplate,
+  type TemplateSeed,
+} from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
 import { Button, readThemeCookie } from '../../ui';
 import type { Theme } from '../../ui';
 import { publicHostSuffix, type HostConfigEnv } from '../../host-config';
 
-// Seed asset bytes inlined as base64 so the template preview works in
-// Workers (no filesystem access). Each key matches a SeedAsset.sourcePath.
-const SEED_SOURCE_B64: Record<string, string> = {
-  'transparent.png.b64':
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=',
-};
-
-const seedBytesCache = new Map<string, Uint8Array>();
-function readSeedBytes(sourcePath: string): Uint8Array {
-  const cached = seedBytesCache.get(sourcePath);
-  if (cached) return cached;
-  const b64 = SEED_SOURCE_B64[sourcePath];
-  if (!b64) throw new Error(`seed source not found: ${sourcePath}`);
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  seedBytesCache.set(sourcePath, bytes);
-  return bytes;
-}
-
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
+  ASSETS_BUCKET: R2Bucket;
   TURNSTILE_SITE_KEY?: string;
 };
 
@@ -362,6 +346,27 @@ export function renderBuiltInTemplatePreviewBodyHtml(
   );
 }
 
+export async function renderBuiltInTemplatePreviewAssetResponse(
+  assetId: string,
+  r2: R2Bucket,
+): Promise<Response | null> {
+  const asset = getSeedAsset(assetId);
+  if (!asset) return null;
+  const object = await r2.get(asset.r2Key);
+  if (!object) {
+    throw new Error(
+      `template preview asset ${assetId} references missing R2 object ${asset.r2Key}`,
+    );
+  }
+  return new Response(object.body, {
+    headers: {
+      'content-type': object.httpMetadata?.contentType ?? asset.mediaType,
+      'cache-control': 'public, max-age=31536000, immutable',
+      'x-content-type-options': 'nosniff',
+    },
+  });
+}
+
 function PreviewPage({
   template,
   turnstileSiteKey,
@@ -577,28 +582,19 @@ templatesRoute.get('/:templateId/preview', (c) => {
   );
 });
 
-templatesRoute.get('/:templateId/assets/:assetId', (c) => {
+templatesRoute.get('/:templateId/assets/:assetId', async (c) => {
   const template = getTemplateSeed(c.req.param('templateId'));
   if (!template) {
     return c.text('template not found', 404);
   }
-  const asset = getSeedAsset(c.req.param('assetId'));
-  if (!asset) {
+  const response = await renderBuiltInTemplatePreviewAssetResponse(
+    c.req.param('assetId'),
+    c.env.ASSETS_BUCKET,
+  );
+  if (!response) {
     return c.text('template asset not found', 404);
   }
-  // The preview path reads bytes directly from the seed-source files so it
-  // works in dev without the R2 binding being populated. The R2-backed
-  // read path (`/assets/:contentHash` on the public host) is the canonical
-  // surface for live sites; this dashboard-side route is a build-time
-  // preview affordance only.
-  const bytes = readSeedBytes(asset.sourcePath);
-  return new Response(bytes, {
-    headers: {
-      'content-type': asset.mediaType,
-      'cache-control': 'public, max-age=31536000, immutable',
-      'x-content-type-options': 'nosniff',
-    },
-  });
+  return response;
 });
 
 templatesRoute.get('/', async (c) => {

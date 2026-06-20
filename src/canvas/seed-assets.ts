@@ -105,6 +105,141 @@ const PROJECT_THUMB_NEUTRAL_SVG = {
   sourcePath: 'project-thumb-neutral.svg.b64',
 };
 
+// Raydotsh Portfolio template seeds. These bytes come from the source repo the
+// template was converted from and are kept as explicit seed assets so the
+// template preview and new-site materialisation do not depend on that repo.
+const RAYDOTSH_YORU = {
+  contentHash: 'e04237ce4f94c8e15c3c94c4137aa128415a895129a877f58a03b38068594593',
+  r2Key: 'assets/e04237ce4f94c8e15c3c94c4137aa128.png',
+  mediaType: 'image/png',
+  kind: 'image' as const,
+  width: 400,
+  height: 400,
+  byteSize: 114802,
+  sourcePath: 'raydotsh-yoru.png.b64',
+};
+
+const RAYDOTSH_PYCASTER = {
+  contentHash: '1202d7082b51783d0c46b464260e573df959ffba06b99b70dcc32606fd6c5062',
+  r2Key: 'assets/1202d7082b51783d0c46b464260e573d.png',
+  mediaType: 'image/png',
+  kind: 'image' as const,
+  width: 959,
+  height: 750,
+  byteSize: 60241,
+  sourcePath: 'raydotsh-pycaster.png.b64',
+};
+
+const RAYDOTSH_BOOK_A_LITTLE_LIFE = {
+  contentHash: 'e79d2d3ebb4dd6868f02a77ca306591055d1a248c0d4c266472470c02509b9f8',
+  r2Key: 'assets/e79d2d3ebb4dd6868f02a77ca3065910.png',
+  mediaType: 'image/png',
+  kind: 'image' as const,
+  width: 614,
+  height: 1024,
+  byteSize: 738989,
+  sourcePath: 'raydotsh-book-a-little-life.png.b64',
+};
+
+const RAYDOTSH_BOOK_PRIDE_AND_PREJUDICE = {
+  contentHash: '87b7f80d2a3840e3759f3a1714a77cdc075467dd05659eff6ffb2719a193f6f5',
+  r2Key: 'assets/87b7f80d2a3840e3759f3a1714a77cdc.png',
+  mediaType: 'image/png',
+  kind: 'image' as const,
+  width: 267,
+  height: 406,
+  byteSize: 222593,
+  sourcePath: 'raydotsh-book-pride-and-prejudice.png.b64',
+};
+
+const RAYDOTSH_BOOK_DRACULA = {
+  contentHash: 'd985e52ff584d89411a4c7972472318b7bfce657e6fa97bb3a5976ccf9b9f4fb',
+  r2Key: 'assets/d985e52ff584d89411a4c7972472318b.jpg',
+  mediaType: 'image/jpeg',
+  kind: 'image' as const,
+  width: 668,
+  height: 1024,
+  byteSize: 328511,
+  sourcePath: 'raydotsh-book-dracula.jpg.b64',
+};
+
+const RAYDOTSH_BOOK_JANE_EYRE = {
+  contentHash: '0bda831c856c3582f916601b8ebdefae2e6610f5b6c3d7a7552dbeb8b3a0cc41',
+  r2Key: 'assets/0bda831c856c3582f916601b8ebdefae.png',
+  mediaType: 'image/png',
+  kind: 'image' as const,
+  width: 480,
+  height: 792,
+  byteSize: 737881,
+  sourcePath: 'raydotsh-book-jane-eyre.png.b64',
+};
+
+const RAYDOTSH_BOOK_HARRY_POTTER = {
+  contentHash: 'c5cb82c7340ddd33dcbebedfce36d39abd61e60fe093d97563b31e287f79d79b',
+  r2Key: 'assets/c5cb82c7340ddd33dcbebedfce36d39a.jpg',
+  mediaType: 'image/jpeg',
+  kind: 'image' as const,
+  width: 684,
+  height: 1024,
+  byteSize: 321088,
+  sourcePath: 'raydotsh-book-harry-potter.jpg.b64',
+};
+
+const RAYDOTSH_BOOK_GOODNIGHT_PUNPUN = {
+  contentHash: 'e6d9d0dccd705898831c0822e2c318a6f8508c87a68fbce39ff2f6626e351486',
+  r2Key: 'assets/e6d9d0dccd705898831c0822e2c318a6.jpg',
+  mediaType: 'image/jpeg',
+  kind: 'image' as const,
+  width: 712,
+  height: 1024,
+  byteSize: 651183,
+  sourcePath: 'raydotsh-book-goodnight-punpun.jpg.b64',
+};
+
+const RAYDOTSH_BOOK_HUNGER_GAMES = {
+  contentHash: 'c3cb1940baa011a6c8c8793320108c828feb4ed25529d2df728ef19c4a1d5d66',
+  r2Key: 'assets/c3cb1940baa011a6c8c8793320108c82.png',
+  mediaType: 'image/png',
+  kind: 'image' as const,
+  width: 652,
+  height: 1000,
+  byteSize: 380090,
+  sourcePath: 'raydotsh-book-hunger-games.png.b64',
+};
+
+const RAYDOTSH_BOOK_THOUSAND_SPLENDID_SUNS = {
+  contentHash: 'e64c4453ede15ab70ebe554232db3bf84943fe5dedb80f0c3072cc021c6c1dd2',
+  r2Key: 'assets/e64c4453ede15ab70ebe554232db3bf8.png',
+  mediaType: 'image/png',
+  kind: 'image' as const,
+  width: 499,
+  height: 768,
+  byteSize: 736580,
+  sourcePath: 'raydotsh-book-thousand-splendid-suns.png.b64',
+};
+
+const RAYDOTSH_BOOK_MAN_CALLED_OVE = {
+  contentHash: 'd63da7f70c2f09432d5994ecf4eb7383d3179aa745605dbb421f99852bbb3cbd',
+  r2Key: 'assets/d63da7f70c2f09432d5994ecf4eb7383.jpg',
+  mediaType: 'image/jpeg',
+  kind: 'image' as const,
+  width: 656,
+  height: 1024,
+  byteSize: 321882,
+  sourcePath: 'raydotsh-book-man-called-ove.jpg.b64',
+};
+
+const RAYDOTSH_BOOK_RED_TRAINERS = {
+  contentHash: '4cfd4fce78738b4c67b2026524694d6b2a036c36dfe22a694bc5127c5c187103',
+  r2Key: 'assets/4cfd4fce78738b4c67b2026524694d6b.png',
+  mediaType: 'image/png',
+  kind: 'image' as const,
+  width: 302,
+  height: 475,
+  byteSize: 165346,
+  sourcePath: 'raydotsh-book-red-trainers.png.b64',
+};
+
 // Velocity Athlete template seeds (fidelity pilot). Twelve abstract helmet
 // sequence frames plus four editorial media studies. SVG bytes are stable —
 // re-rendering the same XML byte-for-byte yields the same contentHash.
@@ -300,6 +435,54 @@ export const SEED_ASSET_REGISTRY: Record<string, SeedAsset> = {
   'seed-project-thumb-neutral': {
     ...PROJECT_THUMB_NEUTRAL_SVG,
     alt: 'Neutral project thumbnail',
+  },
+  'seed-raydotsh-yoru': {
+    ...RAYDOTSH_YORU,
+    alt: 'Rehana portrait illustration from the Raydotsh portfolio source site',
+  },
+  'seed-raydotsh-pycaster': {
+    ...RAYDOTSH_PYCASTER,
+    alt: 'Pycaster project screenshot from the Raydotsh portfolio source site',
+  },
+  'seed-raydotsh-book-a-little-life': {
+    ...RAYDOTSH_BOOK_A_LITTLE_LIFE,
+    alt: 'A Little Life book cover',
+  },
+  'seed-raydotsh-book-pride-and-prejudice': {
+    ...RAYDOTSH_BOOK_PRIDE_AND_PREJUDICE,
+    alt: 'Pride and Prejudice book cover',
+  },
+  'seed-raydotsh-book-dracula': {
+    ...RAYDOTSH_BOOK_DRACULA,
+    alt: 'Dracula book cover',
+  },
+  'seed-raydotsh-book-jane-eyre': {
+    ...RAYDOTSH_BOOK_JANE_EYRE,
+    alt: 'Jane Eyre book cover',
+  },
+  'seed-raydotsh-book-harry-potter': {
+    ...RAYDOTSH_BOOK_HARRY_POTTER,
+    alt: "Harry Potter and the Philosopher's Stone book cover",
+  },
+  'seed-raydotsh-book-goodnight-punpun': {
+    ...RAYDOTSH_BOOK_GOODNIGHT_PUNPUN,
+    alt: 'Goodnight Punpun book cover',
+  },
+  'seed-raydotsh-book-hunger-games': {
+    ...RAYDOTSH_BOOK_HUNGER_GAMES,
+    alt: 'The Hunger Games book cover',
+  },
+  'seed-raydotsh-book-thousand-splendid-suns': {
+    ...RAYDOTSH_BOOK_THOUSAND_SPLENDID_SUNS,
+    alt: 'A Thousand Splendid Suns book cover',
+  },
+  'seed-raydotsh-book-man-called-ove': {
+    ...RAYDOTSH_BOOK_MAN_CALLED_OVE,
+    alt: 'A Man Called Ove book cover',
+  },
+  'seed-raydotsh-book-red-trainers': {
+    ...RAYDOTSH_BOOK_RED_TRAINERS,
+    alt: 'She Wore Red Trainers book cover',
   },
   'seed-velocity-helmet-frame-00': {
     ...VELOCITY_HELMET_FRAME_00,

@@ -1,0 +1,276 @@
+{
+  "baseSlug": "raydotsh-template-experience",
+  "category": "features",
+  "name": "Experience",
+  "description": "Raydotsh Portfolio experience section - native tabbed job list.",
+  "recipeId": "custom",
+  "headingPreview": "/ experience",
+  "sectionData": {
+    "id": "raydotsh-experience",
+    "recipeId": "custom",
+    "name": "Experience",
+    "height": 610,
+    "anchorId": "experience",
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "raydotsh-experience-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 610,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#0a192f"
+        }
+      },
+      {
+        "id": "raydotsh-experience-title",
+        "type": "text",
+        "box": {
+          "x": 220,
+          "y": 70,
+          "w": 340,
+          "h": 76,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "/ experience"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 46,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#ccd6f6"
+        }
+      },
+      {
+        "id": "raydotsh-experience-rule",
+        "type": "shape",
+        "box": {
+          "x": 560,
+          "y": 109,
+          "w": 340,
+          "h": 1,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "#233554"
+        }
+      },
+      {
+        "id": "raydotsh-experience-tabs",
+        "type": "tabs",
+        "box": {
+          "x": 220,
+          "y": 166,
+          "w": 920,
+          "h": 342,
+          "z": 3
+        },
+        "activeTabId": "freelance",
+        "tabBarHeight": 64,
+        "variant": "underline",
+        "tabsStyle": {
+          "barGap": 18,
+          "barBackgroundColor": "transparent",
+          "barBorderColor": "#233554",
+          "tabColor": "#8892b0",
+          "activeTabColor": "#64ffda",
+          "activeIndicatorColor": "#64ffda",
+          "tabFontWeight": "medium",
+          "activeTabFontWeight": "bold",
+          "panelBackgroundColor": "transparent"
+        },
+        "tabs": [
+          {
+            "id": "freelance",
+            "label": [
+              {
+                "text": "Freelance"
+              }
+            ],
+            "elements": [
+              {
+                "id": "raydotsh-freelance-title",
+                "type": "text",
+                "box": {
+                  "x": 0,
+                  "y": 26,
+                  "w": 760,
+                  "h": 44,
+                  "z": 1
+                },
+                "content": [
+                  {
+                    "text": "Freelance Content Strategist & Copywriter"
+                  }
+                ],
+                "role": "heading",
+                "fontSize": 28,
+                "fontWeight": 700,
+                "align": "left",
+                "pinnedStyle": {
+                  "color": "#ccd6f6"
+                }
+              },
+              {
+                "id": "raydotsh-freelance-duration",
+                "type": "text",
+                "box": {
+                  "x": 0,
+                  "y": 76,
+                  "w": 260,
+                  "h": 28,
+                  "z": 1
+                },
+                "content": [
+                  {
+                    "text": "2023 - PRESENT"
+                  }
+                ],
+                "role": "label",
+                "fontSize": 18,
+                "fontWeight": 500,
+                "align": "left",
+                "letterSpacing": "0.08em",
+                "pinnedStyle": {
+                  "color": "#8892b0"
+                }
+              },
+              {
+                "id": "raydotsh-freelance-points",
+                "type": "text",
+                "box": {
+                  "x": 0,
+                  "y": 126,
+                  "w": 820,
+                  "h": 132,
+                  "z": 1
+                },
+                "content": [
+                  {
+                    "text": "> Build end-to-end content strategies and ghostwrite across LinkedIn, Twitter, and newsletters for AI/SaaS and Web3 founders\n> Lead launch content for Product Hunt campaigns including pre-launch sequences and cold outreach copy\n> Ghostwrite long-form and short-form content for fintech, devtools, and cloud infrastructure clients"
+                  }
+                ],
+                "role": "body",
+                "fontSize": 18,
+                "fontWeight": 400,
+                "align": "left",
+                "lineHeight": 1.55,
+                "pinnedStyle": {
+                  "color": "#8892b0",
+                  "white-space": "pre-line"
+                }
+              }
+            ]
+          },
+          {
+            "id": "fundmemommy",
+            "label": [
+              {
+                "text": "FundMeMommy"
+              }
+            ],
+            "elements": [
+              {
+                "id": "raydotsh-newsletter-title",
+                "type": "text",
+                "box": {
+                  "x": 0,
+                  "y": 26,
+                  "w": 760,
+                  "h": 44,
+                  "z": 1
+                },
+                "content": [
+                  {
+                    "text": "Editor @ "
+                  },
+                  {
+                    "text": "FundMeMommy",
+                    "marks": [
+                      {
+                        "type": "color",
+                        "color": "#64ffda"
+                      },
+                      {
+                        "type": "bold"
+                      }
+                    ]
+                  }
+                ],
+                "role": "heading",
+                "fontSize": 28,
+                "fontWeight": 700,
+                "align": "left",
+                "pinnedStyle": {
+                  "color": "#ccd6f6"
+                }
+              },
+              {
+                "id": "raydotsh-newsletter-duration",
+                "type": "text",
+                "box": {
+                  "x": 0,
+                  "y": 76,
+                  "w": 260,
+                  "h": 28,
+                  "z": 1
+                },
+                "content": [
+                  {
+                    "text": "ONGOING"
+                  }
+                ],
+                "role": "label",
+                "fontSize": 18,
+                "fontWeight": 500,
+                "align": "left",
+                "letterSpacing": "0.08em",
+                "pinnedStyle": {
+                  "color": "#8892b0"
+                }
+              },
+              {
+                "id": "raydotsh-newsletter-points",
+                "type": "text",
+                "box": {
+                  "x": 0,
+                  "y": 126,
+                  "w": 820,
+                  "h": 100,
+                  "z": 1
+                },
+                "content": [
+                  {
+                    "text": "> Run a weekly newsletter surfacing indie tech projects and founder stories for builders and early adopters\n> Manage editorial calendar, landing page, and growth strategy end-to-end"
+                  }
+                ],
+                "role": "body",
+                "fontSize": 18,
+                "fontWeight": 400,
+                "align": "left",
+                "lineHeight": 1.55,
+                "pinnedStyle": {
+                  "color": "#8892b0",
+                  "white-space": "pre-line"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "raydotsh-portfolio"
+}

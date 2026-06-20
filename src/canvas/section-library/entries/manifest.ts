@@ -78,28 +78,36 @@ import e69 from './press-template-features.json' with { type: 'json' };
 import e70 from './press-template-footer.json' with { type: 'json' };
 import e71 from './press-template-header.json' with { type: 'json' };
 import e72 from './press-template-hero.json' with { type: 'json' };
-import e73 from './starter-template-cta.json' with { type: 'json' };
-import e74 from './starter-template-features.json' with { type: 'json' };
-import e75 from './starter-template-footer.json' with { type: 'json' };
-import e76 from './starter-template-header.json' with { type: 'json' };
-import e77 from './starter-template-hero.json' with { type: 'json' };
-import e78 from './studio-template-cta.json' with { type: 'json' };
-import e79 from './studio-template-features.json' with { type: 'json' };
-import e80 from './studio-template-footer.json' with { type: 'json' };
-import e81 from './studio-template-header.json' with { type: 'json' };
-import e82 from './studio-template-hero.json' with { type: 'json' };
-import e83 from './velocity-template-artifacts.json' with { type: 'json' };
-import e84 from './velocity-template-footer.json' with { type: 'json' };
-import e85 from './velocity-template-header.json' with { type: 'json' };
-import e86 from './velocity-template-hero.json' with { type: 'json' };
-import e87 from './velocity-template-impact.json' with { type: 'json' };
-import e88 from './velocity-template-store.json' with { type: 'json' };
-import e89 from './velocity-template-story.json' with { type: 'json' };
-import e90 from './violet-template-cta.json' with { type: 'json' };
-import e91 from './violet-template-features.json' with { type: 'json' };
-import e92 from './violet-template-footer.json' with { type: 'json' };
-import e93 from './violet-template-header.json' with { type: 'json' };
-import e94 from './violet-template-hero.json' with { type: 'json' };
+import e73 from './raydotsh-template-about.json' with { type: 'json' };
+import e74 from './raydotsh-template-books.json' with { type: 'json' };
+import e75 from './raydotsh-template-books-gallery.json' with { type: 'json' };
+import e76 from './raydotsh-template-experience.json' with { type: 'json' };
+import e77 from './raydotsh-template-footer.json' with { type: 'json' };
+import e78 from './raydotsh-template-header.json' with { type: 'json' };
+import e79 from './raydotsh-template-hero.json' with { type: 'json' };
+import e80 from './raydotsh-template-software.json' with { type: 'json' };
+import e81 from './starter-template-cta.json' with { type: 'json' };
+import e82 from './starter-template-features.json' with { type: 'json' };
+import e83 from './starter-template-footer.json' with { type: 'json' };
+import e84 from './starter-template-header.json' with { type: 'json' };
+import e85 from './starter-template-hero.json' with { type: 'json' };
+import e86 from './studio-template-cta.json' with { type: 'json' };
+import e87 from './studio-template-features.json' with { type: 'json' };
+import e88 from './studio-template-footer.json' with { type: 'json' };
+import e89 from './studio-template-header.json' with { type: 'json' };
+import e90 from './studio-template-hero.json' with { type: 'json' };
+import e91 from './velocity-template-artifacts.json' with { type: 'json' };
+import e92 from './velocity-template-footer.json' with { type: 'json' };
+import e93 from './velocity-template-header.json' with { type: 'json' };
+import e94 from './velocity-template-hero.json' with { type: 'json' };
+import e95 from './velocity-template-impact.json' with { type: 'json' };
+import e96 from './velocity-template-store.json' with { type: 'json' };
+import e97 from './velocity-template-story.json' with { type: 'json' };
+import e98 from './violet-template-cta.json' with { type: 'json' };
+import e99 from './violet-template-features.json' with { type: 'json' };
+import e100 from './violet-template-footer.json' with { type: 'json' };
+import e101 from './violet-template-header.json' with { type: 'json' };
+import e102 from './violet-template-hero.json' with { type: 'json' };
 
 export const EXTRACTED_ENTRIES: ReadonlyArray<SectionLibraryEntry> = [
   e0 as SectionLibraryEntry,
@@ -197,4 +205,12 @@ export const EXTRACTED_ENTRIES: ReadonlyArray<SectionLibraryEntry> = [
   e92 as SectionLibraryEntry,
   e93 as SectionLibraryEntry,
   e94 as SectionLibraryEntry,
+  e95 as SectionLibraryEntry,
+  e96 as SectionLibraryEntry,
+  e97 as SectionLibraryEntry,
+  e98 as SectionLibraryEntry,
+  e99 as SectionLibraryEntry,
+  e100 as SectionLibraryEntry,
+  e101 as SectionLibraryEntry,
+  e102 as SectionLibraryEntry,
 ];
