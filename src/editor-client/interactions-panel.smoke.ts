@@ -253,6 +253,10 @@ assert(
 );
 assert(panelSrc.includes('Quick from opacity'), 'panel must edit from opacity from the timeline');
 assert(panelSrc.includes('Quick to filter'), 'panel must edit to filter from the timeline');
+assert(panelSrc.includes('Quick duration (ms)'), 'panel must edit duration beside the timeline');
+assert(panelSrc.includes('Quick delay (ms)'), 'panel must edit delay beside the timeline');
+assert(panelSrc.includes('Quick stagger (ms)'), 'panel must edit stagger beside the timeline');
+assert(panelSrc.includes('Quick easing'), 'panel must edit easing beside the timeline');
 assert(
   panelSrc.includes('data-opencanvas-motion-preview-progress'),
   'panel must publish Motion Sequence preview progress metadata',

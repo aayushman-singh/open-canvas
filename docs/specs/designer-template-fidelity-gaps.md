@@ -234,14 +234,15 @@ Current state:
   `durationMs` directly, with invalid editor measurements reported through the
   status channel instead of ignored.
 - **June 2026 update:** Timeline quick properties now edit common per-step
-  `from`/`to` opacity, transform, and filter values beside the visual timeline,
-  using the same schema-owned Motion Sequence step fields as the detailed form.
+  timing/easing plus `from`/`to` opacity, transform, and filter values beside
+  the visual timeline, using the same schema-owned Motion Sequence step fields
+  as the detailed form.
 
 User-visible miss:
 
 - Cannot yet edit every advanced property through a direct-manipulation
-  timeline canvas; uncommon properties and detailed target/easing controls
-  remain in the field-level editor.
+  timeline canvas; uncommon properties and detailed target controls remain in
+  the field-level editor.
 
 Needed primitive:
 

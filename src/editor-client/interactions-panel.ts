@@ -2370,6 +2370,36 @@ function renderMotionSequenceTimelinePropertyEditor(
     const grid = document.createElement('div');
     grid.className = 'opencanvas-motion-timeline-property-grid';
 
+    const quickDuration = numberInput(step.durationMs, 0, 10000, 10);
+    quickDuration.addEventListener('change', () =>
+      updateMotionStepFinite(ctx, sequence.id, step, 'durationMs', quickDuration, 0, 10000),
+    );
+    grid.appendChild(field('Quick duration (ms)', quickDuration));
+
+    const quickDelay = numberInput(step.delayMs ?? 0, 0, 10000, 10);
+    quickDelay.addEventListener('change', () =>
+      updateMotionStepFinite(ctx, sequence.id, step, 'delayMs', quickDelay, 0, 10000),
+    );
+    grid.appendChild(field('Quick delay (ms)', quickDelay));
+
+    const quickStagger = numberInput(step.staggerMs ?? 0, 0, 10000, 10);
+    quickStagger.addEventListener('change', () =>
+      updateMotionStepFinite(ctx, sequence.id, step, 'staggerMs', quickStagger, 0, 10000),
+    );
+    grid.appendChild(field('Quick stagger (ms)', quickStagger));
+
+    const quickEasing = textInput(step.easing ?? DEFAULT_EASING, DEFAULT_EASING);
+    quickEasing.addEventListener('change', () => {
+      const value = quickEasing.value.trim();
+      if (value.length === 0) {
+        ctx.setStatus('Motion Sequence easing cannot be empty', 'error');
+        quickEasing.value = step.easing ?? DEFAULT_EASING;
+        return;
+      }
+      mutate(ctx, () => updateScrollSequenceStep(ctx, sequence.id, step.id, { easing: value }));
+    });
+    grid.appendChild(field('Quick easing', quickEasing));
+
     const fromOpacity = optionalNumberInput(motionNumberValue(step.from, 'opacity'), 0, 1, 0.05);
     fromOpacity.addEventListener('change', () =>
       updateMotionStepProperty(ctx, sequence.id, step, 'from', 'opacity', fromOpacity, 0, 1),
