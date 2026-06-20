@@ -9,6 +9,8 @@ import type {
   InteractionTrigger,
   BehaviourLoadExperience,
   PremiumLoadExperience,
+  OverlayChoreographyPreset,
+  OverlayChoreographyReducedMotionMode,
   LoadExperienceGate,
   LoadExperiencePreset,
   LoadExperienceRunPolicy,
@@ -70,6 +72,8 @@ import {
   LOAD_EXPERIENCE_GATES,
   LOAD_EXPERIENCE_PRESETS,
   LOAD_EXPERIENCE_RUN_POLICIES,
+  OVERLAY_CHOREOGRAPHY_PRESETS,
+  OVERLAY_CHOREOGRAPHY_REDUCED_MOTION_MODES,
   MOTION_SEQUENCE_LITE_EFFECTS,
   MOTION_SEQUENCE_LITE_TARGET_TYPES,
   OVERLAY_BACKDROP_STYLES,
@@ -143,7 +147,14 @@ export function defaultOverlay(id: string, name: string, pageId: string): Overla
       height: 420,
       elements: [],
     },
-    presentation: { mode: 'modal', chrome: 'standard', backdrop: 'dim', closePlacement: 'top-right' },
+    presentation: {
+      mode: 'modal',
+      chrome: 'standard',
+      backdrop: 'dim',
+      closePlacement: 'top-right',
+      choreography: 'none',
+      reducedMotion: 'instant',
+    },
     dismissal: defaultDismissal(),
   };
 }
@@ -4168,6 +4179,8 @@ function renderOverlayCard(
           chrome: overlay.presentation?.chrome ?? 'standard',
           backdrop: overlay.presentation?.backdrop ?? 'dim',
           closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          choreography: overlay.presentation?.choreography ?? 'none',
+          reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
         },
       };
     });
@@ -4184,6 +4197,8 @@ function renderOverlayCard(
           chrome: chrome.value as OverlayChromePreset,
           backdrop: overlay.presentation?.backdrop ?? 'dim',
           closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          choreography: overlay.presentation?.choreography ?? 'none',
+          reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
         },
       };
     });
@@ -4200,6 +4215,8 @@ function renderOverlayCard(
           chrome: overlay.presentation?.chrome ?? 'standard',
           backdrop: backdrop.value as OverlayBackdropStyle,
           closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          choreography: overlay.presentation?.choreography ?? 'none',
+          reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
         },
       };
     });
@@ -4219,11 +4236,55 @@ function renderOverlayCard(
           chrome: overlay.presentation?.chrome ?? 'standard',
           backdrop: overlay.presentation?.backdrop ?? 'dim',
           closePlacement: closePlacement.value as OverlayClosePlacement,
+          choreography: overlay.presentation?.choreography ?? 'none',
+          reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
         },
       };
     });
   });
   card.appendChild(field('Close placement', closePlacement));
+
+  const choreography = selectInput(
+    OVERLAY_CHOREOGRAPHY_PRESETS,
+    overlay.presentation?.choreography ?? 'none',
+  );
+  choreography.addEventListener('change', () => {
+    mutate(ctx, () => {
+      ctx.state!.overlays![index] = {
+        ...overlay,
+        presentation: {
+          mode: overlay.presentation?.mode ?? 'modal',
+          chrome: overlay.presentation?.chrome ?? 'standard',
+          backdrop: overlay.presentation?.backdrop ?? 'dim',
+          closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          choreography: choreography.value as OverlayChoreographyPreset,
+          reducedMotion: overlay.presentation?.reducedMotion ?? 'instant',
+        },
+      };
+    });
+  });
+  card.appendChild(field('Choreography', choreography));
+
+  const reducedMotion = selectInput(
+    OVERLAY_CHOREOGRAPHY_REDUCED_MOTION_MODES,
+    overlay.presentation?.reducedMotion ?? 'instant',
+  );
+  reducedMotion.addEventListener('change', () => {
+    mutate(ctx, () => {
+      ctx.state!.overlays![index] = {
+        ...overlay,
+        presentation: {
+          mode: overlay.presentation?.mode ?? 'modal',
+          chrome: overlay.presentation?.chrome ?? 'standard',
+          backdrop: overlay.presentation?.backdrop ?? 'dim',
+          closePlacement: overlay.presentation?.closePlacement ?? 'top-right',
+          choreography: overlay.presentation?.choreography ?? 'none',
+          reducedMotion: reducedMotion.value as OverlayChoreographyReducedMotionMode,
+        },
+      };
+    });
+  });
+  card.appendChild(field('Choreography reduced motion', reducedMotion));
 
   const contentCanvas = compactButton(
     'Edit content canvas',

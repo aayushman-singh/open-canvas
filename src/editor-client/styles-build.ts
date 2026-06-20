@@ -4259,6 +4259,57 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   top: 20px;
   right: 20px;
 }
+.opencanvas-overlay[data-opencanvas-overlay-choreography="stagger-rise"][data-opencanvas-overlay-open] .opencanvas-overlay-surface [data-opencanvas-element] {
+  animation: opencanvas-overlay-stagger-rise 520ms cubic-bezier(.22,1,.36,1) both;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="stagger-rise"][data-opencanvas-overlay-open] .opencanvas-overlay-surface [data-opencanvas-element]:nth-of-type(2) {
+  animation-delay: 70ms;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="stagger-rise"][data-opencanvas-overlay-open] .opencanvas-overlay-surface [data-opencanvas-element]:nth-of-type(3) {
+  animation-delay: 140ms;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="mask-sweep"][data-opencanvas-overlay-open] .opencanvas-overlay-surface {
+  animation: opencanvas-overlay-mask-sweep 620ms cubic-bezier(.76,0,.24,1) both;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="slide-stack"][data-opencanvas-overlay-open] .opencanvas-overlay-surface {
+  animation: opencanvas-overlay-slide-stack 560ms cubic-bezier(.22,1,.36,1) both;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="slide-stack"][data-opencanvas-overlay-open] .opencanvas-overlay-backdrop {
+  animation: opencanvas-overlay-backdrop-rise 560ms ease both;
+}
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="instant"] .opencanvas-overlay-surface,
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="instant"] .opencanvas-overlay-backdrop,
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="instant"] .opencanvas-overlay-surface [data-opencanvas-element] {
+  animation-duration: 1ms !important;
+  animation-delay: 0ms !important;
+}
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="fade"] .opencanvas-overlay-surface,
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="fade"] .opencanvas-overlay-backdrop,
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="fade"] .opencanvas-overlay-surface [data-opencanvas-element] {
+  animation-name: opencanvas-overlay-reduced-fade !important;
+  animation-duration: 140ms !important;
+  animation-delay: 0ms !important;
+}
+@keyframes opencanvas-overlay-stagger-rise {
+  from { opacity: 0; transform: translateY(34px); filter: blur(10px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@keyframes opencanvas-overlay-mask-sweep {
+  from { clip-path: inset(0 0 100% 0 round 32px); transform: scale(1.02); }
+  to { clip-path: inset(0 0 0 0 round 0); transform: scale(1); }
+}
+@keyframes opencanvas-overlay-slide-stack {
+  from { opacity: 0; transform: translate3d(0, 44px, 0) scale(.96); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes opencanvas-overlay-backdrop-rise {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes opencanvas-overlay-reduced-fade {
+  from { opacity: 0; transform: none; clip-path: none; filter: none; }
+  to { opacity: 1; transform: none; clip-path: none; filter: none; }
+}
 .opencanvas-load-experience {
   position: fixed;
   inset: 0;

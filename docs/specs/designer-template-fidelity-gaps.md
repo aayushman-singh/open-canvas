@@ -907,9 +907,9 @@ adding disconnected one-off runtimes.
 
 ### 17. Overlay v2 Fullscreen Menu Presentation
 
-Status: addressed for the schema-owned fullscreen menu presentation slice. Owners can set an Overlay presentation to `fullscreen-menu`, keep authoring the content through the existing `Overlay.content` Canvas Section, preview it from the Interactions panel, and publish explicit overlay presentation/content-canvas metadata consumed by the Runtime Hydrator. Unsupported presentation modes now fail validation instead of degrading to modal behaviour.
+Status: addressed for the schema-owned fullscreen menu presentation and choreography slices. Owners can set an Overlay presentation to `fullscreen-menu`, choose bounded choreography presets (`none`, `stagger-rise`, `mask-sweep`, `slide-stack`), set explicit choreography reduced-motion behaviour, keep authoring the content through the existing `Overlay.content` Canvas Section, preview it from the Interactions panel, and publish explicit overlay presentation/content-canvas/choreography metadata consumed by the Runtime Hydrator. Unsupported presentation or choreography modes now fail validation instead of degrading to modal behaviour.
 
-Intentional deferral: richer nested overlay-canvas editing affordances, overlay-specific layout presets, and menu choreography presets remain outside this slice; Motion Sequence Lite can already animate the overlay surface/backdrop. A later chrome slice added bounded overlay chrome/backdrop/close placement presets without introducing raw CSS blobs.
+Intentional deferral: richer nested overlay-canvas editing affordances and overlay-specific layout presets remain outside this slice; Motion Sequence Lite can still animate the overlay surface/backdrop for custom sequencing. A later chrome slice added bounded overlay chrome/backdrop/close placement presets without introducing raw CSS blobs.
 
 ### 18. Collection Gallery v2 Hover Reveal Detail
 

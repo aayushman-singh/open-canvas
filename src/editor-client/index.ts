@@ -348,16 +348,26 @@ function ensureEditorOverlayPreviewShell(ctx: EditorContext, overlay: Overlay): 
   const chrome = overlay.presentation?.chrome ?? 'standard';
   const backdropStyle = overlay.presentation?.backdrop ?? 'dim';
   const closePlacement = overlay.presentation?.closePlacement ?? 'top-right';
+  const choreography = overlay.presentation?.choreography ?? 'none';
+  const reducedMotion = overlay.presentation?.reducedMotion ?? 'instant';
   const shell = document.createElement('div');
   shell.className =
     presentation === 'fullscreen-menu'
-      ? 'opencanvas-overlay opencanvas-overlay--fullscreen-menu opencanvas-overlay--chrome-' + chrome
-      : 'opencanvas-overlay opencanvas-overlay--chrome-' + chrome;
+      ? 'opencanvas-overlay opencanvas-overlay--fullscreen-menu opencanvas-overlay--chrome-' +
+        chrome +
+        ' opencanvas-overlay--choreography-' +
+        choreography
+      : 'opencanvas-overlay opencanvas-overlay--chrome-' +
+        chrome +
+        ' opencanvas-overlay--choreography-' +
+        choreography;
   shell.setAttribute('data-opencanvas-overlay', overlay.id);
   shell.setAttribute('data-opencanvas-overlay-presentation', presentation);
   shell.setAttribute('data-opencanvas-overlay-chrome', chrome);
   shell.setAttribute('data-opencanvas-overlay-backdrop-style', backdropStyle);
   shell.setAttribute('data-opencanvas-overlay-close-placement', closePlacement);
+  shell.setAttribute('data-opencanvas-overlay-choreography', choreography);
+  shell.setAttribute('data-opencanvas-overlay-reduced-motion', reducedMotion);
   shell.setAttribute('data-opencanvas-overlay-trigger-type', overlay.trigger.type);
   shell.setAttribute('data-opencanvas-editor-preview-temp', 'true');
   shell.setAttribute('hidden', '');

@@ -109,6 +109,8 @@ import {
   NAV_THEME_REDUCED_MOTION_MODES,
   NAV_THEME_TARGETS,
   OVERLAY_BACKDROP_STYLES,
+  OVERLAY_CHOREOGRAPHY_PRESETS,
+  OVERLAY_CHOREOGRAPHY_REDUCED_MOTION_MODES,
   OVERLAY_CHROME_PRESETS,
   OVERLAY_CLOSE_PLACEMENTS,
   MEDIA_KINDS,
@@ -2805,6 +2807,22 @@ function validateOverlays(site: Record<string, unknown>, errors: string[]): void
             presentationRecord.closePlacement,
             OVERLAY_CLOSE_PLACEMENTS,
             `${basePath}.presentation.closePlacement`,
+            errors,
+          );
+        }
+        if (presentationRecord.choreography !== undefined) {
+          assertOneOf(
+            presentationRecord.choreography,
+            OVERLAY_CHOREOGRAPHY_PRESETS,
+            `${basePath}.presentation.choreography`,
+            errors,
+          );
+        }
+        if (presentationRecord.reducedMotion !== undefined) {
+          assertOneOf(
+            presentationRecord.reducedMotion,
+            OVERLAY_CHOREOGRAPHY_REDUCED_MOTION_MODES,
+            `${basePath}.presentation.reducedMotion`,
             errors,
           );
         }

@@ -36,6 +36,16 @@ function hydrateOverlays(scope, options) {
         overlayFailure(id, 'overlay-close-placement', { closePlacement: closePlacement });
         return;
       }
+      var choreography = overlay.getAttribute('data-opencanvas-overlay-choreography') || 'none';
+      if (choreography !== 'none' && choreography !== 'stagger-rise' && choreography !== 'mask-sweep' && choreography !== 'slide-stack') {
+        overlayFailure(id, 'overlay-choreography', { choreography: choreography });
+        return;
+      }
+      var reducedMotion = overlay.getAttribute('data-opencanvas-overlay-reduced-motion') || 'instant';
+      if (reducedMotion !== 'instant' && reducedMotion !== 'fade') {
+        overlayFailure(id, 'overlay-choreography-reduced-motion', { reducedMotion: reducedMotion });
+        return;
+      }
       var surface = overlay.querySelector('[data-opencanvas-overlay-surface]');
       var backdrop = overlay.querySelector('[data-opencanvas-overlay-backdrop]');
       var closeButtonEnabled = overlay.getAttribute('data-opencanvas-overlay-close-button') === 'true';
@@ -58,6 +68,8 @@ function hydrateOverlays(scope, options) {
         if (closeSequence && typeof runMotionSequenceLite === 'function') runMotionSequenceLite(overlay, closeSequence);
         overlay.removeAttribute('data-opencanvas-overlay-open');
         overlay.removeAttribute('data-opencanvas-overlay-active-presentation');
+        overlay.removeAttribute('data-opencanvas-overlay-choreography-active');
+        overlay.removeAttribute('data-opencanvas-overlay-reduced-motion-active');
         if (document.documentElement.getAttribute('data-opencanvas-overlay-active-presentation') === presentation) {
           document.documentElement.removeAttribute('data-opencanvas-overlay-active-presentation');
         }
@@ -92,6 +104,13 @@ function hydrateOverlays(scope, options) {
         overlay.hidden = false;
         overlay.setAttribute('data-opencanvas-overlay-open', 'true');
         overlay.setAttribute('data-opencanvas-overlay-active-presentation', presentation);
+        overlay.setAttribute('data-opencanvas-overlay-choreography-active', choreography);
+        var reduce = false;
+        if (typeof window.matchMedia === 'function') {
+          reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches === true;
+        }
+        if (reduce && choreography !== 'none') overlay.setAttribute('data-opencanvas-overlay-reduced-motion-active', reducedMotion);
+        else overlay.removeAttribute('data-opencanvas-overlay-reduced-motion-active');
         document.documentElement.setAttribute('data-opencanvas-overlay-active-presentation', presentation);
         if (lockEnabled) document.body.style.overflow = 'hidden';
         if (closeButtonEnabled && surface && !closeButton) {
