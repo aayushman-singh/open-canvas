@@ -20,7 +20,13 @@ export const MOTION_SEQUENCE_PROPERTIES = [
   'fontVariationWidth',
   'fontVariationSlant',
 ] as const;
-export const MOTION_SEQUENCE_TEXT_EFFECTS = ['none', 'scramble', 'mask-reveal'] as const;
+export const MOTION_SEQUENCE_TEXT_EFFECTS = [
+  'none',
+  'scramble',
+  'mask-reveal',
+  'blur-reveal',
+  'wave-rise',
+] as const;
 export const MOTION_SEQUENCE_REPEAT_MODES = ['restart', 'yoyo'] as const;
 export const MOTION_SEQUENCE_PLAYBACK_DIRECTIONS = ['normal', 'reverse'] as const;
 export const RICH_MOTION_KINDS = [

@@ -103,6 +103,7 @@ function behaviourSplitTextTarget(el, unit) {
     span.className = 'opencanvas-text-split';
     span.setAttribute('data-opencanvas-text-split-unit', unit);
     span.setAttribute('data-opencanvas-text-split-final', parts[i]);
+    span.setAttribute('data-opencanvas-text-split-index', String(i));
     span.setAttribute('aria-hidden', 'true');
     span.style.display = unit === 'line' ? 'block' : 'inline-block';
     span.textContent = parts[i];
@@ -115,7 +116,7 @@ function behaviourSplitTextTarget(el, unit) {
 
 function behaviourMotionTextEffect(step) {
   var effect = step.textEffect || 'none';
-  if (effect !== 'none' && effect !== 'scramble' && effect !== 'mask-reveal') {
+  if (effect !== 'none' && effect !== 'scramble' && effect !== 'mask-reveal' && effect !== 'blur-reveal' && effect !== 'wave-rise') {
     behaviourFailure('motion-sequence-text-effect', { stepId: step.id, textEffect: step.textEffect }, new Error('unsupported text effect'));
   }
   if (effect !== 'none' && (!step.target || step.target.type !== 'text-split')) {
@@ -146,7 +147,7 @@ function behaviourScrambleText(text, progress) {
 
 function behaviourApplyTextEffect(node, effect, progress) {
   if (effect === 'none') return;
-  if (effect !== 'scramble' && effect !== 'mask-reveal') {
+  if (effect !== 'scramble' && effect !== 'mask-reveal' && effect !== 'blur-reveal' && effect !== 'wave-rise') {
     behaviourFailure('motion-sequence-text-effect', { textEffect: effect }, new Error('unsupported text effect'));
   }
   var finalText = node.getAttribute('data-opencanvas-text-split-final');
@@ -160,6 +161,20 @@ function behaviourApplyTextEffect(node, effect, progress) {
   }
   node.textContent = finalText;
   var clamped = Math.max(0, Math.min(1, Number(progress) || 0));
+  if (effect === 'blur-reveal') {
+    var blurPx = Math.max(0, (1 - clamped) * 12);
+    node.style.filter = 'blur(' + String(Math.round(blurPx * 1000) / 1000) + 'px)';
+    node.style.willChange = 'filter';
+    return;
+  }
+  if (effect === 'wave-rise') {
+    var index = parseInt(node.getAttribute('data-opencanvas-text-split-index') || '0', 10);
+    var distance = Math.max(0, (1 - clamped) * 18);
+    var wave = Math.sin(clamped * Math.PI + (isFinite(index) ? index : 0) * 0.55) * distance;
+    node.style.transform = 'translateY(' + String(Math.round(wave * 1000) / 1000) + 'px)';
+    node.style.willChange = 'transform';
+    return;
+  }
   var remaining = Math.max(0, Math.min(100, (1 - clamped) * 100));
   var remainingText = String(Math.round(remaining * 1000) / 1000);
   node.style.clipPath = 'inset(0 0 ' + remainingText + '% 0)';

@@ -1,4 +1,5 @@
 import type { EditableSite } from './schema.js';
+import { MOTION_SEQUENCE_TEXT_EFFECTS } from './behaviour-primitives.js';
 import { validateEditableSite } from './validate.js';
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -121,6 +122,23 @@ function buildValidState(): EditableSite & Record<string, unknown> {
             to: { opacity: 1 },
             durationMs: 280,
           },
+          {
+            id: 'step-text-blur',
+            target: { type: 'text-split', elementId: 'tab-copy', unit: 'word' },
+            textEffect: 'blur-reveal',
+            from: { opacity: 0 },
+            to: { opacity: 1 },
+            durationMs: 320,
+          },
+          {
+            id: 'step-text-wave',
+            target: { type: 'text-split', elementId: 'tab-copy', unit: 'char' },
+            textEffect: 'wave-rise',
+            from: { opacity: 0 },
+            to: { opacity: 1 },
+            durationMs: 360,
+            staggerMs: 20,
+          },
         ],
       },
       {
@@ -188,6 +206,14 @@ function expectInvalid(
 }
 
 const validState = buildValidState();
+assert(
+  (MOTION_SEQUENCE_TEXT_EFFECTS as readonly string[]).includes('blur-reveal'),
+  'motion text effects must include blur-reveal',
+);
+assert(
+  (MOTION_SEQUENCE_TEXT_EFFECTS as readonly string[]).includes('wave-rise'),
+  'motion text effects must include wave-rise',
+);
 expectValid(validState, 'valid behaviour primitive state');
 
 const invalidLoadHandoffEffect = structuredClone(validState);

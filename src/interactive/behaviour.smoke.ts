@@ -1002,7 +1002,100 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(spans[0]!.textContent === 'One ', 'mask-reveal text effect must preserve final text');
 }
 
-// (6) scroll scene horizontal track translates with scene progress
+// (7) scroll scene advanced kinetic text effects apply bounded visual state
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'kinetic-scroll',
+        trigger: { type: 'scroll-scene', scrollSceneId: 'kinetic-scene' },
+        steps: [
+          {
+            id: 'kinetic-blur-step',
+            target: { type: 'text-split', elementId: 'impact-heading', unit: 'word' },
+            textEffect: 'blur-reveal',
+            from: { opacity: 0 },
+            to: { opacity: 1 },
+            durationMs: 100,
+          },
+          {
+            id: 'kinetic-wave-step',
+            target: { type: 'text-split', elementId: 'impact-subhead', unit: 'word' },
+            textEffect: 'wave-rise',
+            from: { opacity: 0 },
+            to: { opacity: 1 },
+            durationMs: 100,
+          },
+        ],
+      },
+    ],
+    scrollScenes: [
+      {
+        id: 'kinetic-scene',
+        sectionId: 'section-story',
+        sequenceId: 'kinetic-scroll',
+        pinTarget: { type: 'section', sectionId: 'section-story' },
+        startOffsetPx: 0,
+        endOffsetPx: 800,
+      },
+    ],
+    richMotionAssets: [],
+  });
+  doc.body.appendChild(script);
+  const section = new StubElement('section');
+  section.setAttribute('data-opencanvas-section', 'section-story');
+  const heading = new StubElement('div');
+  heading.setAttribute('data-opencanvas-element', 'impact-heading');
+  const headingText = new StubElement('div');
+  headingText.className = 'opencanvas-text';
+  headingText.textContent = 'Blur text';
+  heading.appendChild(headingText);
+  const subhead = new StubElement('div');
+  subhead.setAttribute('data-opencanvas-element', 'impact-subhead');
+  const subheadText = new StubElement('div');
+  subheadText.className = 'opencanvas-text';
+  subheadText.textContent = 'Wave text';
+  subhead.appendChild(subheadText);
+  section.appendChild(heading);
+  section.appendChild(subhead);
+  doc.body.appendChild(section);
+  section.getBoundingClientRect = (): { top: number; left: number; width: number; height: number } => ({
+    top: 100 - win.scrollY,
+    left: 0,
+    width: 1200,
+    height: 800,
+  });
+  runBehaviour(doc, win, StubImage);
+  win.scrollY = 500;
+  win.dispatchScroll();
+  const blurSpans = heading.querySelectorAll('.opencanvas-text-split');
+  const waveSpans = subhead.querySelectorAll('.opencanvas-text-split');
+  assert(blurSpans.length === 2, 'blur-reveal text effect must resolve split words');
+  assert(
+    blurSpans[0]!.getAttribute('data-opencanvas-text-effect') === 'blur-reveal',
+    'blur-reveal text effect must mark split spans',
+  );
+  assert(
+    blurSpans[0]!.style.filter.includes('blur('),
+    'blur-reveal text effect must apply bounded blur from progress',
+  );
+  assert(waveSpans.length === 2, 'wave-rise text effect must resolve split words');
+  assert(
+    waveSpans[0]!.getAttribute('data-opencanvas-text-effect') === 'wave-rise',
+    'wave-rise text effect must mark split spans',
+  );
+  assert(
+    waveSpans[0]!.style.transform.includes('translateY'),
+    'wave-rise text effect must apply bounded vertical wave from progress',
+  );
+}
+
+// (8) scroll scene horizontal track translates with scene progress
 {
   const doc = new StubDocument();
   const win = new StubWindow();

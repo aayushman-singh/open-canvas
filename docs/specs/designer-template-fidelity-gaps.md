@@ -630,19 +630,26 @@ Current state:
   It preserves the final semantic text, clips generated split spans from
   Motion Sequence progress, and is available to owners from the same Text
   effect control as `scramble`.
+- **June 2026 update:** The text-effect catalog now also includes
+  `blur-reveal` and `wave-rise`. These effects remain schema-owned
+  `MotionSequenceStep.textEffect` values, validate as text-split-only
+  relations, and run through the Behaviour runtime for scroll-scrubbed or
+  time-based split text without owner-authored JavaScript.
 
 User-visible miss:
 
-- Cannot yet reproduce arbitrary advanced kinetic headline systems or
-  multi-step text timelines from a unified timeline canvas.
+- Can reproduce bounded scramble, mask, blur, and wave split-text effects from
+  Motion Sequence steps.
+- Cannot yet reproduce arbitrary custom kinetic headline systems or multi-step
+  text timelines from a unified timeline canvas.
 
 Needed primitive:
 
 - Text Split targets as an explicit render mode: by character, word, or line,
   with semantic HTML preserved and the Motion Sequence targeting generated
   spans. Accessibility must define what screen readers see.
-- Remaining next wave: richer text-specific effects beyond deterministic
-  scramble/mask-reveal and visual multi-step editing of split targets.
+- Remaining next wave: visual multi-step editing of split targets and custom
+  per-glyph choreography beyond the bounded text-effect catalog.
 
 ### 11. Rich Media / 3D / Shader Surfaces Are Missing
 
