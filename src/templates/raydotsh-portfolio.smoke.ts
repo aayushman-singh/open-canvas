@@ -33,8 +33,7 @@ const RAYDOTSH_FIDELITY_LEDGER: FidelityItem[] = [
   {
     id: 'typewriter-greeting',
     sourceBehaviour: 'Hero name reveals as an ordered typewriter sequence with a cursor',
-    status: 'missing',
-    requiredPrimitive: 'Typewriter Text Effect',
+    status: 'native',
   },
   {
     id: 'robot-game-overlay',
@@ -86,6 +85,13 @@ const missingOrApproximate = RAYDOTSH_FIDELITY_LEDGER.filter(
   (item) => item.status === 'missing' || item.status === 'approximate',
 );
 assert(missingOrApproximate.length > 0, 'current template must not be reported as faithful yet');
+const typewriterLedgerItem = RAYDOTSH_FIDELITY_LEDGER.find(
+  (item) => item.id === 'typewriter-greeting',
+);
+assert(
+  typewriterLedgerItem?.status === 'native',
+  'Raydotsh typewriter greeting must be recorded as native after binding the primitive',
+);
 
 const seed = getTemplateSeed('raydotsh-portfolio');
 assert(seed !== null, 'raydotsh-portfolio template seed must be registered');
@@ -105,6 +111,28 @@ assert(
 assert(
   state.faviconAssetId === 'seed-raydotsh-favicon',
   'Raydotsh should bind the source favicon seed asset',
+);
+const typewriterSequence = state.motionSequences?.find(
+  (sequence) => sequence.id === 'raydotsh-typewriter-greeting',
+);
+assert(typewriterSequence !== undefined, 'Raydotsh should include a typewriter greeting sequence');
+assert(
+  typewriterSequence.trigger.type === 'page-enter' &&
+    typewriterSequence.trigger.pageId === 'page-raydotsh-home',
+  'Raydotsh typewriter greeting should run on home page entry',
+);
+const typewriterStep = typewriterSequence.steps.find(
+  (step) => step.id === 'raydotsh-typewriter-heading',
+);
+assert(typewriterStep !== undefined, 'Raydotsh typewriter greeting should include a heading step');
+assert(
+  typewriterStep.textEffect === 'typewriter',
+  'Raydotsh typewriter greeting should use the typewriter text effect',
+);
+assert(
+  typewriterStep.target.type === 'text-split' &&
+    typewriterStep.target.elementId === 'raydotsh-hero-heading',
+  'Raydotsh typewriter greeting should target the hero heading text split',
 );
 
 const editValidation = validateEditableSite(state);
@@ -169,6 +197,10 @@ const requiredCopy = [
 for (const token of requiredCopy) {
   assert(html.includes(token), `rendered template should include ${JSON.stringify(token)}`);
 }
+assert(
+  html.includes('"textEffect":"typewriter"'),
+  'rendered template should publish the typewriter behaviour payload',
+);
 
 const unsupportedRuntimeTokens = [
   'react-type-animation',

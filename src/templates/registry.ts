@@ -976,6 +976,25 @@ export const raydotshPortfolioTemplate: TemplateSeed = {
     durationMs: 220,
     easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
   },
+  motionSequences: [
+    {
+      id: 'raydotsh-typewriter-greeting',
+      trigger: { type: 'page-enter', pageId: 'page-raydotsh-home' },
+      reducedMotion: 'final-state',
+      steps: [
+        {
+          id: 'raydotsh-typewriter-heading',
+          target: { type: 'text-split', elementId: 'raydotsh-hero-heading', unit: 'word' },
+          textEffect: 'typewriter',
+          from: { opacity: 1 },
+          to: { opacity: 1 },
+          durationMs: 700,
+          staggerMs: 90,
+          easing: 'linear',
+        },
+      ],
+    },
+  ],
   pages: [
     {
       id: 'page-raydotsh-home',
