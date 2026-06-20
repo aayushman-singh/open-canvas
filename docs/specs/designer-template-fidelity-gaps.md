@@ -250,6 +250,10 @@ Current state:
   the existing schema-owned `MotionSequence.playbackDirection` and
   `MotionSequence.repeat` fields. Scroll-scene sequences keep repeat/playback
   disabled rather than silently ignoring unsupported loops.
+- **June 2026 update:** Timeline quick properties now expose per-step
+  `startAtMs` and `waitAfterMs` controls beside duration, delay, stagger, and
+  easing. Scroll-scene sequences keep time-only controls disabled rather than
+  silently accepting unsupported offsets.
 
 User-visible miss:
 
@@ -811,8 +815,8 @@ User-visible miss:
 - Template authors can inspect, scrub, reposition, resize, and edit common
   transform/opacity/filter properties and target binding directly beside the
   timeline overview.
-- Long sequences still require field-level editing for some detailed timing
-  changes.
+- Long sequences still require field-level editing for less common per-step
+  details and multi-step visual choreography.
 
 Needed primitive:
 

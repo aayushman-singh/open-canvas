@@ -2399,6 +2399,13 @@ function renderMotionSequenceTimelinePropertyEditor(
 
     renderMotionSequenceTimelineTargetEditor(ctx, grid, sequence, step);
 
+    const quickStartAt = optionalNumberInput(step.startAtMs, 0, 60000, 10);
+    quickStartAt.disabled = sequence.trigger.type === 'scroll-scene';
+    quickStartAt.addEventListener('change', () =>
+      updateMotionStepOptionalFinite(ctx, sequence.id, step, 'startAtMs', quickStartAt, 0, 60000),
+    );
+    grid.appendChild(field('Quick start at (ms)', quickStartAt));
+
     const quickDuration = numberInput(step.durationMs, 0, 10000, 10);
     quickDuration.addEventListener('change', () =>
       updateMotionStepFinite(ctx, sequence.id, step, 'durationMs', quickDuration, 0, 10000),
@@ -2410,6 +2417,13 @@ function renderMotionSequenceTimelinePropertyEditor(
       updateMotionStepFinite(ctx, sequence.id, step, 'delayMs', quickDelay, 0, 10000),
     );
     grid.appendChild(field('Quick delay (ms)', quickDelay));
+
+    const quickWaitAfter = numberInput(step.waitAfterMs ?? 0, 0, 10000, 10);
+    quickWaitAfter.disabled = sequence.trigger.type === 'scroll-scene';
+    quickWaitAfter.addEventListener('change', () =>
+      updateMotionStepFinite(ctx, sequence.id, step, 'waitAfterMs', quickWaitAfter, 0, 10000),
+    );
+    grid.appendChild(field('Quick wait after (ms)', quickWaitAfter));
 
     const quickStagger = numberInput(step.staggerMs ?? 0, 0, 10000, 10);
     quickStagger.addEventListener('change', () =>

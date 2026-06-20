@@ -266,7 +266,9 @@ assert(panelSrc.includes('Quick to variable font weight'), 'panel must edit vari
 assert(panelSrc.includes('Quick from stroke dash array'), 'panel must edit stroke dash array from the timeline');
 assert(panelSrc.includes('Quick to stroke dash offset'), 'panel must edit stroke dash offset from the timeline');
 assert(panelSrc.includes('Quick duration (ms)'), 'panel must edit duration beside the timeline');
+assert(panelSrc.includes('Quick start at (ms)'), 'panel must edit start time beside the timeline');
 assert(panelSrc.includes('Quick delay (ms)'), 'panel must edit delay beside the timeline');
+assert(panelSrc.includes('Quick wait after (ms)'), 'panel must edit wait-after timing beside the timeline');
 assert(panelSrc.includes('Quick stagger (ms)'), 'panel must edit stagger beside the timeline');
 assert(panelSrc.includes('Quick easing'), 'panel must edit easing beside the timeline');
 assert(
