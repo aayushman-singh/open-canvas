@@ -2361,6 +2361,7 @@ function renderMotionSequenceTimelinePropertyEditor(
   title.className = 'opencanvas-motion-timeline-label';
   title.textContent = 'Timeline quick properties';
   panel.appendChild(title);
+  renderMotionSequenceTimelinePlaybackEditor(ctx, panel, sequence);
   const quickNumberLabels: Partial<Record<EditableMotionNumber, { from: string; to: string }>> = {
     fontVariationWeight: {
       from: 'Quick from variable font weight',
@@ -2495,6 +2496,68 @@ function renderMotionSequenceTimelinePropertyEditor(
   }
 
   wrap.appendChild(panel);
+}
+
+function renderMotionSequenceTimelinePlaybackEditor(
+  ctx: InteractionsPanelContext,
+  panel: HTMLElement,
+  sequence: MotionSequence,
+): void {
+  const grid = document.createElement('div');
+  grid.className = 'opencanvas-motion-timeline-property-grid';
+  const disabled = sequence.trigger.type === 'scroll-scene';
+
+  const playbackDirection = selectInput(
+    [...MOTION_SEQUENCE_PLAYBACK_DIRECTIONS],
+    sequence.playbackDirection ?? 'normal',
+  );
+  playbackDirection.disabled = disabled;
+  playbackDirection.addEventListener('change', () => {
+    mutate(ctx, () => {
+      const next = playbackDirection.value as MotionSequencePlaybackDirection;
+      updateMotionSequence(ctx, sequence.id, {
+        playbackDirection: next === 'normal' ? undefined : next,
+      });
+    });
+  });
+  grid.appendChild(field('Quick playback direction', playbackDirection));
+
+  const repeatCount = numberInput(sequence.repeat?.count ?? 0, 0, 20, 1);
+  repeatCount.disabled = disabled;
+  repeatCount.addEventListener('change', () => {
+    const next = validNumber(repeatCount, 0, 20);
+    if (next === null || !Number.isInteger(next)) {
+      ctx.setStatus('Motion Sequence repeat count must be an integer from 0-20', 'error');
+      repeatCount.value = String(sequence.repeat?.count ?? 0);
+      return;
+    }
+    mutate(ctx, () => {
+      if (next === 0) {
+        updateMotionSequence(ctx, sequence.id, { repeat: undefined });
+        return;
+      }
+      updateMotionSequence(ctx, sequence.id, {
+        repeat: { count: next, mode: sequence.repeat?.mode ?? 'restart' },
+      });
+    });
+  });
+  grid.appendChild(field('Quick repeat count', repeatCount));
+
+  const repeatMode = selectInput([...MOTION_SEQUENCE_REPEAT_MODES], sequence.repeat?.mode ?? 'restart');
+  repeatMode.disabled = disabled;
+  repeatMode.addEventListener('change', () => {
+    mutate(ctx, () =>
+      updateMotionSequence(ctx, sequence.id, {
+        repeat: {
+          count: sequence.repeat?.count ?? 1,
+          mode: repeatMode.value as MotionSequenceRepeatMode,
+        },
+      }),
+    );
+  });
+  grid.appendChild(field('Quick repeat mode', repeatMode));
+
+  panel.appendChild(grid);
 }
 
 function renderMotionSequenceTimelineTargetEditor(

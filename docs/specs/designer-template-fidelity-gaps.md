@@ -245,6 +245,11 @@ Current state:
   controls beside the timeline: target type, page, section, element id, and
   text-split unit all write the same schema-owned `MotionSequenceStep.target`
   shape as the detailed editor.
+- **June 2026 update:** Timeline quick properties now expose sequence-level
+  playback direction, repeat count, and repeat mode beside the timeline, using
+  the existing schema-owned `MotionSequence.playbackDirection` and
+  `MotionSequence.repeat` fields. Scroll-scene sequences keep repeat/playback
+  disabled rather than silently ignoring unsupported loops.
 
 User-visible miss:
 
@@ -798,15 +803,16 @@ Current state:
 - Full Motion Sequence cards include a Timeline overview with visual bars,
   target lanes, snap handles, scrub preview, draggable start-time bars for step
   start/duration, and timeline-adjacent quick property controls for opacity,
-  transform, filter values, advanced properties, and target binding.
+  transform, filter values, advanced properties, target binding, repeat, and
+  playback direction.
 
 User-visible miss:
 
 - Template authors can inspect, scrub, reposition, resize, and edit common
   transform/opacity/filter properties and target binding directly beside the
   timeline overview.
-- Long sequences still require field-level editing for repeat and some detailed
-  timing changes.
+- Long sequences still require field-level editing for some detailed timing
+  changes.
 
 Needed primitive:
 

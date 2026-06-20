@@ -251,6 +251,9 @@ assert(
   panelSrc.includes('data-opencanvas-motion-timeline-property-editor'),
   'panel must expose timeline property editor metadata',
 );
+assert(panelSrc.includes('Quick playback direction'), 'panel must edit playback direction from the timeline');
+assert(panelSrc.includes('Quick repeat count'), 'panel must edit repeat count from the timeline');
+assert(panelSrc.includes('Quick repeat mode'), 'panel must edit repeat mode from the timeline');
 assert(panelSrc.includes('Quick target type'), 'panel must edit target type from the timeline');
 assert(panelSrc.includes('Quick target page'), 'panel must edit target page from the timeline');
 assert(panelSrc.includes('Quick target section'), 'panel must edit target section from the timeline');
