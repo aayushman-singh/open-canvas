@@ -2,7 +2,7 @@ import type { PublishedSnapshot } from '../canvas/schema.js';
 import { renderCanvasSnapshot } from '../canvas/render.js';
 import { injectInteractiveRuntime, snapshotNeedsInteractiveRuntime } from './inject.js';
 import { INTERACTIVE_RUNTIME_SRC } from './build.js';
-import { VIDEO_HOVER_RUNTIME_SRC } from './video-hover.js';
+import { VIDEO_HOVER_RUNTIME_SRC, hydrateVideoHoverStreams } from './video-hover.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error('[video-hover-runtime:smoke] ' + message);
@@ -57,14 +57,39 @@ if (hover.type !== 'media' || hover.mediaKind !== 'video') {
 (hover.hoverPlayback as unknown as Record<string, unknown>).scrubOnHover = true;
 
 assert(snapshotNeedsInteractiveRuntime(snapshot), 'video hover must request interactive runtime');
+
+const hydrateVideoHoverStreamsSource = hydrateVideoHoverStreams.toString();
+assert(
+  VIDEO_HOVER_RUNTIME_SRC.includes(hydrateVideoHoverStreamsSource),
+  'visitor runtime source must include the exported video hover hydrator implementation',
+);
+assert(
+  hydrateVideoHoverStreamsSource.includes('data-opencanvas-video-hover-hydrated'),
+  'exported video hover hydrator must own the hydration marker logic',
+);
+assert(
+  hydrateVideoHoverStreamsSource.includes(
+    'querySelectorAll(\'[data-opencanvas-video-hover="true"]\')',
+  ) ||
+    hydrateVideoHoverStreamsSource.includes(
+      'querySelectorAll("[data-opencanvas-video-hover=\\"true\\"]")',
+    ),
+  'exported video hover hydrator must use the editor-compatible data-attribute selector',
+);
+
 assert(
   VIDEO_HOVER_RUNTIME_SRC.includes('opencanvas:video-hover-failure'),
   'runtime must emit named failure event',
 );
 assert(
-  VIDEO_HOVER_RUNTIME_SRC.includes('pointerenter'),
-  'runtime must listen for hover enter',
+  VIDEO_HOVER_RUNTIME_SRC.includes('invalid-video-node'),
+  'runtime must fail loudly when video hover is authored on a non-video node',
 );
+assert(
+  VIDEO_HOVER_RUNTIME_SRC.includes('missing-event-target-api'),
+  'runtime must fail loudly when the hover target cannot register listeners',
+);
+assert(VIDEO_HOVER_RUNTIME_SRC.includes('pointerenter'), 'runtime must listen for hover enter');
 assert(
   VIDEO_HOVER_RUNTIME_SRC.includes('data-opencanvas-video-hover-scrub'),
   'runtime must read hover scrub metadata',
@@ -86,7 +111,8 @@ assert(
   'runtime must fail loudly for invalid hover intent delays',
 );
 assert(
-  VIDEO_HOVER_RUNTIME_SRC.includes('setTimeout') && VIDEO_HOVER_RUNTIME_SRC.includes('clearTimeout'),
+  VIDEO_HOVER_RUNTIME_SRC.includes('setTimeout') &&
+    VIDEO_HOVER_RUNTIME_SRC.includes('clearTimeout'),
   'runtime must delay hover activation and cancel accidental hovers',
 );
 assert(
@@ -94,7 +120,8 @@ assert(
   'runtime must scrub video currentTime from pointer position',
 );
 assert(
-  VIDEO_HOVER_RUNTIME_SRC.includes("window.matchMedia('(prefers-reduced-motion: reduce)')"),
+  VIDEO_HOVER_RUNTIME_SRC.includes("window.matchMedia('(prefers-reduced-motion: reduce)')") ||
+    VIDEO_HOVER_RUNTIME_SRC.includes('window.matchMedia("(prefers-reduced-motion: reduce)")'),
   'runtime must branch on reduced-motion explicitly',
 );
 assert(

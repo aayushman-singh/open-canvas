@@ -7,9 +7,9 @@
 // `body-builders-data.ts` rather than a pre-rendered snapshot — calls
 // `hydrateInteractives()` to mount the SAME behaviour on its live DOM.
 // Most functions below mirror the runtime fragments line-by-line, while
-// marquee is imported from the shared adapter in `src/interactive/marquee.ts`.
+// marquee and video-hover are imported from their shared adapters in `src/interactive/`.
 //
-// Why this lives here and not under `src/interactive/` (except for marquee):
+// Why this lives here and not under `src/interactive/` (except for marquee and video-hover):
 // the visitor-side modules in `src/interactive/` ship as JS source strings
 // (vanilla ES5, no DOM types pulled in) so the root tsconfig's worker-typed
 // compile stays tight. This module reaches for the DOM directly, which only the
@@ -33,6 +33,7 @@ import type { EditableSite } from '../canvas/schema.js';
 import type { RuntimeHydratorSurfaceId } from '../interactive/runtime-hydrator-surfaces.js';
 import { hydrateBehaviourPreview } from './hydrate-behaviour.js';
 import { hydrateMarquees } from '../interactive/marquee.js';
+import { hydrateVideoHoverStreams } from '../interactive/video-hover.js';
 
 export interface HydrateOptions {
   /** When true, popup sections (`[data-opencanvas-popup="true"]`) are
@@ -103,10 +104,7 @@ export function installEditorRuntimeHydrator(baseOptions: HydrateOptions): void 
   };
 }
 
-export function runEditorRuntimeHydrator(
-  root: ParentNode,
-  options: RuntimeHydratorOptions,
-): void {
+export function runEditorRuntimeHydrator(root: ParentNode, options: RuntimeHydratorOptions): void {
   installEditorRuntimeHydrator(options);
   const hydrate = window.__opencanvasHydrate;
   if (typeof hydrate !== 'function') {
@@ -137,10 +135,7 @@ function dispatchRequiredSurface(
  * Mirrors the visitor runtime's `hydrateAll()` dispatch in
  * `./runtime.ts` — same data-attribute contract, same idempotence guard.
  */
-export function hydrateInteractives(
-  root: ParentNode,
-  options: HydrateOptions = {},
-): void {
+export function hydrateInteractives(root: ParentNode, options: HydrateOptions = {}): void {
   const wrappers = root.querySelectorAll('[data-opencanvas-interactive]');
   for (let i = 0; i < wrappers.length; i++) {
     const wrapper = wrappers[i];
@@ -187,7 +182,12 @@ function prefersReducedMotion(options: HydrateOptions): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function emitCollectionSearchFailure(root: Element, code: string, message: string, cause: unknown): never {
+function emitCollectionSearchFailure(
+  root: Element,
+  code: string,
+  message: string,
+  cause: unknown,
+): never {
   const detail = {
     code,
     message,
@@ -199,7 +199,12 @@ function emitCollectionSearchFailure(root: Element, code: string, message: strin
   throw new Error('[opencanvas collection-search] ' + message);
 }
 
-function emitCollectionFilterFailure(root: Element, code: string, message: string, cause: unknown): never {
+function emitCollectionFilterFailure(
+  root: Element,
+  code: string,
+  message: string,
+  cause: unknown,
+): never {
   const detail = {
     code,
     message,
@@ -211,7 +216,12 @@ function emitCollectionFilterFailure(root: Element, code: string, message: strin
   throw new Error('[opencanvas collection-filter] ' + message);
 }
 
-function emitCollectionViewFailure(root: Element, code: string, message: string, cause: unknown): never {
+function emitCollectionViewFailure(
+  root: Element,
+  code: string,
+  message: string,
+  cause: unknown,
+): never {
   const detail = {
     code,
     message,
@@ -334,7 +344,10 @@ function hydrateCollectionSearch(
       const matched =
         query.length === 0 ||
         normaliseCollectionSearchText(entry.textContent).indexOf(query) !== -1;
-      entry.setAttribute('data-opencanvas-collection-entry-search-match', matched ? 'true' : 'false');
+      entry.setAttribute(
+        'data-opencanvas-collection-entry-search-match',
+        matched ? 'true' : 'false',
+      );
     }
     node.setAttribute('data-opencanvas-collection-search-query', query);
     updateCollectionQueryVisibility(node, entries, empty);
@@ -361,7 +374,9 @@ function collectionEntryMatchesFilter(
   }
   if (field === 'tag') {
     try {
-      const parsed = JSON.parse(entry.getAttribute('data-opencanvas-collection-entry-tags') ?? '[]') as unknown;
+      const parsed = JSON.parse(
+        entry.getAttribute('data-opencanvas-collection-entry-tags') ?? '[]',
+      ) as unknown;
       if (!Array.isArray(parsed)) return false;
       return parsed.includes(value);
     } catch (err: unknown) {
@@ -385,7 +400,12 @@ function hydrateCollectionFilter(
   const field = node.getAttribute('data-opencanvas-collection-filter');
   const reducedMotion = node.getAttribute('data-opencanvas-collection-filter-reduced-motion');
   if (field !== 'folder' && field !== 'category' && field !== 'tag') {
-    emitCollectionFilterFailure(node, 'invalid-filter-field', 'Collection filter field must be folder, category, or tag', field);
+    emitCollectionFilterFailure(
+      node,
+      'invalid-filter-field',
+      'Collection filter field must be folder, category, or tag',
+      field,
+    );
   }
   if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
     emitCollectionFilterFailure(
@@ -397,7 +417,12 @@ function hydrateCollectionFilter(
   }
   const buttons = node.querySelectorAll<HTMLElement>('[data-opencanvas-collection-filter-option]');
   if (buttons.length === 0) {
-    emitCollectionFilterFailure(node, 'missing-filter-options', 'Collection filter requires rendered option buttons', null);
+    emitCollectionFilterFailure(
+      node,
+      'missing-filter-options',
+      'Collection filter requires rendered option buttons',
+      null,
+    );
   }
   if (prefersReducedMotion(options) && reducedMotion === 'instant') {
     node.setAttribute('data-opencanvas-collection-filter-reduced', 'instant');
@@ -406,19 +431,28 @@ function hydrateCollectionFilter(
     let matchedButton = false;
     for (let i = 0; i < buttons.length; i++) {
       const button = buttons[i]!;
-      const buttonValue = button.getAttribute('data-opencanvas-collection-filter-option') ?? '__all__';
+      const buttonValue =
+        button.getAttribute('data-opencanvas-collection-filter-option') ?? '__all__';
       const active = buttonValue === value;
       button.setAttribute('data-opencanvas-collection-filter-active', String(active));
       button.setAttribute('aria-pressed', String(active));
       if (active) matchedButton = true;
     }
     if (!matchedButton) {
-      emitCollectionFilterFailure(node, 'missing-default-filter', 'Collection filter default must match a rendered option', value);
+      emitCollectionFilterFailure(
+        node,
+        'missing-default-filter',
+        'Collection filter default must match a rendered option',
+        value,
+      );
     }
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]!;
       const matched = collectionEntryMatchesFilter(node, entry, field, value);
-      entry.setAttribute('data-opencanvas-collection-entry-filter-match', matched ? 'true' : 'false');
+      entry.setAttribute(
+        'data-opencanvas-collection-entry-filter-match',
+        matched ? 'true' : 'false',
+      );
     }
     node.setAttribute('data-opencanvas-collection-filter-active-value', value);
     updateCollectionQueryVisibility(node, entries, empty);
@@ -440,7 +474,12 @@ function hydrateCollectionViewToggle(node: Element, options: HydrateOptions): vo
   const defaultMode = node.getAttribute('data-opencanvas-collection-view-default') ?? 'grid';
   const reducedMotion = node.getAttribute('data-opencanvas-collection-view-reduced-motion');
   if (defaultMode !== 'grid' && defaultMode !== 'list') {
-    emitCollectionViewFailure(node, 'invalid-view-default', 'Collection view default must be grid or list', defaultMode);
+    emitCollectionViewFailure(
+      node,
+      'invalid-view-default',
+      'Collection view default must be grid or list',
+      defaultMode,
+    );
   }
   if (reducedMotion !== 'instant' && reducedMotion !== 'allow') {
     emitCollectionViewFailure(
@@ -452,14 +491,24 @@ function hydrateCollectionViewToggle(node: Element, options: HydrateOptions): vo
   }
   const buttons = node.querySelectorAll<HTMLElement>('[data-opencanvas-collection-view-option]');
   if (buttons.length === 0) {
-    emitCollectionViewFailure(node, 'missing-view-options', 'Collection view toggle requires rendered option buttons', null);
+    emitCollectionViewFailure(
+      node,
+      'missing-view-options',
+      'Collection view toggle requires rendered option buttons',
+      null,
+    );
   }
   if (prefersReducedMotion(options) && reducedMotion === 'instant') {
     node.setAttribute('data-opencanvas-collection-view-reduced', 'instant');
   }
   const setView = (mode: string): void => {
     if (mode !== 'grid' && mode !== 'list') {
-      emitCollectionViewFailure(node, 'invalid-view-option', 'Collection view option must be grid or list', mode);
+      emitCollectionViewFailure(
+        node,
+        'invalid-view-option',
+        'Collection view option must be grid or list',
+        mode,
+      );
     }
     let matchedButton = false;
     for (let i = 0; i < buttons.length; i++) {
@@ -471,7 +520,12 @@ function hydrateCollectionViewToggle(node: Element, options: HydrateOptions): vo
       if (active) matchedButton = true;
     }
     if (!matchedButton) {
-      emitCollectionViewFailure(node, 'missing-default-view', 'Collection view default must match a rendered option', mode);
+      emitCollectionViewFailure(
+        node,
+        'missing-default-view',
+        'Collection view default must match a rendered option',
+        mode,
+      );
     }
     node.setAttribute('data-opencanvas-collection-view-active', mode);
   };
@@ -489,272 +543,8 @@ function hydrateCollectionViewToggle(node: Element, options: HydrateOptions): vo
 }
 
 // ---------------------------------------------------------------------------
-// Video Stream Hover — mirrors VIDEO_HOVER_RUNTIME_SRC in `src/interactive/video-hover.ts`.
+// Video Stream Hover — imported from the shared adapter in `src/interactive/video-hover.ts`.
 // ---------------------------------------------------------------------------
-
-function failVideoHover(
-  video: HTMLVideoElement,
-  code: string,
-  message: string,
-  cause: string | Error | null,
-): never {
-  const wrapper = video.closest('[data-opencanvas-element]');
-  const detail = {
-    code,
-    message,
-    elementId: wrapper?.getAttribute('data-opencanvas-element') ?? null,
-    cause: cause instanceof Error ? cause.message : cause,
-  };
-  window.dispatchEvent(new CustomEvent('opencanvas:video-hover-failure', { detail }));
-  console.error('[opencanvas video-hover] ' + message, detail);
-  throw new Error('[opencanvas video-hover] ' + message);
-}
-
-function readVideoHoverConfig(video: HTMLVideoElement): {
-  mode: 'play-pause' | 'play-reset';
-  scrubOnHover: boolean;
-  reducedMotion: 'disabled' | 'allow';
-  streamSrc: string | null;
-  posterSrc: string | null;
-  intentDelayMs: number;
-} {
-  const mode = video.getAttribute('data-opencanvas-video-hover-mode');
-  if (mode !== 'play-pause' && mode !== 'play-reset') {
-    failVideoHover(video, 'invalid-mode', 'Video hover mode must be play-pause or play-reset', mode);
-  }
-  const reducedMotion = video.getAttribute('data-opencanvas-video-hover-reduced-motion');
-  if (reducedMotion !== 'disabled' && reducedMotion !== 'allow') {
-    failVideoHover(
-      video,
-      'invalid-reduced-motion',
-      'Video hover reduced-motion mode must be disabled or allow',
-      reducedMotion,
-    );
-  }
-  const scrubOnHover = video.getAttribute('data-opencanvas-video-hover-scrub') === 'true';
-  const streamSrc = video.getAttribute('data-opencanvas-video-hover-stream-src');
-  if (streamSrc !== null && streamSrc.trim() === '') {
-    failVideoHover(
-      video,
-      'stream-src-empty',
-      'Video hover alternate stream source cannot be empty',
-      streamSrc,
-    );
-  }
-  const posterSrc = video.getAttribute('data-opencanvas-video-hover-poster-src');
-  if (posterSrc !== null && posterSrc.trim() === '') {
-    failVideoHover(
-      video,
-      'poster-src-empty',
-      'Video hover alternate poster source cannot be empty',
-      posterSrc,
-    );
-  }
-  const intentDelayAttr = video.getAttribute('data-opencanvas-video-hover-intent-delay-ms');
-  let intentDelayMs = 0;
-  if (intentDelayAttr !== null) {
-    intentDelayMs = Number(intentDelayAttr);
-    if (!Number.isFinite(intentDelayMs) || intentDelayMs < 0 || intentDelayMs > 5000) {
-      failVideoHover(
-        video,
-        'invalid-intent-delay',
-        'Video hover intent delay must be between 0 and 5000ms',
-        intentDelayAttr,
-      );
-    }
-  }
-  return { mode, scrubOnHover, reducedMotion, streamSrc, posterSrc, intentDelayMs };
-}
-
-function videoHoverError(err: unknown): Error {
-  if (err instanceof Error) return err;
-  if (typeof err === 'string') return new Error(err);
-  if (typeof err === 'number' || typeof err === 'boolean') return new Error(String(err));
-  return new Error('non-error video hover failure');
-}
-
-function setVideoHoverSource(
-  video: HTMLVideoElement,
-  src: string | null,
-  poster: string | null,
-  code: string,
-): void {
-  if (src === null) return;
-  try {
-    if (video.getAttribute('src') !== src) {
-      video.setAttribute('src', src);
-      video.load();
-    }
-    if (poster !== null) video.setAttribute('poster', poster);
-  } catch (err: unknown) {
-    failVideoHover(video, code, 'Video hover source swap failed', videoHoverError(err));
-  }
-}
-
-function restoreVideoHoverSource(
-  video: HTMLVideoElement,
-  originalSrc: string,
-  originalPoster: string | null,
-): void {
-  if (originalSrc.length === 0) {
-    failVideoHover(
-      video,
-      'original-src-missing',
-      'Video hover cannot restore the original video source',
-      null,
-    );
-  }
-  try {
-    if (video.getAttribute('src') !== originalSrc) {
-      video.setAttribute('src', originalSrc);
-      video.load();
-    }
-    if (originalPoster === null) {
-      video.removeAttribute('poster');
-    } else {
-      video.setAttribute('poster', originalPoster);
-    }
-  } catch (err: unknown) {
-    failVideoHover(video, 'source-restore-failed', 'Video hover source restore failed', videoHoverError(err));
-  }
-}
-
-function scrubVideoHover(video: HTMLVideoElement, target: Element, ev: Event): void {
-  if (!(ev instanceof PointerEvent)) return;
-  const duration = Number(video.duration);
-  if (!Number.isFinite(duration) || duration <= 0) {
-    failVideoHover(
-      video,
-      'scrub-duration-missing',
-      'Video hover scrub requires a finite video duration',
-      String(video.duration),
-    );
-  }
-  const rect = target.getBoundingClientRect();
-  if (!(rect.width > 0)) {
-    failVideoHover(
-      video,
-      'scrub-target-width',
-      'Video hover scrub target width must be > 0',
-      String(rect.width),
-    );
-  }
-  const progress = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
-  video.currentTime = progress * duration;
-}
-
-function hydrateVideoHoverStreams(scope: ParentNode, options: HydrateOptions = {}): void {
-  const videos = scope.querySelectorAll('[data-opencanvas-video-hover="true"]');
-  for (let i = 0; i < videos.length; i++) {
-    const node = videos[i];
-    if (!(node instanceof HTMLVideoElement)) continue;
-    if (node.getAttribute('data-opencanvas-video-hover-hydrated') === 'true') continue;
-    const config = readVideoHoverConfig(node);
-    const reduce = prefersReducedMotion(options);
-    if (reduce && config.reducedMotion === 'disabled') {
-      node.setAttribute('data-opencanvas-video-hover-hydrated', 'true');
-      node.setAttribute('data-opencanvas-video-hover-reduced', 'disabled');
-      continue;
-    }
-    if (typeof node.play !== 'function' || typeof node.pause !== 'function') {
-      failVideoHover(node, 'missing-video-api', 'Video hover requires play and pause support', null);
-    }
-    node.muted = true;
-    node.playsInline = true;
-    const target = node.closest('[data-opencanvas-element]') ?? node;
-    const originalSrc = node.getAttribute('src') ?? '';
-    const originalPoster = node.getAttribute('poster');
-    if (config.streamSrc !== null && originalSrc.length === 0) {
-      failVideoHover(
-        node,
-        'original-src-missing',
-        'Video hover alternate stream requires an original source to restore',
-        null,
-      );
-    }
-    let active = false;
-    let intentTimer: number | null = null;
-    let pendingIntentEvent: Event | null = null;
-    const activate = (ev: Event | null): void => {
-      try {
-        setVideoHoverSource(node, config.streamSrc, config.posterSrc, 'source-swap-failed');
-        if (config.scrubOnHover) {
-          node.pause();
-          if (ev !== null) scrubVideoHover(node, target, ev);
-          return;
-        }
-        if (config.mode === 'play-reset') node.currentTime = 0;
-        node.play().catch((err: unknown) => {
-          failVideoHover(
-            node,
-            'play-rejected',
-            'Video hover play() was rejected',
-            videoHoverError(err),
-          );
-        });
-      } catch (err: unknown) {
-        failVideoHover(
-          node,
-          'play-failed',
-          'Video hover play failed',
-          videoHoverError(err),
-        );
-      }
-    };
-    const enter = (ev: Event): void => {
-      if (active) return;
-      active = true;
-      pendingIntentEvent = ev;
-      if (config.intentDelayMs > 0) {
-        intentTimer = window.setTimeout((): void => {
-          intentTimer = null;
-          activate(pendingIntentEvent);
-          pendingIntentEvent = null;
-        }, config.intentDelayMs);
-        return;
-      }
-      activate(ev);
-      pendingIntentEvent = null;
-    };
-    const leave = (): void => {
-      if (!active) return;
-      active = false;
-      if (intentTimer !== null) {
-        window.clearTimeout(intentTimer);
-        intentTimer = null;
-        pendingIntentEvent = null;
-        return;
-      }
-      try {
-        node.pause();
-        if (config.mode === 'play-reset') node.currentTime = 0;
-        if (config.streamSrc !== null) restoreVideoHoverSource(node, originalSrc, originalPoster);
-      } catch (err: unknown) {
-        failVideoHover(
-          node,
-          'pause-failed',
-          'Video hover pause failed',
-          videoHoverError(err),
-        );
-      }
-    };
-    target.addEventListener('pointerenter', enter);
-    target.addEventListener('pointerleave', leave);
-    target.addEventListener('pointermove', (ev: Event): void => {
-      if (!active || !config.scrubOnHover) return;
-      if (intentTimer !== null) {
-        pendingIntentEvent = ev;
-        return;
-      }
-      scrubVideoHover(node, target, ev);
-    });
-    target.addEventListener('focusin', enter);
-    target.addEventListener('focusout', leave);
-    node.setAttribute('data-opencanvas-video-hover-hydrated', 'true');
-  }
-}
-
-
 
 // ---------------------------------------------------------------------------
 // Pointer-fx — mirrors POINTER_FX_RUNTIME_SRC in `src/interactive/pointer-fx.ts`.
@@ -869,7 +659,10 @@ function hydratePointerFx(scope: ParentNode, options: HydrateOptions = {}): void
         appendPointerTrail(el, ev);
       });
     } else if (primitive === 'image-follow') {
-      const img = appendPointerImageFollow(el, el.getAttribute('data-opencanvas-pointer-fx-preview-src'));
+      const img = appendPointerImageFollow(
+        el,
+        el.getAttribute('data-opencanvas-pointer-fx-preview-src'),
+      );
       el.addEventListener('pointermove', (ev: PointerEvent): void => {
         positionPointerImageFollow(el, img, ev);
       });
@@ -905,7 +698,11 @@ function appendPointerImageFollow(el: HTMLElement, previewSrc: string | null): H
   return img;
 }
 
-function positionPointerImageFollow(el: HTMLElement, img: HTMLImageElement, ev: PointerEvent): void {
+function positionPointerImageFollow(
+  el: HTMLElement,
+  img: HTMLImageElement,
+  ev: PointerEvent,
+): void {
   const r = el.getBoundingClientRect();
   if (!(r.width > 0) || !(r.height > 0)) return;
   const px = ((ev.clientX - r.left) / r.width) * 100;
@@ -1148,8 +945,7 @@ function hydratePopups(root: ParentNode): void {
         if (fired) return;
         fired = true;
         const bg = document.createElement('div');
-        bg.style.cssText =
-          'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.5)';
+        bg.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.5)';
         const btn = document.createElement('button');
         btn.setAttribute('aria-label', 'Close popup');
         btn.style.cssText =

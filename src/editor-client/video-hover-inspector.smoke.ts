@@ -10,15 +10,15 @@ function assert(condition: boolean, message: string): asserts condition {
 
 const mountsSrc = await Bun.file(new URL('./inspector-media-mounts.ts', import.meta.url)).text();
 const hydrateSrc = await Bun.file(new URL('./hydrate-interactives.ts', import.meta.url)).text();
+const sharedVideoHoverSrc = await Bun.file(
+  new URL('../interactive/video-hover.ts', import.meta.url),
+).text();
 
 assert(
   mountsSrc.includes('Video Stream Hover'),
   'media inspector must expose video stream hover controls',
 );
-assert(
-  mountsSrc.includes('VIDEO_HOVER_PLAYBACK_MODES'),
-  'hover mode select must use schema modes',
-);
+assert(mountsSrc.includes('VIDEO_HOVER_PLAYBACK_MODES'), 'hover mode select must use schema modes');
 assert(
   mountsSrc.includes('VIDEO_HOVER_REDUCED_MOTION_MODES'),
   'reduced-motion select must use schema modes',
@@ -37,14 +37,21 @@ assert(
   mountsSrc.includes('Hover intent delay') && mountsSrc.includes('intentDelayMs'),
   'media inspector must expose hover intent delay control',
 );
-assert(mountsSrc.includes('playback.autoplay = false'), 'enabling hover must clear autoplay conflict');
 assert(
-  hydrateSrc.includes('function hydrateVideoHoverStreams'),
-  'editor runtime must hydrate video hover streams',
+  mountsSrc.includes('playback.autoplay = false'),
+  'enabling hover must clear autoplay conflict',
 );
 assert(
-  hydrateSrc.includes('opencanvas:video-hover-failure'),
-  'editor runtime must emit named video-hover failure event',
+  hydrateSrc.includes("import { hydrateVideoHoverStreams } from '../interactive/video-hover.js';"),
+  'editor runtime must import the shared video hover hydrator',
+);
+assert(
+  !hydrateSrc.includes('function hydrateVideoHoverStreams('),
+  'editor runtime must not define a local video hover hydrator',
+);
+assert(
+  sharedVideoHoverSrc.includes('opencanvas:video-hover-failure'),
+  'shared video hover adapter must emit named video-hover failure event',
 );
 const marqueeHydrateCall = hydrateSrc.indexOf('hydrateMarquees(root, options)');
 const videoHoverHydrateCall = hydrateSrc.indexOf('hydrateVideoHoverStreams(root, options)');
