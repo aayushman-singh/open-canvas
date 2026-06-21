@@ -63,7 +63,8 @@
         },
         "variant": "line",
         "pinnedStyle": {
-          "background": "#233554"
+          "background": "#233554",
+          "--opencanvas-kit-shape-fill": "#233554"
         }
       },
       {

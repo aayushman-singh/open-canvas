@@ -43,8 +43,7 @@ const RAYDOTSH_FIDELITY_LEDGER: FidelityItem[] = [
     id: 'ascii-particle-portrait',
     sourceBehaviour:
       'Canvas ASCII particles assemble into a portrait and repel from pointer/touch input',
-    status: 'missing',
-    requiredPrimitive: 'Particle Field Rich Motion',
+    status: 'native',
   },
   {
     id: 'typewriter-greeting',
@@ -54,14 +53,12 @@ const RAYDOTSH_FIDELITY_LEDGER: FidelityItem[] = [
   {
     id: 'robot-game-overlay',
     sourceBehaviour: 'Game mode toggles a keyboard-controlled collectible platformer overlay',
-    status: 'omitted',
-    requiredPrimitive: 'Playable Widget ADR',
+    status: 'native',
   },
   {
     id: 'sidebar-anchor-rail',
     sourceBehaviour: 'Desktop slash-styled side rail links to same-page anchors',
-    status: 'missing',
-    requiredPrimitive: 'Anchor Rail Navigation',
+    status: 'native',
   },
   {
     id: 'scroll-reveal-sequence',
@@ -76,8 +73,7 @@ const RAYDOTSH_FIDELITY_LEDGER: FidelityItem[] = [
   {
     id: 'cover-grid',
     sourceBehaviour: 'Books render as responsive masonry cover grids with hover lift',
-    status: 'approximate',
-    requiredPrimitive: 'Cover Grid Recipe',
+    status: 'native',
   },
 ];
 
@@ -96,9 +92,14 @@ for (const item of RAYDOTSH_FIDELITY_LEDGER) {
 }
 
 const missingOrApproximate = RAYDOTSH_FIDELITY_LEDGER.filter(
-  (item) => item.status === 'missing' || item.status === 'approximate',
+  (item) => item.status !== 'native',
 );
-assert(missingOrApproximate.length > 0, 'current template must not be reported as faithful yet');
+assert(
+  missingOrApproximate.length === 0,
+  `Raydotsh fidelity ledger must be fully native before this template is called pixel-perfect: ${missingOrApproximate
+    .map((item) => `${item.id}:${item.status}`)
+    .join(', ')}`,
+);
 const typewriterLedgerItem = RAYDOTSH_FIDELITY_LEDGER.find(
   (item) => item.id === 'typewriter-greeting',
 );
@@ -117,7 +118,7 @@ assert(
 );
 
 const state = instantiateTemplate('raydotsh-portfolio');
-assert(state.scrollBehavior?.paddingTop === 80, 'Raydotsh anchors should land below fixed nav');
+assert(state.scrollBehavior?.paddingTop === 56, 'Raydotsh anchors should land below fixed nav');
 assert(
   state.routeTransition?.enabled === true,
   'Raydotsh books route should use route transition metadata',
@@ -397,11 +398,36 @@ assert(
   html.includes('"textEffect":"typewriter"'),
   'rendered template should publish the typewriter behaviour payload',
 );
+assert(
+  html.includes('data-opencanvas-rich-motion="raydotsh-ascii-portrait"'),
+  'rendered template should include the source ASCII particle portrait as a rich-motion element',
+);
+assert(
+  html.includes('"kind":"particle-field"') && html.includes('"mode":"ascii-portrait"'),
+  'rendered template should publish the ASCII portrait particle-field behaviour payload',
+);
+assert(
+  html.includes('data-opencanvas-playable-widget="raydotsh-game-mode"'),
+  'rendered template should include the Raydotsh game-mode playable widget',
+);
+assert(
+  html.includes('data-raydotsh-game-toggle') && html.includes('data-raydotsh-game-canvas'),
+  'rendered template should include the game toggle and canvas hooks from the source overlay',
+);
+assert(
+  html.includes('data-opencanvas-anchor-rail="raydotsh-sidebar-nav"'),
+  'rendered template should include the desktop slash anchor rail',
+);
+assert(
+  html.includes('data-opencanvas-cover-grid="raydotsh-books-home"') &&
+    html.includes('data-opencanvas-cover-grid="raydotsh-books-gallery"'),
+  'rendered template should use cover-grid masonry hooks for both book grids',
+);
 
 const unsupportedRuntimeTokens = [
   'react-type-animation',
   'RobotGame',
-  'game-toggle',
+  'className="game-toggle"',
   'AsciiPortrait',
   'react-router-dom',
 ];

@@ -9,9 +9,9 @@
     "id": "raydotsh-hero",
     "recipeId": "custom",
     "name": "Intro Hero",
-    "height": 760,
-    "anchorId": "intro",
-    "backgroundEffect": "grain",
+    "height": 664,
+    "anchorId": "home",
+    "backgroundEffect": "none",
     "entrance": "fade-up",
     "elements": [
       {
@@ -21,7 +21,7 @@
           "x": 0,
           "y": 0,
           "w": 1440,
-          "h": 760,
+          "h": 664,
           "z": 0
         },
         "variant": "flat",
@@ -30,132 +30,164 @@
         }
       },
       {
-        "id": "raydotsh-ascii-panel",
-        "type": "container",
+        "id": "raydotsh-ascii-portrait",
+        "type": "rich-motion",
         "box": {
-          "x": 128,
-          "y": 168,
-          "w": 380,
-          "h": 380,
-          "z": 1
+          "x": 220,
+          "y": 166,
+          "w": 400,
+          "h": 400,
+          "z": 2
         },
-        "variant": "outlined",
-        "elementStyle": {
-          "backgroundColor": "#020c1b",
-          "borderColor": "#233554",
-          "borderWidth": 1,
-          "borderRadius": 10,
-          "boxShadow": "0 24px 44px rgba(2, 12, 27, 0.42)"
+        "assetRefId": "raydotsh-ascii-portrait",
+        "fit": "contain",
+        "label": "ASCII particle portrait",
+        "responsive": {
+          "tablet": {
+            "x": 184,
+            "y": 120,
+            "w": 280,
+            "h": 280
+          },
+          "phone": {
+            "x": 78,
+            "y": 63,
+            "w": 220,
+            "h": 220
+          }
         }
       },
       {
-        "id": "raydotsh-ascii-text",
+        "id": "raydotsh-hero-hi",
         "type": "text",
-        "box": {
-          "x": 156,
-          "y": 198,
-          "w": 324,
-          "h": 310,
-          "z": 2
-        },
-        "content": [
-          {
-            "text": "      .:-=++=-:.      \n   .-*%%%%%%%%%%*-.   \n  :#%%*+=----=+*%%#:  \n -%%#-   content -#%%- \n *%%=  systems   =%%* \n -%%#-  rehana  -#%%- \n  :#%%*+=----=+*%%#:  \n   .-*%%%%%%%%%%*-.   \n      .:-=++=-:.      "
-          }
-        ],
-        "role": "label",
-        "fontSize": 14,
-        "fontWeight": 500,
-        "align": "center",
-        "lineHeight": 1.55,
-        "pinnedStyle": {
-          "color": "#64ffda",
-          "font-family": "ui-monospace, SFMono-Regular, monospace",
-          "white-space": "pre"
-        }
-      },
-      {
-        "id": "raydotsh-hero-label",
-        "type": "text",
-        "box": {
-          "x": 592,
-          "y": 174,
-          "w": 620,
-          "h": 30,
-          "z": 2
-        },
-        "content": [
-          {
-            "text": "content systems / founder storytelling"
-          }
-        ],
-        "role": "label",
-        "fontSize": 16,
-        "fontWeight": 600,
+        "role": "heading",
+        "fontSize": 80,
+        "fontWeight": 400,
         "align": "left",
-        "letterSpacing": "0.08em",
-        "textTransform": "uppercase",
-        "pinnedStyle": {
-          "color": "#64ffda"
-        }
-      },
-      {
-        "id": "raydotsh-hero-heading",
-        "type": "text",
+        "lineHeight": 1.05,
+        "textWrap": "balance",
         "box": {
-          "x": 588,
-          "y": 216,
-          "w": 690,
-          "h": 132,
+          "x": 676,
+          "y": 206,
+          "w": 88,
+          "h": 98,
           "z": 2
         },
         "content": [
           {
             "text": "hi, "
-          },
-          {
-            "text": "rehana",
-            "marks": [
-              {
-                "type": "bold"
-              },
-              {
-                "type": "color",
-                "color": "#64ffda"
-              }
-            ]
-          },
-          {
-            "text": " here."
-          },
-          {
-            "text": "|",
-            "marks": [
-              {
-                "type": "color",
-                "color": "#64ffda"
-              }
-            ]
           }
         ],
+        "pinnedStyle": {
+          "color": "#ccd6f6",
+          "font-family": "NTR, sans-serif",
+          "overflow": "visible"
+        },
+        "responsive": {
+          "tablet": {
+            "x": 122,
+            "y": 332,
+            "w": 80,
+            "h": 86
+          },
+          "phone": {
+            "x": 34,
+            "y": 278,
+            "w": 62,
+            "h": 54
+          }
+        }
+      },
+      {
+        "id": "raydotsh-hero-heading",
+        "type": "text",
         "role": "heading",
-        "fontSize": 82,
+        "fontSize": 80,
         "fontWeight": 700,
         "align": "left",
         "lineHeight": 1.05,
         "textWrap": "balance",
+        "box": {
+          "x": 766,
+          "y": 206,
+          "w": 230,
+          "h": 98,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "rehana"
+          }
+        ],
         "pinnedStyle": {
-          "color": "#ccd6f6"
+          "color": "#64ffda",
+          "font-family": "NTR, sans-serif",
+          "overflow": "visible"
+        },
+        "responsive": {
+          "tablet": {
+            "x": 206,
+            "y": 332,
+            "w": 208,
+            "h": 86
+          },
+          "phone": {
+            "x": 100,
+            "y": 278,
+            "w": 132,
+            "h": 54
+          }
+        }
+      },
+      {
+        "id": "raydotsh-hero-here",
+        "type": "text",
+        "role": "heading",
+        "fontSize": 80,
+        "fontWeight": 400,
+        "align": "left",
+        "lineHeight": 1.05,
+        "textWrap": "balance",
+        "box": {
+          "x": 994,
+          "y": 206,
+          "w": 250,
+          "h": 98,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": " here.|"
+          }
+        ],
+        "pinnedStyle": {
+          "color": "#ccd6f6",
+          "font-family": "NTR, sans-serif",
+          "overflow": "visible"
+        },
+        "responsive": {
+          "tablet": {
+            "x": 414,
+            "y": 332,
+            "w": 230,
+            "h": 86
+          },
+          "phone": {
+            "x": 232,
+            "y": 278,
+            "w": 110,
+            "h": 54
+          }
         }
       },
       {
         "id": "raydotsh-hero-body",
         "type": "text",
         "box": {
-          "x": 592,
-          "y": 372,
-          "w": 662,
-          "h": 150,
+          "x": 676,
+          "y": 312,
+          "w": 550,
+          "h": 120,
           "z": 2
         },
         "content": [
@@ -164,23 +196,38 @@
           }
         ],
         "role": "body",
-        "fontSize": 22,
+        "fontSize": 20,
         "fontWeight": 400,
         "align": "left",
         "lineHeight": 1.5,
         "textWrap": "pretty",
         "pinnedStyle": {
-          "color": "#8892b0"
+          "color": "#8892b0",
+          "font-family": "NTR, sans-serif"
+        },
+        "responsive": {
+          "tablet": {
+            "x": 122,
+            "y": 430,
+            "w": 620,
+            "h": 112
+          },
+          "phone": {
+            "x": 34,
+            "y": 344,
+            "w": 307,
+            "h": 112
+          }
         }
       },
       {
         "id": "raydotsh-hero-contact",
         "type": "action",
         "box": {
-          "x": 592,
-          "y": 556,
-          "w": 160,
-          "h": 54,
+          "x": 676,
+          "y": 474,
+          "w": 150,
+          "h": 48,
           "z": 2
         },
         "label": [
@@ -202,34 +249,182 @@
           "borderRadius": 4,
           "fontSize": 16,
           "fontWeight": "bold",
-          "paddingX": 26,
-          "paddingY": 14,
-          "iconGap": 8
+          "paddingX": 32,
+          "paddingY": 12,
+          "iconGap": 6
+        },
+        "responsive": {
+          "tablet": {
+            "x": 308,
+            "y": 536,
+            "w": 150,
+            "h": 48
+          },
+          "phone": {
+            "x": 124,
+            "y": 460,
+            "w": 128,
+            "h": 40
+          }
         }
       },
       {
-        "id": "raydotsh-hero-note",
+        "id": "raydotsh-mobile-hero-heading",
         "type": "text",
         "box": {
-          "x": 808,
-          "y": 568,
-          "w": 360,
-          "h": 44,
-          "z": 2
+          "x": 0,
+          "y": 314,
+          "w": 322,
+          "h": 54,
+          "z": 3
         },
         "content": [
           {
-            "text": "Based on the source site's game and particle energy, rebuilt here with editable native blocks."
+            "text": "hi, "
+          },
+          {
+            "text": "rehana",
+            "marks": [
+              {
+                "type": "bold"
+              },
+              {
+                "type": "color",
+                "color": "#64ffda"
+              }
+            ]
+          },
+          {
+            "text": " here."
           }
         ],
-        "role": "label",
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 400,
+        "align": "center",
+        "lineHeight": 1.1,
+        "textWrap": "balance",
+        "pinnedStyle": {
+          "color": "#ccd6f6",
+          "font-family": "NTR, sans-serif",
+          "overflow": "visible"
+        },
+        "responsive": {
+          "phone": {
+            "x": 34,
+            "y": 306,
+            "w": 322,
+            "h": 54
+          }
+        }
+      },
+      {
+        "id": "raydotsh-mobile-hero-body",
+        "type": "text",
+        "box": {
+          "x": 0,
+          "y": 398,
+          "w": 290,
+          "h": 92,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Freelance content strategist and copywriter in Bengaluru. I build content systems for AI/SaaS founders by day and run a newsletter surfacing indie tech stories by night. Occasionally both happen at the same time."
+          }
+        ],
+        "role": "body",
         "fontSize": 14,
         "fontWeight": 400,
-        "align": "left",
-        "lineHeight": 1.35,
+        "align": "center",
+        "lineHeight": 1.45,
+        "textWrap": "pretty",
         "pinnedStyle": {
-          "color": "#a8b2d1"
+          "color": "#8892b0",
+          "font-family": "NTR, sans-serif"
+        },
+        "responsive": {
+          "phone": {
+            "x": 50,
+            "y": 360,
+            "w": 290,
+            "h": 120
+          }
         }
+      },
+      {
+        "id": "raydotsh-mobile-hero-contact",
+        "type": "action",
+        "box": {
+          "x": 0,
+          "y": 538,
+          "w": 108,
+          "h": 42,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Say hi!"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "mailto:rehanarahman004@gmail.com"
+        },
+        "variant": "outline",
+        "iconKind": "mail",
+        "actionStyle": {
+          "backgroundColor": "transparent",
+          "color": "#64ffda",
+          "borderColor": "#64ffda",
+          "borderWidth": 1,
+          "borderRadius": 4,
+          "fontSize": 14,
+          "fontWeight": "bold",
+          "paddingX": 20,
+          "paddingY": 8,
+          "iconGap": 6
+        },
+        "responsive": {
+          "phone": {
+            "x": 141,
+            "y": 481,
+            "w": 108,
+            "h": 42
+          }
+        }
+      }
+    ],
+    "responsive": {
+      "tablet": {
+        "h": 664
+      },
+      "phone": {
+        "h": 619
+      }
+    },
+    "responsiveVariants": [
+      {
+        "id": "raydotsh-hero-desktop",
+        "breakpoint": "desktop",
+        "contentSourceId": "raydotsh-hero-copy",
+        "elementIds": [
+          "raydotsh-hero-hi",
+          "raydotsh-hero-heading",
+          "raydotsh-hero-here",
+          "raydotsh-hero-body",
+          "raydotsh-hero-contact"
+        ]
+      },
+      {
+        "id": "raydotsh-hero-phone",
+        "breakpoint": "phone",
+        "contentSourceId": "raydotsh-hero-copy",
+        "elementIds": [
+          "raydotsh-mobile-hero-heading",
+          "raydotsh-mobile-hero-body",
+          "raydotsh-mobile-hero-contact"
+        ]
       }
     ]
   },

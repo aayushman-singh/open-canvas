@@ -9,7 +9,7 @@
     "id": "raydotsh-books",
     "recipeId": "custom",
     "name": "Books Preview",
-    "height": 710,
+    "height": 1450,
     "anchorId": "books",
     "entrance": "fade-up",
     "elements": [
@@ -20,20 +20,21 @@
           "x": 0,
           "y": 0,
           "w": 1440,
-          "h": 710,
+          "h": 1450,
           "z": 0
         },
         "variant": "flat",
         "pinnedStyle": {
           "background": "#0a192f"
-        }
+        },
+        "coverGridId": "raydotsh-books-home"
       },
       {
         "id": "raydotsh-books-title",
         "type": "text",
         "box": {
           "x": 220,
-          "y": 70,
+          "y": 80,
           "w": 260,
           "h": 76,
           "z": 2
@@ -56,22 +57,23 @@
         "type": "shape",
         "box": {
           "x": 440,
-          "y": 109,
+          "y": 119,
           "w": 390,
           "h": 1,
           "z": 1
         },
         "variant": "line",
         "pinnedStyle": {
-          "background": "#233554"
+          "background": "#233554",
+          "--opencanvas-kit-shape-fill": "#233554"
         }
       },
       {
         "id": "raydotsh-books-link",
         "type": "action",
         "box": {
-          "x": 1028,
-          "y": 88,
+          "x": 1070,
+          "y": 96,
           "w": 150,
           "h": 42,
           "z": 2
@@ -102,8 +104,8 @@
         "type": "text",
         "box": {
           "x": 220,
-          "y": 154,
-          "w": 650,
+          "y": 160,
+          "w": 600,
           "h": 70,
           "z": 2
         },
@@ -126,10 +128,10 @@
         "type": "media",
         "box": {
           "x": 220,
-          "y": 270,
-          "w": 142,
-          "h": 220,
-          "z": 1
+          "y": 250,
+          "w": 320,
+          "h": 534,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-a-little-life",
@@ -137,32 +139,58 @@
         "fit": "cover",
         "elementStyle": {
           "backgroundColor": "#112240",
-          "borderColor": "#233554",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "tablet": {
+            "x": 34,
+            "y": 335,
+            "w": 213,
+            "h": 356
+          },
+          "phone": {
+            "x": 34,
+            "y": 297,
+            "w": 322,
+            "h": 537
+          }
         }
       },
       {
         "id": "book-card-pride",
         "type": "media",
         "box": {
-          "x": 390,
-          "y": 300,
-          "w": 142,
-          "h": 250,
-          "z": 1
+          "x": 220,
+          "y": 822,
+          "w": 320,
+          "h": 487,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-pride-and-prejudice",
         "alt": "Pride and Prejudice book cover",
         "fit": "cover",
         "elementStyle": {
-          "backgroundColor": "#1b2d4b",
-          "borderColor": "#233554",
+          "backgroundColor": "#112240",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "tablet": {
+            "x": 34,
+            "y": 1101,
+            "w": 213,
+            "h": 324
+          },
+          "phone": {
+            "x": 34,
+            "y": 870,
+            "w": 322,
+            "h": 490
+          }
         }
       },
       {
@@ -170,43 +198,69 @@
         "type": "media",
         "box": {
           "x": 560,
-          "y": 258,
-          "w": 142,
-          "h": 210,
-          "z": 1
+          "y": 263,
+          "w": 320,
+          "h": 491,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-dracula",
         "alt": "Dracula book cover",
         "fit": "cover",
         "elementStyle": {
-          "backgroundColor": "#233554",
-          "borderColor": "#233554",
+          "backgroundColor": "#112240",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "tablet": {
+            "x": 272,
+            "y": 352,
+            "w": 213,
+            "h": 327
+          },
+          "phone": {
+            "x": 34,
+            "y": 1380,
+            "w": 322,
+            "h": 494
+          }
         }
       },
       {
         "id": "book-card-jane",
         "type": "media",
         "box": {
-          "x": 730,
-          "y": 304,
-          "w": 142,
-          "h": 230,
-          "z": 1
+          "x": 560,
+          "y": 780,
+          "w": 320,
+          "h": 528,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-jane-eyre",
         "alt": "Jane Eyre book cover",
         "fit": "cover",
         "elementStyle": {
-          "backgroundColor": "#0f2744",
-          "borderColor": "#233554",
+          "backgroundColor": "#112240",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "tablet": {
+            "x": 272,
+            "y": 1045,
+            "w": 213,
+            "h": 352
+          },
+          "phone": {
+            "x": 34,
+            "y": 1893,
+            "w": 322,
+            "h": 531
+          }
         }
       },
       {
@@ -214,10 +268,10 @@
         "type": "media",
         "box": {
           "x": 900,
-          "y": 266,
-          "w": 142,
-          "h": 250,
-          "z": 1
+          "y": 269,
+          "w": 320,
+          "h": 479,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-harry-potter",
@@ -225,33 +279,58 @@
         "fit": "cover",
         "elementStyle": {
           "backgroundColor": "#112240",
-          "borderColor": "#233554",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "tablet": {
+            "x": 510,
+            "y": 360,
+            "w": 213,
+            "h": 319
+          },
+          "phone": {
+            "x": 34,
+            "y": 2445,
+            "w": 322,
+            "h": 482
+          }
         }
       },
       {
         "id": "book-card-punpun",
         "type": "media",
         "box": {
-          "x": 1070,
-          "y": 306,
-          "w": 142,
-          "h": 210,
-          "z": 1
+          "x": 900,
+          "y": 768,
+          "w": 320,
+          "h": 460,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-goodnight-punpun",
         "alt": "Goodnight Punpun book cover",
         "fit": "cover",
         "elementStyle": {
-          "backgroundColor": "#020c1b",
-          "borderColor": "#64ffda",
-          "borderWidth": 1,
+          "backgroundColor": "#112240",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "tablet": {
+            "x": 510,
+            "y": 1029,
+            "w": 213,
+            "h": 306
+          },
+          "phone": {
+            "x": 34,
+            "y": 2947,
+            "w": 322,
+            "h": 463
+          }
         }
       },
       {
@@ -259,9 +338,9 @@
         "type": "text",
         "box": {
           "x": 220,
-          "y": 596,
-          "w": 800,
-          "h": 42,
+          "y": 1340,
+          "w": 600,
+          "h": 52,
           "z": 2
         },
         "content": [
@@ -277,7 +356,15 @@
           "color": "#a8b2d1"
         }
       }
-    ]
+    ],
+    "responsive": {
+      "tablet": {
+        "h": 1988
+      },
+      "phone": {
+        "h": 3490
+      }
+    }
   },
   "assetManifest": [],
   "originTemplateId": "raydotsh-portfolio"

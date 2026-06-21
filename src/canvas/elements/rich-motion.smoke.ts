@@ -314,6 +314,41 @@ assert(
   `video-stream rich-motion snapshot must publish: ${videoStreamValidation.valid ? '' : videoStreamValidation.errors.join('; ')}`,
 );
 
+const particleFieldState = structuredClone(goodSnapshot);
+particleFieldState.pages[0]!.sections[0]!.elements[0] = {
+  ...particleFieldState.pages[0]!.sections[0]!.elements[0],
+  assetRefId: 'motion-particle-field',
+} as unknown as typeof richMotionElement;
+(particleFieldState as { richMotionAssets: unknown[] }).richMotionAssets = [
+  {
+    id: 'motion-particle-field',
+    kind: 'particle-field',
+    mode: 'ascii-portrait',
+    alt: 'ASCII particle portrait',
+    color: '#64ffda',
+    fontFamily: 'NTR',
+    fontSize: 7,
+    charset: ' .:-=+*#%@',
+    pointSets: [
+      {
+        breakpoint: 'desktop',
+        canvasSize: 400,
+        points: [
+          { x: 120, y: 120, char: '#', alpha: 0.9 },
+          { x: 128, y: 120, char: '%', alpha: 0.9 },
+        ],
+      },
+    ],
+    pointer: { radius: 72, force: 44 },
+    reducedMotion: 'settled',
+  },
+];
+const particleFieldValidation = validatePublishedSnapshot(particleFieldState);
+assert(
+  particleFieldValidation.valid,
+  `particle-field rich-motion snapshot must publish: ${particleFieldValidation.valid ? '' : particleFieldValidation.errors.join('; ')}`,
+);
+
 const invalidVideoStreamState = structuredClone(videoStreamState);
 (
   (invalidVideoStreamState as { richMotionAssets: Array<Record<string, unknown>> })

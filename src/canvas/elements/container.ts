@@ -49,6 +49,12 @@ export interface ContainerElement extends BaseElement {
    * when a second marker earns its place.
    */
   preset?: 'card';
+  /**
+   * Optional published hook for cover-grid/masonry surfaces. The renderer
+   * stamps it on the element wrapper so template previews and runtime CSS can
+   * target the authored cover grid without parsing child geometry.
+   */
+  coverGridId?: string;
 }
 
 export function renderContainer(element: ContainerElement): string {

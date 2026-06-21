@@ -49,6 +49,7 @@ interface SnapshotWithBehaviour {
   scrollScenes?: ScrollScene[];
   layoutTransitions?: LayoutTransition[];
   richMotionAssets?: RichMotionAsset[];
+  playableWidgets?: unknown[];
   scrollBehavior?: {
     smooth?: boolean;
     paddingTop?: number;
@@ -129,6 +130,7 @@ export function snapshotHasBehaviourPrimitives(snapshot: SnapshotWithBehaviour):
   if ((snapshot.scrollScenes ?? []).length > 0) return true;
   if ((snapshot.layoutTransitions ?? []).length > 0) return true;
   if ((snapshot.richMotionAssets ?? []).length > 0) return true;
+  if ((snapshot.playableWidgets ?? []).length > 0) return true;
   if (collectSmoothScrollRuntime(snapshot) !== null) return true;
   if (collectNavThemeRuntimes(snapshot).length > 0) return true;
   if (

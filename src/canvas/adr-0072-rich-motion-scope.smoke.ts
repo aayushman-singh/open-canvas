@@ -17,6 +17,7 @@ const SHIPPED_RICH_MOTION_KINDS = [
   'lottie',
   'model-3d',
   'shader-scene',
+  'particle-field',
   'video-stream',
 ] as const;
 
@@ -26,6 +27,7 @@ const RUNTIME_HYDRATORS: Record<(typeof SHIPPED_RICH_MOTION_KINDS)[number], stri
   lottie: 'behaviourHydrateLottie',
   'model-3d': 'behaviourHydrateModel3D',
   'shader-scene': 'behaviourHydrateShaderScene',
+  'particle-field': 'behaviourHydrateParticleField',
   'video-stream': 'behaviourHydrateVideoStream',
 };
 
@@ -101,6 +103,30 @@ function richMotionAsset(kind: string): Record<string, unknown> {
       controls: false,
       playback: { trigger: 'hover-focus', resetOnExit: true },
       reducedMotion: 'poster',
+    };
+  }
+  if (kind === 'particle-field') {
+    return {
+      id: 'motion-asset',
+      kind,
+      mode: 'ascii-portrait',
+      alt: 'ASCII particle portrait',
+      color: '#64ffda',
+      fontFamily: 'NTR',
+      fontSize: 7,
+      charset: ' .:-=+*#%@',
+      pointSets: [
+        {
+          breakpoint: 'desktop',
+          canvasSize: 400,
+          points: [
+            { x: 120, y: 120, char: '#', alpha: 0.9 },
+            { x: 128, y: 120, char: '%', alpha: 0.9 },
+          ],
+        },
+      ],
+      pointer: { radius: 72, force: 44 },
+      reducedMotion: 'settled',
     };
   }
   return { id: 'motion-asset', kind, alt: 'Unsupported motion asset' };

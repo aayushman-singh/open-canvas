@@ -9,7 +9,7 @@
     "id": "raydotsh-books-gallery",
     "recipeId": "custom",
     "name": "Reading List",
-    "height": 900,
+    "height": 4108,
     "anchorId": "reading-list",
     "entrance": "fade-up",
     "elements": [
@@ -20,19 +20,20 @@
           "x": 0,
           "y": 0,
           "w": 1440,
-          "h": 900,
+          "h": 4108,
           "z": 0
         },
         "variant": "flat",
         "pinnedStyle": {
           "background": "#0a192f"
-        }
+        },
+        "coverGridId": "raydotsh-books-gallery"
       },
       {
         "id": "raydotsh-books-back",
         "type": "action",
         "box": {
-          "x": 218,
+          "x": 220,
           "y": 92,
           "w": 52,
           "h": 44,
@@ -109,11 +110,11 @@
         "id": "gallery-card-little-life",
         "type": "media",
         "box": {
-          "x": 220,
-          "y": 290,
-          "w": 178,
-          "h": 250,
-          "z": 1
+          "x": 240,
+          "y": 249,
+          "w": 470,
+          "h": 784,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-a-little-life",
@@ -121,87 +122,115 @@
         "fit": "cover",
         "elementStyle": {
           "backgroundColor": "#112240",
-          "borderColor": "#233554",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "phone": {
+            "x": 54,
+            "y": 243,
+            "w": 282,
+            "h": 475
+          }
         }
       },
       {
         "id": "gallery-card-pride",
         "type": "media",
         "box": {
-          "x": 426,
-          "y": 290,
-          "w": 178,
-          "h": 250,
-          "z": 1
+          "x": 240,
+          "y": 1053,
+          "w": 470,
+          "h": 715,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-pride-and-prejudice",
         "alt": "Pride and Prejudice book cover",
         "fit": "cover",
         "elementStyle": {
-          "backgroundColor": "#1b2d4b",
-          "borderColor": "#233554",
+          "backgroundColor": "#112240",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "phone": {
+            "x": 54,
+            "y": 738,
+            "w": 282,
+            "h": 429
+          }
         }
       },
       {
         "id": "gallery-card-dracula",
         "type": "media",
         "box": {
-          "x": 632,
-          "y": 290,
-          "w": 178,
-          "h": 250,
-          "z": 1
+          "x": 240,
+          "y": 1788,
+          "w": 470,
+          "h": 720,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-dracula",
         "alt": "Dracula book cover",
         "fit": "cover",
         "elementStyle": {
-          "backgroundColor": "#233554",
-          "borderColor": "#233554",
+          "backgroundColor": "#112240",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "phone": {
+            "x": 54,
+            "y": 1187,
+            "w": 282,
+            "h": 432
+          }
         }
       },
       {
         "id": "gallery-card-jane",
         "type": "media",
         "box": {
-          "x": 838,
-          "y": 290,
-          "w": 178,
-          "h": 250,
-          "z": 1
+          "x": 240,
+          "y": 2528,
+          "w": 470,
+          "h": 776,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-jane-eyre",
         "alt": "Jane Eyre book cover",
         "fit": "cover",
         "elementStyle": {
-          "backgroundColor": "#0f2744",
-          "borderColor": "#233554",
+          "backgroundColor": "#112240",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "phone": {
+            "x": 54,
+            "y": 1639,
+            "w": 282,
+            "h": 466
+          }
         }
       },
       {
         "id": "gallery-card-harry",
         "type": "media",
         "box": {
-          "x": 1044,
-          "y": 290,
-          "w": 178,
-          "h": 250,
-          "z": 1
+          "x": 240,
+          "y": 3323,
+          "w": 470,
+          "h": 704,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-harry-potter",
@@ -209,33 +238,46 @@
         "fit": "cover",
         "elementStyle": {
           "backgroundColor": "#112240",
-          "borderColor": "#233554",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "phone": {
+            "x": 54,
+            "y": 2125,
+            "w": 282,
+            "h": 422
+          }
         }
       },
       {
         "id": "gallery-card-punpun",
         "type": "media",
         "box": {
-          "x": 220,
-          "y": 580,
-          "w": 178,
-          "h": 250,
-          "z": 1
+          "x": 730,
+          "y": 244,
+          "w": 470,
+          "h": 676,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-goodnight-punpun",
         "alt": "Goodnight Punpun book cover",
         "fit": "cover",
         "elementStyle": {
-          "backgroundColor": "#020c1b",
-          "borderColor": "#64ffda",
-          "borderWidth": 1,
+          "backgroundColor": "#112240",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "phone": {
+            "x": 54,
+            "y": 2567,
+            "w": 282,
+            "h": 405
+          }
         }
       },
       {
@@ -308,26 +350,40 @@
         "id": "gallery-card-red-trainers",
         "type": "media",
         "box": {
-          "x": 1044,
-          "y": 580,
-          "w": 178,
-          "h": 250,
-          "z": 1
+          "x": 730,
+          "y": 3183,
+          "w": 470,
+          "h": 739,
+          "z": 2
         },
         "mediaKind": "image",
         "assetId": "seed-raydotsh-book-red-trainers",
         "alt": "She Wore Red Trainers book cover",
         "fit": "cover",
         "elementStyle": {
-          "backgroundColor": "#020c1b",
-          "borderColor": "#ffd166",
-          "borderWidth": 1,
+          "backgroundColor": "#112240",
           "borderRadius": 4,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.42)",
+          "boxShadow": "0 10px 30px -15px rgba(2, 12, 27, 0.7)",
           "overflow": "hidden"
+        },
+        "responsive": {
+          "phone": {
+            "x": 54,
+            "y": 4359,
+            "w": 282,
+            "h": 433
+          }
         }
       }
-    ]
+    ],
+    "responsive": {
+      "phone": {
+        "h": 4873
+      },
+      "tablet": {
+        "h": 4108
+      }
+    }
   },
   "assetManifest": [],
   "originTemplateId": "raydotsh-portfolio"

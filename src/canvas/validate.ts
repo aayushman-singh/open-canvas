@@ -76,6 +76,9 @@ import {
   MOTION_SEQUENCE_REPEAT_MODES,
   MOTION_SEQUENCE_TEXT_EFFECTS,
   MOTION_SEQUENCE_TRIGGER_TYPES,
+  PARTICLE_FIELD_BREAKPOINTS,
+  PARTICLE_FIELD_MODES,
+  PARTICLE_FIELD_REDUCED_MOTION_MODES,
   RICH_MOTION_KINDS,
   RIVE_INPUT_EVENTS,
   RIVE_INPUT_TYPES,
@@ -99,6 +102,8 @@ import {
   BREAKPOINTS,
   COLLECTION_PAGE_KINDS,
   ELEMENT_TYPES,
+  FONT_FACE_DISPLAYS,
+  FONT_FACE_FORMATS,
   IMPORT_ANIMATION_INVENTORY_STATUSES,
   IMPORT_ANIMATION_PRIMITIVES,
   IMPORT_ANIMATION_SOURCE_TRIGGERS,
@@ -133,6 +138,7 @@ import {
   POINTER_FX_DRAG_AXES,
   POINTER_FX_REDUCED_MOTION_MODES,
   POINTER_FX_TOUCH_ACTIVATION_MODES,
+  PLAYABLE_WIDGET_KINDS,
   ROUTE_TRANSITION_MODES,
   SCROLL_TRIGGER_MODES,
   SECTION_RECIPE_IDS,
@@ -148,6 +154,8 @@ import {
   type CanvasSection,
   type EditableSite,
   type ElementType,
+  type FontFaceDisplay,
+  type FontFaceFormat,
   type InlineMarkType,
   type LoadExperienceGate,
   type LoadExperiencePreset,
@@ -185,7 +193,7 @@ const PAGE_WIDTH_MIN = 960;
 const PAGE_WIDTH_MAX = 1920;
 const SECTION_HEIGHT_MIN = 240;
 const PINNED_SECTION_HEIGHT_MIN = 48;
-const SECTION_HEIGHT_MAX = 1400;
+const SECTION_HEIGHT_MAX = 6000;
 const VIEW_TRANSITION_NAME_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
 const POPUP_TRIGGER_TYPES = ['exit-intent', 'delay', 'scroll'] as const;
@@ -1310,6 +1318,8 @@ const FLOW_LAYOUT_RESPONSIVE_KEYS = [
 ] as const;
 const FLOW_ITEM_KEYS = ['id', 'element', 'span', 'align', 'responsive'] as const;
 const FLOW_ITEM_RESPONSIVE_KEYS = ['span', 'align', 'hidden', 'order'] as const;
+const SECTION_RESPONSIVE_KEYS = ['tablet', 'phone'] as const;
+const SECTION_RESPONSIVE_OVERRIDE_KEYS = ['h'] as const;
 const RESPONSIVE_LAYOUT_VARIANT_KEYS = [
   'id',
   'breakpoint',
@@ -1890,6 +1900,13 @@ function validateElement(
       if (element.tint !== undefined) {
         validateInjectionSafeString(element.tint, 'tint', basePath, errors);
       }
+      if (element.coverGridId !== undefined) {
+        if (typeof element.coverGridId !== 'string' || !ANCHOR_ID_RE.test(element.coverGridId)) {
+          errors.push(
+            `${basePath}.coverGridId must match /^[a-z][a-z0-9-]*$/ when present (got ${describe(element.coverGridId)})`,
+          );
+        }
+      }
       break;
     }
     case 'collection': {
@@ -2430,6 +2447,37 @@ function validateElement(
   }
 }
 
+function validateSectionResponsive(
+  value: unknown,
+  minHeight: number,
+  basePath: string,
+  errors: string[],
+): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`${basePath} must be an object when present`);
+    return;
+  }
+  validateAllowedKeys(value, SECTION_RESPONSIVE_KEYS, basePath, errors);
+  for (const bp of SECTION_RESPONSIVE_KEYS) {
+    const override = value[bp];
+    if (override === undefined) continue;
+    const overridePath = `${basePath}.${bp}`;
+    if (!isRecord(override)) {
+      errors.push(`${overridePath} must be an object when present`);
+      continue;
+    }
+    validateAllowedKeys(override, SECTION_RESPONSIVE_OVERRIDE_KEYS, overridePath, errors);
+    if (override.h !== undefined) {
+      if (!isFiniteNumber(override.h) || override.h < minHeight || override.h > SECTION_HEIGHT_MAX) {
+        errors.push(
+          `${overridePath}.h must be a finite number in [${String(minHeight)}, ${String(SECTION_HEIGHT_MAX)}] when present (got ${describe(override.h)})`,
+        );
+      }
+    }
+  }
+}
+
 function validateSection(
   section: unknown,
   pageWidth: number,
@@ -2515,6 +2563,7 @@ function validateSection(
       );
     }
   }
+  validateSectionResponsive(section.responsive, minHeight, `${basePath}.responsive`, errors);
   if (!Array.isArray(section.elements)) {
     errors.push(`${basePath}.elements must be an array`);
     return;
@@ -4337,6 +4386,105 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
           );
           return;
         }
+        if (asset.kind === 'particle-field') {
+          assertOneOf(asset.mode, PARTICLE_FIELD_MODES, `${assetPath}.mode`, errors);
+          assertNonEmptyString(asset.alt, `${assetPath}.alt`, errors);
+          if (typeof asset.color !== 'string' || !INLINE_COLOR_HEX_RE.test(asset.color)) {
+            errors.push(`${assetPath}.color must be a hex colour (#RGB, #RRGGBB, or #RRGGBBAA)`);
+          }
+          if (asset.fontFamily !== undefined) {
+            assertNonEmptyString(asset.fontFamily, `${assetPath}.fontFamily`, errors);
+          }
+          if (asset.fontSize !== undefined) {
+            if (!isFiniteNumber(asset.fontSize) || asset.fontSize < 4 || asset.fontSize > 64) {
+              errors.push(
+                `${assetPath}.fontSize must be a finite number in [4, 64] when present (got ${describe(asset.fontSize)})`,
+              );
+            }
+          }
+          assertNonEmptyString(asset.charset, `${assetPath}.charset`, errors);
+          if (!Array.isArray(asset.pointSets) || asset.pointSets.length === 0) {
+            errors.push(`${assetPath}.pointSets must be a non-empty array`);
+          } else {
+            const knownPointSetBreakpoints = new Set<string>();
+            asset.pointSets.forEach((set, setIdx) => {
+              const setPath = `${assetPath}.pointSets[${String(setIdx)}]`;
+              if (!isRecord(set)) {
+                errors.push(`${setPath} must be an object`);
+                return;
+              }
+              const breakpointOk = assertOneOf(
+                set.breakpoint,
+                PARTICLE_FIELD_BREAKPOINTS,
+                `${setPath}.breakpoint`,
+                errors,
+              );
+              if (breakpointOk) {
+                const breakpoint = set.breakpoint as (typeof PARTICLE_FIELD_BREAKPOINTS)[number];
+                assertUnique(
+                  breakpoint,
+                  knownPointSetBreakpoints,
+                  `${setPath}.breakpoint`,
+                  `within ${assetPath}.pointSets`,
+                  errors,
+                );
+              }
+              if (!isFiniteNumber(set.canvasSize) || set.canvasSize <= 0 || set.canvasSize > 1000) {
+                errors.push(
+                  `${setPath}.canvasSize must be a finite number in (0, 1000] (got ${describe(set.canvasSize)})`,
+                );
+              }
+              if (!Array.isArray(set.points) || set.points.length === 0) {
+                errors.push(`${setPath}.points must be a non-empty array`);
+              } else if (set.points.length > 20000) {
+                errors.push(`${setPath}.points must contain at most 20000 points`);
+              } else {
+                set.points.forEach((point, pointIdx) => {
+                  const pointPath = `${setPath}.points[${String(pointIdx)}]`;
+                  if (!isRecord(point)) {
+                    errors.push(`${pointPath} must be an object`);
+                    return;
+                  }
+                  if (!isFiniteNumber(point.x) || point.x < 0 || point.x > 1000) {
+                    errors.push(`${pointPath}.x must be a finite number in [0, 1000]`);
+                  }
+                  if (!isFiniteNumber(point.y) || point.y < 0 || point.y > 1000) {
+                    errors.push(`${pointPath}.y must be a finite number in [0, 1000]`);
+                  }
+                  if (typeof point.char !== 'string' || point.char.length < 1 || point.char.length > 2) {
+                    errors.push(`${pointPath}.char must be a 1-2 character string`);
+                  }
+                  if (!isFiniteNumber(point.alpha) || point.alpha < 0 || point.alpha > 1) {
+                    errors.push(`${pointPath}.alpha must be a finite number in [0, 1]`);
+                  }
+                });
+              }
+            });
+          }
+          if (asset.pointer !== undefined) {
+            if (!isRecord(asset.pointer)) {
+              errors.push(`${assetPath}.pointer must be an object when present`);
+            } else {
+              if (!isFiniteNumber(asset.pointer.radius) || asset.pointer.radius < 0 || asset.pointer.radius > 500) {
+                errors.push(
+                  `${assetPath}.pointer.radius must be a finite number in [0, 500] when present`,
+                );
+              }
+              if (!isFiniteNumber(asset.pointer.force) || asset.pointer.force < 0 || asset.pointer.force > 1000) {
+                errors.push(
+                  `${assetPath}.pointer.force must be a finite number in [0, 1000] when present`,
+                );
+              }
+            }
+          }
+          assertOneOf(
+            asset.reducedMotion,
+            PARTICLE_FIELD_REDUCED_MOTION_MODES,
+            `${assetPath}.reducedMotion`,
+            errors,
+          );
+          return;
+        }
         if (asset.kind === 'video-stream') {
           if (!isAssetIdLike(asset.assetId)) {
             errors.push(
@@ -4470,6 +4618,165 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
   validateOverlayTriggerTargets(state, errors, targetIndex);
 }
 
+const FONT_FACE_KEYS = [
+  'id',
+  'fontFamily',
+  'src',
+  'format',
+  'fontStyle',
+  'fontWeight',
+  'fontDisplay',
+] as const;
+const ANCHOR_RAIL_KEYS = ['id', 'label', 'links', 'hideBelowPx'] as const;
+const ANCHOR_RAIL_LINK_KEYS = ['id', 'label', 'anchorId'] as const;
+const PLAYABLE_WIDGET_KEYS = [
+  'id',
+  'kind',
+  'label',
+  'toggleLabel',
+  'hideBelowPx',
+  'counterLabel',
+] as const;
+
+function validateHttpUrl(value: unknown, basePath: string, errors: string[]): void {
+  if (!isNonEmptyString(value)) {
+    errors.push(`${basePath} must be a non-empty http(s) URL (got ${describe(value)})`);
+    return;
+  }
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      errors.push(`${basePath} must use http: or https: (got ${describe(value)})`);
+    }
+  } catch {
+    errors.push(`${basePath} must be a parseable http(s) URL (got ${describe(value)})`);
+  }
+}
+
+function validateFontFaces(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    errors.push(`${basePath} must be an array when present`);
+    return;
+  }
+  const knownIds = new Set<string>();
+  const knownFamilies = new Set<string>();
+  value.forEach((fontFace, idx) => {
+    const fontPath = `${basePath}[${String(idx)}]`;
+    if (!isRecord(fontFace)) {
+      errors.push(`${fontPath} must be an object`);
+      return;
+    }
+    validateAllowedKeys(fontFace, FONT_FACE_KEYS, fontPath, errors);
+    if (assertNonEmptyString(fontFace.id, `${fontPath}.id`, errors)) {
+      assertUnique(fontFace.id, knownIds, `${fontPath}.id`, 'within fontFaces', errors);
+    }
+    if (assertNonEmptyString(fontFace.fontFamily, `${fontPath}.fontFamily`, errors)) {
+      assertUnique(
+        fontFace.fontFamily,
+        knownFamilies,
+        `${fontPath}.fontFamily`,
+        'within fontFaces',
+        errors,
+      );
+    }
+    validateHttpUrl(fontFace.src, `${fontPath}.src`, errors);
+    assertOneOf<FontFaceFormat>(fontFace.format, FONT_FACE_FORMATS, `${fontPath}.format`, errors);
+    if (fontFace.fontStyle !== undefined) {
+      assertNonEmptyString(fontFace.fontStyle, `${fontPath}.fontStyle`, errors);
+    }
+    if (fontFace.fontWeight !== undefined) {
+      assertNonEmptyString(fontFace.fontWeight, `${fontPath}.fontWeight`, errors);
+    }
+    if (fontFace.fontDisplay !== undefined) {
+      assertOneOf<FontFaceDisplay>(
+        fontFace.fontDisplay,
+        FONT_FACE_DISPLAYS,
+        `${fontPath}.fontDisplay`,
+        errors,
+      );
+    }
+  });
+}
+
+function validateAnchorRails(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    errors.push(`${basePath} must be an array when present`);
+    return;
+  }
+  const knownIds = new Set<string>();
+  value.forEach((rail, railIdx) => {
+    const railPath = `${basePath}[${String(railIdx)}]`;
+    if (!isRecord(rail)) {
+      errors.push(`${railPath} must be an object`);
+      return;
+    }
+    validateAllowedKeys(rail, ANCHOR_RAIL_KEYS, railPath, errors);
+    if (assertNonEmptyString(rail.id, `${railPath}.id`, errors)) {
+      assertUnique(rail.id, knownIds, `${railPath}.id`, 'within anchorRails', errors);
+    }
+    assertNonEmptyString(rail.label, `${railPath}.label`, errors);
+    if (rail.hideBelowPx !== undefined && (!isFiniteNumber(rail.hideBelowPx) || rail.hideBelowPx < 0)) {
+      errors.push(`${railPath}.hideBelowPx must be a finite number >= 0 when present`);
+    }
+    if (!Array.isArray(rail.links) || rail.links.length === 0) {
+      errors.push(`${railPath}.links must be a non-empty array`);
+      return;
+    }
+    const knownLinkIds = new Set<string>();
+    rail.links.forEach((link, linkIdx) => {
+      const linkPath = `${railPath}.links[${String(linkIdx)}]`;
+      if (!isRecord(link)) {
+        errors.push(`${linkPath} must be an object`);
+        return;
+      }
+      validateAllowedKeys(link, ANCHOR_RAIL_LINK_KEYS, linkPath, errors);
+      if (assertNonEmptyString(link.id, `${linkPath}.id`, errors)) {
+        assertUnique(link.id, knownLinkIds, `${linkPath}.id`, `within ${railPath}.links`, errors);
+      }
+      assertNonEmptyString(link.label, `${linkPath}.label`, errors);
+      if (typeof link.anchorId !== 'string' || !ANCHOR_ID_RE.test(link.anchorId)) {
+        errors.push(
+          `${linkPath}.anchorId must match /^[a-z][a-z0-9-]*$/ (got ${describe(link.anchorId)})`,
+        );
+      }
+    });
+  });
+}
+
+function validatePlayableWidgets(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    errors.push(`${basePath} must be an array when present`);
+    return;
+  }
+  const knownIds = new Set<string>();
+  value.forEach((widget, widgetIdx) => {
+    const widgetPath = `${basePath}[${String(widgetIdx)}]`;
+    if (!isRecord(widget)) {
+      errors.push(`${widgetPath} must be an object`);
+      return;
+    }
+    validateAllowedKeys(widget, PLAYABLE_WIDGET_KEYS, widgetPath, errors);
+    if (assertNonEmptyString(widget.id, `${widgetPath}.id`, errors)) {
+      assertUnique(widget.id, knownIds, `${widgetPath}.id`, 'within playableWidgets', errors);
+    }
+    assertOneOf(widget.kind, PLAYABLE_WIDGET_KINDS, `${widgetPath}.kind`, errors);
+    assertNonEmptyString(widget.label, `${widgetPath}.label`, errors);
+    assertNonEmptyString(widget.toggleLabel, `${widgetPath}.toggleLabel`, errors);
+    if (widget.counterLabel !== undefined) {
+      assertNonEmptyString(widget.counterLabel, `${widgetPath}.counterLabel`, errors);
+    }
+    if (
+      widget.hideBelowPx !== undefined &&
+      (!isFiniteNumber(widget.hideBelowPx) || widget.hideBelowPx < 0)
+    ) {
+      errors.push(`${widgetPath}.hideBelowPx must be a finite number >= 0 when present`);
+    }
+  });
+}
+
 const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } = {
   // ADR 0016 — `styleKit` and `customStyleKit` are a discriminated union at
   // the type layer. The validator owns the cross-field contract: when the
@@ -4532,6 +4839,15 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
   motionSequences: () => {},
   scrollScenes: () => {},
   richMotionAssets: () => {},
+  fontFaces: ({ state, errors }) => {
+    validateFontFaces(state.fontFaces, 'fontFaces', errors);
+  },
+  anchorRails: ({ state, errors }) => {
+    validateAnchorRails(state.anchorRails, 'anchorRails', errors);
+  },
+  playableWidgets: ({ state, errors }) => {
+    validatePlayableWidgets(state.playableWidgets, 'playableWidgets', errors);
+  },
   layoutTransitions: () => {},
   importAnimationInventory: ({ state, errors }) => {
     validateImportAnimationInventory(state.importAnimationInventory, errors);
@@ -4990,6 +5306,7 @@ function validatePublishedRichMotionReferencesInElement(
       asset.kind !== 'lottie' &&
       asset.kind !== 'model-3d' &&
       asset.kind !== 'shader-scene' &&
+      asset.kind !== 'particle-field' &&
       asset.kind !== 'video-stream'
     ) {
       errors.push(

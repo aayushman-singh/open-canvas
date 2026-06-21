@@ -467,6 +467,7 @@ function encodeContainerElement(el: ContainerElement): Y.Map<unknown> {
   setIfDefined(out, 'linkLabel', el.linkLabel);
   // Gap #17 — optional accent.
   setIfDefined(out, 'tint', el.tint);
+  setIfDefined(out, 'coverGridId', el.coverGridId);
   return out;
 }
 
@@ -1034,6 +1035,9 @@ function encodeSection(section: CanvasSection): Y.Map<unknown> {
   // state survives Yjs encode/decode. Library rows never carry it; only
   // sections materialised via instantiateTemplate do.
   setIfDefined(out, 'instanceScope', section.instanceScope);
+  if (section.responsive !== undefined) {
+    out.set('responsive', encodeJsonValue(section.responsive));
+  }
   if (section.responsiveVariants !== undefined) {
     const variants = new Y.Array<Y.Map<unknown>>();
     for (const variant of section.responsiveVariants) {
@@ -1181,6 +1185,15 @@ export function encodeYDoc(state: EditableSite): Y.Doc {
     }
     if (state.richMotionAssets !== undefined) {
       root.set('richMotionAssets', encodeJsonValue(state.richMotionAssets));
+    }
+    if (state.fontFaces !== undefined) {
+      root.set('fontFaces', encodeJsonValue(state.fontFaces));
+    }
+    if (state.anchorRails !== undefined) {
+      root.set('anchorRails', encodeJsonValue(state.anchorRails));
+    }
+    if (state.playableWidgets !== undefined) {
+      root.set('playableWidgets', encodeJsonValue(state.playableWidgets));
     }
     if (state.importAnimationInventory !== undefined) {
       root.set('importAnimationInventory', encodeJsonValue(state.importAnimationInventory));
@@ -1460,6 +1473,7 @@ function decodeContainerElement(map: Y.Map<unknown>, base: BaseElement): Contain
   }
   if (map.has('linkLabel')) out.linkLabel = map.get('linkLabel') as string;
   if (map.has('tint')) out.tint = map.get('tint') as string;
+  if (map.has('coverGridId')) out.coverGridId = map.get('coverGridId') as string;
   return out;
 }
 
@@ -2091,6 +2105,11 @@ function decodeSection(map: Y.Map<unknown>): CanvasSection {
   if (map.has('instanceScope')) {
     section.instanceScope = map.get('instanceScope') as string;
   }
+  if (map.has('responsive')) {
+    section.responsive = decodeJsonValue(
+      map.get('responsive'),
+    ) as NonNullable<CanvasSection['responsive']>;
+  }
   if (map.has('responsiveVariants')) {
     const variants = map.get('responsiveVariants') as Y.Array<Y.Map<unknown>>;
     section.responsiveVariants = variants.map((variant) => ({
@@ -2258,6 +2277,21 @@ export function decodeYDoc(doc: Y.Doc): EditableSite {
     state.richMotionAssets = decodeJsonValue(
       root.get('richMotionAssets'),
     ) as NonNullable<EditableSite['richMotionAssets']>;
+  }
+  if (root.has('fontFaces')) {
+    state.fontFaces = decodeJsonValue(root.get('fontFaces')) as NonNullable<
+      EditableSite['fontFaces']
+    >;
+  }
+  if (root.has('anchorRails')) {
+    state.anchorRails = decodeJsonValue(root.get('anchorRails')) as NonNullable<
+      EditableSite['anchorRails']
+    >;
+  }
+  if (root.has('playableWidgets')) {
+    state.playableWidgets = decodeJsonValue(root.get('playableWidgets')) as NonNullable<
+      EditableSite['playableWidgets']
+    >;
   }
   if (root.has('importAnimationInventory')) {
     state.importAnimationInventory = decodeJsonValue(

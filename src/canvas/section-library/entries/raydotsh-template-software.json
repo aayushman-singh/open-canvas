@@ -31,7 +31,9 @@
         "id": "raydotsh-projects-phone",
         "breakpoint": "phone",
         "contentSourceId": "raydotsh-projects",
-        "elementIds": ["raydotsh-mobile-project-list"]
+        "elementIds": [
+          "raydotsh-mobile-project-list"
+        ]
       }
     ],
     "elements": [
@@ -85,7 +87,8 @@
         },
         "variant": "line",
         "pinnedStyle": {
-          "background": "#233554"
+          "background": "#233554",
+          "--opencanvas-kit-shape-fill": "#233554"
         }
       },
       {

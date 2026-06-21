@@ -36,6 +36,10 @@ for (const marker of [
   'seed-raydotsh-yoru',
   'seed-raydotsh-pycaster',
   'seed-raydotsh-book-a-little-life',
+  '@font-face',
+  'font-family: "NTR"',
+  'data-opencanvas-rich-motion="raydotsh-ascii-portrait"',
+  'data-opencanvas-playable-widget="raydotsh-game-mode"',
 ]) {
   assert(
     raydotshHtml.includes(marker),

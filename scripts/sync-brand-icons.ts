@@ -13,7 +13,7 @@
 // USAGE:
 //   bun run scripts/sync-brand-icons.ts
 //
-// REQUIRES: network access to https://cdn.simpleicons.org/<slug>/
+// REQUIRES: network access to https://cdn.jsdelivr.net/npm/simple-icons@v16/icons/<slug>.svg
 //
 // The script is idempotent — running twice with the same SLUGS yields a
 // byte-identical output file.
@@ -26,7 +26,6 @@ import { dirname } from 'node:path';
 // matches Simple Icons' URL path: https://cdn.simpleicons.org/<slug>/.
 const SLUGS = [
   'github',
-  'linkedin',
   'x',
   'instagram',
   'facebook',
@@ -40,7 +39,7 @@ const SLUGS = [
 ] as const;
 
 const OUT = 'src/canvas/icons/brand-icons.generated.ts';
-const SOURCE = 'https://cdn.simpleicons.org';
+const SOURCE = 'https://cdn.jsdelivr.net/npm/simple-icons@v16/icons';
 
 interface FetchedIcon {
   slug: string;
@@ -57,7 +56,10 @@ export function stripSimpleIconInnerSvg(slug: string, svg: string): string {
   if (!/\bviewBox=["']0 0 24 24["']/.test(openingTag)) {
     throw new Error(`malformed SVG response for ${slug}: expected viewBox="0 0 24 24"`);
   }
-  const innerSvg = svg.slice(opener + 1, closer).trim();
+  const innerSvg = svg
+    .slice(opener + 1, closer)
+    .replace(/<title\b[\s\S]*?<\/title>/g, '')
+    .trim();
   if (!/^<(path|g|circle|rect|polygon|polyline|line|ellipse)\b/.test(innerSvg)) {
     throw new Error(`malformed SVG response for ${slug}: expected SVG geometry`);
   }
@@ -65,7 +67,7 @@ export function stripSimpleIconInnerSvg(slug: string, svg: string): string {
 }
 
 async function fetchOne(slug: string): Promise<FetchedIcon> {
-  const url = `${SOURCE}/${slug}/`;
+  const url = `${SOURCE}/${slug}.svg`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`fetch ${url} failed: ${String(res.status)} ${res.statusText}`);

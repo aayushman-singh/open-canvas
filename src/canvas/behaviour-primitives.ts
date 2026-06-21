@@ -43,10 +43,14 @@ export const RICH_MOTION_KINDS = [
   'lottie',
   'model-3d',
   'shader-scene',
+  'particle-field',
   'video-stream',
 ] as const;
 export const SHADER_SCENE_PRESETS = ['aurora-flow', 'racing-lines', 'particle-field'] as const;
 export const SHADER_SCENE_REDUCED_MOTION_MODES = ['static', 'animate'] as const;
+export const PARTICLE_FIELD_MODES = ['ascii-portrait'] as const;
+export const PARTICLE_FIELD_BREAKPOINTS = ['desktop', 'tablet', 'phone'] as const;
+export const PARTICLE_FIELD_REDUCED_MOTION_MODES = ['settled', 'animate'] as const;
 export const VIDEO_STREAM_TRIGGERS = ['hover-focus', 'click-toggle', 'load'] as const;
 export const VIDEO_STREAM_REDUCED_MOTION_MODES = ['poster', 'play'] as const;
 export const LOAD_PROGRESS_DISPLAY_MODES = ['hidden', 'bar', 'number', 'bar-number'] as const;
@@ -215,6 +219,36 @@ export interface ShaderSceneRichMotionAsset {
   reducedMotion: (typeof SHADER_SCENE_REDUCED_MOTION_MODES)[number];
 }
 
+export interface ParticleFieldPoint {
+  x: number;
+  y: number;
+  char: string;
+  alpha: number;
+}
+
+export interface ParticleFieldPointSet {
+  breakpoint: (typeof PARTICLE_FIELD_BREAKPOINTS)[number];
+  canvasSize: number;
+  points: ParticleFieldPoint[];
+}
+
+export interface ParticleFieldRichMotionAsset {
+  id: string;
+  kind: 'particle-field';
+  mode: (typeof PARTICLE_FIELD_MODES)[number];
+  alt: string;
+  color: string;
+  fontFamily?: string;
+  fontSize?: number;
+  charset: string;
+  pointSets: ParticleFieldPointSet[];
+  pointer?: {
+    radius: number;
+    force: number;
+  };
+  reducedMotion: (typeof PARTICLE_FIELD_REDUCED_MOTION_MODES)[number];
+}
+
 export interface VideoStreamRichMotionAsset {
   id: string;
   kind: 'video-stream';
@@ -237,6 +271,7 @@ export type RichMotionAsset =
   | LottieRichMotionAsset
   | Model3DRichMotionAsset
   | ShaderSceneRichMotionAsset
+  | ParticleFieldRichMotionAsset
   | VideoStreamRichMotionAsset;
 
 export interface LoadExperience {

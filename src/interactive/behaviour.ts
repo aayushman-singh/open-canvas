@@ -749,6 +749,131 @@ function behaviourHydrateImageSequence(asset, root, payload) {
   }
 }
 
+function behaviourParticlePointSet(asset, canvas) {
+  var width = canvas.clientWidth || canvas.width || 0;
+  var desired = width <= 480 ? 'phone' : width <= 768 ? 'tablet' : 'desktop';
+  var sets = asset.pointSets || [];
+  for (var i = 0; i < sets.length; i++) {
+    if (sets[i].breakpoint === desired) return sets[i];
+  }
+  for (var j = 0; j < sets.length; j++) {
+    if (sets[j].breakpoint === 'desktop') return sets[j];
+  }
+  if (sets.length > 0) return sets[0];
+  behaviourFailure('rich-motion-particle-field-empty', { assetId: asset.id }, new Error('particle field has no point sets'));
+}
+
+function behaviourDrawParticleField(canvas, ctx, asset, pointSet, particles, pointer, progress) {
+  var width = canvas.clientWidth || canvas.width;
+  var height = canvas.clientHeight || canvas.height;
+  if (!(width > 0) || !(height > 0)) return;
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  ctx.clearRect(0, 0, width, height);
+  var size = Number(pointSet.canvasSize) || Math.max(width, height);
+  var scale = Math.min(width, height) / size;
+  var offsetX = (width - size * scale) / 2;
+  var offsetY = (height - size * scale) / 2;
+  var fontSize = Number(asset.fontSize || 7) * scale;
+  ctx.font = String(Math.max(4, fontSize)) + 'px ' + (asset.fontFamily || 'monospace');
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  for (var i = 0; i < particles.length; i++) {
+    var p = particles[i];
+    var targetX = offsetX + p.tx * scale;
+    var targetY = offsetY + p.ty * scale;
+    var x = p.x + (targetX - p.x) * progress;
+    var y = p.y + (targetY - p.y) * progress;
+    if (pointer.active) {
+      var dx = x - pointer.x;
+      var dy = y - pointer.y;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      var radius = asset.pointer && typeof asset.pointer.radius === 'number' ? asset.pointer.radius : 72;
+      var force = asset.pointer && typeof asset.pointer.force === 'number' ? asset.pointer.force : 44;
+      if (dist < radius) {
+        var push = (1 - dist / radius) * force;
+        x += (dx / dist) * push;
+        y += (dy / dist) * push;
+      }
+    }
+    var alpha = Math.max(0, Math.min(1, p.alpha * (0.25 + progress * 0.75)));
+    ctx.fillStyle = 'rgba(' + p.rgb + ',' + alpha.toFixed(3) + ')';
+    ctx.fillText(p.char, x, y);
+  }
+}
+
+function behaviourHexToRgbString(hex) {
+  var value = String(hex || '#64ffda').replace('#', '');
+  if (value.length === 3) {
+    value = value[0] + value[0] + value[1] + value[1] + value[2] + value[2];
+  }
+  var n = parseInt(value.slice(0, 6), 16);
+  if (!isFinite(n)) return '100,255,218';
+  return String((n >> 16) & 255) + ',' + String((n >> 8) & 255) + ',' + String(n & 255);
+}
+
+function behaviourHydrateParticleField(asset, root) {
+  if (asset.kind !== 'particle-field') {
+    behaviourFailure('rich-motion-unsupported-kind', { assetId: asset.id, kind: asset.kind }, new Error('unsupported rich motion kind'));
+  }
+  if (asset.mode !== 'ascii-portrait') {
+    behaviourFailure('rich-motion-particle-field-mode', { assetId: asset.id, mode: asset.mode }, new Error('unsupported particle field mode'));
+  }
+  var nodes = behaviourFindRichMotionNodes(root, asset.id);
+  if (!nodes.length) {
+    behaviourFailure('rich-motion-node-missing', { assetId: asset.id }, new Error('rich motion element not found'));
+  }
+  for (var n = 0; n < nodes.length; n++) {
+    (function(node) {
+      var canvas = behaviourFindRichMotionCanvas(node);
+      var ctx = canvas.getContext('2d');
+      if (!ctx) behaviourFailure('rich-motion-particle-field-context', { assetId: asset.id }, new Error('canvas 2d context unavailable'));
+      var pointSet = behaviourParticlePointSet(asset, canvas);
+      var rgb = behaviourHexToRgbString(asset.color);
+      var particles = [];
+      for (var i = 0; i < pointSet.points.length; i++) {
+        var point = pointSet.points[i];
+        particles.push({
+          tx: Number(point.x),
+          ty: Number(point.y),
+          x: Math.random() * (canvas.clientWidth || pointSet.canvasSize),
+          y: Math.random() * (canvas.clientHeight || pointSet.canvasSize),
+          char: point.char,
+          alpha: Number(point.alpha),
+          rgb: rgb
+        });
+      }
+      var pointer = { active: false, x: 0, y: 0 };
+      function updatePointer(event) {
+        var rect = canvas.getBoundingClientRect();
+        var source = event.touches && event.touches[0] ? event.touches[0] : event;
+        pointer.active = true;
+        pointer.x = source.clientX - rect.left;
+        pointer.y = source.clientY - rect.top;
+      }
+      canvas.addEventListener('pointermove', updatePointer, { passive: true });
+      canvas.addEventListener('pointerleave', function(){ pointer.active = false; }, { passive: true });
+      canvas.addEventListener('touchmove', updatePointer, { passive: true });
+      canvas.addEventListener('touchend', function(){ pointer.active = false; }, { passive: true });
+      var reduced = behaviourPrefersReducedMotion() && asset.reducedMotion === 'settled';
+      var started = Date.now();
+      function frame() {
+        pointSet = behaviourParticlePointSet(asset, canvas);
+        var elapsed = Date.now() - started;
+        var progress = reduced ? 1 : Math.min(1, elapsed / 1100);
+        behaviourDrawParticleField(canvas, ctx, asset, pointSet, particles, pointer, progress);
+        if (!reduced && (progress < 1 || pointer.active)) {
+          requestAnimationFrame(frame);
+        } else if (!reduced) {
+          requestAnimationFrame(frame);
+        }
+      }
+      node.setAttribute('data-opencanvas-rich-motion-hydrated', 'particle-field');
+      frame();
+    })(nodes[n]);
+  }
+}
+
 var behaviourRiveRuntimePromise = null;
 var behaviourRiveRuntimeUrl = 'https://unpkg.com/@rive-app/canvas@2.38.1/rive.js';
 var behaviourLottieRuntimePromise = null;
@@ -2047,10 +2172,128 @@ function behaviourHydrateNavThemes(payload, root) {
   window.addEventListener('resize', schedule);
   update();
 }
+
+function behaviourHydratePlayableWidgets(root) {
+  var widgets = root.querySelectorAll('[data-opencanvas-playable-widget]');
+  for (var i = 0; i < widgets.length; i++) {
+    (function(widget) {
+      if (widget.getAttribute('data-opencanvas-playable-hydrated') === 'true') return;
+      var kind = widget.getAttribute('data-opencanvas-playable-kind');
+      if (kind !== 'collectible-platformer') {
+        behaviourFailure('playable-widget-unsupported-kind', { kind: kind }, new Error('unsupported playable widget kind'));
+      }
+      var toggle = widget.querySelector('[data-opencanvas-playable-toggle]');
+      var canvas = widget.querySelector('[data-opencanvas-playable-canvas]');
+      var counter = widget.querySelector('[data-opencanvas-playable-counter]');
+      if (!toggle || !canvas || !counter) {
+        behaviourFailure('playable-widget-mount-missing', {}, new Error('playable widget mount nodes missing'));
+      }
+      var ctx = canvas.getContext('2d');
+      if (!ctx) behaviourFailure('playable-widget-canvas-context', {}, new Error('canvas 2d context unavailable'));
+      var active = false;
+      var keys = {};
+      var score = 0;
+      var player = { x: 120, y: 160, vx: 0, vy: 0, grounded: false };
+      var collectibles = [];
+      for (var c = 0; c < 8; c++) {
+        collectibles.push({ x: 180 + c * 140, y: 120 + (c % 3) * 70, taken: false });
+      }
+      function resize() {
+        var width = window.innerWidth || document.documentElement.clientWidth || 1;
+        var height = window.innerHeight || document.documentElement.clientHeight || 1;
+        if (canvas.width !== width) canvas.width = width;
+        if (canvas.height !== height) canvas.height = height;
+      }
+      function draw() {
+        resize();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(100,255,218,0.08)';
+        ctx.fillRect(0, canvas.height - 74, canvas.width, 2);
+        ctx.fillStyle = '#64ffda';
+        for (var j = 0; j < collectibles.length; j++) {
+          var item = collectibles[j];
+          if (item.taken) continue;
+          ctx.beginPath();
+          ctx.arc(item.x, item.y, 7, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#ccd6f6';
+        ctx.fillRect(player.x - 10, player.y - 24, 20, 24);
+        ctx.fillStyle = '#64ffda';
+        ctx.fillRect(player.x - 6, player.y - 18, 4, 4);
+        ctx.fillRect(player.x + 4, player.y - 18, 4, 4);
+      }
+      function step() {
+        if (!active) return;
+        var left = keys.ArrowLeft || keys.KeyA;
+        var right = keys.ArrowRight || keys.KeyD;
+        if (left) player.vx -= 0.7;
+        if (right) player.vx += 0.7;
+        player.vx *= 0.86;
+        player.vy += 0.85;
+        if ((keys.ArrowUp || keys.KeyW || keys.Space) && player.grounded) {
+          player.vy = -15;
+          player.grounded = false;
+        }
+        player.x += player.vx;
+        player.y += player.vy;
+        var floor = canvas.height - 76;
+        if (player.y > floor) {
+          player.y = floor;
+          player.vy = 0;
+          player.grounded = true;
+        }
+        if (player.x < 20) player.x = 20;
+        if (player.x > canvas.width - 20) player.x = canvas.width - 20;
+        for (var k = 0; k < collectibles.length; k++) {
+          var item = collectibles[k];
+          if (item.taken) continue;
+          var dx = player.x - item.x;
+          var dy = player.y - item.y;
+          if (dx * dx + dy * dy < 900) {
+            item.taken = true;
+            score += 1;
+            counter.textContent = String(score);
+          }
+        }
+        draw();
+        requestAnimationFrame(step);
+      }
+      function setActive(next) {
+        active = next;
+        widget.setAttribute('data-opencanvas-playable-active', String(active));
+        toggle.setAttribute('aria-pressed', String(active));
+        canvas.style.display = active ? 'block' : 'none';
+        counter.style.display = active ? 'block' : 'none';
+        if (active) {
+          resize();
+          requestAnimationFrame(step);
+        }
+      }
+      toggle.addEventListener('click', function(event) {
+        event.preventDefault();
+        setActive(!active);
+      });
+      window.addEventListener('keydown', function(event) {
+        keys[event.code] = true;
+      });
+      window.addEventListener('keyup', function(event) {
+        keys[event.code] = false;
+      });
+      window.addEventListener('resize', function() {
+        if (active) draw();
+      });
+      widget.setAttribute('data-opencanvas-playable-hydrated', 'true');
+      counter.textContent = '0';
+    })(widgets[i]);
+  }
+}
+
 function hydrateBehaviour(scope, options) {
   behaviourRuntimeOptions = options || {};
   var root = scope || document;
   if (root === document && document.documentElement.getAttribute('data-opencanvas-behaviour-hydrated') === 'true') return;
+  behaviourHydratePlayableWidgets(root);
   var payload = parseBehaviourPayload();
   if (!payload) return;
   behaviourHydrateSmoothScroll(payload, root);
@@ -2098,6 +2341,8 @@ function hydrateBehaviour(scope, options) {
       behaviourHydrateModel3D(assets[a], root);
     } else if (assets[a].kind === 'shader-scene') {
       behaviourHydrateShaderScene(assets[a], root);
+    } else if (assets[a].kind === 'particle-field') {
+      behaviourHydrateParticleField(assets[a], root);
     } else if (assets[a].kind === 'video-stream') {
       behaviourHydrateVideoStream(assets[a], root);
     } else {

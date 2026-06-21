@@ -499,6 +499,15 @@ export interface ResponsiveOverrides {
   phone?: ResponsiveBoxOverride;
 }
 
+export interface SectionResponsiveOverride {
+  h?: number;
+}
+
+export interface SectionResponsiveOverrides {
+  tablet?: SectionResponsiveOverride;
+  phone?: SectionResponsiveOverride;
+}
+
 export interface ResponsiveLayoutVariant {
   id: string;
   breakpoint: Breakpoint;
@@ -739,6 +748,7 @@ export interface CanvasSection {
    * Yjs codec encodes it so post-instantiation state round-trips cleanly.
    */
   instanceScope?: string;
+  responsive?: SectionResponsiveOverrides;
   responsiveVariants?: ResponsiveLayoutVariant[];
   elements: CanvasElement[];
 }
@@ -924,6 +934,47 @@ export interface SiteScrollBehavior {
   reducedMotion?: ScrollBehaviorReducedMotionMode;
 }
 
+export const FONT_FACE_FORMATS = ['truetype', 'woff2', 'woff', 'opentype'] as const;
+export type FontFaceFormat = (typeof FONT_FACE_FORMATS)[number];
+
+export const FONT_FACE_DISPLAYS = ['auto', 'block', 'swap', 'fallback', 'optional'] as const;
+export type FontFaceDisplay = (typeof FONT_FACE_DISPLAYS)[number];
+
+export interface FontFaceAsset {
+  id: string;
+  fontFamily: string;
+  src: string;
+  format: FontFaceFormat;
+  fontStyle?: string;
+  fontWeight?: string;
+  fontDisplay?: FontFaceDisplay;
+}
+
+export interface AnchorRailLink {
+  id: string;
+  label: string;
+  anchorId: string;
+}
+
+export interface AnchorRail {
+  id: string;
+  label: string;
+  links: AnchorRailLink[];
+  hideBelowPx?: number;
+}
+
+export const PLAYABLE_WIDGET_KINDS = ['collectible-platformer'] as const;
+export type PlayableWidgetKind = (typeof PLAYABLE_WIDGET_KINDS)[number];
+
+export interface PlayableWidget {
+  id: string;
+  kind: PlayableWidgetKind;
+  label: string;
+  toggleLabel: string;
+  hideBelowPx?: number;
+  counterLabel?: string;
+}
+
 export interface EditableSiteBase {
   pages: CanvasPage[];
   /** Site-wide header section shared across all pages. */
@@ -940,6 +991,12 @@ export interface EditableSiteBase {
   scrollScenes?: ScrollScene[];
   /** Rich-motion asset declarations referenced by later render/runtime tasks. */
   richMotionAssets?: RichMotionAsset[];
+  /** Schema-owned @font-face declarations emitted by the published renderer. */
+  fontFaces?: FontFaceAsset[];
+  /** Site-level desktop anchor rails rendered outside page layout. */
+  anchorRails?: AnchorRail[];
+  /** Site-level playable overlays rendered outside page layout. */
+  playableWidgets?: PlayableWidget[];
   /** Same-page shared-layout transitions owned by the Runtime Hydrator. */
   layoutTransitions?: LayoutTransition[];
   /** Source animation facts captured during import before exact primitive mapping. */

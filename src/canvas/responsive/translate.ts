@@ -213,11 +213,11 @@ function resolveSectionLayout(
     sectionId: section.id,
     tablet: {
       w: roundPx(pageWidth * tabletScale),
-      h: roundPx(section.height * tabletScale),
+      h: section.responsive?.tablet?.h ?? roundPx(section.height * tabletScale),
     },
     phone: {
       w: roundPx(pageWidth * phoneScale),
-      h: roundPx(section.height * phoneScale),
+      h: section.responsive?.phone?.h ?? roundPx(section.height * phoneScale),
     },
   };
 }

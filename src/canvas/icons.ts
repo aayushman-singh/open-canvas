@@ -33,8 +33,13 @@
 // The generic set ships unchanged; brand support is purely additive.
 
 import { escapeAttr } from './elements/render-utils.js';
+import {
+  BRAND_ICON_PATHS,
+  BRAND_ICON_SLUGS,
+  type BrandIconSlug,
+} from './icons/brand-icons.generated.js';
 
-export const ICON_NAMES = [
+const GENERIC_ICON_NAMES = [
   'mail',
   'copy',
   'check',
@@ -49,7 +54,9 @@ export const ICON_NAMES = [
   'minus',
   'search',
 ] as const;
-export type IconName = (typeof ICON_NAMES)[number];
+type GenericIconName = (typeof GENERIC_ICON_NAMES)[number];
+export const ICON_NAMES = [...GENERIC_ICON_NAMES, ...BRAND_ICON_SLUGS] as const;
+export type IconName = GenericIconName | BrandIconSlug;
 
 /**
  * Inner SVG markup for each icon. The wrapper (<svg viewBox=… stroke=…>) is
@@ -59,7 +66,7 @@ export type IconName = (typeof ICON_NAMES)[number];
  * All paths are designed against a 24x24 viewBox with stroke-width 2 and
  * `stroke-linecap="round"`, `stroke-linejoin="round"`. None are fill-based.
  */
-const ICON_PATHS: Record<IconName, string> = {
+const GENERIC_ICON_PATHS: Record<GenericIconName, string> = {
   // Envelope: outer rect + flap triangle inside.
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
 
@@ -115,13 +122,28 @@ const ICON_PATHS: Record<IconName, string> = {
  * `IconName` reaching here is one of the registered keys.
  */
 export function renderIconSvg(name: IconName, opts: { inline?: boolean } = {}): string {
-  const inner = ICON_PATHS[name];
+  if (isBrandIconSlug(name)) return renderBrandIconSvg(name, opts);
+  const inner = GENERIC_ICON_PATHS[name];
   if (inner === undefined) {
     throw new Error(`renderIconSvg: unknown icon "${String(name)}"`);
   }
   const inline = opts.inline ?? true;
   const sizeAttrs = inline ? 'width="1em" height="1em"' : 'width="100%" height="100%"';
   return `<svg class="opencanvas-icon" data-opencanvas-icon="${escapeAttr(name)}" viewBox="0 0 24 24" ${sizeAttrs} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+}
+
+function renderBrandIconSvg(name: BrandIconSlug, opts: { inline?: boolean } = {}): string {
+  const inner = BRAND_ICON_PATHS[name];
+  if (inner === undefined) {
+    throw new Error(`renderIconSvg: unknown brand icon "${String(name)}"`);
+  }
+  const inline = opts.inline ?? true;
+  const sizeAttrs = inline ? 'width="1em" height="1em"' : 'width="100%" height="100%"';
+  return `<svg class="opencanvas-icon" data-opencanvas-icon="${escapeAttr(name)}" viewBox="0 0 24 24" ${sizeAttrs} fill="currentColor" aria-hidden="true">${inner}</svg>`;
+}
+
+function isBrandIconSlug(value: unknown): value is BrandIconSlug {
+  return typeof value === 'string' && (BRAND_ICON_SLUGS as readonly string[]).includes(value);
 }
 
 export function isIconName(value: unknown): value is IconName {

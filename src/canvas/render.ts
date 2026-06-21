@@ -34,6 +34,7 @@ import { isPremiumLoadExperience } from './schema.js';
 import { componentStyleEntriesForElement } from './elements/component-style.js';
 import {
   escapeAttr,
+  escapeCssAttrId,
   escapeCssValue,
   escapeHtml,
   sanitiseCssKey,
@@ -96,13 +97,40 @@ function applyElementStyle(
   }
 }
 
-function buildElementStyleDataAttrs(es: ElementStyle | undefined): string {
-  if (!es) return '';
+function buildElementStyleDataAttrs(element: CanvasElement): string {
+  const es = element.elementStyle;
+  const pinned = element.pinnedStyle;
   let attrs = '';
-  if (es.backgroundColor || es.backgroundImageAssetId) attrs += ' data-es-bg';
-  if (typeof es.borderRadius === 'number') attrs += ' data-es-radius';
-  if (es.borderColor || typeof es.borderWidth === 'number') attrs += ' data-es-border';
-  if (es.boxShadow) attrs += ' data-es-shadow';
+  if (
+    es?.backgroundColor ||
+    es?.backgroundImageAssetId ||
+    pinned?.background ||
+    pinned?.backgroundColor ||
+    pinned?.['background-color'] ||
+    pinned?.backgroundImage ||
+    pinned?.['background-image']
+  ) {
+    attrs += ' data-es-bg';
+  }
+  if (
+    typeof es?.borderRadius === 'number' ||
+    pinned?.borderRadius ||
+    pinned?.['border-radius']
+  ) {
+    attrs += ' data-es-radius';
+  }
+  if (
+    es?.borderColor ||
+    typeof es?.borderWidth === 'number' ||
+    pinned?.border ||
+    pinned?.borderColor ||
+    pinned?.['border-color'] ||
+    pinned?.borderWidth ||
+    pinned?.['border-width']
+  ) {
+    attrs += ' data-es-border';
+  }
+  if (es?.boxShadow || pinned?.boxShadow || pinned?.['box-shadow']) attrs += ' data-es-shadow';
   return attrs;
 }
 
@@ -345,15 +373,19 @@ function buildElementCommonAttrs(
       : '';
   const ariaAttrs = buildAriaWrapperAttrs(element);
   const variant = variantAttr(element);
-  const esAttrs = buildElementStyleDataAttrs(element.elementStyle);
+  const esAttrs = buildElementStyleDataAttrs(element);
   const responsiveAttrs = responsiveVariantAttrs(responsiveMembership);
+  const coverGridAttrs =
+    element.type === 'container' && typeof element.coverGridId === 'string'
+      ? ` data-opencanvas-cover-grid="${escapeAttr(element.coverGridId)}"`
+      : '';
   // ADR 0050 dec 2 — anchor ids emit as DOM id="..." on the wrapper.
   // Validator enforces the strict charset, so escapeAttr is belt-and-braces.
   const idAttr =
     typeof element.anchorId === 'string' && element.anchorId.length > 0
       ? ` id="${escapeAttr(element.anchorId)}"`
       : '';
-  return `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${marqueeAttrs}${pointerFxAttrs}${ariaAttrs}${esAttrs}${responsiveAttrs}`;
+  return `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${marqueeAttrs}${pointerFxAttrs}${ariaAttrs}${esAttrs}${responsiveAttrs}${coverGridAttrs}`;
 }
 
 function renderElement(
@@ -704,6 +736,113 @@ export interface RenderSnapshotOptions {
   renderPages?: CanvasPage[];
 }
 
+function cssString(value: string): string {
+  return JSON.stringify(value).replace(/</g, '\\003c ');
+}
+
+function renderFontFaces(snapshot: PublishedSnapshot): string {
+  const fontFaces = snapshot.fontFaces ?? [];
+  if (fontFaces.length === 0) return '';
+  const rules = fontFaces.map((font) => {
+    const src = `url(${cssString(font.src)}) format(${cssString(font.format)})`;
+    const declarations = [
+      `font-family: ${cssString(font.fontFamily)}`,
+      font.fontStyle !== undefined ? `font-style: ${escapeCssValue(font.fontStyle)}` : '',
+      font.fontWeight !== undefined ? `font-weight: ${escapeCssValue(font.fontWeight)}` : '',
+      font.fontDisplay !== undefined ? `font-display: ${escapeCssValue(font.fontDisplay)}` : '',
+      `src: ${src}`,
+    ].filter((declaration) => declaration.length > 0);
+    return `@font-face{${declarations.join(';')}}`;
+  });
+  return `<style data-opencanvas-font-faces>${rules.join('')}</style>`;
+}
+
+function renderAnchorRails(snapshot: PublishedSnapshot): string {
+  const rails = snapshot.anchorRails ?? [];
+  if (rails.length === 0) return '';
+  return rails
+    .map((rail) => {
+      const hideBelow =
+        typeof rail.hideBelowPx === 'number'
+          ? `<style data-opencanvas-anchor-rail-style="${escapeAttr(rail.id)}">@media (max-width:${escapeAttr(String(rail.hideBelowPx))}px){[data-opencanvas-anchor-rail="${escapeCssAttrId(rail.id)}"]{display:none!important}}</style>`
+          : '';
+      const links = rail.links
+        .map(
+          (link) =>
+            `<a class="opencanvas-anchor-rail-link" data-opencanvas-anchor-rail-link="${escapeAttr(link.id)}" href="#${escapeAttr(link.anchorId)}"><span aria-hidden="true">/</span>${escapeHtml(link.label)}</a>`,
+        )
+        .join('');
+      const style = styleFromEntries([
+        ['position', 'fixed'],
+        ['left', '-9999px'],
+        ['top', '-9999px'],
+        ['z-index', '850'],
+        ['display', 'none'],
+        ['flex-direction', 'row'],
+        ['gap', '12px'],
+        ['font-family', 'var(--opencanvas-kit-font-body, inherit)'],
+        ['font-size', '16px'],
+        ['line-height', '1'],
+      ]);
+      return `${hideBelow}<nav aria-label="${escapeAttr(rail.label)}" class="opencanvas-anchor-rail" data-opencanvas-anchor-rail="${escapeAttr(rail.id)}" style="${style}">${links}</nav>`;
+    })
+    .join('');
+}
+
+function renderPlayableWidgets(snapshot: PublishedSnapshot): string {
+  const widgets = snapshot.playableWidgets ?? [];
+  if (widgets.length === 0) return '';
+  return widgets
+    .map((widget) => {
+      const hideBelow =
+        typeof widget.hideBelowPx === 'number'
+          ? `<style data-opencanvas-playable-widget-style="${escapeAttr(widget.id)}">@media (max-width:${escapeAttr(String(widget.hideBelowPx))}px){[data-opencanvas-playable-widget="${escapeCssAttrId(widget.id)}"]{display:none!important}}</style>`
+          : '';
+      const rootStyle = styleFromEntries([
+        ['position', 'fixed'],
+        ['inset', '0'],
+        ['z-index', '900'],
+        ['pointer-events', 'none'],
+        ['font-family', 'var(--opencanvas-kit-font-body, inherit)'],
+      ]);
+      const toggleStyle = styleFromEntries([
+        ['position', 'fixed'],
+        ['top', '74px'],
+        ['left', '20px'],
+        ['z-index', '902'],
+        ['pointer-events', 'auto'],
+        ['border', '1px solid #233554'],
+        ['border-radius', '999px'],
+        ['background', 'rgba(10,25,47,0.72)'],
+        ['color', '#8892b0'],
+        ['padding', '7px 13px'],
+        ['font', 'inherit'],
+        ['font-size', '12px'],
+        ['letter-spacing', '0'],
+        ['line-height', '1'],
+        ['cursor', 'pointer'],
+      ]);
+      const canvasStyle = styleFromEntries([
+        ['position', 'fixed'],
+        ['inset', '0'],
+        ['width', '100vw'],
+        ['height', '100vh'],
+        ['display', 'none'],
+      ]);
+      const counterStyle = styleFromEntries([
+        ['position', 'fixed'],
+        ['top', '74px'],
+        ['right', '20px'],
+        ['z-index', '902'],
+        ['display', 'none'],
+        ['color', '#64ffda'],
+        ['font-size', '18px'],
+      ]);
+      return `${hideBelow}<div class="opencanvas-playable-widget" data-opencanvas-playable-widget="${escapeAttr(widget.id)}" data-opencanvas-playable-kind="${escapeAttr(widget.kind)}" style="${rootStyle}"><button type="button" data-opencanvas-playable-toggle data-raydotsh-game-toggle style="${toggleStyle}" aria-pressed="false">${escapeHtml(widget.toggleLabel)}</button><canvas data-opencanvas-playable-canvas data-raydotsh-game-canvas aria-label="${escapeAttr(widget.label)}" style="${canvasStyle}"></canvas><div data-opencanvas-playable-counter style="${counterStyle}">${escapeHtml(widget.counterLabel ?? '0')}</div></div>`;
+    })
+    .join('');
+}
+
 /**
  * Render the body of a Published Snapshot. The returned string is a
  * self-contained `<main>` block — the caller wraps it in the document
@@ -754,6 +893,9 @@ export function renderCanvasSnapshot(
   const pagesHtml = pagesToRender
     .map((page) => renderPage(page, baseCtx, snapshot.header, snapshot.footer))
     .join('');
+  const fontFaceStyle = renderFontFaces(snapshot);
+  const anchorRailsHtml = renderAnchorRails(snapshot);
+  const playableWidgetsHtml = renderPlayableWidgets(snapshot);
   const responsiveStyle = renderResponsiveCss(snapshot);
   const scrollStyle = renderScrollBehaviourCss(snapshot.scrollBehavior);
   const copyScript = renderCopyHandlerScript(snapshot);
@@ -773,7 +915,7 @@ export function renderCanvasSnapshot(
       ? ` data-opencanvas-route-transition="${escapeAttr(snapshot.routeTransition.id)}" data-opencanvas-route-mode="${escapeAttr(snapshot.routeTransition.mode)}" data-opencanvas-route-duration-ms="${escapeAttr(String(snapshot.routeTransition.durationMs))}" data-opencanvas-route-easing="${escapeAttr(snapshot.routeTransition.easing)}"${snapshot.routeTransition.sharedElements && snapshot.routeTransition.sharedElements.length > 0 ? ` data-opencanvas-route-shared-elements="${escapeAttr(JSON.stringify(snapshot.routeTransition.sharedElements))}"` : ''}${snapshot.routeTransition.outgoingSequence ? ` data-opencanvas-route-outgoing-sequence="${escapeAttr(snapshot.routeTransition.outgoingSequence.id)}"` : ''}${snapshot.routeTransition.incomingSequence ? ` data-opencanvas-route-incoming-sequence="${escapeAttr(snapshot.routeTransition.incomingSequence.id)}"` : ''}`
       : '';
   const smoothScrollAttrs = renderSmoothScrollAttrs(snapshot.scrollBehavior);
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${loadExperienceHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${importAnimationInventoryScript}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${fontFaceStyle}${scrollStyle}${responsiveStyle}${loadExperienceHtml}${anchorRailsHtml}${playableWidgetsHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${importAnimationInventoryScript}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
 }
 
 /**

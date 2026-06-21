@@ -2,14 +2,22 @@
   "baseSlug": "raydotsh-template-header",
   "category": "header",
   "name": "Navigation",
-  "description": "Raydotsh Portfolio header - fixed navy navigation with mint links and contact action.",
+  "description": "Raydotsh Portfolio header - compact fixed navy navigation with source anchors and social links.",
   "recipeId": "custom",
   "headingPreview": "Rehana",
   "sectionData": {
     "id": "raydotsh-header",
     "recipeId": "custom",
     "name": "Navigation",
-    "height": 82,
+    "height": 56,
+    "responsive": {
+      "tablet": {
+        "h": 56
+      },
+      "phone": {
+        "h": 56
+      }
+    },
     "elements": [
       {
         "id": "raydotsh-header-bg",
@@ -18,14 +26,20 @@
           "x": 0,
           "y": 0,
           "w": 1440,
-          "h": 82,
-          "z": 0
+          "h": 56,
+          "z": 900
         },
         "variant": "flat",
         "pinnedStyle": {
-          "background": "rgba(10, 25, 47, 0.92)",
+          "position": "fixed",
+          "top": "0",
+          "left": "0",
+          "width": "100%",
+          "height": "56px",
+          "background": "#0a192f",
           "backdrop-filter": "blur(10px)",
-          "border-bottom": "1px solid #233554"
+          "border-bottom": "1px solid #233554",
+          "z-index": "900"
         }
       },
       {
@@ -34,31 +48,31 @@
         "box": {
           "x": 72,
           "y": 0,
-          "w": 1296,
-          "h": 82,
-          "z": 2
+          "w": 540,
+          "h": 56,
+          "z": 901
         },
         "siteTitle": "Rehana",
         "links": [
           {
             "label": "Home",
-            "href": "/#intro",
-            "kind": "external"
+            "href": "#home",
+            "kind": "anchor"
           },
           {
             "label": "About",
-            "href": "/#about",
-            "kind": "external"
+            "href": "#about",
+            "kind": "anchor"
           },
           {
             "label": "Experience",
-            "href": "/#experience",
-            "kind": "external"
+            "href": "#experience",
+            "kind": "anchor"
           },
           {
             "label": "Software",
-            "href": "/#projects",
-            "kind": "external"
+            "href": "#software",
+            "kind": "anchor"
           },
           {
             "label": "Books",
@@ -66,25 +80,300 @@
             "kind": "internal"
           }
         ],
-        "primaryAction": {
-          "label": "Say hi",
-          "href": "mailto:rehanarahman004@gmail.com",
-          "kind": "external"
-        },
         "layout": "left-center-right",
-        "sticky": true,
+        "sticky": false,
+        "pinnedStyle": {
+          "position": "fixed",
+          "top": "0",
+          "left": "72px",
+          "width": "540px",
+          "height": "56px",
+          "z-index": "901"
+        },
         "navStyle": {
           "backgroundColor": "transparent",
-          "slotGap": 26,
+          "slotGap": 14,
           "linkColor": "#ccd6f6",
           "linkHoverColor": "#64ffda",
           "activeLinkColor": "#64ffda",
           "siteTitleColor": "#ccd6f6",
           "siteTitleFontSize": 20,
           "siteTitleFontWeight": "bold",
-          "primaryBackgroundColor": "#64ffda",
-          "primaryColor": "#020c1b",
-          "primaryBorderRadius": 4
+          "linkPaddingX": 8,
+          "linkPaddingY": 4
+        },
+        "responsive": {
+          "phone": {
+            "hidden": true
+          }
+        }
+      },
+      {
+        "id": "raydotsh-header-mail",
+        "type": "action",
+        "box": {
+          "x": 1234,
+          "y": 14,
+          "w": 28,
+          "h": 28,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": ""
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "mailto:rehanarahman004@gmail.com"
+        },
+        "variant": "ghost",
+        "iconKind": "mail",
+        "actionStyle": {
+          "backgroundColor": "transparent",
+          "color": "#ccd6f6",
+          "fontSize": 18,
+          "fontWeight": "bold",
+          "paddingX": 4,
+          "paddingY": 4,
+          "iconGap": 0,
+          "borderRadius": 4
+        },
+        "pinnedStyle": {
+          "position": "fixed",
+          "top": "14px",
+          "left": "1234px",
+          "width": "28px",
+          "height": "28px",
+          "z-index": "902"
+        },
+        "responsive": {
+          "phone": {
+            "hidden": true
+          }
+        }
+      },
+      {
+        "id": "raydotsh-header-github",
+        "type": "action",
+        "box": {
+          "x": 1268,
+          "y": 14,
+          "w": 32,
+          "h": 28,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": ""
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://github.com/raydotsh"
+        },
+        "variant": "ghost",
+        "actionStyle": {
+          "backgroundColor": "transparent",
+          "color": "#ccd6f6",
+          "fontSize": 16,
+          "fontWeight": "bold",
+          "paddingX": 4,
+          "paddingY": 4,
+          "iconGap": 0,
+          "borderRadius": 4
+        },
+        "pinnedStyle": {
+          "position": "fixed",
+          "top": "14px",
+          "left": "1268px",
+          "width": "32px",
+          "height": "28px",
+          "z-index": "902"
+        },
+        "responsive": {
+          "phone": {
+            "hidden": true
+          }
+        },
+        "iconKind": "github"
+      },
+      {
+        "id": "raydotsh-header-linkedin",
+        "type": "action",
+        "box": {
+          "x": 1306,
+          "y": 14,
+          "w": 28,
+          "h": 28,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "in"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://www.linkedin.com/in/rehana-rahman/"
+        },
+        "variant": "ghost",
+        "actionStyle": {
+          "backgroundColor": "transparent",
+          "color": "#ccd6f6",
+          "fontSize": 16,
+          "fontWeight": "bold",
+          "paddingX": 4,
+          "paddingY": 4,
+          "iconGap": 0,
+          "borderRadius": 4
+        },
+        "pinnedStyle": {
+          "position": "fixed",
+          "top": "14px",
+          "left": "1306px",
+          "width": "28px",
+          "height": "28px",
+          "z-index": "902"
+        },
+        "responsive": {
+          "phone": {
+            "hidden": true
+          }
+        }
+      },
+      {
+        "id": "raydotsh-header-medium",
+        "type": "action",
+        "box": {
+          "x": 1344,
+          "y": 14,
+          "w": 32,
+          "h": 28,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "M"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://medium.com/@rehanarahman004"
+        },
+        "variant": "ghost",
+        "actionStyle": {
+          "backgroundColor": "transparent",
+          "color": "#ccd6f6",
+          "fontSize": 16,
+          "fontWeight": "bold",
+          "paddingX": 4,
+          "paddingY": 4,
+          "iconGap": 0,
+          "borderRadius": 4
+        },
+        "pinnedStyle": {
+          "position": "fixed",
+          "top": "14px",
+          "left": "1344px",
+          "width": "32px",
+          "height": "28px",
+          "z-index": "902"
+        },
+        "responsive": {
+          "phone": {
+            "hidden": true
+          }
+        }
+      },
+      {
+        "id": "raydotsh-header-menu-line-1",
+        "type": "shape",
+        "box": {
+          "x": 0,
+          "y": 18,
+          "w": 24,
+          "h": 2,
+          "z": 903
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "position": "fixed",
+          "top": "18px",
+          "left": "-999px",
+          "width": "24px",
+          "height": "2px",
+          "background": "#8892b0",
+          "--opencanvas-kit-shape-fill": "#8892b0",
+          "z-index": "903"
+        },
+        "responsive": {
+          "phone": {
+            "x": 28,
+            "y": 18,
+            "w": 24,
+            "h": 2
+          }
+        }
+      },
+      {
+        "id": "raydotsh-header-menu-line-2",
+        "type": "shape",
+        "box": {
+          "x": 0,
+          "y": 27,
+          "w": 24,
+          "h": 2,
+          "z": 903
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "position": "fixed",
+          "top": "27px",
+          "left": "-999px",
+          "width": "24px",
+          "height": "2px",
+          "background": "#8892b0",
+          "--opencanvas-kit-shape-fill": "#8892b0",
+          "z-index": "903"
+        },
+        "responsive": {
+          "phone": {
+            "x": 28,
+            "y": 27,
+            "w": 24,
+            "h": 2
+          }
+        }
+      },
+      {
+        "id": "raydotsh-header-menu-line-3",
+        "type": "shape",
+        "box": {
+          "x": 0,
+          "y": 36,
+          "w": 24,
+          "h": 2,
+          "z": 903
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "position": "fixed",
+          "top": "36px",
+          "left": "-999px",
+          "width": "24px",
+          "height": "2px",
+          "background": "#8892b0",
+          "--opencanvas-kit-shape-fill": "#8892b0",
+          "z-index": "903"
+        },
+        "responsive": {
+          "phone": {
+            "x": 28,
+            "y": 36,
+            "w": 24,
+            "h": 2
+          }
         }
       }
     ]

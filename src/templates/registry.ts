@@ -38,6 +38,7 @@ import {
   entryRowId,
   type SectionInstanceRef,
 } from '../canvas/section-library/index.js';
+import { RAYDOTSH_ASCII_POINT_SETS } from './raydotsh-ascii-points.js';
 
 /**
  * ADR 0061 Decision 6 — TemplateSeed shape.
@@ -63,6 +64,9 @@ export interface TemplateSeed {
   motionSequences?: MotionSequence[];
   scrollScenes?: ScrollScene[];
   richMotionAssets?: RichMotionAsset[];
+  fontFaces?: EditableSite['fontFaces'];
+  anchorRails?: EditableSite['anchorRails'];
+  playableWidgets?: EditableSite['playableWidgets'];
   faviconAssetId?: string;
   scrollBehavior?: SiteScrollBehavior;
   pages: TemplatePage[];
@@ -968,7 +972,42 @@ export const raydotshPortfolioTemplate: TemplateSeed = {
   headerRef: { sectionId: 'raydotsh-template-header-v1', instanceId: 'raydotshheader' },
   footerRef: { sectionId: 'raydotsh-template-footer-v1', instanceId: 'raydotshfooter' },
   faviconAssetId: 'seed-raydotsh-favicon',
-  scrollBehavior: { smooth: true, paddingTop: 80 },
+  scrollBehavior: { smooth: true, paddingTop: 56 },
+  fontFaces: [
+    {
+      id: 'raydotsh-font-ntr',
+      fontFamily: 'NTR',
+      src: 'https://fonts.gstatic.com/s/ntr/v19/RLpzK5Xy0ZjiGA.ttf',
+      format: 'truetype',
+      fontStyle: 'normal',
+      fontWeight: '400',
+      fontDisplay: 'swap',
+    },
+  ],
+  anchorRails: [
+    {
+      id: 'raydotsh-sidebar-nav',
+      label: 'Section navigation',
+      hideBelowPx: 800,
+      links: [
+        { id: 'rail-home', label: 'home', anchorId: 'home' },
+        { id: 'rail-about', label: 'about', anchorId: 'about' },
+        { id: 'rail-experience', label: 'experience', anchorId: 'experience' },
+        { id: 'rail-software', label: 'software', anchorId: 'software' },
+        { id: 'rail-books', label: 'books', anchorId: 'books' },
+      ],
+    },
+  ],
+  playableWidgets: [
+    {
+      id: 'raydotsh-game-mode',
+      kind: 'collectible-platformer',
+      label: 'Raydotsh game mode',
+      toggleLabel: '• GAME MODE',
+      hideBelowPx: 800,
+      counterLabel: '0',
+    },
+  ],
   routeTransition: {
     id: 'raydotsh-route-transition',
     enabled: true,
@@ -984,12 +1023,12 @@ export const raydotshPortfolioTemplate: TemplateSeed = {
       steps: [
         {
           id: 'raydotsh-typewriter-heading',
-          target: { type: 'text-split', elementId: 'raydotsh-hero-heading', unit: 'word' },
+          target: { type: 'text-split', elementId: 'raydotsh-hero-heading', unit: 'char' },
           textEffect: 'typewriter',
           from: { opacity: 1 },
           to: { opacity: 1 },
-          durationMs: 700,
-          staggerMs: 90,
+          durationMs: 240,
+          staggerMs: 45,
           easing: 'linear',
         },
       ],
@@ -1016,6 +1055,21 @@ export const raydotshPortfolioTemplate: TemplateSeed = {
           staggerMs: 100,
         },
       ],
+    },
+  ],
+  richMotionAssets: [
+    {
+      id: 'raydotsh-ascii-portrait',
+      kind: 'particle-field',
+      mode: 'ascii-portrait',
+      alt: 'ASCII particle portrait of Rehana',
+      color: '#64ffda',
+      fontFamily: 'NTR',
+      fontSize: 7,
+      charset: ' .:-=+*#%@',
+      pointSets: RAYDOTSH_ASCII_POINT_SETS,
+      pointer: { radius: 72, force: 44 },
+      reducedMotion: 'settled',
     },
   ],
   pages: [
@@ -1146,12 +1200,18 @@ export function instantiateTemplate(templateId: string): EditableSite {
   const motionSequences = cloneTemplateField(seed.motionSequences);
   const scrollScenes = cloneTemplateField(seed.scrollScenes);
   const richMotionAssets = cloneTemplateField(seed.richMotionAssets);
+  const fontFaces = cloneTemplateField(seed.fontFaces);
+  const anchorRails = cloneTemplateField(seed.anchorRails);
+  const playableWidgets = cloneTemplateField(seed.playableWidgets);
   const scrollBehavior = cloneTemplateField(seed.scrollBehavior);
   if (loadExperience !== undefined) state.loadExperience = loadExperience;
   if (routeTransition !== undefined) state.routeTransition = routeTransition;
   if (motionSequences !== undefined) state.motionSequences = motionSequences;
   if (scrollScenes !== undefined) state.scrollScenes = scrollScenes;
   if (richMotionAssets !== undefined) state.richMotionAssets = richMotionAssets;
+  if (fontFaces !== undefined) state.fontFaces = fontFaces;
+  if (anchorRails !== undefined) state.anchorRails = anchorRails;
+  if (playableWidgets !== undefined) state.playableWidgets = playableWidgets;
   if (seed.faviconAssetId !== undefined) state.faviconAssetId = seed.faviconAssetId;
   if (scrollBehavior !== undefined) state.scrollBehavior = scrollBehavior;
   return state;
