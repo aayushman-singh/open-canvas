@@ -12,6 +12,28 @@
     "height": 930,
     "anchorId": "projects",
     "entrance": "fade-up",
+    "responsiveVariants": [
+      {
+        "id": "raydotsh-projects-desktop",
+        "breakpoint": "desktop",
+        "contentSourceId": "raydotsh-projects",
+        "elementIds": [
+          "raydotsh-pycaster-card",
+          "raydotsh-pycaster-media",
+          "raydotsh-pycaster-title",
+          "raydotsh-pycaster-desc",
+          "raydotsh-pycaster-tech",
+          "raydotsh-pycaster-action",
+          "raydotsh-project-grid"
+        ]
+      },
+      {
+        "id": "raydotsh-projects-phone",
+        "breakpoint": "phone",
+        "contentSourceId": "raydotsh-projects",
+        "elementIds": ["raydotsh-mobile-project-list"]
+      }
+    ],
     "elements": [
       {
         "id": "raydotsh-software-bg",
@@ -266,265 +288,878 @@
         }
       },
       {
-        "id": "raydotsh-project-pyshell",
-        "type": "container",
+        "id": "raydotsh-project-grid",
+        "type": "flow-container",
         "box": {
           "x": 220,
           "y": 704,
-          "w": 314,
+          "w": 1000,
           "h": 180,
           "z": 1
         },
-        "variant": "raised",
-        "elementStyle": {
-          "backgroundColor": "#112240",
-          "borderRadius": 16,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.32)"
-        }
-      },
-      {
-        "id": "raydotsh-pyshell-title",
-        "type": "text",
-        "box": {
-          "x": 248,
-          "y": 728,
-          "w": 260,
-          "h": 38,
-          "z": 2
+        "layout": {
+          "mode": "grid",
+          "columns": 3,
+          "gap": {
+            "row": 0,
+            "column": 29
+          },
+          "padding": {
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "align": "stretch",
+          "justify": "start"
         },
-        "content": [
+        "items": [
           {
-            "text": "pyshell"
+            "id": "raydotsh-pyshell-item",
+            "element": {
+              "id": "raydotsh-project-pyshell",
+              "type": "flow-container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "elementStyle": {
+                "backgroundColor": "#112240",
+                "borderRadius": 16,
+                "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.32)"
+              },
+              "layout": {
+                "mode": "stack",
+                "gap": {
+                  "row": 12,
+                  "column": 0
+                },
+                "padding": {
+                  "top": 24,
+                  "right": 28,
+                  "bottom": 22,
+                  "left": 28
+                },
+                "align": "stretch",
+                "justify": "start"
+              },
+              "items": [
+                {
+                  "id": "raydotsh-pyshell-title-item",
+                  "element": {
+                    "id": "raydotsh-pyshell-title",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "pyshell"
+                      }
+                    ],
+                    "role": "heading",
+                    "fontSize": 24,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#ccd6f6"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-pyshell-desc-item",
+                  "element": {
+                    "id": "raydotsh-pyshell-desc",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "A terminal shell built from scratch in Python, implementing core shell functionality."
+                      }
+                    ],
+                    "role": "body",
+                    "fontSize": 16,
+                    "fontWeight": 400,
+                    "align": "left",
+                    "lineHeight": 1.35,
+                    "pinnedStyle": {
+                      "color": "#8892b0"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-pyshell-tech-item",
+                  "element": {
+                    "id": "raydotsh-pyshell-tech",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "Python"
+                      }
+                    ],
+                    "role": "label",
+                    "fontSize": 14,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#64ffda"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "raydotsh-nottosql-item",
+            "element": {
+              "id": "raydotsh-project-nottosql",
+              "type": "flow-container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "elementStyle": {
+                "backgroundColor": "#112240",
+                "borderRadius": 16,
+                "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.32)"
+              },
+              "layout": {
+                "mode": "stack",
+                "gap": {
+                  "row": 12,
+                  "column": 0
+                },
+                "padding": {
+                  "top": 24,
+                  "right": 28,
+                  "bottom": 22,
+                  "left": 28
+                },
+                "align": "stretch",
+                "justify": "start"
+              },
+              "items": [
+                {
+                  "id": "raydotsh-nottosql-title-item",
+                  "element": {
+                    "id": "raydotsh-nottosql-title",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "nottoSQL"
+                      }
+                    ],
+                    "role": "heading",
+                    "fontSize": 24,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#ccd6f6"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-nottosql-desc-item",
+                  "element": {
+                    "id": "raydotsh-nottosql-desc",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "A light SQLite database built from scratch in C with B-trees and page storage."
+                      }
+                    ],
+                    "role": "body",
+                    "fontSize": 16,
+                    "fontWeight": 400,
+                    "align": "left",
+                    "lineHeight": 1.35,
+                    "pinnedStyle": {
+                      "color": "#8892b0"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-nottosql-tech-item",
+                  "element": {
+                    "id": "raydotsh-nottosql-tech",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "C"
+                      }
+                    ],
+                    "role": "label",
+                    "fontSize": 14,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#64ffda"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "raydotsh-pits-item",
+            "element": {
+              "id": "raydotsh-project-pits",
+              "type": "flow-container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "elementStyle": {
+                "backgroundColor": "#112240",
+                "borderRadius": 16,
+                "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.32)"
+              },
+              "layout": {
+                "mode": "stack",
+                "gap": {
+                  "row": 12,
+                  "column": 0
+                },
+                "padding": {
+                  "top": 24,
+                  "right": 28,
+                  "bottom": 22,
+                  "left": 28
+                },
+                "align": "stretch",
+                "justify": "start"
+              },
+              "items": [
+                {
+                  "id": "raydotsh-pits-title-item",
+                  "element": {
+                    "id": "raydotsh-pits-title",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "pitsoferrors"
+                      }
+                    ],
+                    "role": "heading",
+                    "fontSize": 24,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#ccd6f6"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-pits-desc-item",
+                  "element": {
+                    "id": "raydotsh-pits-desc",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "A mini number-guessing game built directly in shell scripting."
+                      }
+                    ],
+                    "role": "body",
+                    "fontSize": 16,
+                    "fontWeight": 400,
+                    "align": "left",
+                    "lineHeight": 1.35,
+                    "pinnedStyle": {
+                      "color": "#8892b0"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-pits-tech-item",
+                  "element": {
+                    "id": "raydotsh-pits-tech",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "Shell"
+                      }
+                    ],
+                    "role": "label",
+                    "fontSize": 14,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#64ffda"
+                    }
+                  }
+                }
+              ]
+            }
           }
-        ],
-        "role": "heading",
-        "fontSize": 24,
-        "fontWeight": 700,
-        "align": "left",
-        "pinnedStyle": {
-          "color": "#ccd6f6"
-        }
+        ]
       },
       {
-        "id": "raydotsh-pyshell-desc",
-        "type": "text",
+        "id": "raydotsh-mobile-project-list",
+        "type": "flow-container",
         "box": {
-          "x": 248,
-          "y": 776,
-          "w": 250,
-          "h": 60,
-          "z": 2
-        },
-        "content": [
-          {
-            "text": "A terminal shell built from scratch in Python, implementing core shell functionality."
-          }
-        ],
-        "role": "body",
-        "fontSize": 16,
-        "fontWeight": 400,
-        "align": "left",
-        "lineHeight": 1.35,
-        "pinnedStyle": {
-          "color": "#8892b0"
-        }
-      },
-      {
-        "id": "raydotsh-pyshell-tech",
-        "type": "text",
-        "box": {
-          "x": 248,
-          "y": 846,
-          "w": 120,
-          "h": 26,
-          "z": 2
-        },
-        "content": [
-          {
-            "text": "Python"
-          }
-        ],
-        "role": "label",
-        "fontSize": 14,
-        "fontWeight": 700,
-        "align": "left",
-        "pinnedStyle": {
-          "color": "#64ffda"
-        }
-      },
-      {
-        "id": "raydotsh-project-nottosql",
-        "type": "container",
-        "box": {
-          "x": 563,
-          "y": 704,
-          "w": 314,
-          "h": 180,
+          "x": 220,
+          "y": 520,
+          "w": 1000,
+          "h": 360,
           "z": 1
         },
-        "variant": "raised",
-        "elementStyle": {
-          "backgroundColor": "#112240",
-          "borderRadius": 16,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.32)"
-        }
-      },
-      {
-        "id": "raydotsh-nottosql-title",
-        "type": "text",
-        "box": {
-          "x": 591,
-          "y": 728,
-          "w": 260,
-          "h": 38,
-          "z": 2
+        "layout": {
+          "mode": "stack",
+          "gap": {
+            "row": 18,
+            "column": 0
+          },
+          "padding": {
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "align": "stretch",
+          "justify": "start"
         },
-        "content": [
+        "items": [
           {
-            "text": "nottoSQL"
-          }
-        ],
-        "role": "heading",
-        "fontSize": 24,
-        "fontWeight": 700,
-        "align": "left",
-        "pinnedStyle": {
-          "color": "#ccd6f6"
-        }
-      },
-      {
-        "id": "raydotsh-nottosql-desc",
-        "type": "text",
-        "box": {
-          "x": 591,
-          "y": 776,
-          "w": 250,
-          "h": 60,
-          "z": 2
-        },
-        "content": [
+            "id": "raydotsh-mobile-pycaster-item",
+            "element": {
+              "id": "raydotsh-mobile-pycaster-card",
+              "type": "flow-container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "elementStyle": {
+                "backgroundColor": "#112240",
+                "borderColor": "#233554",
+                "borderWidth": 1,
+                "borderRadius": 16,
+                "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.32)"
+              },
+              "layout": {
+                "mode": "stack",
+                "gap": {
+                  "row": 10,
+                  "column": 0
+                },
+                "padding": {
+                  "top": 22,
+                  "right": 24,
+                  "bottom": 22,
+                  "left": 24
+                },
+                "align": "stretch",
+                "justify": "start"
+              },
+              "items": [
+                {
+                  "id": "raydotsh-mobile-pycaster-title-item",
+                  "element": {
+                    "id": "raydotsh-mobile-pycaster-title",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "pycaster"
+                      }
+                    ],
+                    "role": "heading",
+                    "fontSize": 26,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#ccd6f6"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-mobile-pycaster-desc-item",
+                  "element": {
+                    "id": "raydotsh-mobile-pycaster-desc",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "A Wolfenstein 3D style raycasting rendering engine built from scratch in Python."
+                      }
+                    ],
+                    "role": "body",
+                    "fontSize": 16,
+                    "fontWeight": 400,
+                    "align": "left",
+                    "lineHeight": 1.4,
+                    "textWrap": "pretty",
+                    "pinnedStyle": {
+                      "color": "#8892b0"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-mobile-pycaster-tech-item",
+                  "element": {
+                    "id": "raydotsh-mobile-pycaster-tech",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "Python"
+                      }
+                    ],
+                    "role": "label",
+                    "fontSize": 14,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#64ffda"
+                    }
+                  }
+                }
+              ]
+            }
+          },
           {
-            "text": "A light SQLite database built from scratch in C with B-trees and page storage."
-          }
-        ],
-        "role": "body",
-        "fontSize": 16,
-        "fontWeight": 400,
-        "align": "left",
-        "lineHeight": 1.35,
-        "pinnedStyle": {
-          "color": "#8892b0"
-        }
-      },
-      {
-        "id": "raydotsh-nottosql-tech",
-        "type": "text",
-        "box": {
-          "x": 591,
-          "y": 846,
-          "w": 120,
-          "h": 26,
-          "z": 2
-        },
-        "content": [
+            "id": "raydotsh-mobile-pyshell-item",
+            "element": {
+              "id": "raydotsh-mobile-pyshell-card",
+              "type": "flow-container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "elementStyle": {
+                "backgroundColor": "#112240",
+                "borderColor": "#233554",
+                "borderWidth": 1,
+                "borderRadius": 16,
+                "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.32)"
+              },
+              "layout": {
+                "mode": "stack",
+                "gap": {
+                  "row": 10,
+                  "column": 0
+                },
+                "padding": {
+                  "top": 22,
+                  "right": 24,
+                  "bottom": 22,
+                  "left": 24
+                },
+                "align": "stretch",
+                "justify": "start"
+              },
+              "items": [
+                {
+                  "id": "raydotsh-mobile-pyshell-title-item",
+                  "element": {
+                    "id": "raydotsh-mobile-pyshell-title",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "pyshell"
+                      }
+                    ],
+                    "role": "heading",
+                    "fontSize": 26,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#ccd6f6"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-mobile-pyshell-desc-item",
+                  "element": {
+                    "id": "raydotsh-mobile-pyshell-desc",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "A terminal shell built from scratch in Python, implementing core shell functionality."
+                      }
+                    ],
+                    "role": "body",
+                    "fontSize": 16,
+                    "fontWeight": 400,
+                    "align": "left",
+                    "lineHeight": 1.4,
+                    "textWrap": "pretty",
+                    "pinnedStyle": {
+                      "color": "#8892b0"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-mobile-pyshell-tech-item",
+                  "element": {
+                    "id": "raydotsh-mobile-pyshell-tech",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "Python"
+                      }
+                    ],
+                    "role": "label",
+                    "fontSize": 14,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#64ffda"
+                    }
+                  }
+                }
+              ]
+            }
+          },
           {
-            "text": "C"
-          }
-        ],
-        "role": "label",
-        "fontSize": 14,
-        "fontWeight": 700,
-        "align": "left",
-        "pinnedStyle": {
-          "color": "#64ffda"
-        }
-      },
-      {
-        "id": "raydotsh-project-pits",
-        "type": "container",
-        "box": {
-          "x": 906,
-          "y": 704,
-          "w": 314,
-          "h": 180,
-          "z": 1
-        },
-        "variant": "raised",
-        "elementStyle": {
-          "backgroundColor": "#112240",
-          "borderRadius": 16,
-          "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.32)"
-        }
-      },
-      {
-        "id": "raydotsh-pits-title",
-        "type": "text",
-        "box": {
-          "x": 934,
-          "y": 728,
-          "w": 260,
-          "h": 38,
-          "z": 2
-        },
-        "content": [
+            "id": "raydotsh-mobile-nottosql-item",
+            "element": {
+              "id": "raydotsh-mobile-nottosql-card",
+              "type": "flow-container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "elementStyle": {
+                "backgroundColor": "#112240",
+                "borderColor": "#233554",
+                "borderWidth": 1,
+                "borderRadius": 16,
+                "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.32)"
+              },
+              "layout": {
+                "mode": "stack",
+                "gap": {
+                  "row": 10,
+                  "column": 0
+                },
+                "padding": {
+                  "top": 22,
+                  "right": 24,
+                  "bottom": 22,
+                  "left": 24
+                },
+                "align": "stretch",
+                "justify": "start"
+              },
+              "items": [
+                {
+                  "id": "raydotsh-mobile-nottosql-title-item",
+                  "element": {
+                    "id": "raydotsh-mobile-nottosql-title",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "nottoSQL"
+                      }
+                    ],
+                    "role": "heading",
+                    "fontSize": 26,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#ccd6f6"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-mobile-nottosql-desc-item",
+                  "element": {
+                    "id": "raydotsh-mobile-nottosql-desc",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "A light SQLite database built from scratch in C with B-trees and page storage."
+                      }
+                    ],
+                    "role": "body",
+                    "fontSize": 16,
+                    "fontWeight": 400,
+                    "align": "left",
+                    "lineHeight": 1.4,
+                    "textWrap": "pretty",
+                    "pinnedStyle": {
+                      "color": "#8892b0"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-mobile-nottosql-tech-item",
+                  "element": {
+                    "id": "raydotsh-mobile-nottosql-tech",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "C"
+                      }
+                    ],
+                    "role": "label",
+                    "fontSize": 14,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#64ffda"
+                    }
+                  }
+                }
+              ]
+            }
+          },
           {
-            "text": "pitsoferrors"
+            "id": "raydotsh-mobile-pits-item",
+            "element": {
+              "id": "raydotsh-mobile-pits-card",
+              "type": "flow-container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "elementStyle": {
+                "backgroundColor": "#112240",
+                "borderColor": "#233554",
+                "borderWidth": 1,
+                "borderRadius": 16,
+                "boxShadow": "0 10px 30px rgba(2, 12, 27, 0.32)"
+              },
+              "layout": {
+                "mode": "stack",
+                "gap": {
+                  "row": 10,
+                  "column": 0
+                },
+                "padding": {
+                  "top": 22,
+                  "right": 24,
+                  "bottom": 22,
+                  "left": 24
+                },
+                "align": "stretch",
+                "justify": "start"
+              },
+              "items": [
+                {
+                  "id": "raydotsh-mobile-pits-title-item",
+                  "element": {
+                    "id": "raydotsh-mobile-pits-title",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "pitsoferrors"
+                      }
+                    ],
+                    "role": "heading",
+                    "fontSize": 26,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#ccd6f6"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-mobile-pits-desc-item",
+                  "element": {
+                    "id": "raydotsh-mobile-pits-desc",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "A mini number-guessing game built directly in shell scripting."
+                      }
+                    ],
+                    "role": "body",
+                    "fontSize": 16,
+                    "fontWeight": 400,
+                    "align": "left",
+                    "lineHeight": 1.4,
+                    "textWrap": "pretty",
+                    "pinnedStyle": {
+                      "color": "#8892b0"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-mobile-pits-tech-item",
+                  "element": {
+                    "id": "raydotsh-mobile-pits-tech",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "Shell"
+                      }
+                    ],
+                    "role": "label",
+                    "fontSize": 14,
+                    "fontWeight": 700,
+                    "align": "left",
+                    "pinnedStyle": {
+                      "color": "#64ffda"
+                    }
+                  }
+                }
+              ]
+            }
           }
-        ],
-        "role": "heading",
-        "fontSize": 24,
-        "fontWeight": 700,
-        "align": "left",
-        "pinnedStyle": {
-          "color": "#ccd6f6"
-        }
-      },
-      {
-        "id": "raydotsh-pits-desc",
-        "type": "text",
-        "box": {
-          "x": 934,
-          "y": 776,
-          "w": 250,
-          "h": 60,
-          "z": 2
-        },
-        "content": [
-          {
-            "text": "A mini number-guessing game built directly in shell scripting."
-          }
-        ],
-        "role": "body",
-        "fontSize": 16,
-        "fontWeight": 400,
-        "align": "left",
-        "lineHeight": 1.35,
-        "pinnedStyle": {
-          "color": "#8892b0"
-        }
-      },
-      {
-        "id": "raydotsh-pits-tech",
-        "type": "text",
-        "box": {
-          "x": 934,
-          "y": 846,
-          "w": 120,
-          "h": 26,
-          "z": 2
-        },
-        "content": [
-          {
-            "text": "Shell"
-          }
-        ],
-        "role": "label",
-        "fontSize": 14,
-        "fontWeight": 700,
-        "align": "left",
-        "pinnedStyle": {
-          "color": "#64ffda"
-        }
+        ]
       }
     ]
   },

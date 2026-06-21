@@ -124,8 +124,7 @@ const VELOCITY_KIT: StyleKitPreset = {
   muted: '#5D6254',
   accent: '#C8FF1A',
   accentText: '#111112',
-  fontFamilyDisplay:
-    "'Instrument Serif', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+  fontFamilyDisplay: "'Instrument Serif', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
   fontFamilyBody: "'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif",
   fontFamilyMono: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
   headingScale: 1.12,
@@ -481,7 +480,8 @@ const RAYDOTSH_KIT: StyleKitPreset = {
 export const velocityAthleteTemplate: TemplateSeed = {
   id: 'velocity-athlete',
   name: 'Velocity Athlete',
-  tagline: 'A kinetic personal-brand template for athletes, creators, and high-energy product drops.',
+  tagline:
+    'A kinetic personal-brand template for athletes, creators, and high-energy product drops.',
   styleKit: 'custom',
   customStyleKit: VELOCITY_KIT,
   headerRef: { sectionId: 'velocity-template-header-v1', instanceId: 'velocityheader' },
@@ -991,6 +991,29 @@ export const raydotshPortfolioTemplate: TemplateSeed = {
           durationMs: 700,
           staggerMs: 90,
           easing: 'linear',
+        },
+      ],
+    },
+    {
+      id: 'raydotsh-project-card-reveal',
+      trigger: { type: 'section-enter', sectionId: 'raydotsh-software' },
+      reducedMotion: 'final-state',
+      steps: [
+        {
+          id: 'project-cards',
+          target: { type: 'children-of', elementId: 'raydotsh-project-grid' },
+          from: { translateY: 20, opacity: 0 },
+          to: { translateY: 0, opacity: 1 },
+          durationMs: 600,
+          staggerMs: 100,
+        },
+        {
+          id: 'mobile-project-cards',
+          target: { type: 'children-of', elementId: 'raydotsh-mobile-project-list' },
+          from: { translateY: 20, opacity: 0 },
+          to: { translateY: 0, opacity: 1 },
+          durationMs: 600,
+          staggerMs: 100,
         },
       ],
     },

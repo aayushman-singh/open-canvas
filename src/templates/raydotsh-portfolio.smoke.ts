@@ -1,7 +1,7 @@
 import { injectInteractiveRuntime } from '../interactive/inject.js';
 import { renderCanvasSnapshot } from '../canvas/render.js';
 import { getSeedAsset } from '../canvas/seed-assets.js';
-import type { PublishedSnapshot } from '../canvas/schema.js';
+import type { CanvasElement, PublishedSnapshot } from '../canvas/schema.js';
 import {
   validateEditableSite,
   validatePublishedSnapshot,
@@ -20,6 +20,22 @@ interface FidelityItem {
   sourceBehaviour: string;
   status: FidelityStatus;
   requiredPrimitive?: string;
+}
+
+function collectElementTree(elements: CanvasElement[]): CanvasElement[] {
+  const collected: CanvasElement[] = [];
+  const visit = (element: CanvasElement): void => {
+    collected.push(element);
+    if (element.type === 'flow-container') {
+      for (const item of element.items) visit(item.element);
+    } else if (element.type === 'tabs') {
+      for (const tab of element.tabs) {
+        for (const child of tab.elements) visit(child);
+      }
+    }
+  };
+  for (const element of elements) visit(element);
+  return collected;
 }
 
 const RAYDOTSH_FIDELITY_LEDGER: FidelityItem[] = [
@@ -50,14 +66,12 @@ const RAYDOTSH_FIDELITY_LEDGER: FidelityItem[] = [
   {
     id: 'scroll-reveal-sequence',
     sourceBehaviour: 'Repeated sections and list items reveal with child-index delays',
-    status: 'approximate',
-    requiredPrimitive: 'Reveal Sequence',
+    status: 'native',
   },
   {
     id: 'responsive-project-variants',
     sourceBehaviour: 'Projects use desktop spotlight structure and separate mobile card structure',
-    status: 'approximate',
-    requiredPrimitive: 'Responsive Layout Variant',
+    status: 'native',
   },
   {
     id: 'cover-grid',
@@ -135,6 +149,161 @@ assert(
   'Raydotsh typewriter greeting should target the hero heading text split',
 );
 
+const topLevelElements = state.pages.flatMap((page) =>
+  page.sections.flatMap((section) => section.elements),
+);
+const allElements = collectElementTree(topLevelElements);
+const allElementIds = new Set(allElements.map((element) => element.id));
+const elementById = new Map(allElements.map((element) => [element.id, element]));
+
+const revealSequence = state.motionSequences?.find((sequence) =>
+  sequence.steps?.some((step) => step.target.type === 'children-of'),
+);
+assert(
+  revealSequence !== undefined,
+  'A Raydotsh reveal motion sequence with a children-of target must exist',
+);
+assert(
+  revealSequence.reducedMotion !== undefined,
+  'The reveal motion sequence must have reducedMotion set',
+);
+const revealSteps = revealSequence.steps.filter((step) => step.target.type === 'children-of');
+const revealTargetIds = revealSteps.map(
+  (step) => (step.target as { type: 'children-of'; elementId: string }).elementId,
+);
+for (const targetId of ['raydotsh-project-grid', 'raydotsh-mobile-project-list']) {
+  assert(
+    revealTargetIds.includes(targetId),
+    `Raydotsh reveal sequence must target ${targetId} with children-of`,
+  );
+}
+for (const step of revealSteps) {
+  assert((step.staggerMs ?? 0) > 0, `${step.id} must have staggerMs > 0`);
+  const revealHostId = (step.target as { type: 'children-of'; elementId: string }).elementId;
+  const revealHost = elementById.get(revealHostId);
+  assert(revealHost !== undefined, `children-of host "${revealHostId}" must exist`);
+  const descendantIds = collectElementTree([revealHost])
+    .map((element) => element.id)
+    .filter((id) => id !== revealHostId);
+  assert(
+    descendantIds.length >= 3,
+    `children-of host "${revealHostId}" must own rendered child elements`,
+  );
+}
+
+const desktopRevealHost = elementById.get('raydotsh-project-grid');
+assert(desktopRevealHost !== undefined, 'desktop project reveal host must exist');
+const desktopRevealDescendantIds = new Set(
+  collectElementTree([desktopRevealHost]).map((element) => element.id),
+);
+for (const elementId of [
+  'raydotsh-project-pyshell',
+  'raydotsh-pyshell-title',
+  'raydotsh-nottosql-title',
+  'raydotsh-pits-title',
+]) {
+  assert(
+    desktopRevealDescendantIds.has(elementId),
+    `desktop reveal host must own ${elementId} instead of leaving it as an ungated sibling`,
+  );
+}
+
+const scrollRevealLedgerItem = RAYDOTSH_FIDELITY_LEDGER.find(
+  (item) => item.id === 'scroll-reveal-sequence',
+);
+assert(
+  scrollRevealLedgerItem?.status === 'native',
+  'scroll-reveal-sequence ledger item must be "native" if the sequence exists',
+);
+
+const softwareSection = state.pages
+  .flatMap((page) => page.sections)
+  .find((section) => section.id === 'raydotsh-software');
+assert(softwareSection !== undefined, 'The raydotsh-software section must exist');
+assert(
+  Array.isArray(softwareSection.responsiveVariants) &&
+    softwareSection.responsiveVariants.length >= 2,
+  'The raydotsh-software section must have at least 2 responsive variants',
+);
+
+const desktopVariant = softwareSection.responsiveVariants.find((v) => v.breakpoint === 'desktop');
+const phoneVariant = softwareSection.responsiveVariants.find((v) => v.breakpoint === 'phone');
+assert(desktopVariant !== undefined, 'software section must have a desktop responsive variant');
+assert(phoneVariant !== undefined, 'software section must have a phone responsive variant');
+
+assert(
+  desktopVariant.contentSourceId === phoneVariant.contentSourceId,
+  'The responsive variants must share the same contentSourceId',
+);
+assert(desktopVariant.contentSourceId.length > 0, 'The shared contentSourceId must be non-empty');
+
+assert(
+  desktopVariant.elementIds.length > 0 && phoneVariant.elementIds.length > 0,
+  'Both responsive variants must have non-empty elementIds arrays',
+);
+const allVariantElementIds = new Set([...desktopVariant.elementIds, ...phoneVariant.elementIds]);
+assert(
+  allVariantElementIds.size === desktopVariant.elementIds.length + phoneVariant.elementIds.length,
+  'The elementIds for desktop and phone variants must be distinct',
+);
+
+const sectionElementIds = new Set(softwareSection.elements.map((el) => el.id));
+for (const elementId of allVariantElementIds) {
+  assert(
+    sectionElementIds.has(elementId),
+    `Variant element ID "${elementId}" must exist in the section elements`,
+  );
+}
+for (const elementId of [
+  'raydotsh-pycaster-card',
+  'raydotsh-pycaster-media',
+  'raydotsh-pycaster-title',
+  'raydotsh-pycaster-desc',
+  'raydotsh-pycaster-tech',
+  'raydotsh-pycaster-action',
+  'raydotsh-project-grid',
+]) {
+  assert(
+    desktopVariant.elementIds.includes(elementId),
+    `desktop project variant must include ${elementId}`,
+  );
+}
+assert(
+  phoneVariant.elementIds.includes('raydotsh-mobile-project-list'),
+  'phone project variant must include the mobile project list host',
+);
+const phoneRevealHost = elementById.get('raydotsh-mobile-project-list');
+assert(phoneRevealHost !== undefined, 'phone project list host must exist');
+const phoneRevealDescendantIds = new Set(
+  collectElementTree([phoneRevealHost]).map((element) => element.id),
+);
+for (const elementId of [
+  'raydotsh-mobile-pycaster-title',
+  'raydotsh-mobile-pyshell-title',
+  'raydotsh-mobile-nottosql-title',
+  'raydotsh-mobile-pits-title',
+]) {
+  assert(
+    phoneRevealDescendantIds.has(elementId),
+    `phone project variant must own rendered content ${elementId}`,
+  );
+}
+for (const elementId of [
+  'raydotsh-pycaster-card',
+  'raydotsh-project-grid',
+  'raydotsh-mobile-project-list',
+]) {
+  assert(allElementIds.has(elementId), `${elementId} must exist in the rendered element tree`);
+}
+
+const responsiveProjectLedgerItem = RAYDOTSH_FIDELITY_LEDGER.find(
+  (item) => item.id === 'responsive-project-variants',
+);
+assert(
+  responsiveProjectLedgerItem?.status === 'native',
+  'responsive-project-variants ledger item must be "native" if the variants exist',
+);
+
 const editValidation = validateEditableSite(state);
 assert(editValidation.valid, editValidation.valid ? '' : editValidation.errors.join('\n'));
 
@@ -155,6 +324,33 @@ const html = injectInteractiveRuntime(
   }),
   snapshot,
 );
+
+for (const elementId of [
+  'raydotsh-pycaster-title',
+  'raydotsh-pycaster-action',
+  'raydotsh-project-grid',
+]) {
+  assert(
+    new RegExp(
+      `data-opencanvas-element="${elementId}"[^>]*data-opencanvas-responsive-variant="raydotsh-projects-desktop"`,
+    ).test(html),
+    `${elementId} must render as part of the desktop project variant`,
+  );
+}
+assert(
+  /data-opencanvas-element="raydotsh-mobile-project-list"[^>]*data-opencanvas-responsive-variant="raydotsh-projects-phone"[^>]*hidden[^>]*aria-hidden="true"[^>]*inert/.test(
+    html,
+  ),
+  'mobile project list must render as the inactive phone project variant on desktop',
+);
+for (const token of [
+  'data-opencanvas-element="raydotsh-mobile-pycaster-title"',
+  'data-opencanvas-element="raydotsh-mobile-pyshell-title"',
+  'data-opencanvas-element="raydotsh-mobile-nottosql-title"',
+  'data-opencanvas-element="raydotsh-mobile-pits-title"',
+]) {
+  assert(html.includes(token), `rendered phone variant must include ${token}`);
+}
 
 const registeredSourceAssetIds = [
   'seed-raydotsh-yoru',
