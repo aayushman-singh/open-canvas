@@ -61,6 +61,7 @@
 //   'entrance'?         -> string
 //   'trigger'?          -> Y.Map<unknown>
 //   'backgroundVideo'?  -> string
+//   'responsiveVariants'? -> Y.Array<Y.Map<unknown>> (ResponsiveLayoutVariant[])
 //   'elements'          -> Y.Array<Y.Map<unknown>>   (CanvasElement[])
 //
 // Each CanvasElement Y.Map mirrors its TS interface field-for-field.
@@ -1033,6 +1034,20 @@ function encodeSection(section: CanvasSection): Y.Map<unknown> {
   // state survives Yjs encode/decode. Library rows never carry it; only
   // sections materialised via instantiateTemplate do.
   setIfDefined(out, 'instanceScope', section.instanceScope);
+  if (section.responsiveVariants !== undefined) {
+    const variants = new Y.Array<Y.Map<unknown>>();
+    for (const variant of section.responsiveVariants) {
+      const item = new Y.Map<unknown>();
+      item.set('id', variant.id);
+      item.set('breakpoint', variant.breakpoint);
+      item.set('contentSourceId', variant.contentSourceId);
+      const elementIds = new Y.Array<string>();
+      for (const elementId of variant.elementIds) elementIds.push([elementId]);
+      item.set('elementIds', elementIds);
+      variants.push([item]);
+    }
+    out.set('responsiveVariants', variants);
+  }
   const elements = new Y.Array<Y.Map<unknown>>();
   for (const el of section.elements) elements.push([encodeElement(el)]);
   out.set('elements', elements);
@@ -2075,6 +2090,17 @@ function decodeSection(map: Y.Map<unknown>): CanvasSection {
   }
   if (map.has('instanceScope')) {
     section.instanceScope = map.get('instanceScope') as string;
+  }
+  if (map.has('responsiveVariants')) {
+    const variants = map.get('responsiveVariants') as Y.Array<Y.Map<unknown>>;
+    section.responsiveVariants = variants.map((variant) => ({
+      id: variant.get('id') as string,
+      breakpoint: variant.get('breakpoint') as NonNullable<
+        CanvasSection['responsiveVariants']
+      >[number]['breakpoint'],
+      contentSourceId: variant.get('contentSourceId') as string,
+      elementIds: (variant.get('elementIds') as Y.Array<string>).toArray(),
+    }));
   }
   return section;
 }

@@ -40,16 +40,36 @@ import {
 export function buildResponsiveCssBody(
   layouts: ResolvedPageLayout[],
   hasAnyResponsiveOverride: boolean,
+  variantCssBody = '',
 ): string {
   // Fast exit: no overrides AND every page is narrow enough to already fit a
   // phone viewport at its desktop width. The translator still resolves
   // everything for these cases but emitting CSS would be pointless work.
-  if (!hasAnyResponsiveOverride && layouts.every((p) => p.desktopWidth <= PHONE_MAX_PX)) {
+  if (
+    variantCssBody === '' &&
+    !hasAnyResponsiveOverride &&
+    layouts.every((p) => p.desktopWidth <= PHONE_MAX_PX)
+  ) {
     return '';
   }
   const tabletBlock = buildBreakpointBlock(layouts, 'tablet', TABLET_MAX_PX);
   const phoneBlock = buildBreakpointBlock(layouts, 'phone', PHONE_MAX_PX);
-  return `${tabletBlock}\n${phoneBlock}`;
+  return [variantCssBody, tabletBlock, phoneBlock].filter((block) => block.length > 0).join('\n');
+}
+
+export function buildResponsiveVariantCssBody(): string {
+  return [
+    '[data-opencanvas-responsive-active] { display: none !important; }',
+    '[data-opencanvas-responsive-active~="desktop"] { display: block !important; }',
+    `@media (max-width: ${String(TABLET_MAX_PX)}px) {`,
+    '[data-opencanvas-responsive-active] { display: none !important; }',
+    '[data-opencanvas-responsive-active~="tablet"] { display: block !important; }',
+    '}',
+    `@media (max-width: ${String(PHONE_MAX_PX)}px) {`,
+    '[data-opencanvas-responsive-active] { display: none !important; }',
+    '[data-opencanvas-responsive-active~="phone"] { display: block !important; }',
+    '}',
+  ].join('\n');
 }
 
 function buildBreakpointBlock(

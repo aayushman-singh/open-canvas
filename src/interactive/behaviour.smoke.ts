@@ -64,6 +64,7 @@ class StubElement {
   clientHeight = 240;
   scrollHeight = 2400;
   scrollTop = 0;
+  animations: Array<{ keyframes: unknown; options: unknown }> = [];
 
   constructor(tagName: string) {
     this.tagName = tagName.toLowerCase();
@@ -158,7 +159,8 @@ class StubElement {
   getComputedTextLength(): number {
     return 320;
   }
-  animate(): { cancel: () => void } {
+  animate(keyframes?: unknown, options?: unknown): { cancel: () => void } {
+    this.animations.push({ keyframes, options });
     return { cancel: () => undefined };
   }
   getContext(): { clearRect: () => void; drawImage: () => void } {
@@ -808,7 +810,74 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   );
 }
 
-// (4) scroll scene computes progress and applies transform
+// (4) section-enter reveal targets children of a compound element in DOM order
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'card-reveal',
+        trigger: { type: 'section-enter', sectionId: 'section-story' },
+        reducedMotion: 'final-state',
+        steps: [
+          {
+            id: 'project-cards',
+            target: { type: 'children-of', elementId: 'project-grid' },
+            from: { opacity: 0, translateY: 20 },
+            to: { opacity: 1, translateY: 0 },
+            durationMs: 600,
+            staggerMs: 100,
+          },
+        ],
+      },
+    ],
+    scrollScenes: [],
+    richMotionAssets: [],
+  });
+  doc.body.appendChild(script);
+  const section = new StubElement('section');
+  section.setAttribute('data-opencanvas-section', 'section-story');
+  const grid = new StubElement('div');
+  grid.setAttribute('data-opencanvas-element', 'project-grid');
+  const firstCard = new StubElement('article');
+  firstCard.setAttribute('data-opencanvas-element', 'project-card-a');
+  const secondCard = new StubElement('article');
+  secondCard.setAttribute('data-opencanvas-element', 'project-card-b');
+  const thirdCard = new StubElement('article');
+  thirdCard.setAttribute('data-opencanvas-element', 'project-card-c');
+  grid.appendChild(firstCard);
+  grid.appendChild(secondCard);
+  grid.appendChild(thirdCard);
+  section.appendChild(grid);
+  doc.body.appendChild(section);
+  runBehaviour(doc, win, StubImage);
+  assert(firstCard.style.opacity === '0', 'first child reveal target must receive authored from opacity');
+  assert(
+    firstCard.style.transform.includes('translate(0px,20px)'),
+    'first child reveal target must receive authored from transform',
+  );
+  assert(firstCard.animations.length === 1, 'first child reveal target must animate once');
+  assert(secondCard.animations.length === 1, 'second child reveal target must animate once');
+  assert(thirdCard.animations.length === 1, 'third child reveal target must animate once');
+  assert(
+    (firstCard.animations[0]!.options as { delay?: number }).delay === 0,
+    'first child reveal target must keep zero stagger delay',
+  );
+  assert(
+    (secondCard.animations[0]!.options as { delay?: number }).delay === 100,
+    'second child reveal target must receive one stagger interval',
+  );
+  assert(
+    (thirdCard.animations[0]!.options as { delay?: number }).delay === 200,
+    'third child reveal target must receive two stagger intervals',
+  );
+}
+
+// (5) scroll scene computes progress and applies transform
 {
   const doc = new StubDocument();
   const win = new StubWindow();
@@ -866,7 +935,7 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   );
 }
 
-// (5) scroll scene staggers text-split targets across scroll progress
+// (6) scroll scene staggers text-split targets across scroll progress
 {
   const doc = new StubDocument();
   const win = new StubWindow();
@@ -933,7 +1002,7 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(spans[2]!.style.opacity === '0', 'third split word must not start before its stagger window');
 }
 
-// (6) scroll scene mask-reveal text effect clips split text from progress
+// (7) scroll scene mask-reveal text effect clips split text from progress
 {
   const doc = new StubDocument();
   const win = new StubWindow();

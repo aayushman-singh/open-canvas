@@ -499,6 +499,13 @@ export interface ResponsiveOverrides {
   phone?: ResponsiveBoxOverride;
 }
 
+export interface ResponsiveLayoutVariant {
+  id: string;
+  breakpoint: Breakpoint;
+  contentSourceId: string;
+  elementIds: string[];
+}
+
 export const BACKGROUND_SIZES = ['cover', 'contain'] as const;
 export type BackgroundSize = (typeof BACKGROUND_SIZES)[number];
 
@@ -732,6 +739,7 @@ export interface CanvasSection {
    * Yjs codec encodes it so post-instantiation state round-trips cleanly.
    */
   instanceScope?: string;
+  responsiveVariants?: ResponsiveLayoutVariant[];
   elements: CanvasElement[];
 }
 

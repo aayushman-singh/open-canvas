@@ -96,6 +96,7 @@ import {
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
   BACKGROUND_SIZES,
+  BREAKPOINTS,
   COLLECTION_PAGE_KINDS,
   ELEMENT_TYPES,
   IMPORT_ANIMATION_INVENTORY_STATUSES,
@@ -143,6 +144,7 @@ import {
   type ActionVariant,
   type BackgroundEffect,
   type BackgroundSize,
+  type Breakpoint,
   type CanvasSection,
   type EditableSite,
   type ElementType,
@@ -166,6 +168,7 @@ import {
   type PointerFxPrimitive,
   type PointerFxReducedMotionMode,
   type PointerFxTouchActivationMode,
+  type ResponsiveLayoutVariant,
   type RouteTransitionMode,
   type ScrollTriggerMode,
   type SectionRecipeId,
@@ -174,6 +177,7 @@ import {
   type StyleKit,
   type SurfaceVariant,
 } from './schema.js';
+import { activeResponsiveVariantForBreakpoint } from './responsive/variants.js';
 
 export type ValidationResult = { valid: true } | { valid: false; errors: string[] };
 
@@ -1306,6 +1310,12 @@ const FLOW_LAYOUT_RESPONSIVE_KEYS = [
 ] as const;
 const FLOW_ITEM_KEYS = ['id', 'element', 'span', 'align', 'responsive'] as const;
 const FLOW_ITEM_RESPONSIVE_KEYS = ['span', 'align', 'hidden', 'order'] as const;
+const RESPONSIVE_LAYOUT_VARIANT_KEYS = [
+  'id',
+  'breakpoint',
+  'contentSourceId',
+  'elementIds',
+] as const;
 
 function validateFlowLayout(value: unknown, basePath: string, errors: string[]): number | null {
   if (!isRecord(value)) {
@@ -2527,6 +2537,106 @@ function validateSection(
       section.elements as unknown[],
     );
   });
+  validateResponsiveLayoutVariants(
+    section.responsiveVariants,
+    section.elements as unknown[],
+    `${basePath}.responsiveVariants`,
+    errors,
+  );
+}
+
+function validateResponsiveLayoutVariants(
+  value: unknown,
+  sectionElements: unknown[],
+  basePath: string,
+  errors: string[],
+): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    errors.push(`${basePath} must be an array when present`);
+    return;
+  }
+  const sectionElementIds = new Set<string>();
+  for (const element of sectionElements) {
+    if (isRecord(element) && typeof element.id === 'string' && element.id.length > 0) {
+      sectionElementIds.add(element.id);
+    }
+  }
+  const knownVariantIds = new Set<string>();
+  const knownSourceBreakpoints = new Set<string>();
+  const variantsBySource = new Map<string, ResponsiveLayoutVariant[]>();
+  value.forEach((variant, variantIdx) => {
+    const variantPath = `${basePath}[${String(variantIdx)}]`;
+    if (!isRecord(variant)) {
+      errors.push(`${variantPath} must be an object`);
+      return;
+    }
+    validateAllowedKeys(variant, RESPONSIVE_LAYOUT_VARIANT_KEYS, variantPath, errors);
+    if (assertNonEmptyString(variant.id, `${variantPath}.id`, errors)) {
+      assertUnique(variant.id, knownVariantIds, `${variantPath}.id`, 'within responsiveVariants', errors);
+    }
+    const breakpointOk = assertOneOf<Breakpoint>(
+      variant.breakpoint,
+      BREAKPOINTS,
+      `${variantPath}.breakpoint`,
+      errors,
+    );
+    const sourceOk = assertNonEmptyString(
+      variant.contentSourceId,
+      `${variantPath}.contentSourceId`,
+      errors,
+    );
+    if (!Array.isArray(variant.elementIds)) {
+      errors.push(`${variantPath}.elementIds must be a non-empty array`);
+    } else {
+      if (variant.elementIds.length === 0) {
+        errors.push(`${variantPath}.elementIds must be a non-empty array`);
+      }
+      variant.elementIds.forEach((elementId, elementIdx) => {
+        const elementPath = `${variantPath}.elementIds[${String(elementIdx)}]`;
+        if (!assertNonEmptyString(elementId, elementPath, errors)) return;
+        if (!sectionElementIds.has(elementId)) {
+          errors.push(`${elementPath} "${elementId}" must reference an existing section element`);
+        }
+      });
+    }
+    if (!breakpointOk || !sourceOk || !Array.isArray(variant.elementIds)) return;
+    const validatedVariant: ResponsiveLayoutVariant = {
+      id: variant.id as string,
+      breakpoint: variant.breakpoint as Breakpoint,
+      contentSourceId: variant.contentSourceId as string,
+      elementIds: variant.elementIds as string[],
+    };
+    const sourceBreakpointKey = `${validatedVariant.contentSourceId}\u0000${validatedVariant.breakpoint}`;
+    if (knownSourceBreakpoints.has(sourceBreakpointKey)) {
+      errors.push(
+        `${variantPath}.breakpoint duplicates "${String(
+          variant.breakpoint,
+        )}" for contentSourceId "${String(variant.contentSourceId)}"`,
+      );
+    } else {
+      knownSourceBreakpoints.add(sourceBreakpointKey);
+    }
+    const group = variantsBySource.get(validatedVariant.contentSourceId) ?? [];
+    group.push(validatedVariant);
+    variantsBySource.set(validatedVariant.contentSourceId, group);
+  });
+
+  for (const [contentSourceId, variants] of variantsBySource.entries()) {
+    if (!variants.some((variant) => variant.breakpoint === 'desktop')) {
+      errors.push(
+        `${basePath} contentSourceId "${contentSourceId}" must include a desktop variant before tablet or phone variants`,
+      );
+    }
+    for (const breakpoint of BREAKPOINTS) {
+      const active = activeResponsiveVariantForBreakpoint(variants, breakpoint);
+      if (!active || active.elementIds.length === 0) {
+        errors.push(
+          `${basePath} contentSourceId "${contentSourceId}" leaves all variants hidden at ${breakpoint}`,
+        );
+      }
+    }
+  }
 }
 
 // ADR 0062 — discriminated-union accent border. Mirrors the validateSectionTrigger
@@ -3246,6 +3356,7 @@ interface BehaviourTargetIndex {
   pageIds: Set<string>;
   sectionIds: Map<string, number>;
   elementIds: Map<string, number>;
+  compoundElementIds: Map<string, number>;
   textElementIds: Map<string, number>;
 }
 
@@ -3259,12 +3370,16 @@ function collectBehaviourTargetIndex(state: Record<string, unknown>): BehaviourT
     pageIds: new Set<string>(),
     sectionIds: new Map<string, number>(),
     elementIds: new Map<string, number>(),
+    compoundElementIds: new Map<string, number>(),
     textElementIds: new Map<string, number>(),
   };
 
   const visitElementTree = (element: unknown): void => {
     if (!isRecord(element)) return;
     bumpIdCount(index.elementIds, element.id);
+    if (element.type === 'flow-container' || element.type === 'tabs' || element.type === 'collection') {
+      bumpIdCount(index.compoundElementIds, element.id);
+    }
     if (element.type === 'text') {
       bumpIdCount(index.textElementIds, element.id);
     }
@@ -3399,6 +3514,15 @@ function validateBehaviourTarget(
       break;
     case 'element':
       resolveIndexedId(index.elementIds, value.elementId, `${path}.elementId`, 'element', errors);
+      break;
+    case 'children-of':
+      resolveIndexedId(
+        index.compoundElementIds,
+        value.elementId,
+        `${path}.elementId`,
+        'compound element',
+        errors,
+      );
       break;
     case 'text-split':
       resolveIndexedId(
@@ -3675,6 +3799,9 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
             );
           }
           validateBehaviourTarget(step.target, `${stepPath}.target`, errors, targetIndex);
+          if (isRecord(step.target) && step.target.type === 'children-of' && sequence.reducedMotion === undefined) {
+            errors.push(`${sequencePath}.reducedMotion is required when a Motion Sequence targets children-of`);
+          }
           if (step.textEffect !== undefined) {
             const textEffectValid = assertOneOf(
               step.textEffect,
