@@ -1,5 +1,33 @@
 # Follow Ups
 
+## Production Template Source Admin
+
+Status: implemented 2026-06-22; deploy requires `TEMPLATE_SOURCE_GITHUB_TOKEN`.
+
+- The current dashboard admin page at `/dashboard/admin/templates` is visible in
+  prod only to the DB customer email `aayushman2702@gmail.com`, but the actual
+  source editor is intentionally local-only at `http://127.0.0.1:8791/`.
+- Build a production-capable template editing path so admin changes can safely
+  propagate into template source. Preferred implementation directions:
+  - GitHub-backed edits: create a branch/commit/PR from admin changes, then deploy
+    through the normal release path.
+  - DB-backed template drafts: store editable template overrides in Postgres, add
+    an explicit promote-to-source/deploy step, and keep failures loud if promotion
+    cannot complete.
+- Do not make the Worker write repository files directly; production Workers do
+  not have a repo filesystem to mutate.
+
+### Resolution — 2026-06-22
+
+- Implemented the GitHub-backed path at `/dashboard/admin/templates`.
+- Production admins can load code-defined template section JSON, edit it, and
+  create a GitHub branch/commit/PR through the protected dashboard route.
+- The Worker never writes repository files directly. It validates the section
+  JSON against the Section Library and canvas schema before calling GitHub.
+- Non-secret GitHub repository/base-branch config is in `wrangler.toml`.
+  `TEMPLATE_SOURCE_GITHUB_TOKEN` remains a required Worker secret and fails
+  loudly if missing.
+
 ## Resolution — 2026-06-21
 
 - Raydotsh Fidelity Track is implemented on `feat/raydotsh-next-fidelity` in

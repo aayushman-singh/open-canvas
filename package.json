@@ -20,6 +20,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "dev:all": "bun run scripts/dev-all.mjs",
+    "template-source-admin": "bun run scripts/template-source-admin.ts",
     "deploy": "bun run editor-client:build && bun run dashboard-client:build && wrangler deploy",
     "build": "bun run editor-client:build && bun run dashboard-client:build && wrangler deploy --dry-run --outdir=dist",
     "editor-client:build": "bun run scripts/build-editor-client.ts",
@@ -68,6 +69,7 @@
     "snapshot-replay:smoke": "bun run src/canvas/snapshot-replay.smoke.ts",
     "site-pinned-only-migration:smoke": "bun run src/canvas/site-pinned-only-migration.smoke.ts",
     "auth-access:smoke": "bun run src/auth/access.smoke.ts",
+    "admin-gate:smoke": "bun run src/auth/db-admin.smoke.ts",
     "clerk-dev-rebuild:smoke": "bun run src/auth/clerk-dev-rebuild.smoke.ts",
     "customer-resolution-dedup:smoke": "bun run src/auth/customer-resolution-dedup.smoke.ts",
     "sign-out:smoke": "bun run src/auth/sign-out-route.smoke.ts",
@@ -87,6 +89,7 @@
     "site-settings:smoke": "bun run src/routes/dashboard/site-settings.smoke.ts",
     "dashboard-shell:smoke": "bun run src/routes/dashboard/shell.smoke.ts",
     "template-preview:smoke": "bun run src/routes/dashboard/template-preview.smoke.ts",
+    "template-source-admin:smoke": "bun run src/templates/source-admin.smoke.ts && bun run src/templates/source-admin-dashboard.smoke.ts && bun run src/templates/source-admin-github.smoke.ts && bun run src/routes/dashboard/admin-template-source.smoke.ts",
     "responsive:smoke": "bun run src/canvas/responsive/smoke.ts",
     "version:smoke": "bun run src/version/smoke.ts",
     "version-route-collab-access:smoke": "bun run src/version/route-collab-access.smoke.ts",

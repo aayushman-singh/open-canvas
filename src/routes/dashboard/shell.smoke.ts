@@ -19,5 +19,17 @@ for (const className of [
 }
 
 assert(!source.includes('r-modal'), 'dashboard shell must not emit stale r-modal classes');
+assert(
+  !source.includes('New site'),
+  'dashboard shell topbar must not render the duplicate New site action',
+);
+assert(
+  source.includes('showAdminLink'),
+  'dashboard shell must accept an admin visibility flag',
+);
+assert(
+  source.includes('/dashboard/admin/templates') && source.includes('Admin'),
+  'dashboard shell must render the admin entry point when admin visibility is enabled',
+);
 
 console.log('[dashboard-shell:smoke] OK');

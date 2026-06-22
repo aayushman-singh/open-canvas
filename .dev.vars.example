@@ -63,6 +63,18 @@ UNLOCK_SIGNING_SECRET=<your-unlock-signing-secret>
 ADMIN_CLERK_USER_IDS=<your-clerk-user-id>
 
 # ---------------------------------------------------------------------------
+# Template source admin (GitHub-backed production edits)
+# ---------------------------------------------------------------------------
+# Fine-grained GitHub token allowed to create branches, write contents, and
+# open pull requests on the repository below. Production sets this with
+# `wrangler secret put TEMPLATE_SOURCE_GITHUB_TOKEN`.
+TEMPLATE_SOURCE_GITHUB_TOKEN=<your-github-token>
+# Repository that receives production template source pull requests.
+TEMPLATE_SOURCE_GITHUB_REPOSITORY=aayushman-singh/open-canvas
+# Base branch for production template source pull requests.
+TEMPLATE_SOURCE_GITHUB_BASE_BRANCH=main
+
+# ---------------------------------------------------------------------------
 # Database (Neon)
 # ---------------------------------------------------------------------------
 # Neon Serverless Postgres connection string. Owns the rev01 schema.

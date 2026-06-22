@@ -19,7 +19,7 @@ import { opencanvasModalScript } from '../../ui/opencanvas-modal-script';
 // Two shell variants share one component:
 //   1. Dashboard root (no `siteNav`): wordmark + primary nav (Your sites /
 //      Templates / Add-ons / Settings) in the `.side` rail, top bar with
-//      theme toggle + notifications + "New site" + avatar.
+//      theme toggle + notifications + optional admin entry + avatar.
 //   2. Site sub-page (`siteNav` provided): the `.side` rail swaps to back-
 //      link + site identity + per-site links; the top bar gains the page
 //      crumb. Drives the sub-pages in §7 (settings/forms/versions/...).
@@ -355,6 +355,7 @@ type Props = {
   // cache that same-origin iframes (e.g. site-card srcdoc previews) read
   // from — see ADR 0038 + dashboard index.tsx for the iframe shape.
   headLinks?: Child;
+  showAdminLink?: boolean;
   children?: Child;
 };
 
@@ -410,19 +411,24 @@ function NotificationIcon() {
   );
 }
 
-function PlusIcon() {
-  return raw(
-    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
-  );
-}
-
 function BackArrowIcon() {
   return raw(
     `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`,
   );
 }
 
-export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta, siteNav, theme, headLinks, children }: Props) {
+export function DashboardShell({
+  title,
+  crumbs,
+  activePath,
+  pageStyles,
+  userMeta,
+  siteNav,
+  theme,
+  headLinks,
+  showAdminLink,
+  children,
+}: Props) {
   // theme.css tokens go FIRST so the alias block re-points
   // --bg/--panel/--text/--accent/... onto Open Canvas palette before any
   // chrome rule reads them. Per-page <style> blocks (pageStyles) win last
@@ -535,10 +541,11 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
                   </ul>
                 </div>
               </div>
-              <a href="/dashboard/templates" class="btn btn-primary btn-sm">
-                <PlusIcon />
-                New site
-              </a>
+              {showAdminLink && (
+                <a href="/dashboard/admin/templates" class="btn btn-primary btn-sm">
+                  Admin
+                </a>
+              )}
               {userMeta && (
                 <a
                   href="/dashboard/profile"

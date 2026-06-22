@@ -152,9 +152,16 @@ The throughline: the previous generation lets you *fill in a layout*. Open Canva
 ```bash
 bun install
 bun.cmd run dev            # wrangler dev — http://localhost:8787
+bun.cmd run template-source-admin  # local source editor — http://127.0.0.1:8791
 ```
 
 `/` renders the Post-Aero landing. `/health` returns a JSON heartbeat. `/dashboard` is gated by Clerk.
+The template source admin is a local-only tool for built-in Template Seeds; it rewrites
+`src/templates/registry.ts` name/tagline literals and
+`src/canvas/section-library/entries/*.json` section source files directly.
+Production admins use `/dashboard/admin/templates`; section edits create a GitHub branch,
+commit, and pull request instead of writing files from the Worker. Configure
+`TEMPLATE_SOURCE_GITHUB_TOKEN` as a Worker secret with contents + pull-request access.
 
 ## Verify
 

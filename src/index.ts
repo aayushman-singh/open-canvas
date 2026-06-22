@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import landing from './landing';
 import { dashboard } from './routes/dashboard';
+import adminTemplateSourceRoute from './routes/dashboard/admin-template-source';
 import { templatesRoute } from './routes/dashboard/templates';
 import sites from './routes/api/sites';
 import { importRouter } from './routes/api/import';
@@ -106,6 +107,7 @@ app.route('/', apexSeoRouter);
 // surface (see src/landing/index.tsx).
 app.route('/', landing);
 
+app.route('/dashboard/admin/templates', adminTemplateSourceRoute);
 app.route('/dashboard/templates', templatesRoute);
 app.route('/dashboard', canvasEditor);
 app.route('/dashboard', dashboard);

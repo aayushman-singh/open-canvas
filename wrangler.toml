@@ -139,6 +139,10 @@ directory = "./dist"
 # Required by site import:
 #   SCRAPER_URL           — Base URL of the external Playwright scraper service.
 #   SCRAPER_API_SECRET    — Shared secret for Worker → scraper auth.
+#
+# Required by production template source admin:
+#   TEMPLATE_SOURCE_GITHUB_TOKEN — GitHub token with branch, contents, and PR
+#                                  permissions on TEMPLATE_SOURCE_GITHUB_REPOSITORY.
 
 # [[kv_namespaces]]
 # binding = "KV"
@@ -162,6 +166,8 @@ APP_DOMAIN = "opencanvas.aayushman.dev"
 AUTHORIZED_PARTIES = "https://opencanvas.aayushman.dev,http://localhost:8787,http://localhost:8788,http://127.0.0.1:8787,http://127.0.0.1:8788"
 COOKIE_NAME_PREFIX = "__opencanvas_"
 EMAIL_FROM = "Open Canvas <noreply@opencanvas.aayushman.dev>"
+TEMPLATE_SOURCE_GITHUB_REPOSITORY = "aayushman-singh/open-canvas"
+TEMPLATE_SOURCE_GITHUB_BASE_BRANCH = "main"
 
 # Cron triggers. The `scheduled` handler in src/scheduled.ts branches on
 # event.cron to dispatch per-feature work:

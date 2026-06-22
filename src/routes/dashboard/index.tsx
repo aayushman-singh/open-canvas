@@ -6,6 +6,7 @@ import { PlanTiles, planTilesStyles } from '../../billing/plan-tiles';
 import { db } from '../../db/client';
 import { site, ownerAsset, siteCollaborator } from '../../db/schema';
 import { clerkAuth, getClerkUser, resolveClerkKeys } from '../../auth/middleware';
+import { isTemplateSourceAdminCustomer } from '../../auth/db-admin';
 import { clerkFrontendApiHost, requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
@@ -1252,6 +1253,7 @@ dashboard.get('/', async (c) => {
       pageStyles={cardStyles}
       userMeta={{ avatarUrl, displayName, email: primaryEmail }}
       theme={readThemeCookie(c)}
+      showAdminLink={isTemplateSourceAdminCustomer(customerRecord)}
     >
       <div class="page-head">
         <div>
