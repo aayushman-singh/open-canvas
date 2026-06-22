@@ -341,13 +341,10 @@ const adminScript = `
     // Clear confirmation inputs
     els.deleteConfirmName.value = '';
 
-    // Actions visibility / setup
-    if (tmpl.templateDraftSiteId) {
-      els.editDraftBtn.style.display = 'inline-flex';
-      els.editDraftBtn.href = '/dashboard/admin/templates/' + encodeURIComponent(tmpl.id) + '/edit';
-    } else {
-      els.editDraftBtn.style.display = 'none';
-    }
+    // The editor route calls ensureCuratedTemplateDraft, so migrated curated
+    // templates with a null templateDraftSiteId can still be opened here.
+    els.editDraftBtn.style.display = 'inline-flex';
+    els.editDraftBtn.href = '/dashboard/admin/templates/' + encodeURIComponent(tmpl.id) + '/edit';
 
     if (tmpl.publicationStatus === 'published') {
       els.publishBtn.style.display = 'none';

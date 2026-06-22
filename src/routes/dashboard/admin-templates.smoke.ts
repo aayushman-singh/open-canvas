@@ -15,6 +15,10 @@ for (const text of [
 ]) {
   assert(routeSource.includes(text), `admin visual panel missing ${text}`);
 }
+assert(
+  !routeSource.includes('if (tmpl.templateDraftSiteId)'),
+  'visual admin must not hide Edit draft for migrated templates without templateDraftSiteId',
+);
 
 const indexSource = readFileSync('src/index.ts', 'utf8');
 assert(indexSource.includes("app.route('/dashboard/admin/templates', adminTemplatesRoute)"));
