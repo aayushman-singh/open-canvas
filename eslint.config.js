@@ -12,7 +12,6 @@ export default tseslint.config(
       'node_modules/',
       'worker-configuration.d.ts',
       'src/routes/api/test-build-template.ts',
-      'src/editor-client/**/*.smoke.ts',
     ],
   },
   {
