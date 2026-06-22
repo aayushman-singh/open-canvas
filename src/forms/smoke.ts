@@ -305,6 +305,7 @@ class InMemoryDb {
     this.sites.push({
       id: row.id,
       customerId: 'cust-1',
+      siteKind: 'owner_site',
       name: 'Test',
       subdomain: 'test',
       styleKit: 'charcoal',

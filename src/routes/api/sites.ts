@@ -550,12 +550,16 @@ sites.post('/', async (c) => {
         assetManifest: customTemplate.assetManifest,
         visibility: customTemplate.visibility,
         customerId: customTemplate.customerId,
+        publicationStatus: customTemplate.publicationStatus,
       })
       .from(customTemplate)
       .where(eq(customTemplate.id, templateId))
       .limit(1);
     const dt = dtRow[0];
     if (!dt) {
+      return c.json({ error: `unknown templateId: ${templateId}` }, 404);
+    }
+    if (dt.visibility === 'global' && dt.publicationStatus !== 'published') {
       return c.json({ error: `unknown templateId: ${templateId}` }, 404);
     }
     if (!canReadScopedLibraryRow(dt, customerId)) {

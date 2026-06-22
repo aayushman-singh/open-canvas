@@ -1,4 +1,4 @@
-import { eq, or, sql } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth } from '../../auth/middleware';
@@ -561,7 +561,10 @@ templatesRoute.get('/', async (c) => {
     const customerPlan = customerRecord.plan;
 
     const whereClause = or(
-      eq(customTemplate.visibility, 'global'),
+      and(
+        eq(customTemplate.visibility, 'global'),
+        eq(customTemplate.publicationStatus, 'published'),
+      ),
       eq(customTemplate.customerId, customerId),
     );
 

@@ -107,6 +107,9 @@ export const customer = pgTable('customer', {
 export type Customer = typeof customer.$inferSelect;
 export type NewCustomer = typeof customer.$inferInsert;
 
+export const SITE_KINDS = ['owner_site', 'template_draft'] as const;
+export type SiteKind = (typeof SITE_KINDS)[number];
+
 export const site = pgTable(
   'site',
   {
@@ -116,6 +119,7 @@ export const site = pgTable(
     customerId: text('customer_id')
       .notNull()
       .references(() => customer.id, { onDelete: 'cascade' }),
+    siteKind: text('site_kind').notNull().default('owner_site').$type<SiteKind>(),
     name: text('name').notNull(),
     subdomain: text('subdomain').notNull().unique(),
     styleKit: text('style_kit').notNull().$type<StyleKit>(),
@@ -545,12 +549,27 @@ export type NewLibrarySection = typeof librarySection.$inferInsert;
 export const CUSTOM_TEMPLATE_VISIBILITY = ['global', 'private'] as const;
 export type CustomTemplateVisibility = (typeof CUSTOM_TEMPLATE_VISIBILITY)[number];
 
+export const CUSTOM_TEMPLATE_PUBLICATION_STATUSES = [
+  'drafting',
+  'published',
+  'unpublished',
+] as const;
+export type CustomTemplatePublicationStatus =
+  (typeof CUSTOM_TEMPLATE_PUBLICATION_STATUSES)[number];
+
 export const customTemplate = pgTable('custom_template', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   customerId: text('customer_id').references(() => customer.id, { onDelete: 'cascade' }),
   visibility: text('visibility').notNull().$type<CustomTemplateVisibility>(),
+  publicationStatus: text('publication_status')
+    .notNull()
+    .default('published')
+    .$type<CustomTemplatePublicationStatus>(),
+  templateDraftSiteId: text('template_draft_site_id').references(() => site.id, {
+    onDelete: 'set null',
+  }),
   name: text('name').notNull(),
   tagline: text('tagline').notNull().default(''),
   styleKit: text('style_kit').notNull(),
