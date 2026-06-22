@@ -21,6 +21,7 @@ coverage/
 .idea/
 .claude/
 .agents/
+.codex-screens/
 skills-lock.json
 RECON_AGENT.md
 PARALLEL_AGENT.md
