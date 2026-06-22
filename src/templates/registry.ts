@@ -39,6 +39,7 @@ import {
   type SectionInstanceRef,
 } from '../canvas/section-library/index.js';
 import { RAYDOTSH_ASCII_POINT_SETS } from './raydotsh-ascii-points.js';
+import { generatedTemplateSeeds } from './generated/manifest.js';
 
 /**
  * ADR 0061 Decision 6 — TemplateSeed shape.
@@ -1121,6 +1122,7 @@ export const allTemplateSeeds: ReadonlyArray<TemplateSeed> = [
   portfolioShowcaseTemplate,
   raydotshPortfolioTemplate,
   velocityAthleteTemplate,
+  ...generatedTemplateSeeds,
 ];
 
 const templatesById = new Map(allTemplateSeeds.map((template) => [template.id, template]));
