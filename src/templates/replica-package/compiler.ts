@@ -84,6 +84,69 @@ function renderGeneratedTemplateManifest(pkg: ReplicaSourcePackage): string {
   ].join('\n');
 }
 
+function renderGeneratedSmokeSource(pkg: ReplicaSourcePackage): string {
+  const requiredCopy = JSON.stringify(pkg.metadata.requiredCopy, null, 2);
+  const requiredAssetIds = JSON.stringify(pkg.metadata.requiredAssetIds, null, 2);
+  const forbidden = JSON.stringify(pkg.metadata.forbiddenRuntimeTokens, null, 2);
+  const nativeEvidence = JSON.stringify(
+    pkg.fidelityLedger.flatMap((item) => (item.status === 'native' ? (item.evidence ?? []) : [])),
+    null,
+    2,
+  );
+  const unsupportedIds = JSON.stringify(pkg.unsupported.map((item) => item.id), null, 2);
+  return `import { renderBuiltInTemplatePreviewBodyHtml } from './built-in-preview.js';
+import { getSeedAsset } from '../canvas/seed-assets.js';
+import { validateEditableSite, validatePublishedSnapshot, validateSeedFixture } from '../canvas/validate.js';
+import { getTemplateSeed, instantiateTemplate } from './registry.js';
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error('[${pkg.metadata.id}:replica-smoke] ' + message);
+}
+
+const seed = getTemplateSeed('${pkg.metadata.id}');
+assert(seed !== null, 'getTemplateSeed(\\'${pkg.metadata.id}\\') must resolve generated template');
+
+const state = instantiateTemplate('${pkg.metadata.id}');
+
+const editable = validateEditableSite(state);
+if (!editable.valid) {
+  throw new Error('[${pkg.metadata.id}:replica-smoke] ' + editable.errors.join('\\\\n'));
+}
+
+const seedFixture = validateSeedFixture(state);
+if (!seedFixture.valid) {
+  throw new Error('[${pkg.metadata.id}:replica-smoke] ' + seedFixture.errors.join('\\\\n'));
+}
+
+const published = validatePublishedSnapshot({ ...state, version: 1, publishedAt: '2026-06-22T00:00:00.000Z' });
+if (!published.valid) {
+  throw new Error('[${pkg.metadata.id}:replica-smoke] ' + published.errors.join('\\\\n'));
+}
+
+const html = renderBuiltInTemplatePreviewBodyHtml('${pkg.metadata.id}', {
+  turnstileSiteKey: '1x00000000000000000000AA',
+});
+for (const token of ${requiredCopy}) {
+  assert(html.includes(token), 'preview must include required copy ' + JSON.stringify(token));
+}
+for (const assetId of ${requiredAssetIds}) {
+  assert(getSeedAsset(assetId) !== null, 'seed asset must be registered ' + assetId);
+  assert(html.includes(assetId), 'preview must include seed asset id ' + assetId);
+}
+for (const token of ${forbidden}) {
+  assert(!html.toLowerCase().includes(String(token).toLowerCase()), 'preview must not include forbidden runtime token ' + token);
+}
+for (const token of ${nativeEvidence}) {
+  assert(html.includes(token), 'native fidelity evidence missing ' + JSON.stringify(token));
+}
+for (const unsupportedId of ${unsupportedIds}) {
+  assert(unsupportedId.length > 0, 'unsupported finding id must be non-empty');
+}
+
+console.log('[${pkg.metadata.id}:replica-smoke] OK');
+`;
+}
+
 function materializePage(pkg: ReplicaSourcePackage, page: ReplicaPageSource): EditableSite['pages'][number] {
   return {
     id: page.id,
@@ -157,6 +220,9 @@ async function compileSeedTarget(pkg: ReplicaSourcePackage, repoRoot: string): P
   const manifestPath = join(repoRoot, 'src', 'templates', 'generated', 'manifest.ts');
   await writeFileAtomic(manifestPath, renderGeneratedTemplateManifest(pkg));
   written.push(manifestPath);
+  const smokePath = join(repoRoot, 'src', 'templates', `${pkg.metadata.id}.replica.smoke.ts`);
+  await writeFileAtomic(smokePath, renderGeneratedSmokeSource(pkg));
+  written.push(smokePath);
   return written;
 }
 
