@@ -27,6 +27,8 @@
 // it by design. Only `validateSeedFixture` (canvas/validate.ts) reads it, and
 // only against the bundled fixture.
 
+import { GENERATED_SEED_ASSET_REGISTRY } from './seed-assets.generated.js';
+
 export interface SeedAsset {
   /**
    * Lower-case hex sha256 of the raw bytes referenced by `sourcePath`. This
@@ -563,6 +565,7 @@ export const SEED_ASSET_REGISTRY: Record<string, SeedAsset> = {
     ...VELOCITY_PRODUCT_STUDY,
     alt: 'Editorial product macro study with signal accents',
   },
+  ...GENERATED_SEED_ASSET_REGISTRY,
 };
 
 export const SEED_ASSET_IDS = Object.keys(SEED_ASSET_REGISTRY);

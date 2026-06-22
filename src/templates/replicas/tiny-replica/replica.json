@@ -1,0 +1,26 @@
+{
+  "id": "tiny-replica",
+  "name": "Tiny Replica",
+  "tagline": "A deterministic replica compiler fixture.",
+  "source": {
+    "kind": "url",
+    "url": "https://example.test/tiny-replica"
+  },
+  "targets": ["seed", "import"],
+  "styleKit": "charcoal",
+  "pageOrder": ["home"],
+  "requiredCopy": ["Tiny Replica", "Deterministic hero"],
+  "requiredAssetIds": ["seed-tiny-replica-mark"],
+  "forbiddenRuntimeTokens": ["React", "gsap", "ScrollTrigger"],
+  "assets": [
+    {
+      "id": "seed-tiny-replica-mark",
+      "sourcePath": "tiny-mark.svg",
+      "mediaType": "image/svg+xml",
+      "kind": "image",
+      "width": 96,
+      "height": 96,
+      "alt": "Tiny replica geometric mark"
+    }
+  ]
+}

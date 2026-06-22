@@ -96,18 +96,19 @@ import e87 from './studio-template-features.json' with { type: 'json' };
 import e88 from './studio-template-footer.json' with { type: 'json' };
 import e89 from './studio-template-header.json' with { type: 'json' };
 import e90 from './studio-template-hero.json' with { type: 'json' };
-import e91 from './velocity-template-artifacts.json' with { type: 'json' };
-import e92 from './velocity-template-footer.json' with { type: 'json' };
-import e93 from './velocity-template-header.json' with { type: 'json' };
-import e94 from './velocity-template-hero.json' with { type: 'json' };
-import e95 from './velocity-template-impact.json' with { type: 'json' };
-import e96 from './velocity-template-store.json' with { type: 'json' };
-import e97 from './velocity-template-story.json' with { type: 'json' };
-import e98 from './violet-template-cta.json' with { type: 'json' };
-import e99 from './violet-template-features.json' with { type: 'json' };
-import e100 from './violet-template-footer.json' with { type: 'json' };
-import e101 from './violet-template-header.json' with { type: 'json' };
-import e102 from './violet-template-hero.json' with { type: 'json' };
+import e91 from './tiny-replica-hero.json' with { type: 'json' };
+import e92 from './velocity-template-artifacts.json' with { type: 'json' };
+import e93 from './velocity-template-footer.json' with { type: 'json' };
+import e94 from './velocity-template-header.json' with { type: 'json' };
+import e95 from './velocity-template-hero.json' with { type: 'json' };
+import e96 from './velocity-template-impact.json' with { type: 'json' };
+import e97 from './velocity-template-store.json' with { type: 'json' };
+import e98 from './velocity-template-story.json' with { type: 'json' };
+import e99 from './violet-template-cta.json' with { type: 'json' };
+import e100 from './violet-template-features.json' with { type: 'json' };
+import e101 from './violet-template-footer.json' with { type: 'json' };
+import e102 from './violet-template-header.json' with { type: 'json' };
+import e103 from './violet-template-hero.json' with { type: 'json' };
 
 export const EXTRACTED_ENTRIES: ReadonlyArray<SectionLibraryEntry> = [
   e0 as SectionLibraryEntry,
@@ -213,4 +214,5 @@ export const EXTRACTED_ENTRIES: ReadonlyArray<SectionLibraryEntry> = [
   e100 as SectionLibraryEntry,
   e101 as SectionLibraryEntry,
   e102 as SectionLibraryEntry,
+  e103 as SectionLibraryEntry,
 ];

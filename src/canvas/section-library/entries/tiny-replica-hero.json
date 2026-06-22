@@ -1,0 +1,94 @@
+{
+  "baseSlug": "tiny-replica-hero",
+  "category": "hero",
+  "name": "Tiny Replica Hero",
+  "description": "Tiny Replica hero section used by the deterministic replica compiler smoke.",
+  "recipeId": "custom",
+  "headingPreview": "Tiny Replica",
+  "sectionData": {
+    "id": "tiny-replica-hero",
+    "recipeId": "custom",
+    "name": "Tiny Replica Hero",
+    "height": 520,
+    "elements": [
+      {
+        "id": "tiny-replica-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 520,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#f8fafc"
+        }
+      },
+      {
+        "id": "tiny-replica-mark",
+        "type": "media",
+        "box": {
+          "x": 104,
+          "y": 108,
+          "w": 96,
+          "h": 96,
+          "z": 2
+        },
+        "mediaKind": "image",
+        "assetId": "seed-tiny-replica-mark",
+        "alt": "Tiny replica geometric mark",
+        "fit": "contain"
+      },
+      {
+        "id": "tiny-replica-heading",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 100,
+          "w": 720,
+          "h": 96,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Tiny Replica"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 64,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#111827"
+        }
+      },
+      {
+        "id": "tiny-replica-body",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 212,
+          "w": 620,
+          "h": 72,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Deterministic hero emitted from a Replica Source Package."
+          }
+        ],
+        "role": "body",
+        "fontSize": 22,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#334155"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "tiny-replica"
+}

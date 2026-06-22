@@ -1,0 +1,8 @@
+[
+  {
+    "id": "custom-cursor",
+    "sourceBehaviour": "Reference cursor trail follows pointer movement.",
+    "reason": "Tiny Replica fixture does not model pointer-reactive effects.",
+    "requiredPrimitive": "Pointer-Reactive Effect"
+  }
+]
