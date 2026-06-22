@@ -1,0 +1,41 @@
+{
+  "replicaId": "tiny-replica",
+  "target": "both",
+  "writtenFiles": [
+    "C:\\Repo\\open-canvas\\.worktrees\\deterministic-replica-package\\src\\canvas\\section-library\\entries\\tiny-replica-hero.json",
+    "C:\\Repo\\open-canvas\\.worktrees\\deterministic-replica-package\\src\\assets\\seed-source\\tiny-replica-mark.svg.b64",
+    "C:\\Repo\\open-canvas\\.worktrees\\deterministic-replica-package\\src\\canvas\\seed-assets.generated.ts",
+    "C:\\Repo\\open-canvas\\.worktrees\\deterministic-replica-package\\src\\templates\\generated\\tiny-replica.ts",
+    "C:\\Repo\\open-canvas\\.worktrees\\deterministic-replica-package\\src\\templates\\generated\\manifest.ts",
+    "C:\\Repo\\open-canvas\\.worktrees\\deterministic-replica-package\\src\\templates\\tiny-replica.replica.smoke.ts",
+    "C:\\Repo\\open-canvas\\.worktrees\\deterministic-replica-package\\tmp\\replicas\\tiny-replica\\editable-site.json",
+    "C:\\Repo\\open-canvas\\.worktrees\\deterministic-replica-package\\tmp\\replicas\\tiny-replica\\asset-manifest.json"
+  ],
+  "unsupported": [
+    {
+      "id": "custom-cursor",
+      "sourceBehaviour": "Reference cursor trail follows pointer movement.",
+      "reason": "Tiny Replica fixture does not model pointer-reactive effects.",
+      "requiredPrimitive": "Pointer-Reactive Effect"
+    }
+  ],
+  "fidelityLedger": [
+    {
+      "id": "hero-copy",
+      "sourceBehaviour": "Hero heading, body copy, and source mark render as ordinary builder-native elements.",
+      "status": "native",
+      "primitive": "section-library",
+      "evidence": [
+        "Tiny Replica",
+        "Deterministic hero",
+        "seed-tiny-replica-mark"
+      ]
+    },
+    {
+      "id": "custom-cursor",
+      "sourceBehaviour": "Reference cursor trail is intentionally outside the tiny fixture output.",
+      "status": "unsupported",
+      "unsupportedId": "custom-cursor"
+    }
+  ]
+}
