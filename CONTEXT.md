@@ -24,6 +24,34 @@ _Avoid_: Customer, anonymous user, end user
 A curated composition that produces a new Editable Site. It references the Section Library by section id rather than embedding section data, and carries a Theme Choice, an optional site-pinned Header Section ref, an optional site-pinned Footer Section ref, and an ordered list of body Section Instances per page. Each Section Instance may carry a Section Override.
 _Avoid_: Template app, theme, preset, starter kit
 
+**Custom Template**:
+A reusable starting point captured from an Editable Site rather than curated as a Template Seed.
+_Avoid_: Saved site, clone, draft template
+
+**Curated Custom Template**:
+A Custom Template controlled by Template Curators and prepared for possible global publication.
+_Avoid_: Built-in template, Template Seed, public site
+
+**Published Global Custom Template**:
+A Curated Custom Template that every Owner can select as a starting point.
+_Avoid_: Built-in template, Template Seed, unpublished template
+
+**Template Curator**:
+A trusted person who can prepare, publish, unpublish, and remove Curated Custom Templates.
+_Avoid_: Owner, Visitor, Design Collaborator
+
+**Template Draft**:
+A hidden Editable Site used to prepare a Curated Custom Template before publication.
+_Avoid_: Published Site, Template Seed, source PR
+
+**Template Publication Status**:
+The curator-controlled state that decides whether a Curated Custom Template is selectable by Owners.
+_Avoid_: Visibility, access tier, draft mode
+
+**Template Asset Custodian**:
+A system account that owns media assets used by Template Drafts and Curated Custom Templates.
+_Avoid_: Owner, curator account, site owner
+
 **Editable Site**:
 The owner-controlled site state that can be changed before publishing.
 _Avoid_: Draft app, workspace
@@ -271,6 +299,14 @@ _Avoid_: Undo stack, version history, asset trail
 ## Relationships
 
 - An **Owner** creates an **Editable Site** from exactly one **Template Seed**
+- An **Owner** may create an **Editable Site** from one **Custom Template**
+- A **Published Global Custom Template** is a **Curated Custom Template** that every **Owner** may use
+- A **Template Curator** prepares a **Curated Custom Template** through a **Template Draft**
+- A **Template Draft** is an **Editable Site** that does not appear as a normal Owner site
+- A **Curated Custom Template** has at most one **Template Draft**
+- A **Curated Custom Template** changes only after explicit publication from a **Template Draft**
+- A **Template Publication Status** determines whether a **Curated Custom Template** is a **Published Global Custom Template**
+- A **Template Asset Custodian** owns assets used by **Template Drafts**
 - An **Editable Site** contains one or more **Canvas Pages**
 - An **Editable Site** may have one **Header Section** and one **Footer Section** shared by every **Canvas Page**
 - A **Canvas Page** contains one or more **Canvas Sections**

@@ -93,6 +93,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0082 | Vector Animation Rich Motion adapter | Proposed | [`docs/adr/0082-vector-animation-rich-motion-adapter.md`](0082-vector-animation-rich-motion-adapter.md) |
 | 0083 | Interactive Vector Rich Motion adapter | Proposed | [`docs/adr/0083-interactive-vector-rich-motion-adapter.md`](0083-interactive-vector-rich-motion-adapter.md) |
 | 0084 | Bounded 3D Rich Motion adapter | Proposed | [`docs/adr/0084-bounded-3d-rich-motion-adapter.md`](0084-bounded-3d-rich-motion-adapter.md) |
+| 0085 | Curated Custom Templates use hidden Template Drafts | Proposed | [`docs/adr/0085-curated-custom-template-drafts.md`](0085-curated-custom-template-drafts.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 
