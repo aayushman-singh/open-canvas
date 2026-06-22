@@ -28,11 +28,11 @@ import { signEditToken } from './auth/edit-token';
 import { buildLocalSignInUrl, buildSignInUrl } from './auth/require-auth';
 import { resolveLocalSignInRedirect } from './auth/sign-in-route';
 import {
-  prepareSeedAssetsForCustomer,
   RESERVED_SUBDOMAINS,
   SUBDOMAIN_RE,
   validateSubdomain,
 } from './routes/api/sites';
+import { prepareSeedAssetsForCustomer } from './templates/seed-asset-materialization';
 import { canReadScopedLibraryRow, escapeHtmlText } from './routes/api/library-access';
 import { getAddon } from './addons/registry';
 import {

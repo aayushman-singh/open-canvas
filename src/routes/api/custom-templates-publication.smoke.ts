@@ -129,4 +129,8 @@ assert(
   "renameCuratedTemplate must dynamically check and assign tagline if defined"
 );
 
+// 6. Refactor check: curated-admin.ts must not import from routes/api/sites and must import the shared module
+assert(!curatedAdminSource.includes("../routes/api/sites"), "curated-admin.ts must not import from ../routes/api/sites.js");
+assert(curatedAdminSource.includes("./seed-asset-materialization.js"), "curated-admin.ts must import from seed-asset-materialization.js");
+
 console.log('[custom-templates-publication:smoke] OK');

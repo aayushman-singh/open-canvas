@@ -37,7 +37,7 @@ import {
 } from './site-assets.js';
 import type { CanvasElement, CanvasPage, EditableSite } from '../canvas/schema.js';
 import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
-import { prepareSeedAssetsForCustomer } from '../routes/api/sites.js';
+import { prepareSeedAssetsForCustomer } from '../templates/seed-asset-materialization.js';
 import type { Db } from '../db/client.js';
 import { ownerAsset, site, slotHistory } from '../db/schema.js';
 

@@ -5,7 +5,7 @@ import type { StyleKit, EditableSite } from '../canvas/schema.js';
 import { instantiateTemplate } from './registry.js';
 import { validateEditableSite } from '../canvas/validate.js';
 import { buildAssetManifest } from './custom-template-assets.js';
-import { prepareSeedAssetsForCustomer } from '../routes/api/sites.js';
+import { prepareSeedAssetsForCustomer } from './seed-asset-materialization.js';
 
 export interface CuratedTemplateSummary {
   id: string;
