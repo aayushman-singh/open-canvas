@@ -9,6 +9,7 @@ import {
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import { uploadOwnerAsset, UploadAssetError } from '../../assets/upload';
 import { loadAccessibleSite, type SiteAccessRequirement } from '../../auth/accessible-site';
+import { loadTemplateDraftForCurator } from '../../templates/template-draft-access';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import {
@@ -200,7 +201,22 @@ async function loadCanvasSiteAccess(
     c.get('customer')?.id,
   );
   if (!accessibleSite) {
-    return { found: false };
+    const draft = await loadTemplateDraftForCurator(database, c.get('customer'), siteId);
+    if (!draft) {
+      return { found: false };
+    }
+    return {
+      found: true,
+      ownerCustomerId: draft.customerId,
+      site: {
+        id: draft.id,
+        name: draft.name,
+        subdomain: draft.subdomain,
+        styleKit: draft.styleKit,
+        editableState: draft.editableState,
+        publishedVersion: draft.publishedVersion,
+      },
+    };
   }
 
   return {

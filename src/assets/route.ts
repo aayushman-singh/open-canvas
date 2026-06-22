@@ -13,6 +13,7 @@ import { listOwnerAssets } from './list.js';
 import { createR2Client } from './r2-client.js';
 import { uploadOwnerAsset, UploadAssetError } from './upload.js';
 import { loadAccessibleSite } from '../auth/accessible-site.js';
+import { loadTemplateDraftForCurator } from '../templates/template-draft-access.js';
 import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
 import { requireAuth } from '../auth/require-auth.js';
 import { db } from '../db/client.js';
@@ -23,6 +24,7 @@ type Bindings = {
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
   ASSETS_BUCKET: R2Bucket;
+  TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?: string;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -47,15 +49,51 @@ async function resolveCustomerId(c: Context<Env>): Promise<string | null> {
 }
 
 ownerAssetsApi.get('/', async (c) => {
-  const customerId = await resolveCustomerId(c);
-  if (!customerId) {
+  const siteId = c.req.query('siteId');
+  const database = db(c.env);
+  let targetCustomerId: string | null = null;
+
+  if (siteId !== undefined && siteId.length > 0) {
+    const auth = c.get('auth');
+    if (!auth.userId) {
+      throw new Error('owner-assets api reached without an authenticated user');
+    }
+    const accessible = await loadAccessibleSite(
+      database,
+      auth.userId,
+      siteId,
+      'viewer',
+      c.get('customer')?.id,
+    );
+    if (accessible) {
+      targetCustomerId = accessible.customerId;
+    } else {
+      const draft = await loadTemplateDraftForCurator(database, c.get('customer'), siteId);
+      if (draft) {
+        const custodianId = c.env.TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?.trim();
+        if (!custodianId) {
+          return c.json({ error: 'TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID must be set' }, 500);
+        }
+        if (custodianId !== draft.customerId) {
+          return c.json({ error: 'template draft customer does not match TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID' }, 500);
+        }
+        targetCustomerId = draft.customerId;
+      } else {
+        return c.json({ error: 'site not found' }, 404);
+      }
+    }
+  } else {
+    targetCustomerId = await resolveCustomerId(c);
+  }
+
+  if (!targetCustomerId) {
     // Same contract as the canvas API: a Clerk-authenticated user without a
     // materialised customer row gets an empty gallery, not a 404. The
     // dashboard's first-visit hook creates the row.
     return c.json({ assets: [] });
   }
-  const database = db(c.env);
-  const assets = await listOwnerAssets(database, customerId);
+
+  const assets = await listOwnerAssets(database, targetCustomerId);
   return c.json({ assets });
 });
 
@@ -106,11 +144,24 @@ ownerAssetsApi.post('/', async (c) => {
       c.get('customer')?.id,
     );
     if (!accessible) {
-      // Same contract as other site-scoped routes: missing OR not allowed
-      // collapses to 404 so the route doesn't leak existence.
-      return c.json({ error: 'site not found' }, 404);
+      const draft = await loadTemplateDraftForCurator(database, c.get('customer'), siteId);
+      if (draft) {
+        const custodianId = c.env.TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?.trim();
+        if (!custodianId) {
+          return c.json({ error: 'TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID must be set' }, 500);
+        }
+        if (custodianId !== draft.customerId) {
+          return c.json({ error: 'template draft customer does not match TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID' }, 500);
+        }
+        customerId = draft.customerId;
+      } else {
+        // Same contract as other site-scoped routes: missing OR not allowed
+        // collapses to 404 so the route doesn't leak existence.
+        return c.json({ error: 'site not found' }, 404);
+      }
+    } else {
+      customerId = accessible.customerId;
     }
-    customerId = accessible.customerId;
   } else {
     const ownCustomerId = await resolveCustomerId(c);
     if (!ownCustomerId) {

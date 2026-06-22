@@ -133,4 +133,35 @@ assert(
 assert(!curatedAdminSource.includes("../routes/api/sites"), "curated-admin.ts must not import from ../routes/api/sites.js");
 assert(curatedAdminSource.includes("./seed-asset-materialization.js"), "curated-admin.ts must import from seed-asset-materialization.js");
 
+// Task 3: Access assertions for template draft access, canvas, and asset routes
+const draftAccessSource = readFileSync('src/templates/template-draft-access.ts', 'utf8');
+assert(
+  draftAccessSource.includes('isTemplateSourceAdminCustomer'),
+  'template draft access must be restricted to Template Curators',
+);
+assert(
+  draftAccessSource.includes("eq(site.siteKind, 'template_draft')"),
+  'template draft access must only open template_draft sites',
+);
+
+const canvasApiSource = readFileSync('src/routes/api/canvas.ts', 'utf8');
+assert(
+  canvasApiSource.includes('loadTemplateDraftForCurator'),
+  'canvas API must use template draft access after normal site access misses',
+);
+
+const assetRouteSource = readFileSync('src/assets/route.ts', 'utf8');
+assert(
+  assetRouteSource.includes('loadTemplateDraftForCurator'),
+  'asset API must scope template draft asset list/upload through custodian site owner',
+);
+assert(
+  assetRouteSource.includes('TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID'),
+  'asset API must verify configured custodian before listing/uploading template draft assets',
+);
+assert(
+  assetRouteSource.includes("c.req.query('siteId')"),
+  'asset GET must accept siteId so template mode can list custodian assets',
+);
+
 console.log('[custom-templates-publication:smoke] OK');
