@@ -281,7 +281,7 @@ function renderPreviewPage(templateId: string, turnstileSiteKey: string): string
 
 const adminScript = `
 (() => {
-  const base = '/dashboard/admin/templates';
+  const base = '/dashboard/admin/template-source';
   const state = { templates: [], selectedTemplateId: null, document: null, selectedSectionId: null };
   const els = {
     root: document.querySelector('[data-template-source-admin]'),
@@ -442,7 +442,7 @@ adminTemplateSourceRoute.get('/', (c) => {
         <h1>Template source admin</h1>
         <a
           id="sourcePreviewLink"
-          href="/dashboard/admin/templates/preview/starter-canvas"
+          href="/dashboard/admin/template-source/preview/starter-canvas"
           class="btn btn-secondary"
           target="_blank"
           rel="noreferrer"
