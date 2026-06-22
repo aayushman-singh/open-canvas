@@ -1,0 +1,15 @@
+[
+  {
+    "id": "hero-copy",
+    "sourceBehaviour": "Hero heading, body copy, and source mark render as ordinary builder-native elements.",
+    "status": "native",
+    "primitive": "section-library",
+    "evidence": ["Tiny Replica", "Deterministic hero", "seed-tiny-replica-mark"]
+  },
+  {
+    "id": "custom-cursor",
+    "sourceBehaviour": "Reference cursor trail is intentionally outside the tiny fixture output.",
+    "status": "unsupported",
+    "unsupportedId": "custom-cursor"
+  }
+]
