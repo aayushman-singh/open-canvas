@@ -15,7 +15,7 @@
 //   GET    /api/custom-templates/:id/preview  — render preview HTML
 //   GET    /api/custom-templates/:id/assets/:assetId — serve asset from R2
 
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { loadAccessibleSite } from '../../auth/accessible-site.js';
@@ -25,7 +25,7 @@ import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
 import { canvasPublishedStyles } from '../../canvas/public-styles.js';
 import { renderCanvasSnapshot } from '../../canvas/render.js';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form.js';
-import type { EditableSite, PublishedSnapshot } from '../../canvas/schema.js';
+import type { PublishedSnapshot } from '../../canvas/schema.js';
 import { injectInteractiveRuntime } from '../../interactive/inject.js';
 import { validateEditableSite } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
@@ -34,11 +34,20 @@ import {
   customTemplate,
   CUSTOM_TEMPLATE_VISIBILITY,
   type CustomTemplateVisibility,
-  ownerAsset,
   site,
-  type AssetManifestEntry,
 } from '../../db/schema.js';
 import { canReadScopedLibraryRow, escapeHtmlText } from './library-access.js';
+import { buildAssetManifest } from '../../templates/custom-template-assets.js';
+import {
+  listCuratedTemplates,
+  ensureCuratedTemplateDraft,
+  createCuratedTemplateDraft,
+  publishCuratedTemplateDraft,
+  unpublishCuratedTemplate,
+  renameCuratedTemplate,
+  duplicateCuratedTemplateDraft,
+  deleteCuratedTemplate,
+} from '../../templates/curated-admin.js';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -47,6 +56,7 @@ type Bindings = {
   ADMIN_CLERK_USER_IDS?: string;
   ASSETS_BUCKET: R2Bucket;
   TURNSTILE_SITE_KEY?: string;
+  TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?: string;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -65,63 +75,6 @@ async function resolveCustomerId(
     .where(eq(customer.clerkUserId, clerkUserId))
     .limit(1);
   return row[0]?.id ?? null;
-}
-
-function collectAssetIds(state: EditableSite): Set<string> {
-  const ids = new Set<string>();
-  for (const page of state.pages) {
-    for (const section of page.sections) {
-      for (const element of section.elements) {
-        if (element.type !== 'media') continue;
-        ids.add(element.assetId);
-        if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
-          ids.add(element.posterAssetId);
-        }
-      }
-    }
-  }
-  return ids;
-}
-
-async function buildAssetManifest(
-  database: ReturnType<typeof db>,
-  customerId: string,
-  state: EditableSite,
-): Promise<AssetManifestEntry[]> {
-  const assetIds = collectAssetIds(state);
-  if (assetIds.size === 0) return [];
-
-  const rows = await database
-    .select({
-      id: ownerAsset.id,
-      contentHash: ownerAsset.contentHash,
-      r2Key: ownerAsset.r2Key,
-      mediaType: ownerAsset.mediaType,
-      kind: ownerAsset.kind,
-      alt: ownerAsset.alt,
-      width: ownerAsset.width,
-      height: ownerAsset.height,
-      byteSize: ownerAsset.byteSize,
-    })
-    .from(ownerAsset)
-    .where(eq(ownerAsset.customerId, customerId));
-
-  const manifest: AssetManifestEntry[] = [];
-  for (const row of rows) {
-    if (!assetIds.has(row.id)) continue;
-    manifest.push({
-      assetId: row.id,
-      contentHash: row.contentHash,
-      r2Key: row.r2Key,
-      mediaType: row.mediaType,
-      kind: row.kind,
-      alt: row.alt,
-      width: row.width,
-      height: row.height,
-      byteSize: row.byteSize,
-    });
-  }
-  return manifest;
 }
 
 // ---------------------------------------------------------------------------
@@ -387,6 +340,149 @@ customTemplatesAdmin.use('*', clerkAuth());
 customTemplatesAdmin.use('*', requireAuth());
 customTemplatesAdmin.use('*', requireAdmin());
 
+customTemplatesAdmin.get('/', async (c) => {
+  try {
+    const templates = await listCuratedTemplates(db(c.env));
+    return c.json({ templates });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error(`[admin] Error in GET ${c.req.path}:`, msg, stack);
+    return c.json({ error: msg }, 500);
+  }
+});
+
+customTemplatesAdmin.post('/drafts', async (c) => {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const sourceId = typeof body.sourceId === 'string' ? body.sourceId : undefined;
+    const sourceTemplateId = typeof body.sourceTemplateId === 'string' ? body.sourceTemplateId : undefined;
+    const name = typeof body.name === 'string' ? body.name : '';
+    const tagline = typeof body.tagline === 'string' ? body.tagline : undefined;
+
+    const result = await createCuratedTemplateDraft(
+      { database: db(c.env), env: c.env },
+      {
+        sourceId,
+        sourceTemplateId,
+        name,
+        tagline,
+      }
+    );
+    return c.json(result);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error(`[admin] Error in POST ${c.req.path}:`, msg, stack);
+    return c.json({ error: msg }, 500);
+  }
+});
+
+customTemplatesAdmin.post('/:id/draft', async (c) => {
+  const id = c.req.param('id');
+  try {
+    const result = await ensureCuratedTemplateDraft(
+      { database: db(c.env), env: c.env },
+      id
+    );
+    return c.json(result);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error(`[admin] Error in POST ${c.req.path} (id: ${id}):`, msg, stack);
+    return c.json({ error: msg }, 500);
+  }
+});
+
+customTemplatesAdmin.post('/:id/publish', async (c) => {
+  const id = c.req.param('id');
+  try {
+    const result = await publishCuratedTemplateDraft(
+      { database: db(c.env), env: c.env },
+      id
+    );
+    return c.json(result);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error(`[admin] Error in POST ${c.req.path} (id: ${id}):`, msg, stack);
+    return c.json({ error: msg }, 500);
+  }
+});
+
+customTemplatesAdmin.post('/:id/unpublish', async (c) => {
+  const id = c.req.param('id');
+  try {
+    const result = await unpublishCuratedTemplate(
+      { database: db(c.env) },
+      id
+    );
+    return c.json(result);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error(`[admin] Error in POST ${c.req.path} (id: ${id}):`, msg, stack);
+    return c.json({ error: msg }, 500);
+  }
+});
+
+customTemplatesAdmin.patch('/:id', async (c) => {
+  const id = c.req.param('id');
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const name = typeof body.name === 'string' ? body.name : '';
+    const tagline = typeof body.tagline === 'string' ? body.tagline : undefined;
+
+    await renameCuratedTemplate(
+      { database: db(c.env) },
+      id,
+      { name, tagline }
+    );
+    return c.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error(`[admin] Error in PATCH ${c.req.path} (id: ${id}):`, msg, stack);
+    return c.json({ error: msg }, 500);
+  }
+});
+
+customTemplatesAdmin.post('/:id/duplicate', async (c) => {
+  const id = c.req.param('id');
+  try {
+    const result = await duplicateCuratedTemplateDraft(
+      { database: db(c.env), env: c.env },
+      id
+    );
+    return c.json(result);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error(`[admin] Error in POST ${c.req.path} (id: ${id}):`, msg, stack);
+    return c.json({ error: msg }, 500);
+  }
+});
+
+customTemplatesAdmin.delete('/:id', async (c) => {
+  const id = c.req.param('id');
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const confirmationName = typeof body.confirmationName === 'string' ? body.confirmationName : '';
+
+    await deleteCuratedTemplate(
+      { database: db(c.env) },
+      id,
+      confirmationName
+    );
+    return c.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error(`[admin] Error in DELETE ${c.req.path} (id: ${id}):`, msg, stack);
+    return c.json({ error: msg }, 500);
+  }
+});
+
 customTemplatesAdmin.post('/', async (c) => {
   const auth = c.get('auth');
   if (!auth.userId) throw new Error('admin custom-templates reached without auth');
@@ -428,22 +524,4 @@ customTemplatesAdmin.post('/', async (c) => {
     .returning({ id: customTemplate.id });
 
   return c.json({ ok: true, id: row!.id });
-});
-
-customTemplatesAdmin.delete('/:id', async (c) => {
-  const database = db(c.env);
-
-  const deleted = await database
-    .delete(customTemplate)
-    .where(
-      and(
-        eq(customTemplate.id, c.req.param('id')),
-        isNull(customTemplate.customerId),
-        eq(customTemplate.visibility, 'global'),
-      ),
-    )
-    .returning({ id: customTemplate.id });
-
-  if (deleted.length === 0) return c.json({ error: 'global template not found' }, 404);
-  return c.json({ ok: true });
 });

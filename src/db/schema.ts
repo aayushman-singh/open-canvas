@@ -557,27 +557,35 @@ export const CUSTOM_TEMPLATE_PUBLICATION_STATUSES = [
 export type CustomTemplatePublicationStatus =
   (typeof CUSTOM_TEMPLATE_PUBLICATION_STATUSES)[number];
 
-export const customTemplate = pgTable('custom_template', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  customerId: text('customer_id').references(() => customer.id, { onDelete: 'cascade' }),
-  visibility: text('visibility').notNull().$type<CustomTemplateVisibility>(),
-  publicationStatus: text('publication_status')
-    .notNull()
-    .default('published')
-    .$type<CustomTemplatePublicationStatus>(),
-  templateDraftSiteId: text('template_draft_site_id').references(() => site.id, {
-    onDelete: 'set null',
-  }),
-  name: text('name').notNull(),
-  tagline: text('tagline').notNull().default(''),
-  styleKit: text('style_kit').notNull(),
-  siteState: jsonb('site_state').notNull().$type<EditableSite>(),
-  assetManifest: jsonb('asset_manifest').notNull().$type<AssetManifestEntry[]>(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const customTemplate = pgTable(
+  'custom_template',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    customerId: text('customer_id').references(() => customer.id, { onDelete: 'cascade' }),
+    visibility: text('visibility').notNull().$type<CustomTemplateVisibility>(),
+    publicationStatus: text('publication_status')
+      .notNull()
+      .default('published')
+      .$type<CustomTemplatePublicationStatus>(),
+    templateDraftSiteId: text('template_draft_site_id').references(() => site.id, {
+      onDelete: 'set null',
+    }),
+    name: text('name').notNull(),
+    tagline: text('tagline').notNull().default(''),
+    styleKit: text('style_kit').notNull(),
+    siteState: jsonb('site_state').notNull().$type<EditableSite>(),
+    assetManifest: jsonb('asset_manifest').notNull().$type<AssetManifestEntry[]>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    templateDraftSiteIdUnique: uniqueIndex('custom_template_template_draft_site_id_unique')
+      .on(table.templateDraftSiteId)
+      .where(sql`template_draft_site_id IS NOT NULL`),
+  })
+);
 
 export type CustomTemplate = typeof customTemplate.$inferSelect;
 export type NewCustomTemplate = typeof customTemplate.$inferInsert;
