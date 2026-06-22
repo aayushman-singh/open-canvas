@@ -1,5 +1,5 @@
-import { readdir, readFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { readdir, readFile, access } from 'node:fs/promises';
+import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { StyleKitPreset } from '../../canvas/schema.js';
 import type { SectionLibraryEntry } from '../../canvas/section-library/index.js';
@@ -158,7 +158,162 @@ function validateUnsupported(value: unknown): ReplicaUnsupportedFinding[] {
   return value as ReplicaUnsupportedFinding[];
 }
 
-export function assertReplicaPackage(pkg: ReplicaSourcePackage): void {
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function validateAssetSourcePath(rootDir: string, sourcePath: string, assetId: string): Promise<void> {
+  if (isAbsolute(sourcePath) || sourcePath.startsWith('/') || sourcePath.startsWith('\\') || /^[a-zA-Z]:/.test(sourcePath)) {
+    throw new Error(`replica-package: asset "${assetId}" sourcePath "${sourcePath}" is an absolute path or escape attempt`);
+  }
+  
+  const assetsDir = resolve(rootDir, 'assets');
+  const assetFilePath = resolve(assetsDir, sourcePath);
+  
+  const relativePath = relative(assetsDir, assetFilePath);
+  if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+    throw new Error(`replica-package: asset "${assetId}" sourcePath "${sourcePath}" escapes assets directory`);
+  }
+  
+  if (!(await fileExists(assetFilePath))) {
+    throw new Error(`replica-package: asset file "${sourcePath}" does not exist for asset "${assetId}"`);
+  }
+}
+
+async function scanForbiddenTokens(rootDir: string, forbiddenTokens: string[]): Promise<void> {
+  if (forbiddenTokens.length === 0) return;
+
+  const filesToScan: { path: string; isMetadata: boolean }[] = [];
+
+  // replica.json (metadata)
+  const replicaJsonPath = join(rootDir, 'replica.json');
+  if (await fileExists(replicaJsonPath)) {
+    filesToScan.push({ path: replicaJsonPath, isMetadata: true });
+  }
+
+  // pages/*.json
+  const pagesDir = join(rootDir, 'pages');
+  if (await fileExists(pagesDir)) {
+    for (const name of await readdir(pagesDir)) {
+      if (name.endsWith('.json')) {
+        filesToScan.push({ path: join(pagesDir, name), isMetadata: false });
+      }
+    }
+  }
+
+  // sections/*.json
+  const sectionsDir = join(rootDir, 'sections');
+  if (await fileExists(sectionsDir)) {
+    for (const name of await readdir(sectionsDir)) {
+      if (name.endsWith('.json')) {
+        filesToScan.push({ path: join(sectionsDir, name), isMetadata: false });
+      }
+    }
+  }
+
+  for (const { path: filePath, isMetadata } of filesToScan) {
+    let content = await readFile(filePath, 'utf8');
+
+    if (isMetadata) {
+      try {
+        const parsed = JSON.parse(content) as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const clone = { ...parsed } as Record<string, unknown>;
+          delete clone.forbiddenRuntimeTokens;
+          content = JSON.stringify(clone);
+        }
+      } catch (cause) {
+        throw new Error(`replica-package: ${filePath} is not valid JSON`, { cause });
+      }
+    }
+
+    for (const token of forbiddenTokens) {
+      if (content.includes(token)) {
+        const fileRef = relative(rootDir, filePath).replace(/\\/g, '/');
+        throw new Error(`replica-package: forbidden runtime token "${token}" found in "${fileRef}"`);
+      }
+    }
+  }
+}
+
+export async function assertReplicaPackage(pkg: ReplicaSourcePackage): Promise<void> {
+  // 1. Duplicate pageOrder entries (checked first because it validates the package topology)
+  const seenPageOrder = new Set<string>();
+  for (const pageStem of pkg.metadata.pageOrder) {
+    if (seenPageOrder.has(pageStem)) {
+      throw new Error(`replica-package: duplicate pageOrder entry "${pageStem}"`);
+    }
+    seenPageOrder.add(pageStem);
+  }
+
+  // 2. Duplicate asset IDs in metadata.assets
+  const seenAssetIds = new Set<string>();
+  for (const asset of pkg.metadata.assets) {
+    if (seenAssetIds.has(asset.id)) {
+      throw new Error(`replica-package: duplicate asset id "${asset.id}"`);
+    }
+    seenAssetIds.add(asset.id);
+  }
+
+  // 3. Duplicate page IDs
+  const seenPageIds = new Set<string>();
+  for (const page of pkg.pages) {
+    if (seenPageIds.has(page.id)) {
+      throw new Error(`replica-package: duplicate page id "${page.id}"`);
+    }
+    seenPageIds.add(page.id);
+  }
+
+  // 4. Duplicate page slugs
+  const seenPageSlugs = new Set<string>();
+  for (const page of pkg.pages) {
+    if (seenPageSlugs.has(page.slug)) {
+      throw new Error(`replica-package: duplicate page slug "${page.slug}"`);
+    }
+    seenPageSlugs.add(page.slug);
+  }
+
+  // 5. Duplicate section baseSlug values
+  const seenBaseSlugs = new Set<string>();
+  for (const section of pkg.sections) {
+    if (seenBaseSlugs.has(section.baseSlug)) {
+      throw new Error(`replica-package: duplicate section baseSlug "${section.baseSlug}"`);
+    }
+    seenBaseSlugs.add(section.baseSlug);
+  }
+
+  // 6. Duplicate page section references / instance IDs on the same page
+  for (const page of pkg.pages) {
+    const seenSectionRefs = new Set<string>();
+    const seenInstanceIds = new Set<string>();
+    for (const ref of page.sections) {
+      if (seenSectionRefs.has(ref)) {
+        throw new Error(`replica-package: page "${page.fileStem}" has duplicate section reference "${ref}"`);
+      }
+      seenSectionRefs.add(ref);
+
+      const instanceId = ref.replace(/[^a-z0-9]/g, '');
+      if (seenInstanceIds.has(instanceId)) {
+        throw new Error(`replica-package: page "${page.fileStem}" has duplicate section instance ID "${instanceId}" (from reference "${ref}")`);
+      }
+      seenInstanceIds.add(instanceId);
+    }
+  }
+
+  // 7. Validate each metadata asset sourcePath resolves under the package assets directory and exists
+  for (const asset of pkg.metadata.assets) {
+    await validateAssetSourcePath(pkg.rootDir, asset.sourcePath, asset.id);
+  }
+
+  // 8. Scan for forbidden runtime tokens
+  await scanForbiddenTokens(pkg.rootDir, pkg.metadata.forbiddenRuntimeTokens);
+
+  // Existing validations
   const pageStems = new Set(pkg.pages.map((page) => page.fileStem));
   for (const pageStem of pkg.metadata.pageOrder) {
     if (!pageStems.has(pageStem)) throw new Error(`replica-package: pageOrder references missing page "${pageStem}"`);
@@ -227,6 +382,6 @@ export async function loadReplicaPackage(sourceDir: string): Promise<ReplicaSour
     fidelityLedger: validateFidelity(await readJsonFile(join(sourceDir, 'fidelity-ledger.json'))),
     unsupported: validateUnsupported(await readJsonFile(join(sourceDir, 'unsupported.json'))),
   };
-  assertReplicaPackage(pkg);
+  await assertReplicaPackage(pkg);
   return pkg;
 }
