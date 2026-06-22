@@ -164,4 +164,10 @@ assert(
   'asset GET must accept siteId so template mode can list custodian assets',
 );
 
+const devVarsExample = readFileSync('.dev.vars.example', 'utf8');
+assert(
+  devVarsExample.includes('TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID'),
+  '.dev.vars.example must document the template asset custodian config',
+);
+
 console.log('[custom-templates-publication:smoke] OK');

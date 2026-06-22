@@ -75,6 +75,13 @@ TEMPLATE_SOURCE_GITHUB_REPOSITORY=aayushman-singh/open-canvas
 TEMPLATE_SOURCE_GITHUB_BASE_BRANCH=main
 
 # ---------------------------------------------------------------------------
+# Visual template admin
+# ---------------------------------------------------------------------------
+# Customer id that owns hidden template-draft sites and draft-uploaded assets.
+# Missing value blocks draft creation, draft asset upload/listing, and publish.
+TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID=
+
+# ---------------------------------------------------------------------------
 # Database (Neon)
 # ---------------------------------------------------------------------------
 # Neon Serverless Postgres connection string. Owns the rev01 schema.
