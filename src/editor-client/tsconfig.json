@@ -5,5 +5,5 @@
     "types": []
   },
   "include": ["**/*.ts"],
-  "exclude": []
+  "exclude": ["**/*.smoke.ts"]
 }

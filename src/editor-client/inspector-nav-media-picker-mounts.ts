@@ -42,6 +42,7 @@ import {
 } from '../canvas/schema.js';
 import { field, selectInput } from './dom-builders.js';
 import { createInspectorEntry } from './inspector-leaf-builders.js';
+import { ownerAssetsPath } from './runtime-helpers.js';
 
 // ADR 0064 — nav-link list + nav primary-action share the same coupling
 // surface: re-render + persist on commit, plus status emission for the
@@ -307,7 +308,7 @@ export function mountNavLogo(
   async function refreshGalleryGrid(): Promise<void> {
     let entries: Array<{ id?: string; assetId?: string; kind?: string }>;
     try {
-      const resp = await ctx.authFetch(ctx.apiBase + '/owner/assets');
+      const resp = await ctx.authFetch(ownerAssetsPath(ctx));
       if (!resp.ok) {
         console.error('logo gallery fetch failed', resp.status);
         return;
@@ -723,7 +724,7 @@ export function mountMediaPicker(
   async function refreshGalleryGrid(): Promise<void> {
     let entries: Array<{ id?: string; assetId?: string; kind?: string }>;
     try {
-      const resp = await ctx.authFetch(ctx.apiBase + '/owner/assets');
+      const resp = await ctx.authFetch(ownerAssetsPath(ctx));
       if (!resp.ok) {
         console.error('gallery fetch failed', resp.status);
         return;

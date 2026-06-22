@@ -31,6 +31,7 @@ const boot: EditorBoot = {
   wsToken: '',
   displayName: 'Smoke',
   userId: 'user-smoke',
+  editorMode: 'site',
 };
 
 // Pull a reference to createEditor so the import doesn't tree-shake away
@@ -46,6 +47,7 @@ assert(boot.apiBase === '/api', 'apiBase fixture round-trips');
 assert(boot.wsToken === '', 'wsToken fixture round-trips');
 assert(boot.displayName === 'Smoke', 'displayName fixture round-trips');
 assert(boot.userId === 'user-smoke', 'userId fixture round-trips');
+assert(boot.editorMode === 'site', 'editorMode fixture round-trips');
 
 // Phase 3 cutover guard: createEditor is now the production entrypoint, so
 // these ctx members must be live functions. A stub here means normal editor

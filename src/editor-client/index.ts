@@ -161,7 +161,7 @@ import {
   previewOverlayInEditor,
   previewRouteTransitionInEditor,
 } from './hydrate-interactives.js';
-import { attachPublishButtonImpl, publishSiteImpl, updateVersionBadgeImpl } from './publish.js';
+import { attachPublishButtonImpl, publishSiteImpl, publishTemplateImpl, updateVersionBadgeImpl } from './publish.js';
 import {
   attachVersionBadgeImpl,
   closeVersionPillImpl,
@@ -490,6 +490,9 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
       init === undefined ? authFetchImpl(ctx, input) : authFetchImpl(ctx, input, init),
     apiBase: boot.apiBase,
     siteId: boot.siteId,
+    editorMode: boot.editorMode,
+    templateId: boot.templateId,
+    assetLibrarySiteId: boot.assetLibrarySiteId,
     applyAssetIdToElement: runtimeHelperNotInstalled('applyAssetIdToElement'),
     runDeleteAsset: runtimeHelperNotInstalled('runDeleteAsset'),
     uploadMediaForElement: runtimeHelperNotInstalled('uploadMediaForElement'),
@@ -859,6 +862,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     deleteElement: (section, element) => deleteElement(ctx, section, element),
     updateVersionBadge: (version) => updateVersionBadgeImpl(ctx, version),
     publishSite: () => publishSiteImpl(ctx),
+    publishTemplate: () => publishTemplateImpl(ctx),
     attachPublishButton: () => attachPublishButtonImpl(ctx),
     closeVersionPill: () => closeVersionPillImpl(ctx),
     openVersionPill: () => openVersionPillImpl(ctx),

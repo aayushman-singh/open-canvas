@@ -63,6 +63,9 @@ export type PublishSiteContext = DomContext &
   StatusEmitterContext &
   Pick<
     EditorContext,
+    | 'editorMode'
+    | 'templateId'
+    | 'assetLibrarySiteId'
     | 'flushPendingSave'
     | 'accessRevoked'
     | 'sessionExpired'
@@ -90,7 +93,46 @@ export function updateVersionBadgeImpl(
   ctx.versionBadge.textContent = n > 0 ? 'v' + n : 'Draft';
 }
 
+export async function publishTemplateImpl(ctx: PublishSiteContext): Promise<void> {
+  if (!ctx.publishButton) return;
+  ctx.publishButton.disabled = true;
+  try {
+    const saved = await ctx.flushPendingSave();
+    if (!saved) return;
+    ctx.setStatus('Publishing...');
+    const response = await ctx.authFetch(
+      ctx.apiBase + '/admin/custom-templates/' + encodeURIComponent(ctx.templateId!) + '/publish',
+      {
+        method: 'POST',
+      },
+    );
+    if (ctx.accessRevoked || ctx.sessionExpired) return;
+    if (!response.ok) {
+      let detail = response.statusText;
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (body && body.error) {
+        detail = body.error;
+      }
+      ctx.setStatus('Publish template failed: ' + detail, 'error');
+      return;
+    }
+    ctx.setStatus('Template published', 'ok');
+  } catch (err) {
+    if (!ctx.accessRevoked && !ctx.sessionExpired) {
+      const message = err instanceof Error ? err.message : String(err);
+      ctx.setStatus('Publish template failed: ' + message, 'error');
+    }
+  } finally {
+    if (!ctx.accessRevoked && !ctx.sessionExpired) {
+      ctx.publishButton.disabled = false;
+    }
+  }
+}
+
 export async function publishSiteImpl(ctx: PublishSiteContext): Promise<void> {
+  if (ctx.editorMode === 'template') {
+    return publishTemplateImpl(ctx);
+  }
   if (!ctx.publishButton) return;
   ctx.publishButton.disabled = true;
   try {

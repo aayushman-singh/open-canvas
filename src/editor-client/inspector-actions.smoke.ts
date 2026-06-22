@@ -474,6 +474,10 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     publishSite: () => {
       throw new Error('publishSite stub: smoke does not exercise publish flow');
     },
+    publishTemplate: () => {
+      throw new Error('publishTemplate stub: smoke does not exercise template publish flow');
+    },
+    editorMode: 'site',
     attachPublishButton: () => {},
     closeVersionPill: () => {},
     openVersionPill: () => {},

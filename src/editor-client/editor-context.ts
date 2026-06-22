@@ -48,6 +48,9 @@ export interface EditorBoot {
   wsToken: string;
   displayName: string;
   userId: string;
+  editorMode: 'site' | 'template';
+  templateId?: string | undefined;
+  assetLibrarySiteId?: string | undefined;
 }
 
 export interface AiUndoSidecarSnapshot {
@@ -193,6 +196,9 @@ export interface EditorContext {
    *  raw string so media-picker URL construction is `s/<closure-var>/
    *  ctx.<closure-var>/g` from the inline twin without restructuring. */
   siteId: string;
+  editorMode: 'site' | 'template';
+  templateId?: string | undefined;
+  assetLibrarySiteId?: string | undefined;
   /** Mutates element.assetId (+ optional element.mediaKind), re-renders,
    *  schedules a save, then upserts the chosen asset into the slot-history
    *  ledger (PUT /sites/<id>/elements/<id>/history/<assetId>). Awaits
@@ -1741,6 +1747,8 @@ export interface EditorContext {
    *  pill update + post-publish "View live site" modal. Bound impl
    *  lives in publish.ts. */
   publishSite(): Promise<void>;
+  /** Publish the current custom template. Bound impl lives in publish.ts. */
+  publishTemplate(): Promise<void>;
   /** Wire the publish-button click to publishSite. Idempotent — boot
    *  wires this once; safe to no-op when the button is missing. Bound
    *  impl lives in publish.ts. */

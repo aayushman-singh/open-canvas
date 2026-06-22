@@ -508,6 +508,7 @@ const boot = {
   wsToken: '',
   displayName: 'Smoke',
   userId: 'user-runtime-smoke',
+  editorMode: 'site' as const,
 };
 stubWindow.__opencanvasEditorBoot = boot;
 

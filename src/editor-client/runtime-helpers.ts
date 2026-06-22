@@ -1077,6 +1077,11 @@ export function buildPickerThumbImpl(
   return img;
 }
 
+export function ownerAssetsPath(ctx: Pick<EditorContext, 'apiBase' | 'assetLibrarySiteId'>): string {
+  const base = ctx.apiBase + '/owner/assets';
+  return ctx.assetLibrarySiteId ? base + '?siteId=' + encodeURIComponent(ctx.assetLibrarySiteId) : base;
+}
+
 export async function postAssetUploadImpl(
   ctx: PostAssetUploadContext,
   blob: Blob,

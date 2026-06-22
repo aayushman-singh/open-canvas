@@ -32,7 +32,9 @@ import { notificationsInboxScript } from '../notifications/dashboard-inbox-scrip
 import { bellStyles } from '../notifications/bell-styles';
 import { opencanvasModalScript } from '../ui/opencanvas-modal-script';
 import { db } from '../db/client';
-import { customer, site, siteCollaborator } from '../db/schema';
+import { customer, site, siteCollaborator, customTemplate } from '../db/schema';
+import { isTemplateSourceAdminCustomer } from '../auth/db-admin';
+import { ensureCuratedTemplateDraft } from '../templates/curated-admin';
 import { fontPresetGoogleFontsLink } from '../fonts/preset-catalog';
 import { appDomain, appOrigin, type HostConfigEnv } from '../host-config';
 
@@ -115,6 +117,10 @@ export interface EditorPageOptions {
    * flow from the route handler into both surfaces in one pass.
    */
   cspNonce: string;
+  editorMode?: 'site' | 'template';
+  templateId?: string;
+  templateName?: string;
+  assetLibrarySiteId?: string;
 }
 
 async function lookupOwnedSite(
@@ -178,6 +184,10 @@ export function editorPageJsx(opts: EditorPageOptions) {
     wsToken,
     theme,
     cspNonce,
+    editorMode = 'site',
+    templateId,
+    templateName,
+    assetLibrarySiteId,
   } = opts;
   if (clerkPublishableKey && !clerkHost) {
     throw new Error('editorPageJsx requires clerkFrontendApiHost when clerkPublishableKey is set');
@@ -195,6 +205,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
     wsToken: wsToken ?? '',
     displayName: customerDisplayName ?? '',
     userId: presenceUserId ?? '',
+    editorMode,
+    templateId,
+    assetLibrarySiteId,
   };
   const editorBootJson = JSON.stringify(editorBoot);
   const publicAddress = `${subdomain}.${apex}`;
@@ -205,7 +218,13 @@ export function editorPageJsx(opts: EditorPageOptions) {
       : settingsPath;
 
   const breadcrumbs =
-    context === 'public' ? (
+    editorMode === 'template' ? (
+      <span class="crumbs">
+        <span>Template Curator</span>
+        <span class="sep">/</span>
+        <span class="here">{templateName}</span>
+      </span>
+    ) : context === 'public' ? (
       <span class="crumbs">
         <button
           type="button"
@@ -302,34 +321,36 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <main class="opencanvas-editor" data-style-kit={styleKit}>
           <header class="opencanvas-editor-header">
             {breadcrumbs}
-            <span class="address">{publicAddress}</span>
+            <span class="address">{editorMode === 'template' ? 'Template draft' : publicAddress}</span>
             <span class="spacer" />
             <button id="canvas-chat-toggle" type="button" title="Chat with AI to edit your site">
               AI Chat
             </button>
-            <a id="canvas-settings-link" href={settingsHref} title="Open site settings">
-              <svg
-                class="canvas-settings-gear"
-                viewBox="0 0 24 24"
-                width="14"
-                height="14"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-              Settings
-            </a>
+            {editorMode !== 'template' && (
+              <a id="canvas-settings-link" href={settingsHref} title="Open site settings">
+                <svg
+                  class="canvas-settings-gear"
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                Settings
+              </a>
+            )}
             <button id="canvas-save" type="button">
               Save
             </button>
             <button id="canvas-publish" type="button">
-              Publish
+              {editorMode === 'template' ? 'Publish template' : 'Publish'}
             </button>
             {/* Persistent version badge — initial label is the draft sentinel.
                 The client script swaps it to `v{n}` once the site state loads
@@ -339,9 +360,11 @@ export function editorPageJsx(opts: EditorPageOptions) {
             <button id="canvas-version" type="button" data-version="0" aria-haspopup="dialog">
               v0
             </button>
-            <button id="canvas-save-template" type="button">
-              Save as template
-            </button>
+            {editorMode !== 'template' && (
+              <button id="canvas-save-template" type="button">
+                Save as template
+              </button>
+            )}
             <div class="notif-wrap">
               <button
                 class="notif-bell"
@@ -739,6 +762,77 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
       wsToken,
       theme: readThemeCookie(c),
       cspNonce,
+    }),
+  );
+});
+
+canvasEditor.get('/admin/templates/:templateId/edit', async (c) => {
+  const customerRecord = c.get('customer');
+  if (!customerRecord || !isTemplateSourceAdminCustomer(customerRecord)) {
+    return c.text('admin access required', 403);
+  }
+
+  const auth = c.get('auth');
+  if (!auth.userId) {
+    throw new Error('canvas editor route reached without an authenticated user');
+  }
+
+  const templateId = c.req.param('templateId');
+  const database = db(c.env);
+  const draftResult = await ensureCuratedTemplateDraft({ database, env: c.env as unknown as Record<string, unknown> }, templateId);
+
+  const draftSiteRow = await database
+    .select({
+      id: site.id,
+      name: site.name,
+      subdomain: site.subdomain,
+      styleKit: site.styleKit,
+      customerId: site.customerId,
+    })
+    .from(site)
+    .where(and(eq(site.id, draftResult.draftSiteId), eq(site.siteKind, 'template_draft')))
+    .limit(1);
+
+  const draftSite = draftSiteRow[0];
+  if (!draftSite) {
+    return c.text('template draft site not found', 404);
+  }
+
+  const templateRow = await database
+    .select({ name: customTemplate.name })
+    .from(customTemplate)
+    .where(eq(customTemplate.id, templateId))
+    .limit(1);
+  const templateName = templateRow[0]?.name ?? draftSite.name;
+
+  const wsToken = await signEditToken(
+    { siteId: draftSite.id, customerId: draftSite.customerId, clerkUserId: auth.userId },
+    c.env.UNLOCK_SIGNING_SECRET,
+  );
+
+  const { publishableKey } = resolveClerkKeys(c.env);
+  const cspNonce = generateNonce();
+  c.header('Content-Security-Policy', buildEditorCSP(cspNonce));
+
+  return c.html(
+    editorPageJsx({
+      siteId: draftSite.id,
+      siteName: draftSite.name,
+      subdomain: draftSite.subdomain,
+      styleKit: draftSite.styleKit,
+      apex: appDomain(c.env),
+      apexOrigin: appOrigin(c.env),
+      ...(auth.userId ? { presenceUserId: auth.userId } : {}),
+      context: 'dashboard',
+      clerkPublishableKey: publishableKey,
+      clerkFrontendApiHost: clerkFrontendApiHost(publishableKey, c.env.CLERK_FRONTEND_API_URL),
+      wsToken,
+      theme: readThemeCookie(c),
+      cspNonce,
+      editorMode: 'template',
+      templateId,
+      templateName,
+      assetLibrarySiteId: draftSite.id,
     }),
   );
 });
