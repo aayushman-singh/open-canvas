@@ -46,6 +46,7 @@ type Bindings = HostConfigEnv & {
   CLERK_TEST_SECRET_KEY?: string;
   DATABASE_URL: string;
   UNLOCK_SIGNING_SECRET: string;
+  TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?: string;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -779,7 +780,7 @@ canvasEditor.get('/admin/templates/:templateId/edit', async (c) => {
 
   const templateId = c.req.param('templateId');
   const database = db(c.env);
-  const draftResult = await ensureCuratedTemplateDraft({ database, env: c.env as unknown as Record<string, unknown> }, templateId);
+  const draftResult = await ensureCuratedTemplateDraft({ database, env: c.env }, templateId);
 
   const draftSiteRow = await database
     .select({

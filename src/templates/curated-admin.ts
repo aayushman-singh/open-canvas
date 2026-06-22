@@ -17,12 +17,16 @@ export interface CuratedTemplateSummary {
   updatedAt: string;
 }
 
-export interface CuratedAdminDeps {
-  database: Db;
-  env: Record<string, unknown> | undefined;
+export interface TemplateAssetCustodianEnv {
+  TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?: string | undefined;
 }
 
-export function requireTemplateAssetCustodianCustomerId(env: Record<string, unknown> | undefined): string {
+export interface CuratedAdminDeps {
+  database: Db;
+  env: TemplateAssetCustodianEnv | undefined;
+}
+
+export function requireTemplateAssetCustodianCustomerId(env: TemplateAssetCustodianEnv | undefined): string {
   const custodianId = typeof env?.TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID === 'string'
     ? env.TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID.trim()
     : undefined;

@@ -97,11 +97,14 @@ export async function publishTemplateImpl(ctx: PublishSiteContext): Promise<void
   if (!ctx.publishButton) return;
   ctx.publishButton.disabled = true;
   try {
+    if (!ctx.templateId) {
+      throw new Error('templateId missing from template editor boot');
+    }
     const saved = await ctx.flushPendingSave();
     if (!saved) return;
     ctx.setStatus('Publishing...');
     const response = await ctx.authFetch(
-      ctx.apiBase + '/admin/custom-templates/' + encodeURIComponent(ctx.templateId!) + '/publish',
+      ctx.apiBase + '/admin/custom-templates/' + encodeURIComponent(ctx.templateId) + '/publish',
       {
         method: 'POST',
       },
