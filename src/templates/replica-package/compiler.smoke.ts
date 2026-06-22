@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,6 +14,10 @@ await mkdir(join(repoRoot, 'src', 'assets', 'seed-source'), { recursive: true })
 await mkdir(join(repoRoot, 'src', 'canvas'), { recursive: true });
 await mkdir(join(repoRoot, 'src', 'templates', 'generated'), { recursive: true });
 await mkdir(join(repoRoot, 'src', 'templates'), { recursive: true });
+
+// Write a pre-existing template file to prove it gets preserved in the manifest
+const dummyTemplatePath = join(repoRoot, 'src', 'templates', 'generated', 'dummy-preexisting.ts');
+await writeFile(dummyTemplatePath, 'export const generatedTemplateSeeds = [];\n', 'utf8');
 
 const result = await compileReplicaPackage({
   sourceDir: 'src/templates/replicas/tiny-replica',
@@ -41,6 +45,15 @@ assert(
   generatedTemplate.includes('id: "tiny-replica"') &&
     generatedTemplate.includes('sectionId: "tiny-replica-hero-v1"'),
   'generated template must contain deterministic template and section refs',
+);
+
+const generatedManifest = await readFile(join(repoRoot, 'src', 'templates', 'generated', 'manifest.ts'), 'utf8');
+assert(
+  generatedManifest.includes('dummy-preexisting.js') &&
+    generatedManifest.includes('tiny-replica.js') &&
+    generatedManifest.includes('dummy_preexistingTemplates') &&
+    generatedManifest.includes('tiny_replicaTemplates'),
+  'generated manifest must import and spread dummy-preexisting and tiny-replica',
 );
 
 const generatedRegistry = await readFile(join(repoRoot, 'src', 'canvas', 'seed-assets.generated.ts'), 'utf8');
