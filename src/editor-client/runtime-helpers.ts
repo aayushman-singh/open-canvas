@@ -200,11 +200,10 @@ export type FlushPendingSaveContext = StatusEmitterContext &
 // the function builds DOM from arguments.
 export type BuildPickerThumbContext = Pick<EditorContext, 'siteBase'>;
 
-// ADR 0064 — `postAssetUpload` POSTs a Blob + alt + (optional) siteId/
-// elementId to the auth-wrapped owner-assets endpoint. PersistContext
-// already names the (authFetch, apiBase, siteId) triple this function
-// touches; no module-specific verbs.
-export type PostAssetUploadContext = PersistContext;
+// ADR 0064 — `postAssetUpload` POSTs a Blob + alt + site context to the
+// auth-wrapped owner-assets endpoint. `elementId` is optional slot-history
+// metadata; section-level uploads still need site context for ownership.
+export type PostAssetUploadContext = PersistContext & Pick<EditorContext, 'assetLibrarySiteId'>;
 
 // ADR 0064 — `applyAssetIdToElement` writes the new assetId onto the
 // element, re-renders, schedules a save, then upserts the slot-history
@@ -1092,8 +1091,12 @@ export async function postAssetUploadImpl(
   form.append('file', blob);
   form.append('alt', altValue);
   const hasElementId = typeof elementId === 'string' && elementId.length > 0;
+  const uploadSiteId = ctx.assetLibrarySiteId ?? ctx.siteId;
+  if (!uploadSiteId) {
+    throw new Error('postAssetUpload: siteId is required');
+  }
+  form.append('siteId', uploadSiteId);
   if (hasElementId) {
-    form.append('siteId', ctx.siteId);
     form.append('elementId', elementId);
   }
   const response = await ctx.authFetch(ctx.apiBase + '/owner/assets', {

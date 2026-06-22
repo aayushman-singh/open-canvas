@@ -30,5 +30,15 @@ assert(publishSource.includes('/admin/custom-templates/'), 'template publish mus
 
 const runtimeSource = await Bun.file(new URL('./runtime-helpers.ts', import.meta.url)).text();
 assert(runtimeSource.includes('ownerAssetsPath'), 'asset helpers must use mode-aware owner asset path');
+assert(
+  runtimeSource.includes('const uploadSiteId = ctx.assetLibrarySiteId ?? ctx.siteId'),
+  'template-mode uploads must send the draft site id even for section-level uploads without an element id',
+);
+
+const assetRouteSource = await Bun.file(new URL('../assets/route.ts', import.meta.url)).text();
+assert(
+  assetRouteSource.includes('siteId !== undefined && elementId !== undefined'),
+  'owner asset route must keep siteId-only uploads for ownership without forcing slot-history metadata',
+);
 
 console.log('[template-mode:smoke] OK');

@@ -3,7 +3,7 @@
 // Hono router mounted at `/api/owner/assets`. Authenticated via Clerk; the
 // upload, list, and delete endpoints all resolve the current Owner from
 // `auth.userId` before any asset work. Per ADR 0004 the asset root is the
-// Owner — there is no `siteId` in the route shape.
+// Owner; optional `siteId` is only an ownership context for editor uploads.
 
 import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
@@ -120,6 +120,9 @@ ownerAssetsApi.post('/', async (c) => {
   const siteId = typeof siteIdRaw === 'string' && siteIdRaw.length > 0 ? siteIdRaw : undefined;
   const elementId =
     typeof elementIdRaw === 'string' && elementIdRaw.length > 0 ? elementIdRaw : undefined;
+  if (elementId !== undefined && siteId === undefined) {
+    return c.json({ error: 'elementId requires siteId' }, 400);
+  }
 
   // When the upload is bound to a site (editor flow), the asset row's
   // customerId MUST be the site owner's, not the uploader's. A collaborator
@@ -181,16 +184,15 @@ ownerAssetsApi.post('/', async (c) => {
 
   const r2 = createR2Client(c.env.ASSETS_BUCKET);
   try {
-    // `siteId` / `elementId` are explicitly omitted when absent so the
-    // exactOptionalPropertyTypes check is satisfied — the upload primitive
-    // treats the property's absence as "no slot history book-keeping".
+    // The upload primitive requires siteId+elementId together because it only
+    // uses them for slot-history book-keeping. Site-only uploads already used
+    // siteId above for ownership resolution and intentionally skip history.
     const input: Parameters<typeof uploadOwnerAsset>[1] = {
       customerId,
       bytes,
       mediaType,
       alt,
-      ...(siteId !== undefined ? { siteId } : {}),
-      ...(elementId !== undefined ? { elementId } : {}),
+      ...(siteId !== undefined && elementId !== undefined ? { siteId, elementId } : {}),
     };
     const result = await uploadOwnerAsset({ db: database, r2 }, input);
     return c.json(result);
