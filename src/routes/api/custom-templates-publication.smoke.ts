@@ -80,4 +80,53 @@ for (const marker of [
   assert(customTemplatesRouteSource.includes(marker), `admin route missing ${marker}`);
 }
 
+// 1. Publication status checks for global templates in owner-facing routes
+assert(
+  customTemplatesRouteSource.includes("and(eq(customTemplate.visibility, 'global'), eq(customTemplate.publicationStatus, 'published'))"),
+  "GET /api/custom-templates must check publicationStatus for global templates"
+);
+
+assert(
+  customTemplatesRouteSource.includes("customTemplatesOwner.get('/:id/preview'") &&
+    customTemplatesRouteSource.includes("publicationStatus: customTemplate.publicationStatus") &&
+    customTemplatesRouteSource.includes("tmpl.publicationStatus !== 'published'"),
+  "GET /api/custom-templates/:id/preview must check publicationStatus for global templates"
+);
+
+assert(
+  customTemplatesRouteSource.includes("customTemplatesOwner.get('/:id/assets/:assetId'") &&
+    customTemplatesRouteSource.includes("publicationStatus: customTemplate.publicationStatus") &&
+    customTemplatesRouteSource.includes("tmpl.publicationStatus !== 'published'"),
+  "GET /api/custom-templates/:id/assets/:assetId must check publicationStatus for global templates"
+);
+
+// 2. Custodian seed asset materialization
+assert(
+  curatedAdminSource.includes("prepareSeedAssetsForCustomer") &&
+    curatedAdminSource.includes("ownerAsset") &&
+    curatedAdminSource.includes("onConflictDoNothing()"),
+  "createCuratedTemplateDraft must prepare and insert custodian ownerAsset rows"
+);
+
+// 3. New admin route body parsing returns 400 for malformed JSON
+const matchesSilentlyCatch = customTemplatesRouteSource.match(/c\.req\.json\(\)\.catch\(\(\)\s*=>\s*\(\{\}\)\)/g);
+assert(
+  !matchesSilentlyCatch || matchesSilentlyCatch.length === 0,
+  "Admin routes must not silently catch JSON parse errors with empty objects"
+);
+
+// 4. siteKind template_draft verification in publish and delete
+assert(
+  curatedAdminSource.includes("siteKind: site.siteKind") &&
+    curatedAdminSource.includes("siteKind !== 'template_draft'"),
+  "Publish and delete must verify the draft site's siteKind is template_draft"
+);
+
+// 5. PATCH tagline rename-only retaining behavior
+assert(
+  curatedAdminSource.includes("const updateData: Partial<typeof customTemplate.$inferInsert> = {") &&
+    curatedAdminSource.includes("input.tagline !== undefined"),
+  "renameCuratedTemplate must dynamically check and assign tagline if defined"
+);
+
 console.log('[custom-templates-publication:smoke] OK');

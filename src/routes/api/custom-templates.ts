@@ -137,8 +137,11 @@ customTemplatesOwner.get('/', async (c) => {
   const customerId = await resolveCustomerId(database, auth.userId);
 
   const whereClause = customerId
-    ? or(eq(customTemplate.visibility, 'global'), eq(customTemplate.customerId, customerId))
-    : eq(customTemplate.visibility, 'global');
+    ? or(
+        and(eq(customTemplate.visibility, 'global'), eq(customTemplate.publicationStatus, 'published')),
+        eq(customTemplate.customerId, customerId),
+      )
+    : and(eq(customTemplate.visibility, 'global'), eq(customTemplate.publicationStatus, 'published'));
 
   const rows = await database
     .select({
@@ -261,12 +264,16 @@ customTemplatesOwner.get('/:id/preview', async (c) => {
       name: customTemplate.name,
       visibility: customTemplate.visibility,
       customerId: customTemplate.customerId,
+      publicationStatus: customTemplate.publicationStatus,
     })
     .from(customTemplate)
     .where(eq(customTemplate.id, c.req.param('id')))
     .limit(1);
   const tmpl = row[0];
   if (!tmpl || !canReadScopedLibraryRow(tmpl, customerId)) {
+    return c.text('template not found', 404);
+  }
+  if (tmpl.visibility === 'global' && tmpl.publicationStatus !== 'published') {
     return c.text('template not found', 404);
   }
 
@@ -306,12 +313,16 @@ customTemplatesOwner.get('/:id/assets/:assetId', async (c) => {
       assetManifest: customTemplate.assetManifest,
       visibility: customTemplate.visibility,
       customerId: customTemplate.customerId,
+      publicationStatus: customTemplate.publicationStatus,
     })
     .from(customTemplate)
     .where(eq(customTemplate.id, c.req.param('id')))
     .limit(1);
   const tmpl = row[0];
   if (!tmpl || !canReadScopedLibraryRow(tmpl, customerId)) {
+    return c.text('template not found', 404);
+  }
+  if (tmpl.visibility === 'global' && tmpl.publicationStatus !== 'published') {
     return c.text('template not found', 404);
   }
 
@@ -353,8 +364,13 @@ customTemplatesAdmin.get('/', async (c) => {
 });
 
 customTemplatesAdmin.post('/drafts', async (c) => {
+  let body: Record<string, unknown>;
   try {
-    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'invalid JSON body' }, 400);
+  }
+  try {
     const sourceId = typeof body.sourceId === 'string' ? body.sourceId : undefined;
     const sourceTemplateId = typeof body.sourceTemplateId === 'string' ? body.sourceTemplateId : undefined;
     const name = typeof body.name === 'string' ? body.name : '';
@@ -428,8 +444,13 @@ customTemplatesAdmin.post('/:id/unpublish', async (c) => {
 
 customTemplatesAdmin.patch('/:id', async (c) => {
   const id = c.req.param('id');
+  let body: Record<string, unknown>;
   try {
-    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'invalid JSON body' }, 400);
+  }
+  try {
     const name = typeof body.name === 'string' ? body.name : '';
     const tagline = typeof body.tagline === 'string' ? body.tagline : undefined;
 
@@ -465,8 +486,13 @@ customTemplatesAdmin.post('/:id/duplicate', async (c) => {
 
 customTemplatesAdmin.delete('/:id', async (c) => {
   const id = c.req.param('id');
+  let body: Record<string, unknown>;
   try {
-    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'invalid JSON body' }, 400);
+  }
+  try {
     const confirmationName = typeof body.confirmationName === 'string' ? body.confirmationName : '';
 
     await deleteCuratedTemplate(

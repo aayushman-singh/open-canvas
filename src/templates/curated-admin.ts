@@ -1,10 +1,11 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { customTemplate, site } from '../db/schema.js';
+import { customTemplate, site, ownerAsset } from '../db/schema.js';
 import type { StyleKit, EditableSite } from '../canvas/schema.js';
 import { instantiateTemplate } from './registry.js';
 import { validateEditableSite } from '../canvas/validate.js';
 import { buildAssetManifest } from './custom-template-assets.js';
+import { prepareSeedAssetsForCustomer } from '../routes/api/sites.js';
 
 export interface CuratedTemplateSummary {
   id: string;
@@ -127,10 +128,30 @@ export async function createCuratedTemplateDraft(
 
   let siteState: EditableSite;
   let styleKit: string;
+  let assetRows: Array<typeof ownerAsset.$inferInsert> = [];
 
   if (input.sourceId) {
-    siteState = instantiateTemplate(input.sourceId);
+    const existingRows = await deps.database
+      .select({ id: ownerAsset.id, contentHash: ownerAsset.contentHash })
+      .from(ownerAsset)
+      .where(eq(ownerAsset.customerId, custodianId));
+    const existingByHash = new Map<string, string>(
+      existingRows.map((r) => [r.contentHash, r.id])
+    );
+
+    const templateState = instantiateTemplate(input.sourceId);
+    const preparedSeedAssets = prepareSeedAssetsForCustomer(custodianId, templateState, existingByHash);
+    if (!preparedSeedAssets.ok) {
+      throw new Error(
+        `curated-template-admin: seed asset prep failed: ${JSON.stringify({
+          unknownSeedIds: preparedSeedAssets.unknownSeedIds,
+          assetKindErrors: preparedSeedAssets.assetKindErrors,
+        })}`
+      );
+    }
+    siteState = preparedSeedAssets.editableState;
     styleKit = siteState.styleKit;
+    assetRows = preparedSeedAssets.seedRows;
   } else if (input.sourceTemplateId) {
     const rows = await deps.database
       .select({
@@ -154,6 +175,11 @@ export async function createCuratedTemplateDraft(
   const draftSiteId = crypto.randomUUID();
   const templateId = crypto.randomUUID();
   const subdomain = `template-draft-${crypto.randomUUID().slice(0, 8)}`;
+
+  // Insert missing custodian ownerAsset rows before creating the draft site
+  if (assetRows.length > 0) {
+    await deps.database.insert(ownerAsset).values(assetRows).onConflictDoNothing();
+  }
 
   // Create hidden template_draft site row
   await deps.database.insert(site).values({
@@ -212,6 +238,7 @@ export async function publishCuratedTemplateDraft(
     .select({
       styleKit: site.styleKit,
       editableState: site.editableState,
+      siteKind: site.siteKind,
     })
     .from(site)
     .where(and(eq(site.id, tmpl.templateDraftSiteId), eq(site.customerId, custodianId)))
@@ -220,6 +247,10 @@ export async function publishCuratedTemplateDraft(
   const draftSite = siteRows[0];
   if (!draftSite) {
     throw new Error('curated-template-admin: draft site not found or access denied');
+  }
+
+  if (draftSite.siteKind !== 'template_draft') {
+    throw new Error('curated-template-admin: linked site is not a template draft');
   }
 
   const validation = validateEditableSite(draftSite.editableState);
@@ -292,13 +323,18 @@ export async function renameCuratedTemplate(
     throw new Error('curated-template-admin: template not found');
   }
 
+  const updateData: Partial<typeof customTemplate.$inferInsert> = {
+    name: input.name,
+    updatedAt: new Date(),
+  };
+
+  if (input.tagline !== undefined) {
+    updateData.tagline = input.tagline;
+  }
+
   await deps.database
     .update(customTemplate)
-    .set({
-      name: input.name,
-      tagline: input.tagline ?? '',
-      updatedAt: new Date(),
-    })
+    .set(updateData)
     .where(eq(customTemplate.id, templateId));
 }
 
@@ -386,6 +422,18 @@ export async function deleteCuratedTemplate(
   }
 
   const draftSiteId = tmpl.templateDraftSiteId;
+
+  if (draftSiteId) {
+    const siteRows = await deps.database
+      .select({ siteKind: site.siteKind })
+      .from(site)
+      .where(eq(site.id, draftSiteId))
+      .limit(1);
+    const draftSite = siteRows[0];
+    if (draftSite && draftSite.siteKind !== 'template_draft') {
+      throw new Error('curated-template-admin: linked site is not a template draft');
+    }
+  }
 
   // Delete the customTemplate first due to FK templateDraftSiteId -> site.id
   await deps.database.delete(customTemplate).where(eq(customTemplate.id, templateId));
