@@ -171,15 +171,15 @@ async function validateAssetSourcePath(rootDir: string, sourcePath: string, asse
   if (isAbsolute(sourcePath) || sourcePath.startsWith('/') || sourcePath.startsWith('\\') || /^[a-zA-Z]:/.test(sourcePath)) {
     throw new Error(`replica-package: asset "${assetId}" sourcePath "${sourcePath}" is an absolute path or escape attempt`);
   }
-  
+
   const assetsDir = resolve(rootDir, 'assets');
   const assetFilePath = resolve(assetsDir, sourcePath);
-  
+
   const relativePath = relative(assetsDir, assetFilePath);
   if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
     throw new Error(`replica-package: asset "${assetId}" sourcePath "${sourcePath}" escapes assets directory`);
   }
-  
+
   if (!(await fileExists(assetFilePath))) {
     throw new Error(`replica-package: asset file "${sourcePath}" does not exist for asset "${assetId}"`);
   }

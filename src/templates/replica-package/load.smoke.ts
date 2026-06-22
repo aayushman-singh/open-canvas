@@ -22,7 +22,7 @@ async function runNegativeTest(
   expectedError: string,
 ) {
   const badRoot = await mkdtemp(join(tmpdir(), `replica-test-${testNum}-`));
-  
+
   if (!overrides.skipFiles?.includes('pages')) {
     await mkdir(join(badRoot, 'pages'), { recursive: true });
   }
