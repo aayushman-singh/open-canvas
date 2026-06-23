@@ -7,7 +7,7 @@
 //   POST   /api/custom-templates              — save site as private template
 //   DELETE /api/custom-templates/:id          — delete a private template
 //
-// Admin routes (Clerk + requireAdmin):
+// Admin routes (Clerk + Template Curator customer gate):
 //   POST   /api/admin/custom-templates        — save site as global template
 //   DELETE /api/admin/custom-templates/:id    — delete a global template
 //
@@ -15,20 +15,26 @@
 //   GET    /api/custom-templates/:id/preview  — render preview HTML
 //   GET    /api/custom-templates/:id/assets/:assetId — serve asset from R2
 
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { loadAccessibleSite } from '../../auth/accessible-site.js';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
-import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
+import {
+  ENTRANCE_ANIMATION_CSS,
+  ENTRANCE_OBSERVER_SCRIPT,
+} from '../../canvas/entrance-animation.js';
 import { canvasPublishedStyles } from '../../canvas/public-styles.js';
 import { renderCanvasSnapshot } from '../../canvas/render.js';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form.js';
 import type { PublishedSnapshot } from '../../canvas/schema.js';
+import { buildStyleKitCss } from '../../canvas/style-kits.js';
 import { injectInteractiveRuntime } from '../../interactive/inject.js';
+import { resolveStyleKitWithCustom } from '../../themes/custom-resolve.js';
 import { validateEditableSite } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
+import { isTemplateSourceAdminCustomer } from '../../auth/db-admin.js';
 import {
   customer,
   customTemplate,
@@ -53,13 +59,135 @@ type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
-  ADMIN_CLERK_USER_IDS?: string;
   ASSETS_BUCKET: R2Bucket;
   TURNSTILE_SITE_KEY?: string;
   TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?: string;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
+
+function executeRows<T extends Record<string, unknown>>(
+  result: T[] | { rows?: unknown },
+): T[] {
+  if (Array.isArray(result)) return result;
+  return Array.isArray(result.rows) ? (result.rows as T[]) : [];
+}
+
+async function reconcileCustomTemplateDraftSchema(database: ReturnType<typeof db>): Promise<{
+  addedColumns: string[];
+  addedConstraints: string[];
+  addedIndexes: string[];
+}> {
+  type ColumnRow = { column_name: string } & Record<string, unknown>;
+  type NameRow = { name: string } & Record<string, unknown>;
+
+  const columnResult = await database.execute<ColumnRow>(sql`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'custom_template'
+      AND column_name IN ('publication_status', 'template_draft_site_id')
+  `);
+  const existingColumns = new Set(
+    executeRows(columnResult).map((row) => row.column_name),
+  );
+
+  const constraintResult = await database.execute<NameRow>(sql`
+    SELECT conname AS name
+    FROM pg_constraint
+    WHERE conrelid = 'public.custom_template'::regclass
+      AND conname IN (
+        'custom_template_publication_status_check',
+        'custom_template_template_draft_site_id_site_id_fk'
+      )
+  `);
+  const existingConstraints = new Set(
+    executeRows(constraintResult).map((row) => row.name),
+  );
+
+  const indexResult = await database.execute<NameRow>(sql`
+    SELECT indexname AS name
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename = 'custom_template'
+      AND indexname = 'custom_template_template_draft_site_id_unique'
+  `);
+  const existingIndexes = new Set(
+    executeRows(indexResult).map((row) => row.name),
+  );
+
+  const addedColumns: string[] = [];
+  const addedConstraints: string[] = [];
+  const addedIndexes: string[] = [];
+
+  if (!existingColumns.has('publication_status')) {
+    await database.execute(sql.raw(`ALTER TABLE "custom_template" ADD COLUMN "publication_status" text`));
+    addedColumns.push('publication_status');
+  }
+  await database.execute(
+    sql.raw(
+      `UPDATE "custom_template" SET "publication_status" = 'published' WHERE "publication_status" IS NULL`,
+    ),
+  );
+  await database.execute(
+    sql.raw(`ALTER TABLE "custom_template" ALTER COLUMN "publication_status" SET DEFAULT 'published'`),
+  );
+  await database.execute(
+    sql.raw(`ALTER TABLE "custom_template" ALTER COLUMN "publication_status" SET NOT NULL`),
+  );
+  if (!existingConstraints.has('custom_template_publication_status_check')) {
+    await database.execute(
+      sql.raw(
+        `ALTER TABLE "custom_template" ADD CONSTRAINT "custom_template_publication_status_check" CHECK ("publication_status" IN ('drafting', 'published', 'unpublished'))`,
+      ),
+    );
+    addedConstraints.push('custom_template_publication_status_check');
+  }
+
+  if (!existingColumns.has('template_draft_site_id')) {
+    await database.execute(sql.raw(`ALTER TABLE "custom_template" ADD COLUMN "template_draft_site_id" text`));
+    addedColumns.push('template_draft_site_id');
+  }
+  if (!existingConstraints.has('custom_template_template_draft_site_id_site_id_fk')) {
+    await database.execute(
+      sql.raw(
+        `ALTER TABLE "custom_template" ADD CONSTRAINT "custom_template_template_draft_site_id_site_id_fk" FOREIGN KEY ("template_draft_site_id") REFERENCES "public"."site"("id") ON DELETE set null ON UPDATE no action`,
+      ),
+    );
+    addedConstraints.push('custom_template_template_draft_site_id_site_id_fk');
+  }
+  if (!existingIndexes.has('custom_template_template_draft_site_id_unique')) {
+    await database.execute(
+      sql.raw(
+        `CREATE UNIQUE INDEX "custom_template_template_draft_site_id_unique" ON "custom_template" USING btree ("template_draft_site_id") WHERE "template_draft_site_id" IS NOT NULL`,
+      ),
+    );
+    addedIndexes.push('custom_template_template_draft_site_id_unique');
+  }
+
+  return { addedColumns, addedConstraints, addedIndexes };
+}
+
+let customTemplateSchemaEnsurePromise: Promise<void> | null = null;
+
+export async function ensureCustomTemplateDraftSchema(database: ReturnType<typeof db>): Promise<void> {
+  if (customTemplateSchemaEnsurePromise === null) {
+    customTemplateSchemaEnsurePromise = (async () => {
+      const result = await reconcileCustomTemplateDraftSchema(database);
+      if (
+        result.addedColumns.length > 0 ||
+        result.addedConstraints.length > 0 ||
+        result.addedIndexes.length > 0
+      ) {
+        console.warn('[custom-templates] reconciled schema drift', result);
+      }
+    })().catch((err) => {
+      customTemplateSchemaEnsurePromise = null;
+      throw err;
+    });
+  }
+  await customTemplateSchemaEnsurePromise;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -128,6 +256,10 @@ export interface CustomTemplateCatalogEntry {
 export const customTemplatesOwner = new Hono<Env>();
 customTemplatesOwner.use('*', clerkAuth());
 customTemplatesOwner.use('*', requireAuth());
+customTemplatesOwner.use('*', async (c, next) => {
+  await ensureCustomTemplateDraftSchema(db(c.env));
+  await next();
+});
 
 customTemplatesOwner.get('/', async (c) => {
   const auth = c.get('auth');
@@ -178,7 +310,8 @@ customTemplatesOwner.post('/', async (c) => {
   const parsed = parseSaveBody(raw);
   if ('error' in parsed) return c.json({ error: parsed.error }, 400);
 
-  if (parsed.visibility === 'global' && !isAdmin(auth.userId, c.env.ADMIN_CLERK_USER_IDS)) {
+  const customerRecord = c.get('customer');
+  if (parsed.visibility === 'global' && !isTemplateSourceAdminCustomer(customerRecord)) {
     return c.json({ error: 'community (global) templates require admin access' }, 403);
   }
 
@@ -296,9 +429,13 @@ customTemplatesOwner.get('/:id/preview', async (c) => {
     ),
     snapshot,
   );
+  const customKitCss =
+    snapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolveStyleKitWithCustom(snapshot))}` : '';
+  const previewRuntimeOptionsScript =
+    '<script>window.__opencanvasRuntimeOptions={reducedMotion:"no-preference"};</script>';
 
   return c.html(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtmlText(tmpl.name)} preview</title><style>${canvasPublishedStyles}</style><style>${previewStyles}</style></head><body>${html}</body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtmlText(tmpl.name)} preview</title><style>${canvasPublishedStyles}${customKitCss}\n${ENTRANCE_ANIMATION_CSS}</style><style>${previewStyles}</style></head><body>${previewRuntimeOptionsScript}${html}${ENTRANCE_OBSERVER_SCRIPT}</body></html>`,
   );
 });
 
@@ -349,7 +486,32 @@ customTemplatesOwner.get('/:id/assets/:assetId', async (c) => {
 export const customTemplatesAdmin = new Hono<Env>();
 customTemplatesAdmin.use('*', clerkAuth());
 customTemplatesAdmin.use('*', requireAuth());
-customTemplatesAdmin.use('*', requireAdmin());
+customTemplatesAdmin.use('*', async (c, next) => {
+  const customerRecord = c.get('customer');
+  if (!customerRecord) {
+    throw new Error('admin custom-templates reached with authenticated user but no customer row');
+  }
+  if (!isTemplateSourceAdminCustomer(customerRecord)) {
+    return c.text('admin access required', 403);
+  }
+  await next();
+});
+customTemplatesAdmin.use('*', async (c, next) => {
+  await ensureCustomTemplateDraftSchema(db(c.env));
+  await next();
+});
+
+customTemplatesAdmin.get('/reconcile-schema', async (c) => {
+  try {
+    const result = await reconcileCustomTemplateDraftSchema(db(c.env));
+    return c.json({ ok: true, ...result });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error(`[admin] Error in GET ${c.req.path}:`, msg, stack);
+    return c.json({ error: msg }, 500);
+  }
+});
 
 customTemplatesAdmin.get('/', async (c) => {
   try {

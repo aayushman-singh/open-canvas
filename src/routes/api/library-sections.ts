@@ -7,17 +7,17 @@
 //   POST   /api/library/sections           — save a section from an owned site
 //   DELETE /api/library/sections/:id       — delete a private library section
 //
-// Admin routes (Clerk + requireAdmin):
+// Admin routes (Clerk + Template Curator customer gate):
 //   POST   /api/admin/library/sections     — save a section as global
 //   DELETE /api/admin/library/sections/:id — delete a global library section
 
 import { and, eq, isNull, or } from 'drizzle-orm';
 import { Hono } from 'hono';
 
+import { isTemplateSourceAdminCustomer } from '../../auth/db-admin.js';
 import { loadAccessibleSite } from '../../auth/accessible-site.js';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
-import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
 import type { CanvasSection, EditableSite } from '../../canvas/schema.js';
 import { validateEditableSite } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
@@ -37,7 +37,6 @@ type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
-  ADMIN_CLERK_USER_IDS?: string;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -372,7 +371,8 @@ librarySectionsOwner.post('/sections', async (c) => {
   const parsed = parseSaveBody(raw);
   if ('error' in parsed) return c.json({ error: parsed.error }, 400);
 
-  if (parsed.visibility === 'global' && !isAdmin(auth.userId, c.env.ADMIN_CLERK_USER_IDS)) {
+  const customerRecord = c.get('customer');
+  if (parsed.visibility === 'global' && !isTemplateSourceAdminCustomer(customerRecord)) {
     return c.json({ error: 'community (global) sections require admin access' }, 403);
   }
 
@@ -545,7 +545,16 @@ librarySectionsOwner.delete('/sections/:id', async (c) => {
 export const librarySectionsAdmin = new Hono<Env>();
 librarySectionsAdmin.use('*', clerkAuth());
 librarySectionsAdmin.use('*', requireAuth());
-librarySectionsAdmin.use('*', requireAdmin());
+librarySectionsAdmin.use('*', async (c, next) => {
+  const customerRecord = c.get('customer');
+  if (!customerRecord) {
+    throw new Error('admin library sections reached with authenticated user but no customer row');
+  }
+  if (!isTemplateSourceAdminCustomer(customerRecord)) {
+    return c.text('admin access required', 403);
+  }
+  await next();
+});
 
 librarySectionsAdmin.post('/sections', async (c) => {
   const auth = c.get('auth');

@@ -67,6 +67,18 @@ assert(
 );
 
 const customTemplatesRouteSource = readFileSync('src/routes/api/custom-templates.ts', 'utf8');
+assert(
+  customTemplatesRouteSource.includes('isTemplateSourceAdminCustomer'),
+  'custom template admin API must use the Template Curator customer gate',
+);
+assert(
+  !customTemplatesRouteSource.includes('ADMIN_CLERK_USER_IDS'),
+  'custom template admin API must not depend on ADMIN_CLERK_USER_IDS',
+);
+assert(
+  !customTemplatesRouteSource.includes('requireAdmin()'),
+  'custom template admin API must not use the generic Clerk-ID admin gate',
+);
 for (const marker of [
   "customTemplatesAdmin.get('/'",
   "customTemplatesAdmin.post('/drafts'",
