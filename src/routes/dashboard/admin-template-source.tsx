@@ -24,6 +24,7 @@ type Bindings = GitHubTemplateSourceEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
+  ADMIN_CLERK_USER_IDS?: string;
   TURNSTILE_SITE_KEY?: string;
 };
 
@@ -205,11 +206,12 @@ const adminTemplateSourceRoute = new Hono<AdminTemplateSourceEnv>();
 adminTemplateSourceRoute.use('*', clerkAuth());
 adminTemplateSourceRoute.use('*', requireAuth());
 adminTemplateSourceRoute.use('*', async (c, next) => {
+  const auth = c.get('auth');
   const customerRecord = c.get('customer');
   if (!customerRecord) {
     throw new Error('template source admin reached with authenticated user but no customer row');
   }
-  if (!isTemplateSourceAdminCustomer(customerRecord)) {
+  if (!isTemplateSourceAdminCustomer(customerRecord, auth.userId, c.env.ADMIN_CLERK_USER_IDS)) {
     return c.text('admin access required', 403);
   }
   await next();

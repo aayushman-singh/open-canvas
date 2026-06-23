@@ -13,6 +13,10 @@ assert(
   'template source admin email comparison must be case-insensitive and trimmed',
 );
 assert(
+  isTemplateSourceAdminCustomer(null, 'user_123', 'user_123, user_456'),
+  'template curator gate must honor the admin user allowlist',
+);
+assert(
   !isTemplateSourceAdminCustomer({ email: 'someone@example.com' }),
   'non-admin email must be rejected',
 );

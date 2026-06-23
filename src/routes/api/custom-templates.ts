@@ -59,6 +59,7 @@ type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
+  ADMIN_CLERK_USER_IDS?: string;
   ASSETS_BUCKET: R2Bucket;
   TURNSTILE_SITE_KEY?: string;
   TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?: string;
@@ -311,7 +312,10 @@ customTemplatesOwner.post('/', async (c) => {
   if ('error' in parsed) return c.json({ error: parsed.error }, 400);
 
   const customerRecord = c.get('customer');
-  if (parsed.visibility === 'global' && !isTemplateSourceAdminCustomer(customerRecord)) {
+  if (
+    parsed.visibility === 'global' &&
+    !isTemplateSourceAdminCustomer(customerRecord, auth.userId, c.env.ADMIN_CLERK_USER_IDS)
+  ) {
     return c.json({ error: 'community (global) templates require admin access' }, 403);
   }
 
@@ -487,11 +491,12 @@ export const customTemplatesAdmin = new Hono<Env>();
 customTemplatesAdmin.use('*', clerkAuth());
 customTemplatesAdmin.use('*', requireAuth());
 customTemplatesAdmin.use('*', async (c, next) => {
+  const auth = c.get('auth');
   const customerRecord = c.get('customer');
   if (!customerRecord) {
     throw new Error('admin custom-templates reached with authenticated user but no customer row');
   }
-  if (!isTemplateSourceAdminCustomer(customerRecord)) {
+  if (!isTemplateSourceAdminCustomer(customerRecord, auth.userId, c.env.ADMIN_CLERK_USER_IDS)) {
     return c.text('admin access required', 403);
   }
   await next();

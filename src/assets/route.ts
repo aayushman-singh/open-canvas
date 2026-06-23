@@ -24,6 +24,7 @@ type Bindings = {
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
   ASSETS_BUCKET: R2Bucket;
+  ADMIN_CLERK_USER_IDS?: string;
   TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?: string;
 };
 
@@ -58,17 +59,23 @@ ownerAssetsApi.get('/', async (c) => {
     if (!auth.userId) {
       throw new Error('owner-assets api reached without an authenticated user');
     }
-    const accessible = await loadAccessibleSite(
-      database,
-      auth.userId,
-      siteId,
-      'viewer',
-      c.get('customer')?.id,
-    );
+      const accessible = await loadAccessibleSite(
+        database,
+        auth.userId,
+        siteId,
+        'viewer',
+        c.get('customer')?.id,
+      );
     if (accessible) {
       targetCustomerId = accessible.customerId;
     } else {
-      const draft = await loadTemplateDraftForCurator(database, c.get('customer'), siteId);
+      const draft = await loadTemplateDraftForCurator(
+        database,
+        c.get('customer'),
+        auth.userId,
+        c.env.ADMIN_CLERK_USER_IDS,
+        siteId,
+      );
       if (draft) {
         const custodianId = c.env.TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?.trim();
         if (!custodianId) {
@@ -147,7 +154,13 @@ ownerAssetsApi.post('/', async (c) => {
       c.get('customer')?.id,
     );
     if (!accessible) {
-      const draft = await loadTemplateDraftForCurator(database, c.get('customer'), siteId);
+      const draft = await loadTemplateDraftForCurator(
+        database,
+        c.get('customer'),
+        auth.userId,
+        c.env.ADMIN_CLERK_USER_IDS,
+        siteId,
+      );
       if (draft) {
         const custodianId = c.env.TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?.trim();
         if (!custodianId) {

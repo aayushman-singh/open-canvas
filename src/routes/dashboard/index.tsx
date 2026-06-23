@@ -28,6 +28,7 @@ type Bindings = HostConfigEnv & {
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
   DATABASE_URL: string;
+  ADMIN_CLERK_USER_IDS?: string;
   TURNSTILE_SITE_KEY?: string;
 };
 
@@ -1134,6 +1135,7 @@ dashboard.get('/', async (c) => {
   if (!customerRecord) {
     throw new Error('dashboard reached without a resolved customer');
   }
+  const auth = c.get('auth');
 
   const database = db(c.env);
   const primaryEmail = customerRecord.email;
@@ -1253,7 +1255,7 @@ dashboard.get('/', async (c) => {
       pageStyles={cardStyles}
       userMeta={{ avatarUrl, displayName, email: primaryEmail }}
       theme={readThemeCookie(c)}
-      showAdminLink={isTemplateSourceAdminCustomer(customerRecord)}
+      showAdminLink={isTemplateSourceAdminCustomer(customerRecord, auth.userId, c.env.ADMIN_CLERK_USER_IDS)}
     >
       <div class="page-head">
         <div>

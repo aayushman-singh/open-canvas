@@ -30,6 +30,7 @@ type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
+  ADMIN_CLERK_USER_IDS?: string;
   REPLICATE_API_TOKEN: string;
   ASSETS_BUCKET: R2Bucket;
   SITE_ROOM: DurableObjectNamespace;
@@ -201,7 +202,13 @@ async function loadCanvasSiteAccess(
     c.get('customer')?.id,
   );
   if (!accessibleSite) {
-    const draft = await loadTemplateDraftForCurator(database, c.get('customer'), siteId);
+    const draft = await loadTemplateDraftForCurator(
+      database,
+      c.get('customer'),
+      auth.userId,
+      c.env.ADMIN_CLERK_USER_IDS,
+      siteId,
+    );
     if (!draft) {
       return { found: false };
     }

@@ -12,6 +12,7 @@ type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
+  ADMIN_CLERK_USER_IDS?: string;
   TURNSTILE_SITE_KEY?: string;
 };
 
@@ -25,11 +26,12 @@ const adminTemplatesRoute = new Hono<AdminTemplatesEnv>();
 adminTemplatesRoute.use('*', clerkAuth());
 adminTemplatesRoute.use('*', requireAuth());
 adminTemplatesRoute.use('*', async (c, next) => {
+  const auth = c.get('auth');
   const customerRecord = c.get('customer');
   if (!customerRecord) {
     throw new Error('visual template admin reached with authenticated user but no customer row');
   }
-  if (!isTemplateSourceAdminCustomer(customerRecord)) {
+  if (!isTemplateSourceAdminCustomer(customerRecord, auth.userId, c.env.ADMIN_CLERK_USER_IDS)) {
     return c.text('admin access required', 403);
   }
   await next();

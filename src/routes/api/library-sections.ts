@@ -37,6 +37,7 @@ type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
+  ADMIN_CLERK_USER_IDS?: string;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -372,7 +373,10 @@ librarySectionsOwner.post('/sections', async (c) => {
   if ('error' in parsed) return c.json({ error: parsed.error }, 400);
 
   const customerRecord = c.get('customer');
-  if (parsed.visibility === 'global' && !isTemplateSourceAdminCustomer(customerRecord)) {
+  if (
+    parsed.visibility === 'global' &&
+    !isTemplateSourceAdminCustomer(customerRecord, auth.userId, c.env.ADMIN_CLERK_USER_IDS)
+  ) {
     return c.json({ error: 'community (global) sections require admin access' }, 403);
   }
 
@@ -546,11 +550,12 @@ export const librarySectionsAdmin = new Hono<Env>();
 librarySectionsAdmin.use('*', clerkAuth());
 librarySectionsAdmin.use('*', requireAuth());
 librarySectionsAdmin.use('*', async (c, next) => {
+  const auth = c.get('auth');
   const customerRecord = c.get('customer');
   if (!customerRecord) {
     throw new Error('admin library sections reached with authenticated user but no customer row');
   }
-  if (!isTemplateSourceAdminCustomer(customerRecord)) {
+  if (!isTemplateSourceAdminCustomer(customerRecord, auth.userId, c.env.ADMIN_CLERK_USER_IDS)) {
     return c.text('admin access required', 403);
   }
   await next();

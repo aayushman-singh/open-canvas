@@ -46,6 +46,7 @@ type Bindings = HostConfigEnv & {
   CLERK_TEST_SECRET_KEY?: string;
   DATABASE_URL: string;
   UNLOCK_SIGNING_SECRET: string;
+  ADMIN_CLERK_USER_IDS?: string;
   TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?: string;
 };
 
@@ -768,12 +769,12 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
 });
 
 canvasEditor.get('/admin/templates/:templateId/edit', async (c) => {
+  const auth = c.get('auth');
   const customerRecord = c.get('customer');
-  if (!customerRecord || !isTemplateSourceAdminCustomer(customerRecord)) {
+  if (!customerRecord || !isTemplateSourceAdminCustomer(customerRecord, auth.userId, c.env.ADMIN_CLERK_USER_IDS)) {
     return c.text('admin access required', 403);
   }
 
-  const auth = c.get('auth');
   if (!auth.userId) {
     throw new Error('canvas editor route reached without an authenticated user');
   }

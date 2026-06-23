@@ -72,12 +72,16 @@ assert(
   'custom template admin API must use the Template Curator customer gate',
 );
 assert(
-  !customTemplatesRouteSource.includes('ADMIN_CLERK_USER_IDS'),
-  'custom template admin API must not depend on ADMIN_CLERK_USER_IDS',
+  customTemplatesRouteSource.includes('ADMIN_CLERK_USER_IDS'),
+  'custom template admin API must accept the admin allowlist as a curator fallback',
 );
 assert(
   !customTemplatesRouteSource.includes('requireAdmin()'),
   'custom template admin API must not use the generic Clerk-ID admin gate',
+);
+assert(
+  customTemplatesRouteSource.includes('isTemplateSourceAdminCustomer(customerRecord, auth.userId, c.env.ADMIN_CLERK_USER_IDS)'),
+  'custom template admin API must pass auth user id and admin allowlist into the curator gate',
 );
 for (const marker of [
   "customTemplatesAdmin.get('/'",

@@ -7,9 +7,11 @@ import type { Db } from '../db/client';
 export async function loadTemplateDraftForCurator(
   database: Db,
   customerRecord: Customer | null | undefined,
+  clerkUserId: string | null | undefined,
+  adminUserIds: string | undefined,
   siteId: string,
 ) {
-  if (!customerRecord || !isTemplateSourceAdminCustomer(customerRecord)) return null;
+  if (!customerRecord || !isTemplateSourceAdminCustomer(customerRecord, clerkUserId, adminUserIds)) return null;
   const rows = await database
     .select({
       id: site.id,
