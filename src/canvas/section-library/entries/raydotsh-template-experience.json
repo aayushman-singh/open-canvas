@@ -11,7 +11,7 @@
     "name": "Experience",
     "height": 610,
     "anchorId": "experience",
-    "entrance": "fade-up",
+    "entrance": "none",
     "elements": [
       {
         "id": "raydotsh-experience-bg",

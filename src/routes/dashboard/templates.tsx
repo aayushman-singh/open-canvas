@@ -316,7 +316,7 @@ const pageStyles = `
 `;
 
 const previewStyles = `
-  html, body { margin: 0; width: 100%; min-height: 100%; overflow-x: hidden; background: var(--paper); }
+  html, body { margin: 0; width: 100%; min-height: 100%; overflow-x: hidden; }
 `;
 
 export { renderBuiltInTemplatePreviewAssetResponse, renderBuiltInTemplatePreviewBodyHtml };

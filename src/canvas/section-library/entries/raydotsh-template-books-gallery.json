@@ -11,7 +11,7 @@
     "name": "Reading List",
     "height": 4108,
     "anchorId": "reading-list",
-    "entrance": "fade-up",
+    "entrance": "none",
     "elements": [
       {
         "id": "raydotsh-books-gallery-bg",

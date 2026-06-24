@@ -12,7 +12,7 @@
     "height": 720,
     "anchorId": "home",
     "backgroundEffect": "none",
-    "entrance": "fade-up",
+    "entrance": "none",
     "elements": [
       {
         "id": "raydotsh-hero-bg",

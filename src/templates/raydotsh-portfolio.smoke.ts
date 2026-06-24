@@ -157,12 +157,10 @@ const allElements = collectElementTree(topLevelElements);
 const allElementIds = new Set(allElements.map((element) => element.id));
 const elementById = new Map(allElements.map((element) => [element.id, element]));
 
-const revealSequence = state.motionSequences?.find((sequence) =>
-  sequence.steps?.some((step) => step.target.type === 'children-of'),
-);
+const revealSequence = state.motionSequences?.find((sequence) => sequence.id === 'raydotsh-project-card-reveal');
 assert(
   revealSequence !== undefined,
-  'A Raydotsh reveal motion sequence with a children-of target must exist',
+  'Raydotsh project card reveal motion sequence must exist',
 );
 assert(
   revealSequence.reducedMotion !== undefined,
@@ -215,6 +213,37 @@ const scrollRevealLedgerItem = RAYDOTSH_FIDELITY_LEDGER.find(
 assert(
   scrollRevealLedgerItem?.status === 'native',
   'scroll-reveal-sequence ledger item must be "native" if the sequence exists',
+);
+
+for (const sequenceId of [
+  'raydotsh-hero-copy-reveal',
+  'raydotsh-about-reveal',
+  'raydotsh-experience-reveal',
+  'raydotsh-software-intro-reveal',
+  'raydotsh-books-reveal',
+]) {
+  const sequence = state.motionSequences?.find((candidate) => candidate.id === sequenceId);
+  assert(sequence !== undefined, `Raydotsh scroll reveal sequence ${sequenceId} must exist`);
+  assert(
+    sequence.trigger.type === 'section-enter',
+    `${sequenceId} must use section-enter scroll reveals`,
+  );
+  assert(
+    sequence.steps[0]?.from?.translateY === 20 && sequence.steps[0]?.from?.opacity === 0,
+    `${sequenceId} must fade in from translateY(20px) with opacity 0`,
+  );
+}
+
+const aboutReveal = state.motionSequences?.find((candidate) => candidate.id === 'raydotsh-about-reveal');
+assert(aboutReveal !== undefined, 'Raydotsh about reveal sequence must exist');
+assert(
+  aboutReveal.steps.some(
+    (step) =>
+      step.target.type === 'element' &&
+      step.target.elementId === 'raydotsh-skill-content-strategy' &&
+      step.startAtMs === 200,
+  ),
+  'Raydotsh about reveal must stagger skill rows like the source FadeInSection delays',
 );
 
 const heroSection = state.pages
@@ -490,6 +519,12 @@ assert(
 assert(
   !html.includes('data-opencanvas-viewport-fit'),
   'published template must not upscale layout with viewport scale transforms',
+);
+assert(
+  html.includes('data-opencanvas-site-backdrop') &&
+    html.includes('html,body,[data-opencanvas-public-root]{background:#0a192f;}') &&
+    html.includes('style="--opencanvas-kit-accent:#64ffda;background:#0a192f"'),
+  'published template must paint wide-viewport gutters with the page background colour',
 );
 assert(
   html.includes('[data-opencanvas-element="raydotsh-freelance-title"]') &&

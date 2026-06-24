@@ -282,7 +282,7 @@ function renderPreviewPage(templateId: string, turnstileSiteKey: string): string
   <style>${canvasPublishedStyles}\n${ENTRANCE_ANIMATION_CSS}</style>
   <style>html,body{margin:0;width:100%;min-height:100%;overflow-x:hidden;}</style>
 </head>
-<body style="margin:0;overflow-x:hidden;background:var(--paper)"><script>window.__opencanvasRuntimeOptions={reducedMotion:"no-preference"};</script>${html}${renderEntranceObserverScriptTag()}</body>
+<body style="margin:0;overflow-x:hidden"><script>window.__opencanvasRuntimeOptions={reducedMotion:"no-preference"};</script>${html}${renderEntranceObserverScriptTag()}</body>
 </html>`;
 }
 

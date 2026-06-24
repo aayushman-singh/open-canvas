@@ -34,7 +34,11 @@ import { hasLiveEditorSocketAccess } from '../live/editor-auth';
 import { editorPageJsx, type EditorPageOptions } from '../editor/route';
 import { siteCollaborator } from '../db/schema';
 import { canvasPublishedStyles } from '../canvas/public-styles';
-import { renderCanvasSnapshot } from '../canvas/render';
+import {
+  renderCanvasSnapshot,
+  resolvePublishedSiteBackground,
+  renderPublishedSiteBackdropCss,
+} from '../canvas/render';
 import { snapshotHasMotionPresetFields } from '../canvas/behaviour-payload';
 import {
   ENTRANCE_ANIMATION_CSS,
@@ -1214,6 +1218,9 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   const addonScripts = await emitAddonHeadScripts(db(c.env), siteRow.id);
   const addonBodyScripts = await emitAddonBodyScripts(db(c.env), siteRow.id);
   const usesCompiledMotionPresets = snapshotHasMotionPresetFields(renderSnapshot);
+  const siteBackdropCss = renderPublishedSiteBackdropCss(
+    resolvePublishedSiteBackground(pageRenderSnapshot.pages),
+  );
 
   return c.html(
     html`<!doctype html>
@@ -1231,7 +1238,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           <style>
             ${raw(canvasPublishedStyles)}${raw(customKitCss)}${raw(
               fontFaceCss ? `\n${fontFaceCss}` : '',
-            )}${themeEmitsCss ? `\n${dualModeCss}` : ''}
+            )}${siteBackdropCss ? raw(`\n${siteBackdropCss}`) : ''}${themeEmitsCss ? `\n${dualModeCss}` : ''}
             ${usesCompiledMotionPresets ? '' : raw(ENTRANCE_ANIMATION_CSS)}
           </style>
           ${addonScripts ? raw(addonScripts) : ''}

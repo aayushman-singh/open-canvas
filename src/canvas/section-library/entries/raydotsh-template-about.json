@@ -12,7 +12,7 @@
     "height": 720,
     "anchorId": "about",
     "backgroundEffect": "none",
-    "entrance": "fade-up",
+    "entrance": "none",
     "elements": [
       {
         "id": "raydotsh-about-bg",
@@ -57,7 +57,8 @@
         "fontWeight": 700,
         "align": "left",
         "pinnedStyle": {
-          "color": "#ccd6f6"
+          "color": "#ccd6f6",
+          "font-family": "NTR, sans-serif"
         },
         "responsive": {
           "phone": {
@@ -127,7 +128,7 @@
         "box": {
           "x": 220,
           "y": 176,
-          "w": 650,
+          "w": 600,
           "h": 204,
           "z": 2
         },
@@ -140,11 +141,18 @@
         "fontSize": 22,
         "fontWeight": 400,
         "align": "left",
-        "lineHeight": 1.45,
+        "lineHeight": 1.5,
         "textWrap": "pretty",
+        "fluidSize": {
+          "min": 18,
+          "max": 22,
+          "vw": 2.1
+        },
         "pinnedStyle": {
           "color": "#8892b0",
-          "white-space": "pre-line"
+          "white-space": "pre-line",
+          "font-family": "NTR, sans-serif",
+          "text-align": "justify"
         },
         "responsive": {
           "phone": {
@@ -171,11 +179,12 @@
           }
         ],
         "role": "body",
-        "fontSize": 21,
+        "fontSize": 22,
         "fontWeight": 500,
         "align": "left",
         "pinnedStyle": {
-          "color": "#a8b2d1"
+          "color": "#a8b2d1",
+          "font-family": "NTR, sans-serif"
         },
         "responsive": {
           "phone": {
@@ -206,7 +215,8 @@
         "fontWeight": 500,
         "align": "left",
         "pinnedStyle": {
-          "color": "#8892b0"
+          "color": "#8892b0",
+          "font-family": "NTR, sans-serif"
         },
         "responsive": {
           "phone": {
@@ -237,7 +247,8 @@
         "fontWeight": 500,
         "align": "left",
         "pinnedStyle": {
-          "color": "#8892b0"
+          "color": "#8892b0",
+          "font-family": "NTR, sans-serif"
         },
         "responsive": {
           "phone": {
@@ -268,7 +279,8 @@
         "fontWeight": 500,
         "align": "left",
         "pinnedStyle": {
-          "color": "#8892b0"
+          "color": "#8892b0",
+          "font-family": "NTR, sans-serif"
         },
         "responsive": {
           "phone": {
@@ -299,7 +311,8 @@
         "fontWeight": 500,
         "align": "left",
         "pinnedStyle": {
-          "color": "#8892b0"
+          "color": "#8892b0",
+          "font-family": "NTR, sans-serif"
         },
         "responsive": {
           "phone": {
@@ -330,7 +343,8 @@
         "fontWeight": 500,
         "align": "left",
         "pinnedStyle": {
-          "color": "#8892b0"
+          "color": "#8892b0",
+          "font-family": "NTR, sans-serif"
         },
         "responsive": {
           "phone": {
@@ -347,7 +361,7 @@
         "box": {
           "x": 220,
           "y": 616,
-          "w": 650,
+          "w": 600,
           "h": 60,
           "z": 2
         },
@@ -357,13 +371,20 @@
           }
         ],
         "role": "body",
-        "fontSize": 21,
+        "fontSize": 22,
         "fontWeight": 400,
         "align": "left",
-        "lineHeight": 1.35,
+        "lineHeight": 1.5,
         "textWrap": "pretty",
+        "fluidSize": {
+          "min": 18,
+          "max": 22,
+          "vw": 2.1
+        },
         "pinnedStyle": {
-          "color": "#8892b0"
+          "color": "#8892b0",
+          "font-family": "NTR, sans-serif",
+          "text-align": "justify"
         },
         "responsive": {
           "phone": {

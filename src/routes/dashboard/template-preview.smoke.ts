@@ -71,6 +71,10 @@ assert(
   'template preview route must include entrance animation CSS and observer script',
 );
 assert(
+  !templatesRouteSource.includes('background: var(--paper)'),
+  'template preview route must not override page backdrop with dashboard paper colour',
+);
+assert(
   renderEntranceObserverScriptTag().startsWith('<script data-opencanvas-entrance-observer>') &&
     renderEntranceObserverScriptTag().endsWith('</script>'),
   'entrance observer must render as an executable script tag',

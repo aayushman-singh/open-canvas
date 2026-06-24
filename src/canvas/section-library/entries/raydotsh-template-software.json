@@ -11,7 +11,7 @@
     "name": "Software",
     "height": 930,
     "anchorId": "projects",
-    "entrance": "fade-up",
+    "entrance": "none",
     "responsiveVariants": [
       {
         "id": "raydotsh-projects-desktop",

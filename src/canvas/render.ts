@@ -871,6 +871,32 @@ function renderPlayableWidgets(snapshot: PublishedSnapshot): string {
     .join('');
 }
 
+/** Match wide-viewport gutters to the authored page canvas colour. */
+export function resolvePublishedSiteBackground(
+  pages: readonly CanvasPage[],
+): string | undefined {
+  const backgrounds: string[] = [];
+  for (const page of pages) {
+    if (typeof page.pageBackground !== 'string' || page.pageBackground.length === 0) continue;
+    const safe = escapeCssValue(page.pageBackground);
+    if (safe) backgrounds.push(safe);
+  }
+  if (backgrounds.length === 0) return undefined;
+  const unique = [...new Set(backgrounds)];
+  return unique.length === 1 ? unique[0] : backgrounds[0];
+}
+
+export function renderPublishedSiteBackdropCss(siteBackground: string | undefined): string {
+  if (!siteBackground) return '';
+  return `html,body,[data-opencanvas-public-root]{background:${siteBackground};}`;
+}
+
+function renderPublishedSiteBackdropStyleTag(siteBackground: string | undefined): string {
+  const css = renderPublishedSiteBackdropCss(siteBackground);
+  if (!css) return '';
+  return `<style data-opencanvas-site-backdrop>${css}</style>`;
+}
+
 /**
  * Render the body of a Published Snapshot. The returned string is a
  * self-contained `<main>` block — the caller wraps it in the document
@@ -941,13 +967,19 @@ export function renderCanvasSnapshot(
     : '';
   const behaviourPayloadScript = renderBehaviourPayloadScript(snapshot, assetBasePath);
   const importAnimationInventoryScript = renderImportAnimationInventoryScript(snapshot);
-  const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
+  const siteBackground = resolvePublishedSiteBackground(pagesToRender);
+  const rootStyle = [
+    `--opencanvas-kit-accent:${preset.accent}`,
+    siteBackground ? `background:${siteBackground}` : '',
+  ]
+    .filter(Boolean)
+    .join(';');
   const routeAttrs =
     snapshot.routeTransition?.enabled === true
       ? ` data-opencanvas-route-transition="${escapeAttr(snapshot.routeTransition.id)}" data-opencanvas-route-mode="${escapeAttr(snapshot.routeTransition.mode)}" data-opencanvas-route-duration-ms="${escapeAttr(String(snapshot.routeTransition.durationMs))}" data-opencanvas-route-easing="${escapeAttr(snapshot.routeTransition.easing)}"${snapshot.routeTransition.sharedElements && snapshot.routeTransition.sharedElements.length > 0 ? ` data-opencanvas-route-shared-elements="${escapeAttr(JSON.stringify(snapshot.routeTransition.sharedElements))}"` : ''}${snapshot.routeTransition.outgoingSequence ? ` data-opencanvas-route-outgoing-sequence="${escapeAttr(snapshot.routeTransition.outgoingSequence.id)}"` : ''}${snapshot.routeTransition.incomingSequence ? ` data-opencanvas-route-incoming-sequence="${escapeAttr(snapshot.routeTransition.incomingSequence.id)}"` : ''}`
       : '';
   const smoothScrollAttrs = renderSmoothScrollAttrs(snapshot.scrollBehavior);
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${fontFaceStyle}${scrollStyle}${responsiveStyle}${loadExperienceHtml}${anchorRailsHtml}${playableWidgetsHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${importAnimationInventoryScript}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
+  return `${renderPublishedSiteBackdropStyleTag(siteBackground)}<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${fontFaceStyle}${scrollStyle}${responsiveStyle}${loadExperienceHtml}${anchorRailsHtml}${playableWidgetsHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${importAnimationInventoryScript}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
 }
 
 /**

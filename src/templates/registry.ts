@@ -20,6 +20,7 @@ import portfolioShowcaseSeed from '../canvas/fixtures/portfolio-showcase.json';
 import type {
   LoadExperience,
   MotionSequence,
+  MotionSequenceStep,
   RichMotionAsset,
   ScrollScene,
 } from '../canvas/behaviour-primitives.js';
@@ -963,6 +964,29 @@ export const portfolioShowcaseTemplate: TemplateSeed = {
   ],
 };
 
+const RAYDOTSH_SCROLL_REVEAL_FROM = { translateY: 20, opacity: 0 };
+const RAYDOTSH_SCROLL_REVEAL_TO = { translateY: 0, opacity: 1 };
+const RAYDOTSH_SCROLL_REVEAL_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)';
+const RAYDOTSH_SCROLL_REVEAL_DURATION_MS = 600;
+
+function raydotshScrollRevealStep(
+  id: string,
+  target: MotionSequenceStep['target'],
+  options?: { startAtMs?: number; delayMs?: number },
+): MotionSequenceStep {
+  const step: MotionSequenceStep = {
+    id,
+    target,
+    from: RAYDOTSH_SCROLL_REVEAL_FROM,
+    to: RAYDOTSH_SCROLL_REVEAL_TO,
+    durationMs: RAYDOTSH_SCROLL_REVEAL_DURATION_MS,
+    delayMs: options?.delayMs ?? 0,
+    easing: RAYDOTSH_SCROLL_REVEAL_EASING,
+  };
+  if (options?.startAtMs !== undefined) step.startAtMs = options.startAtMs;
+  return step;
+}
+
 export const raydotshPortfolioTemplate: TemplateSeed = {
   id: 'raydotsh-portfolio',
   name: 'Raydotsh Portfolio',
@@ -1035,6 +1059,92 @@ export const raydotshPortfolioTemplate: TemplateSeed = {
       ],
     },
     {
+      id: 'raydotsh-hero-copy-reveal',
+      trigger: { type: 'section-enter', sectionId: 'raydotsh-hero' },
+      reducedMotion: 'final-state',
+      steps: [
+        raydotshScrollRevealStep(
+          'raydotsh-hero-body-reveal',
+          { type: 'element', elementId: 'raydotsh-hero-body' },
+          { startAtMs: 0 },
+        ),
+        raydotshScrollRevealStep(
+          'raydotsh-hero-contact-reveal',
+          { type: 'element', elementId: 'raydotsh-hero-contact' },
+          { startAtMs: 0 },
+        ),
+        raydotshScrollRevealStep(
+          'raydotsh-mobile-hero-body-reveal',
+          { type: 'element', elementId: 'raydotsh-mobile-hero-body' },
+          { startAtMs: 0 },
+        ),
+        raydotshScrollRevealStep(
+          'raydotsh-mobile-hero-contact-reveal',
+          { type: 'element', elementId: 'raydotsh-mobile-hero-contact' },
+          { startAtMs: 0 },
+        ),
+      ],
+    },
+    {
+      id: 'raydotsh-about-reveal',
+      trigger: { type: 'section-enter', sectionId: 'raydotsh-about' },
+      reducedMotion: 'final-state',
+      steps: [
+        raydotshScrollRevealStep(
+          'raydotsh-about-section-reveal',
+          { type: 'section', sectionId: 'raydotsh-about' },
+        ),
+        raydotshScrollRevealStep(
+          'raydotsh-skill-content-strategy-reveal',
+          { type: 'element', elementId: 'raydotsh-skill-content-strategy' },
+          { startAtMs: 200 },
+        ),
+        raydotshScrollRevealStep(
+          'raydotsh-skill-copywriting-reveal',
+          { type: 'element', elementId: 'raydotsh-skill-copywriting' },
+          { startAtMs: 300 },
+        ),
+        raydotshScrollRevealStep(
+          'raydotsh-skill-social-reveal',
+          { type: 'element', elementId: 'raydotsh-skill-social' },
+          { startAtMs: 400 },
+        ),
+        raydotshScrollRevealStep(
+          'raydotsh-skill-newsletter-reveal',
+          { type: 'element', elementId: 'raydotsh-skill-newsletter' },
+          { startAtMs: 500 },
+        ),
+        raydotshScrollRevealStep(
+          'raydotsh-skill-launches-reveal',
+          { type: 'element', elementId: 'raydotsh-skill-launches' },
+          { startAtMs: 600 },
+        ),
+      ],
+    },
+    {
+      id: 'raydotsh-experience-reveal',
+      trigger: { type: 'section-enter', sectionId: 'raydotsh-experience' },
+      reducedMotion: 'final-state',
+      steps: [
+        raydotshScrollRevealStep(
+          'raydotsh-experience-section-reveal',
+          { type: 'section', sectionId: 'raydotsh-experience' },
+        ),
+      ],
+    },
+    {
+      id: 'raydotsh-software-intro-reveal',
+      trigger: { type: 'section-enter', sectionId: 'raydotsh-software' },
+      reducedMotion: 'final-state',
+      steps: [
+        raydotshScrollRevealStep(
+          'raydotsh-software-kicker-reveal',
+          { type: 'element', elementId: 'raydotsh-software-kicker' },
+          { startAtMs: 200 },
+        ),
+      ],
+    },
+    {
       id: 'raydotsh-project-card-reveal',
       trigger: { type: 'section-enter', sectionId: 'raydotsh-software' },
       reducedMotion: 'final-state',
@@ -1055,6 +1165,18 @@ export const raydotshPortfolioTemplate: TemplateSeed = {
           durationMs: 600,
           staggerMs: 100,
         },
+      ],
+    },
+    {
+      id: 'raydotsh-books-reveal',
+      trigger: { type: 'section-enter', sectionId: 'raydotsh-books' },
+      reducedMotion: 'final-state',
+      steps: [
+        raydotshScrollRevealStep(
+          'raydotsh-books-section-reveal',
+          { type: 'section', sectionId: 'raydotsh-books' },
+          { startAtMs: 200 },
+        ),
       ],
     },
   ],
