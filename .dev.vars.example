@@ -82,10 +82,18 @@ TEMPLATE_SOURCE_GITHUB_BASE_BRANCH=main
 TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID=
 
 # ---------------------------------------------------------------------------
-# Database (Neon)
+# Database (laptop Postgres via db.aayushman.dev)
 # ---------------------------------------------------------------------------
-# Neon Serverless Postgres connection string. Owns the rev01 schema.
-DATABASE_URL=<your-neon-postgres-url>
+# App connection for wrangler dev. Points at the local Access TCP client
+# (`bun run db:tunnel`) on 127.0.0.1:15433 — not 15432, which may belong to
+# another project's pg.aayushman.dev tunnel on the same host.
+DATABASE_URL=postgresql://admin:<password>@127.0.0.1:15433/appdb
+# Cloudflare Access service token Hyperdrive uses in production. Same pair as
+# the db:tunnel client. Create in Zero Trust → Access → Service Auth.
+ACCESS_CLIENT_ID=<your-access-service-token-id>
+ACCESS_CLIENT_SECRET=<your-access-service-token-secret>
+# Repoint production Hyperdrive after changing the password or Access token:
+#   bun run db:hyperdrive:repoint
 
 # ---------------------------------------------------------------------------
 # Cloudflare — TWO different concerns share this section. `CF_*` are the

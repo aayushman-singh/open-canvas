@@ -189,7 +189,7 @@ function resolvePageLayout(
   );
   const elements: ResolvedElementLayout[] = [];
   for (const section of allSections) {
-    for (const element of section.elements) {
+    for (const element of collectNestedElements(section.elements)) {
       elements.push(resolveElementLayout(element, page.width));
     }
   }
@@ -201,6 +201,20 @@ function resolvePageLayout(
     sections,
     elements,
   };
+}
+
+function collectNestedElements(elements: readonly CanvasElement[]): CanvasElement[] {
+  const collected: CanvasElement[] = [];
+  const visit = (element: CanvasElement): void => {
+    collected.push(element);
+    if (element.type === 'tabs') {
+      for (const tab of element.tabs) {
+        for (const child of tab.elements) visit(child);
+      }
+    }
+  };
+  for (const element of elements) visit(element);
+  return collected;
 }
 
 function resolveSectionLayout(

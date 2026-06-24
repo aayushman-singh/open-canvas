@@ -3,14 +3,19 @@ main = "src/index.ts"
 compatibility_date = "2026-05-25"
 compatibility_flags = ["nodejs_compat"]
 
-# Hyperdrive — global Postgres connection pooler + prepared-statement cache
-# in front of Neon. The Worker connects to env.HYPERDRIVE.connectionString
-# via postgres.js TCP. Adopted to cut the ~240ms Neon RTT that dominated
-# every dashboard request after the JSONB projection pass landed. Config
-# created via `wrangler hyperdrive create rev01-pg --connection-string=…`.
+# Hyperdrive — Postgres connection pooler in front of the origin database.
+# Production origin: laptop Postgres exposed at db.aayushman.dev through
+# Cloudflare Access + a cloudflared ingress connector on the laptop. When
+# that ingress or local Postgres is down, every authenticated route 500s at
+# the first DB query. Repoint after credential rotation:
+#   bun run db:hyperdrive:repoint
+# Local `wrangler dev` uses the Access TCP client (`bun run db:tunnel`) on
+# 127.0.0.1:15433 — not 15432, which belongs to another project's
+# pg.aayushman.dev tunnel on this host.
 [[hyperdrive]]
 binding = "HYPERDRIVE"
 id = "fb8eba4bcc154ba196f1d55a8510dd0a"
+localConnectionString = "postgresql://admin:admin@127.0.0.1:15433/appdb"
 
 # Workers Logs — persists every invocation's logs (console.* output, thrown
 # exceptions with stack traces, request metadata) so we can post-mortem a

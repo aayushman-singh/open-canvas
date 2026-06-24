@@ -339,7 +339,7 @@ particleFieldState.pages[0]!.sections[0]!.elements[0] = {
         ],
       },
     ],
-    pointer: { radius: 72, force: 44 },
+    pointer: { radiusRatio: 0.2, force: 4 },
     reducedMotion: 'settled',
   },
 ];

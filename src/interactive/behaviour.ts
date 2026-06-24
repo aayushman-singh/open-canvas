@@ -22,6 +22,11 @@ function behaviourPrefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+function behaviourIsTemplatePreview() {
+  if (typeof window === 'undefined' || !window.location || typeof window.location.pathname !== 'string') return false;
+  return /^(\/dashboard\/templates\/[^/]+\/preview|\/api\/(?:admin\/)?custom-templates\/[^/]+\/preview)$/.test(window.location.pathname);
+}
+
 function parseBehaviourPayload() {
   var node = document.querySelector('script[data-opencanvas-behaviour-payload]');
   if (!node) return null;
@@ -483,6 +488,7 @@ function behaviourSetupPageEnter(sequence, root) {
   if (sequence.trigger.type !== 'page-enter') return;
   var page = root.querySelector('[data-opencanvas-page="' + sequence.trigger.pageId + '"]');
   if (!page) {
+    if (behaviourIsTemplatePreview()) return;
     behaviourFailure('behaviour-target-missing', { sequenceId: sequence.id, pageId: sequence.trigger.pageId }, new Error('page-enter page not found'));
   }
   behaviourApplyStepFromStates(sequence, root);
@@ -741,6 +747,7 @@ function behaviourHydrateImageSequence(asset, root, payload) {
       img.onload = onFrameReady;
       img.onerror = function (err) {
         if (failed) return;
+        if (behaviourIsTemplatePreview()) return;
         failed = true;
         behaviourFailure('rich-motion-frame-load', { assetId: asset.id, frameIndex: index, url: url }, err || new Error('frame load failed'));
       };
@@ -750,7 +757,7 @@ function behaviourHydrateImageSequence(asset, root, payload) {
 }
 
 function behaviourParticlePointSet(asset, canvas) {
-  var width = canvas.clientWidth || canvas.width || 0;
+  var width = (typeof window !== 'undefined' && window.innerWidth) || canvas.clientWidth || canvas.width || 0;
   var desired = width <= 480 ? 'phone' : width <= 768 ? 'tablet' : 'desktop';
   var sets = asset.pointSets || [];
   for (var i = 0; i < sets.length; i++) {
@@ -763,42 +770,134 @@ function behaviourParticlePointSet(asset, canvas) {
   behaviourFailure('rich-motion-particle-field-empty', { assetId: asset.id }, new Error('particle field has no point sets'));
 }
 
-function behaviourDrawParticleField(canvas, ctx, asset, pointSet, particles, pointer, progress) {
-  var width = canvas.clientWidth || canvas.width;
-  var height = canvas.clientHeight || canvas.height;
-  if (!(width > 0) || !(height > 0)) return;
-  if (canvas.width !== width) canvas.width = width;
-  if (canvas.height !== height) canvas.height = height;
-  ctx.clearRect(0, 0, width, height);
+function behaviourParticlePointerConfig(asset) {
+  var pointer = asset.pointer || {};
+  return {
+    radiusRatio: typeof pointer.radiusRatio === 'number' ? pointer.radiusRatio : 0.2,
+    force: typeof pointer.force === 'number' ? pointer.force : 4,
+  };
+}
+
+function behaviourParticleScatterSpread() {
+  return 400;
+}
+
+function behaviourBuildParticleParticles(pointSet, width, height, colorRgb, reduced) {
+  var particles = [];
+  var canvasSize = Number(pointSet.canvasSize) || Math.max(width, height) || 1;
+  var spread = reduced ? 0 : behaviourParticleScatterSpread();
   var size = Number(pointSet.canvasSize) || Math.max(width, height);
   var scale = Math.min(width, height) / size;
   var offsetX = (width - size * scale) / 2;
   var offsetY = (height - size * scale) / 2;
-  var fontSize = Number(asset.fontSize || 7) * scale;
-  ctx.font = String(Math.max(4, fontSize)) + 'px ' + (asset.fontFamily || 'monospace');
+  for (var i = 0; i < pointSet.points.length; i++) {
+    var point = pointSet.points[i];
+    var targetX = offsetX + Number(point.x) * scale;
+    var targetY = offsetY + Number(point.y) * scale;
+    particles.push({
+      targetPointX: Number(point.x),
+      targetPointY: Number(point.y),
+      x: targetX + (reduced ? 0 : (Math.random() - 0.5) * spread * scale),
+      y: targetY + (reduced ? 0 : (Math.random() - 0.5) * spread * scale),
+      targetX: targetX,
+      targetY: targetY,
+      vx: 0,
+      vy: 0,
+      char: point.char,
+      baseAlpha: Number(point.alpha),
+      currentAlpha: reduced ? Number(point.alpha) : 0,
+      delay: reduced ? 0 : Math.random() * 0.4,
+      shimmer: Math.random() * Math.PI * 2,
+      rgb: colorRgb
+    });
+  }
+  return particles;
+}
+
+function behaviourConfigureParticleCanvas(canvas, ctx) {
+  var width = canvas.clientWidth || canvas.width;
+  var height = canvas.clientHeight || canvas.height;
+  if (!(width > 0) || !(height > 0)) return null;
+  var dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  var backingWidth = Math.round(width * dpr);
+  var backingHeight = Math.round(height * dpr);
+  if (canvas.width !== backingWidth || canvas.height !== backingHeight) {
+    canvas.width = backingWidth;
+    canvas.height = backingHeight;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  return { width: width, height: height };
+}
+
+function behaviourDrawParticleField(canvas, ctx, asset, pointSet, particles, pointer, elapsedSeconds) {
+  var canvasSize = behaviourConfigureParticleCanvas(canvas, ctx);
+  if (!canvasSize) return;
+  var width = canvasSize.width;
+  var height = canvasSize.height;
+  var size = Number(pointSet.canvasSize) || Math.max(width, height);
+  var scale = Math.min(width, height) / size;
+  var offsetX = (width - size * scale) / 2;
+  var offsetY = (height - size * scale) / 2;
+  var logicalSize = size;
+  var baseFontSize = logicalSize <= 280 ? 5 : Number(asset.fontSize || 7);
+  var fontSize = baseFontSize * scale;
+  ctx.font = String(Math.max(4, fontSize)) + 'px monospace';
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
+  pointer.x += (pointer.targetX - pointer.x) * 0.15;
+  pointer.y += (pointer.targetY - pointer.y) * 0.15;
+  var pointerConfig = behaviourParticlePointerConfig(asset);
+  var pointerRadius = Math.min(width, height) * pointerConfig.radiusRatio;
   for (var i = 0; i < particles.length; i++) {
     var p = particles[i];
-    var targetX = offsetX + p.tx * scale;
-    var targetY = offsetY + p.ty * scale;
-    var x = p.x + (targetX - p.x) * progress;
-    var y = p.y + (targetY - p.y) * progress;
+    var particleTime = elapsedSeconds - p.delay;
+    if (particleTime < 0) continue;
+    p.targetX = offsetX + p.targetPointX * scale;
+    p.targetY = offsetY + p.targetPointY * scale;
+    var fadeProgress = Math.min(particleTime / 1.5, 1);
+    var easedFade = 1 - Math.pow(1 - fadeProgress, 2);
+    var moveProgress = Math.min(particleTime / 2.5, 1);
+    var easedMove = 1 - Math.pow(1 - moveProgress, 3);
+    var isActive = pointer.active || particleTime < 3;
+    var shimmerVal = isActive ? Math.sin(elapsedSeconds * 2 + p.shimmer) * 0.1 : 0;
+    p.currentAlpha = Math.max(0, Math.min(1, p.baseAlpha * easedFade + shimmerVal));
     if (pointer.active) {
-      var dx = x - pointer.x;
-      var dy = y - pointer.y;
+      var dx = p.x - pointer.x;
+      var dy = p.y - pointer.y;
       var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      var radius = asset.pointer && typeof asset.pointer.radius === 'number' ? asset.pointer.radius : 72;
-      var force = asset.pointer && typeof asset.pointer.force === 'number' ? asset.pointer.force : 44;
-      if (dist < radius) {
-        var push = (1 - dist / radius) * force;
-        x += (dx / dist) * push;
-        y += (dy / dist) * push;
+      if (dist < pointerRadius) {
+        var push = (1 - dist / pointerRadius) * pointerConfig.force;
+        p.vx += (dx / dist) * push;
+        p.vy += (dy / dist) * push;
       }
     }
-    var alpha = Math.max(0, Math.min(1, p.alpha * (0.25 + progress * 0.75)));
-    ctx.fillStyle = 'rgba(' + p.rgb + ',' + alpha.toFixed(3) + ')';
-    ctx.fillText(p.char, x, y);
+    var pullDx = p.targetX - p.x;
+    var pullDy = p.targetY - p.y;
+    var pullStrength = 0.01 + easedMove * 0.08;
+    p.vx += pullDx * pullStrength;
+    p.vy += pullDy * pullStrength;
+    if (isActive) {
+      var breathX = Math.sin(elapsedSeconds * 0.5 + p.targetPointY * 0.1) * 0.15;
+      var breathY = Math.cos(elapsedSeconds * 0.5 + p.targetPointX * 0.1) * 0.15;
+      p.vx += breathX;
+      p.vy += breathY;
+      p.vx *= 0.92;
+      p.vy *= 0.92;
+    } else {
+      p.vx *= 0.85;
+      p.vy *= 0.85;
+      if (particleTime > 4 && Math.abs(pullDx) < 0.01 && Math.abs(pullDy) < 0.01) {
+        p.x = p.targetX;
+        p.y = p.targetY;
+        p.vx = 0;
+        p.vy = 0;
+      }
+    }
+    p.x += p.vx;
+    p.y += p.vy;
+    ctx.fillStyle = 'rgba(' + p.rgb + ',' + p.currentAlpha.toFixed(3) + ')';
+    ctx.fillText(p.char, p.x, p.y);
   }
 }
 
@@ -828,45 +927,57 @@ function behaviourHydrateParticleField(asset, root) {
       var canvas = behaviourFindRichMotionCanvas(node);
       var ctx = canvas.getContext('2d');
       if (!ctx) behaviourFailure('rich-motion-particle-field-context', { assetId: asset.id }, new Error('canvas 2d context unavailable'));
-      var pointSet = behaviourParticlePointSet(asset, canvas);
       var rgb = behaviourHexToRgbString(asset.color);
-      var particles = [];
-      for (var i = 0; i < pointSet.points.length; i++) {
-        var point = pointSet.points[i];
-        particles.push({
-          tx: Number(point.x),
-          ty: Number(point.y),
-          x: Math.random() * (canvas.clientWidth || pointSet.canvasSize),
-          y: Math.random() * (canvas.clientHeight || pointSet.canvasSize),
-          char: point.char,
-          alpha: Number(point.alpha),
-          rgb: rgb
-        });
-      }
-      var pointer = { active: false, x: 0, y: 0 };
+      var pointSet = behaviourParticlePointSet(asset, canvas);
+      var pointSetKey = pointSet.breakpoint + ':' + String(pointSet.points.length);
+      var reduced = behaviourPrefersReducedMotion() && asset.reducedMotion === 'settled';
+      var particles = behaviourBuildParticleParticles(
+        pointSet,
+        canvas.clientWidth || pointSet.canvasSize,
+        canvas.clientHeight || pointSet.canvasSize,
+        rgb,
+        reduced,
+      );
+      var pointer = { active: false, x: -1000, y: -1000, targetX: -1000, targetY: -1000 };
       function updatePointer(event) {
         var rect = canvas.getBoundingClientRect();
         var source = event.touches && event.touches[0] ? event.touches[0] : event;
         pointer.active = true;
-        pointer.x = source.clientX - rect.left;
-        pointer.y = source.clientY - rect.top;
+        pointer.targetX = source.clientX - rect.left;
+        pointer.targetY = source.clientY - rect.top;
       }
       canvas.addEventListener('pointermove', updatePointer, { passive: true });
-      canvas.addEventListener('pointerleave', function(){ pointer.active = false; }, { passive: true });
-      canvas.addEventListener('touchmove', updatePointer, { passive: true });
-      canvas.addEventListener('touchend', function(){ pointer.active = false; }, { passive: true });
-      var reduced = behaviourPrefersReducedMotion() && asset.reducedMotion === 'settled';
+      canvas.addEventListener('pointerleave', function(){
+        pointer.active = false;
+        pointer.targetX = -1000;
+        pointer.targetY = -1000;
+      }, { passive: true });
+      canvas.addEventListener('touchmove', function(event) {
+        updatePointer(event);
+        if (event.cancelable) event.preventDefault();
+      }, { passive: false });
+      canvas.addEventListener('touchend', function(){
+        pointer.active = false;
+        pointer.targetX = -1000;
+        pointer.targetY = -1000;
+      }, { passive: true });
       var started = Date.now();
       function frame() {
         pointSet = behaviourParticlePointSet(asset, canvas);
-        var elapsed = Date.now() - started;
-        var progress = reduced ? 1 : Math.min(1, elapsed / 1100);
-        behaviourDrawParticleField(canvas, ctx, asset, pointSet, particles, pointer, progress);
-        if (!reduced && (progress < 1 || pointer.active)) {
-          requestAnimationFrame(frame);
-        } else if (!reduced) {
-          requestAnimationFrame(frame);
+        var nextPointSetKey = pointSet.breakpoint + ':' + String(pointSet.points.length);
+        if (nextPointSetKey !== pointSetKey) {
+          pointSetKey = nextPointSetKey;
+          particles = behaviourBuildParticleParticles(
+            pointSet,
+            canvas.clientWidth || pointSet.canvasSize,
+            canvas.clientHeight || pointSet.canvasSize,
+            rgb,
+            reduced,
+          );
         }
+        var elapsedSeconds = reduced ? 10 : (Date.now() - started) / 1000;
+        behaviourDrawParticleField(canvas, ctx, asset, pointSet, particles, pointer, elapsedSeconds);
+        requestAnimationFrame(frame);
       }
       node.setAttribute('data-opencanvas-rich-motion-hydrated', 'particle-field');
       frame();

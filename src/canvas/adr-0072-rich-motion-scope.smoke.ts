@@ -125,7 +125,7 @@ function richMotionAsset(kind: string): Record<string, unknown> {
           ],
         },
       ],
-      pointer: { radius: 72, force: 44 },
+      pointer: { radiusRatio: 0.2, force: 4 },
       reducedMotion: 'settled',
     };
   }

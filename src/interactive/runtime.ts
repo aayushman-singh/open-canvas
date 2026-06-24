@@ -51,6 +51,17 @@ const visitorNonInteractiveDispatch = nonInteractives
   .join('\n');
 
 export const RUNTIME_ENTRY_SRC = `
+function readRuntimeOptions(baseOptions) {
+  var winOptions = typeof window !== 'undefined' && window.__opencanvasRuntimeOptions && typeof window.__opencanvasRuntimeOptions === 'object'
+    ? window.__opencanvasRuntimeOptions
+    : null;
+  if (!winOptions) return baseOptions || {};
+  var merged = {};
+  var sourceBase = baseOptions || {};
+  for (var key in sourceBase) merged[key] = sourceBase[key];
+  for (var winKey in winOptions) merged[winKey] = winOptions[winKey];
+  return merged;
+}
 function hydratePremiumInteractions(scope, options) {
   var root = scope || document;
   ${requireSurface('document:pointer-fx')};
@@ -61,6 +72,7 @@ function hydratePremiumInteractions(scope, options) {
 }
 function hydrateAll(scope, options) {
   var rootScope = scope || document;
+  var runtimeOptions = readRuntimeOptions(options);
   var roots = rootScope.querySelectorAll('[data-opencanvas-interactive]');
   for (var i = 0; i < roots.length; i++) {
     var root = roots[i];
@@ -74,7 +86,7 @@ ${visitorInteractiveDispatch}
   // arm (a pointer-fx element need not be an interactive element type). It is
   // idempotent, so running it every hydrateAll (incl. live-publish re-hydrate)
   // is safe.
-  hydratePremiumInteractions(rootScope, options || {});
+  hydratePremiumInteractions(rootScope, runtimeOptions);
   hydrateCollectionGalleries(rootScope);
   hydrateEmbedDrillIns(rootScope);
 ${visitorNonInteractiveDispatch}

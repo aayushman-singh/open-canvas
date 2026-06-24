@@ -243,8 +243,8 @@ export interface ParticleFieldRichMotionAsset {
   charset: string;
   pointSets: ParticleFieldPointSet[];
   pointer?: {
-    radius: number;
-    force: number;
+    radiusRatio?: number;
+    force?: number;
   };
   reducedMotion: (typeof PARTICLE_FIELD_REDUCED_MOTION_MODES)[number];
 }

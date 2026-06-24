@@ -217,6 +217,71 @@ assert(
   'scroll-reveal-sequence ledger item must be "native" if the sequence exists',
 );
 
+const heroSection = state.pages
+  .flatMap((page) => page.sections)
+  .find((section) => section.id === 'raydotsh-hero');
+assert(heroSection !== undefined, 'The raydotsh-hero section must exist');
+const heroDesktopVariant = heroSection.responsiveVariants?.find((v) => v.breakpoint === 'desktop');
+const heroPhoneVariant = heroSection.responsiveVariants?.find((v) => v.breakpoint === 'phone');
+assert(heroDesktopVariant !== undefined, 'hero section must have a desktop responsive variant');
+assert(heroPhoneVariant !== undefined, 'hero section must have a phone responsive variant');
+assert(
+  heroDesktopVariant.elementIds.includes('raydotsh-hero-layout-desktop'),
+  'desktop hero variant must use the flex row layout container',
+);
+assert(
+  heroPhoneVariant.elementIds.includes('raydotsh-hero-layout-phone'),
+  'phone hero variant must use the flex stack layout container',
+);
+assert(
+  allElementIds.has('raydotsh-hero-cursor'),
+  'desktop hero must include a dedicated blinking cursor element',
+);
+assert(
+  allElementIds.has('raydotsh-mobile-hero-cursor'),
+  'phone hero must include a dedicated blinking cursor element',
+);
+assert(
+  allElementIds.has('raydotsh-ascii-portrait'),
+  'desktop hero must include the ASCII particle portrait element',
+);
+assert(
+  allElementIds.has('raydotsh-ascii-portrait-phone'),
+  'phone hero must include the ASCII particle portrait element',
+);
+const desktopCursorElement = elementById.get('raydotsh-hero-cursor');
+const phoneCursorElement = elementById.get('raydotsh-mobile-hero-cursor');
+assert(desktopCursorElement?.type === 'text', 'desktop hero cursor element must exist as text');
+assert(phoneCursorElement?.type === 'text', 'phone hero cursor element must exist as text');
+
+const experienceSection = state.pages
+  .flatMap((page) => page.sections)
+  .find((section) => section.id === 'raydotsh-experience');
+assert(experienceSection !== undefined, 'The raydotsh-experience section must exist');
+assert(
+  experienceSection.responsive?.phone?.h !== undefined,
+  'experience section must define a phone height override',
+);
+const experienceTabs = elementById.get('raydotsh-experience-tabs');
+assert(experienceTabs?.type === 'tabs', 'experience section must keep its tabs host');
+assert(
+  experienceTabs.responsive?.phone?.w !== undefined && experienceTabs.responsive.phone.w <= 340,
+  'experience tabs must shrink to a phone-safe width',
+);
+for (const childId of [
+  'raydotsh-freelance-title',
+  'raydotsh-freelance-points',
+  'raydotsh-newsletter-title',
+  'raydotsh-newsletter-points',
+]) {
+  const child = elementById.get(childId);
+  assert(child !== undefined, `${childId} must exist inside experience tabs`);
+  assert(
+    child.responsive?.phone?.w !== undefined && child.responsive.phone.w <= 322,
+    `${childId} must define a phone width that fits inside the narrowed tabs panel`,
+  );
+}
+
 const softwareSection = state.pages
   .flatMap((page) => page.sections)
   .find((section) => section.id === 'raydotsh-software');
@@ -275,6 +340,13 @@ assert(
 );
 const phoneRevealHost = elementById.get('raydotsh-mobile-project-list');
 assert(phoneRevealHost !== undefined, 'phone project list host must exist');
+assert(
+  phoneRevealHost.responsive?.phone?.w !== undefined &&
+    phoneRevealHost.responsive.phone.w >= 320 &&
+    phoneRevealHost.responsive.phone.h !== undefined &&
+    phoneRevealHost.responsive.phone.h >= 900,
+  'phone project list host must define a full-width phone box tall enough for stacked cards',
+);
 const phoneRevealDescendantIds = new Set(
   collectElementTree([phoneRevealHost]).map((element) => element.id),
 );
@@ -372,9 +444,16 @@ for (const assetId of registeredSourceAssetIds) {
   assert(getSeedAsset(assetId) !== null, `${assetId} should be registered as a seed asset`);
 }
 
-const renderedSourceAssetIds = registeredSourceAssetIds.filter(
-  (assetId) => assetId !== 'seed-raydotsh-favicon',
-);
+const renderedSourceAssetIds = [
+  'seed-raydotsh-yoru',
+  'seed-raydotsh-pycaster',
+  'seed-raydotsh-book-a-little-life',
+  'seed-raydotsh-book-pride-and-prejudice',
+  'seed-raydotsh-book-dracula',
+  'seed-raydotsh-book-jane-eyre',
+  'seed-raydotsh-book-harry-potter',
+  'seed-raydotsh-book-goodnight-punpun',
+];
 for (const assetId of renderedSourceAssetIds) {
   assert(html.includes(`/assets/${assetId}`), `rendered template should reference ${assetId}`);
 }
@@ -382,29 +461,76 @@ for (const assetId of renderedSourceAssetIds) {
 const requiredCopy = [
   'hi, ',
   'rehana',
+  ' here.',
   'Freelance content strategist',
   '/ software',
   'pycaster',
   'A Wolfenstein 3D style raycasting rendering engine',
   '/ books',
   'A Little Life',
-  '/ reading list',
   'Built and designed by Rehana Rahman.',
 ];
 for (const token of requiredCopy) {
   assert(html.includes(token), `rendered template should include ${JSON.stringify(token)}`);
 }
+assert(!html.includes(' here.|'), 'hero copy should not inline a static pipe cursor');
 assert(
   html.includes('"textEffect":"typewriter"'),
   'rendered template should publish the typewriter behaviour payload',
+);
+assert(
+  html.includes('data-opencanvas-element="raydotsh-hero-cursor"') &&
+    html.includes('data-opencanvas-element="raydotsh-mobile-hero-cursor"'),
+  'rendered template should include dedicated cursor elements for desktop and phone hero variants',
+);
+assert(
+  html.includes('opencanvas-caret-blink'),
+  'rendered template should ship the shared blinking caret keyframes',
+);
+assert(
+  html.includes('[data-opencanvas-element="raydotsh-freelance-title"]') &&
+    html.includes('[data-opencanvas-element="raydotsh-newsletter-points"]'),
+  'rendered template should emit responsive CSS rules for nested experience tab content',
+);
+assert(
+  /<article class="opencanvas-page" data-opencanvas-page="page-raydotsh-home"/.test(html),
+  'route-enabled template preview should render the home page article',
+);
+assert(
+  !/<article class="opencanvas-page" data-opencanvas-page="page-raydotsh-books"/.test(html),
+  'route-enabled template preview should not inline the secondary books route by default',
 );
 assert(
   html.includes('data-opencanvas-rich-motion="raydotsh-ascii-portrait"'),
   'rendered template should include the source ASCII particle portrait as a rich-motion element',
 );
 assert(
+  html.includes('data-opencanvas-rich-motion="raydotsh-ascii-portrait-phone"'),
+  'rendered template should include the phone ASCII particle portrait rich-motion element',
+);
+assert(
+  html.includes('data-opencanvas-flow-container="raydotsh-hero-layout-desktop"'),
+  'rendered template should use a desktop flex row hero layout container',
+);
+assert(
+  html.includes('data-opencanvas-flow-container="raydotsh-hero-layout-phone"'),
+  'rendered template should use a phone flex stack hero layout container',
+);
+assert(
+  html.includes('data-flow-layout-mode="row"') && html.includes('data-flow-layout-mode="stack"'),
+  'rendered hero layout should expose source row and stack flow modes',
+);
+assert(
   html.includes('"kind":"particle-field"') && html.includes('"mode":"ascii-portrait"'),
   'rendered template should publish the ASCII portrait particle-field behaviour payload',
+);
+assert(
+  html.includes('"radiusRatio":0.2') && html.includes('"force":4'),
+  'rendered template should publish source-matching ascii portrait pointer physics',
+);
+assert(
+  !html.includes('"radius":72'),
+  'rendered template must not publish legacy absolute pointer radius values',
 );
 assert(
   html.includes('data-opencanvas-playable-widget="raydotsh-game-mode"'),
@@ -419,9 +545,8 @@ assert(
   'rendered template should include the desktop slash anchor rail',
 );
 assert(
-  html.includes('data-opencanvas-cover-grid="raydotsh-books-home"') &&
-    html.includes('data-opencanvas-cover-grid="raydotsh-books-gallery"'),
-  'rendered template should use cover-grid masonry hooks for both book grids',
+  html.includes('data-opencanvas-cover-grid="raydotsh-books-home"'),
+  'rendered template should use the home-route cover-grid masonry hook',
 );
 
 const unsupportedRuntimeTokens = [

@@ -9,7 +9,7 @@
     "id": "raydotsh-hero",
     "recipeId": "custom",
     "name": "Intro Hero",
-    "height": 664,
+    "height": 720,
     "anchorId": "home",
     "backgroundEffect": "none",
     "entrance": "fade-up",
@@ -21,383 +21,585 @@
           "x": 0,
           "y": 0,
           "w": 1440,
-          "h": 664,
+          "h": 720,
           "z": 0
         },
         "variant": "flat",
         "pinnedStyle": {
           "background": "#0a192f"
-        }
-      },
-      {
-        "id": "raydotsh-ascii-portrait",
-        "type": "rich-motion",
-        "box": {
-          "x": 220,
-          "y": 166,
-          "w": 400,
-          "h": 400,
-          "z": 2
-        },
-        "assetRefId": "raydotsh-ascii-portrait",
-        "fit": "contain",
-        "label": "ASCII particle portrait",
-        "responsive": {
-          "tablet": {
-            "x": 184,
-            "y": 120,
-            "w": 280,
-            "h": 280
-          },
-          "phone": {
-            "x": 78,
-            "y": 63,
-            "w": 220,
-            "h": 220
-          }
-        }
-      },
-      {
-        "id": "raydotsh-hero-hi",
-        "type": "text",
-        "role": "heading",
-        "fontSize": 80,
-        "fontWeight": 400,
-        "align": "left",
-        "lineHeight": 1.05,
-        "textWrap": "balance",
-        "box": {
-          "x": 676,
-          "y": 206,
-          "w": 88,
-          "h": 98,
-          "z": 2
-        },
-        "content": [
-          {
-            "text": "hi, "
-          }
-        ],
-        "pinnedStyle": {
-          "color": "#ccd6f6",
-          "font-family": "NTR, sans-serif",
-          "overflow": "visible"
         },
         "responsive": {
-          "tablet": {
-            "x": 122,
-            "y": 332,
-            "w": 80,
-            "h": 86
-          },
           "phone": {
-            "x": 34,
-            "y": 278,
-            "w": 62,
-            "h": 54
+            "h": 619
           }
         }
       },
       {
-        "id": "raydotsh-hero-heading",
-        "type": "text",
-        "role": "heading",
-        "fontSize": 80,
-        "fontWeight": 700,
-        "align": "left",
-        "lineHeight": 1.05,
-        "textWrap": "balance",
-        "box": {
-          "x": 766,
-          "y": 206,
-          "w": 230,
-          "h": 98,
-          "z": 2
-        },
-        "content": [
-          {
-            "text": "rehana"
-          }
-        ],
-        "pinnedStyle": {
-          "color": "#64ffda",
-          "font-family": "NTR, sans-serif",
-          "overflow": "visible"
-        },
-        "responsive": {
-          "tablet": {
-            "x": 206,
-            "y": 332,
-            "w": 208,
-            "h": 86
-          },
-          "phone": {
-            "x": 100,
-            "y": 278,
-            "w": 132,
-            "h": 54
-          }
-        }
-      },
-      {
-        "id": "raydotsh-hero-here",
-        "type": "text",
-        "role": "heading",
-        "fontSize": 80,
-        "fontWeight": 400,
-        "align": "left",
-        "lineHeight": 1.05,
-        "textWrap": "balance",
-        "box": {
-          "x": 994,
-          "y": 206,
-          "w": 250,
-          "h": 98,
-          "z": 2
-        },
-        "content": [
-          {
-            "text": " here.|"
-          }
-        ],
-        "pinnedStyle": {
-          "color": "#ccd6f6",
-          "font-family": "NTR, sans-serif",
-          "overflow": "visible"
-        },
-        "responsive": {
-          "tablet": {
-            "x": 414,
-            "y": 332,
-            "w": 230,
-            "h": 86
-          },
-          "phone": {
-            "x": 232,
-            "y": 278,
-            "w": 110,
-            "h": 54
-          }
-        }
-      },
-      {
-        "id": "raydotsh-hero-body",
-        "type": "text",
-        "box": {
-          "x": 676,
-          "y": 312,
-          "w": 550,
-          "h": 120,
-          "z": 2
-        },
-        "content": [
-          {
-            "text": "Freelance content strategist and copywriter in Bengaluru. I build content systems for AI/SaaS founders by day and run a newsletter surfacing indie tech stories by night. Occasionally both happen at the same time."
-          }
-        ],
-        "role": "body",
-        "fontSize": 20,
-        "fontWeight": 400,
-        "align": "left",
-        "lineHeight": 1.5,
-        "textWrap": "pretty",
-        "pinnedStyle": {
-          "color": "#8892b0",
-          "font-family": "NTR, sans-serif"
-        },
-        "responsive": {
-          "tablet": {
-            "x": 122,
-            "y": 430,
-            "w": 620,
-            "h": 112
-          },
-          "phone": {
-            "x": 34,
-            "y": 344,
-            "w": 307,
-            "h": 112
-          }
-        }
-      },
-      {
-        "id": "raydotsh-hero-contact",
-        "type": "action",
-        "box": {
-          "x": 676,
-          "y": 474,
-          "w": 150,
-          "h": 48,
-          "z": 2
-        },
-        "label": [
-          {
-            "text": "Say hi!"
-          }
-        ],
-        "href": {
-          "type": "external",
-          "url": "mailto:rehanarahman004@gmail.com"
-        },
-        "variant": "outline",
-        "iconKind": "mail",
-        "actionStyle": {
-          "backgroundColor": "transparent",
-          "color": "#64ffda",
-          "borderColor": "#64ffda",
-          "borderWidth": 1,
-          "borderRadius": 4,
-          "fontSize": 16,
-          "fontWeight": "bold",
-          "paddingX": 32,
-          "paddingY": 12,
-          "iconGap": 6
-        },
-        "responsive": {
-          "tablet": {
-            "x": 308,
-            "y": 536,
-            "w": 150,
-            "h": 48
-          },
-          "phone": {
-            "x": 124,
-            "y": 460,
-            "w": 128,
-            "h": 40
-          }
-        }
-      },
-      {
-        "id": "raydotsh-mobile-hero-heading",
-        "type": "text",
+        "id": "raydotsh-hero-layout-desktop",
+        "type": "flow-container",
         "box": {
           "x": 0,
-          "y": 314,
-          "w": 322,
-          "h": 54,
-          "z": 3
+          "y": 0,
+          "w": 1440,
+          "h": 720,
+          "z": 1
         },
-        "content": [
-          {
-            "text": "hi, "
+        "responsive": {
+          "phone": {
+            "h": 619
+          }
+        },
+        "layout": {
+          "mode": "row",
+          "gap": {
+            "row": 0,
+            "column": 58
           },
-          {
-            "text": "rehana",
-            "marks": [
-              {
-                "type": "bold"
+          "padding": {
+            "top": 44,
+            "right": 72,
+            "bottom": 44,
+            "left": 72
+          },
+          "align": "center",
+          "justify": "center",
+          "wrap": false,
+          "responsive": {
+            "tablet": {
+              "gap": {
+                "row": 0,
+                "column": 31
               },
-              {
-                "type": "color",
-                "color": "#64ffda"
+              "padding": {
+                "top": 44,
+                "right": 51,
+                "bottom": 44,
+                "left": 51
               }
-            ]
+            }
+          }
+        },
+        "items": [
+          {
+            "id": "raydotsh-hero-portrait-slot",
+            "align": "center",
+            "element": {
+              "id": "raydotsh-ascii-portrait",
+              "type": "rich-motion",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "assetRefId": "raydotsh-ascii-portrait",
+              "fit": "contain",
+              "label": "ASCII particle portrait",
+              "pinnedStyle": {
+                "width": "400px",
+                "height": "400px",
+                "flex-shrink": "0"
+              }
+            }
           },
           {
-            "text": " here."
+            "id": "raydotsh-hero-copy-slot",
+            "element": {
+              "id": "raydotsh-hero-copy",
+              "type": "flow-container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "pinnedStyle": {
+                "max-width": "550px",
+                "width": "100%"
+              },
+              "layout": {
+                "mode": "stack",
+                "gap": {
+                  "row": 0,
+                  "column": 0
+                },
+                "padding": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "align": "start",
+                "justify": "start"
+              },
+              "items": [
+                {
+                  "id": "raydotsh-hero-title-slot",
+                  "element": {
+                    "id": "raydotsh-hero-title-row",
+                    "type": "flow-container",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "layout": {
+                      "mode": "row",
+                      "gap": {
+                        "row": 0,
+                        "column": 0
+                      },
+                      "padding": {
+                        "top": 0,
+                        "right": 0,
+                        "bottom": 0,
+                        "left": 0
+                      },
+                      "align": "center",
+                      "justify": "start",
+                      "wrap": true
+                    },
+                    "items": [
+                      {
+                        "id": "raydotsh-hero-hi-slot",
+                        "element": {
+                          "id": "raydotsh-hero-hi",
+                          "type": "text",
+                          "role": "heading",
+                          "fontSize": 80,
+                          "fontWeight": 400,
+                          "align": "left",
+                          "lineHeight": 1.05,
+                          "textWrap": "balance",
+                          "box": {
+                            "x": 0,
+                            "y": 0,
+                            "w": 0,
+                            "h": 0,
+                            "z": 0
+                          },
+                          "content": [
+                            {
+                              "text": "hi, "
+                            }
+                          ],
+                          "pinnedStyle": {
+                            "color": "#ccd6f6",
+                            "font-family": "NTR, sans-serif",
+                            "white-space": "nowrap"
+                          }
+                        }
+                      },
+                      {
+                        "id": "raydotsh-hero-heading-slot",
+                        "element": {
+                          "id": "raydotsh-hero-heading",
+                          "type": "text",
+                          "role": "heading",
+                          "fontSize": 80,
+                          "fontWeight": 700,
+                          "align": "left",
+                          "lineHeight": 1.05,
+                          "textWrap": "balance",
+                          "box": {
+                            "x": 0,
+                            "y": 0,
+                            "w": 0,
+                            "h": 0,
+                            "z": 0
+                          },
+                          "content": [
+                            {
+                              "text": "rehana"
+                            }
+                          ],
+                          "pinnedStyle": {
+                            "color": "#64ffda",
+                            "font-family": "NTR, sans-serif",
+                            "white-space": "nowrap"
+                          }
+                        }
+                      },
+                      {
+                        "id": "raydotsh-hero-here-slot",
+                        "element": {
+                          "id": "raydotsh-hero-here",
+                          "type": "text",
+                          "role": "heading",
+                          "fontSize": 80,
+                          "fontWeight": 400,
+                          "align": "left",
+                          "lineHeight": 1.05,
+                          "textWrap": "balance",
+                          "box": {
+                            "x": 0,
+                            "y": 0,
+                            "w": 0,
+                            "h": 0,
+                            "z": 0
+                          },
+                          "content": [
+                            {
+                              "text": " here."
+                            }
+                          ],
+                          "pinnedStyle": {
+                            "color": "#ccd6f6",
+                            "font-family": "NTR, sans-serif",
+                            "white-space": "nowrap"
+                          }
+                        }
+                      },
+                      {
+                        "id": "raydotsh-hero-cursor-slot",
+                        "element": {
+                          "id": "raydotsh-hero-cursor",
+                          "type": "text",
+                          "role": "heading",
+                          "fontSize": 80,
+                          "fontWeight": 400,
+                          "align": "left",
+                          "lineHeight": 1.05,
+                          "textWrap": "balance",
+                          "box": {
+                            "x": 0,
+                            "y": 0,
+                            "w": 0,
+                            "h": 0,
+                            "z": 0
+                          },
+                          "content": [
+                            {
+                              "text": "|"
+                            }
+                          ],
+                          "pinnedStyle": {
+                            "color": "#64ffda",
+                            "font-family": "NTR, sans-serif",
+                            "margin-left": "4px",
+                            "white-space": "nowrap",
+                            "animation": "opencanvas-caret-blink 1s step-end infinite"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "raydotsh-hero-body-slot",
+                  "element": {
+                    "id": "raydotsh-hero-body",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "Freelance content strategist and copywriter in Bengaluru. I build content systems for AI/SaaS founders by day and run a newsletter surfacing indie tech stories by night. Occasionally both happen at the same time."
+                      }
+                    ],
+                    "role": "body",
+                    "fontSize": 20,
+                    "fontWeight": 400,
+                    "align": "left",
+                    "lineHeight": 1.5,
+                    "textWrap": "pretty",
+                    "pinnedStyle": {
+                      "color": "#8892b0",
+                      "font-family": "NTR, sans-serif",
+                      "margin-top": "8px",
+                      "margin-bottom": "40px",
+                      "width": "100%"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-hero-contact-slot",
+                  "element": {
+                    "id": "raydotsh-hero-contact",
+                    "type": "action",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "label": [
+                      {
+                        "text": "Say hi!"
+                      }
+                    ],
+                    "href": {
+                      "type": "external",
+                      "url": "mailto:rehanarahman004@gmail.com"
+                    },
+                    "variant": "outline",
+                    "iconKind": "mail",
+                    "actionStyle": {
+                      "backgroundColor": "transparent",
+                      "color": "#64ffda",
+                      "borderColor": "#64ffda",
+                      "borderWidth": 1,
+                      "borderRadius": 4,
+                      "fontSize": 16,
+                      "fontWeight": "bold",
+                      "paddingX": 32,
+                      "paddingY": 12,
+                      "iconGap": 6
+                    },
+                    "pinnedStyle": {
+                      "align-self": "flex-start"
+                    }
+                  }
+                }
+              ]
+            }
           }
-        ],
-        "role": "heading",
-        "fontSize": 40,
-        "fontWeight": 400,
-        "align": "center",
-        "lineHeight": 1.1,
-        "textWrap": "balance",
-        "pinnedStyle": {
-          "color": "#ccd6f6",
-          "font-family": "NTR, sans-serif",
-          "overflow": "visible"
-        },
-        "responsive": {
-          "phone": {
-            "x": 34,
-            "y": 306,
-            "w": 322,
-            "h": 54
-          }
-        }
+        ]
       },
       {
-        "id": "raydotsh-mobile-hero-body",
-        "type": "text",
+        "id": "raydotsh-hero-layout-phone",
+        "type": "flow-container",
         "box": {
           "x": 0,
-          "y": 398,
-          "w": 290,
-          "h": 92,
-          "z": 3
+          "y": 0,
+          "w": 1440,
+          "h": 619,
+          "z": 1
         },
-        "content": [
+        "layout": {
+          "mode": "stack",
+          "gap": {
+            "row": 16,
+            "column": 0
+          },
+          "padding": {
+            "top": 16,
+            "right": 16,
+            "bottom": 16,
+            "left": 16
+          },
+          "align": "center",
+          "justify": "center"
+        },
+        "items": [
           {
-            "text": "Freelance content strategist and copywriter in Bengaluru. I build content systems for AI/SaaS founders by day and run a newsletter surfacing indie tech stories by night. Occasionally both happen at the same time."
-          }
-        ],
-        "role": "body",
-        "fontSize": 14,
-        "fontWeight": 400,
-        "align": "center",
-        "lineHeight": 1.45,
-        "textWrap": "pretty",
-        "pinnedStyle": {
-          "color": "#8892b0",
-          "font-family": "NTR, sans-serif"
-        },
-        "responsive": {
-          "phone": {
-            "x": 50,
-            "y": 360,
-            "w": 290,
-            "h": 120
-          }
-        }
-      },
-      {
-        "id": "raydotsh-mobile-hero-contact",
-        "type": "action",
-        "box": {
-          "x": 0,
-          "y": 538,
-          "w": 108,
-          "h": 42,
-          "z": 3
-        },
-        "label": [
+            "id": "raydotsh-hero-phone-portrait-slot",
+            "align": "center",
+            "element": {
+              "id": "raydotsh-ascii-portrait-phone",
+              "type": "rich-motion",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "assetRefId": "raydotsh-ascii-portrait",
+              "fit": "contain",
+              "label": "ASCII particle portrait",
+              "pinnedStyle": {
+                "width": "220px",
+                "height": "220px",
+                "flex-shrink": "0"
+              }
+            }
+          },
           {
-            "text": "Say hi!"
+            "id": "raydotsh-hero-phone-title-slot",
+            "element": {
+              "id": "raydotsh-hero-phone-title-row",
+              "type": "flow-container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "layout": {
+                "mode": "row",
+                "gap": {
+                  "row": 0,
+                  "column": 0
+                },
+                "padding": {
+                  "top": 0,
+                  "right": 0,
+                  "bottom": 0,
+                  "left": 0
+                },
+                "align": "center",
+                "justify": "center",
+                "wrap": false
+              },
+              "items": [
+                {
+                  "id": "raydotsh-mobile-hero-heading-slot",
+                  "element": {
+                    "id": "raydotsh-mobile-hero-heading",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "hi, "
+                      },
+                      {
+                        "text": "rehana",
+                        "marks": [
+                          {
+                            "type": "bold"
+                          },
+                          {
+                            "type": "color",
+                            "color": "#64ffda"
+                          }
+                        ]
+                      },
+                      {
+                        "text": " here."
+                      }
+                    ],
+                    "role": "heading",
+                    "fontSize": 40,
+                    "fontWeight": 400,
+                    "align": "center",
+                    "lineHeight": 1.1,
+                    "textWrap": "balance",
+                    "pinnedStyle": {
+                      "color": "#ccd6f6",
+                      "font-family": "NTR, sans-serif",
+                      "white-space": "nowrap"
+                    }
+                  }
+                },
+                {
+                  "id": "raydotsh-mobile-hero-cursor-slot",
+                  "element": {
+                    "id": "raydotsh-mobile-hero-cursor",
+                    "type": "text",
+                    "box": {
+                      "x": 0,
+                      "y": 0,
+                      "w": 0,
+                      "h": 0,
+                      "z": 0
+                    },
+                    "content": [
+                      {
+                        "text": "|"
+                      }
+                    ],
+                    "role": "heading",
+                    "fontSize": 40,
+                    "fontWeight": 400,
+                    "align": "left",
+                    "lineHeight": 1.1,
+                    "textWrap": "balance",
+                    "pinnedStyle": {
+                      "color": "#64ffda",
+                      "font-family": "NTR, sans-serif",
+                      "margin-left": "4px",
+                      "white-space": "nowrap",
+                      "animation": "opencanvas-caret-blink 1s step-end infinite"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "raydotsh-mobile-hero-body-slot",
+            "element": {
+              "id": "raydotsh-mobile-hero-body",
+              "type": "text",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "content": [
+                {
+                  "text": "Freelance content strategist and copywriter in Bengaluru. I build content systems for AI/SaaS founders by day and run a newsletter surfacing indie tech stories by night. Occasionally both happen at the same time."
+                }
+              ],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "center",
+              "lineHeight": 1.45,
+              "textWrap": "pretty",
+              "pinnedStyle": {
+                "color": "#8892b0",
+                "font-family": "NTR, sans-serif",
+                "margin-top": "4px",
+                "margin-bottom": "20px",
+                "max-width": "290px",
+                "width": "100%"
+              }
+            }
+          },
+          {
+            "id": "raydotsh-mobile-hero-contact-slot",
+            "element": {
+              "id": "raydotsh-mobile-hero-contact",
+              "type": "action",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 0,
+                "h": 0,
+                "z": 0
+              },
+              "label": [
+                {
+                  "text": "Say hi!"
+                }
+              ],
+              "href": {
+                "type": "external",
+                "url": "mailto:rehanarahman004@gmail.com"
+              },
+              "variant": "outline",
+              "iconKind": "mail",
+              "actionStyle": {
+                "backgroundColor": "transparent",
+                "color": "#64ffda",
+                "borderColor": "#64ffda",
+                "borderWidth": 1,
+                "borderRadius": 4,
+                "fontSize": 14,
+                "fontWeight": "bold",
+                "paddingX": 20,
+                "paddingY": 8,
+                "iconGap": 6
+              }
+            }
           }
-        ],
-        "href": {
-          "type": "external",
-          "url": "mailto:rehanarahman004@gmail.com"
-        },
-        "variant": "outline",
-        "iconKind": "mail",
-        "actionStyle": {
-          "backgroundColor": "transparent",
-          "color": "#64ffda",
-          "borderColor": "#64ffda",
-          "borderWidth": 1,
-          "borderRadius": 4,
-          "fontSize": 14,
-          "fontWeight": "bold",
-          "paddingX": 20,
-          "paddingY": 8,
-          "iconGap": 6
-        },
-        "responsive": {
-          "phone": {
-            "x": 141,
-            "y": 481,
-            "w": 108,
-            "h": 42
-          }
-        }
+        ]
       }
     ],
     "responsive": {
       "tablet": {
-        "h": 664
+        "h": 720
       },
       "phone": {
         "h": 619
@@ -409,11 +611,7 @@
         "breakpoint": "desktop",
         "contentSourceId": "raydotsh-hero-copy",
         "elementIds": [
-          "raydotsh-hero-hi",
-          "raydotsh-hero-heading",
-          "raydotsh-hero-here",
-          "raydotsh-hero-body",
-          "raydotsh-hero-contact"
+          "raydotsh-hero-layout-desktop"
         ]
       },
       {
@@ -421,9 +619,7 @@
         "breakpoint": "phone",
         "contentSourceId": "raydotsh-hero-copy",
         "elementIds": [
-          "raydotsh-mobile-hero-heading",
-          "raydotsh-mobile-hero-body",
-          "raydotsh-mobile-hero-contact"
+          "raydotsh-hero-layout-phone"
         ]
       }
     ]

@@ -124,18 +124,18 @@ async function reconcileCustomTemplateDraftSchema(database: ReturnType<typeof db
   if (!existingColumns.has('publication_status')) {
     await database.execute(sql.raw(`ALTER TABLE "custom_template" ADD COLUMN "publication_status" text`));
     addedColumns.push('publication_status');
+    await database.execute(
+      sql.raw(
+        `UPDATE "custom_template" SET "publication_status" = 'published' WHERE "publication_status" IS NULL`,
+      ),
+    );
+    await database.execute(
+      sql.raw(`ALTER TABLE "custom_template" ALTER COLUMN "publication_status" SET DEFAULT 'published'`),
+    );
+    await database.execute(
+      sql.raw(`ALTER TABLE "custom_template" ALTER COLUMN "publication_status" SET NOT NULL`),
+    );
   }
-  await database.execute(
-    sql.raw(
-      `UPDATE "custom_template" SET "publication_status" = 'published' WHERE "publication_status" IS NULL`,
-    ),
-  );
-  await database.execute(
-    sql.raw(`ALTER TABLE "custom_template" ALTER COLUMN "publication_status" SET DEFAULT 'published'`),
-  );
-  await database.execute(
-    sql.raw(`ALTER TABLE "custom_template" ALTER COLUMN "publication_status" SET NOT NULL`),
-  );
   if (!existingConstraints.has('custom_template_publication_status_check')) {
     await database.execute(
       sql.raw(

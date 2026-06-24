@@ -3,6 +3,7 @@ import { spawn, spawnSync } from 'node:child_process';
 const isWindows = process.platform === 'win32';
 const bunCommand = isWindows ? 'bun.cmd' : 'bun';
 const wranglerCommand = isWindows ? 'wrangler.cmd' : 'wrangler';
+const tunnelProcess = ['db-tunnel', process.execPath, ['scripts/start-db-tunnel.mjs']];
 const processes = [
   ['scraper', bunCommand, ['run', '--cwd', 'services/scraper', 'dev']],
   ['worker', wranglerCommand, ['dev']],
@@ -64,6 +65,7 @@ const preBuilds = ['editor-client:build:dev', 'dashboard-client:build:dev'];
 
 if (process.argv.includes('--dry-run')) {
   console.log(`[dev:all] ${preBuilds.join(', ')} (pre-step, sequential)`);
+  console.log(`[dev:all] db-tunnel: ${tunnelProcess.join(' ')}`);
   for (const [name, command, args] of processes) {
     console.log(`[dev:all] ${name}: ${command} ${args.join(' ')}`);
   }
@@ -105,6 +107,12 @@ console.log(
   '[dev:all]       src/editor-client/ or src/dashboard-client/, then reload the browser.',
 );
 
-for (const [name, command, args] of processes) {
-  start(name, command, args);
-}
+start(tunnelProcess[0], tunnelProcess[1], tunnelProcess[2]);
+
+setTimeout(() => {
+  if (!shutdownStarted) {
+    for (const [name, command, args] of processes) {
+      start(name, command, args);
+    }
+  }
+}, 2500);
