@@ -488,8 +488,8 @@ assert(
   'rendered template should ship the shared blinking caret keyframes',
 );
 assert(
-  html.includes('data-opencanvas-viewport-fit'),
-  'rendered template should ship viewport width fit script for wide screens',
+  !html.includes('data-opencanvas-viewport-fit'),
+  'published template must not upscale layout with viewport scale transforms',
 );
 assert(
   html.includes('[data-opencanvas-element="raydotsh-freelance-title"]') &&

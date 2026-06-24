@@ -151,7 +151,7 @@
                       "mode": "row",
                       "gap": {
                         "row": 0,
-                        "column": 0
+                        "column": 10
                       },
                       "padding": {
                         "top": 0,
@@ -431,7 +431,7 @@
                 "mode": "row",
                 "gap": {
                   "row": 0,
-                  "column": 0
+                  "column": 10
                 },
                 "padding": {
                   "top": 0,

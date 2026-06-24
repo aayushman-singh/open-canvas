@@ -51,5 +51,9 @@ assert(
   src.includes('width <= 480 ? \'phone\' : width <= 768 ? \'tablet\' : \'desktop\''),
   'particle field point-set selection must follow source viewport breakpoints',
 );
+assert(
+  src.includes('visualWidth') && src.includes('/ visualWidth) * canvas.clientWidth'),
+  'particle field pointer tracking must map visual pointer coords into canvas layout space',
+);
 
 console.log('[particle-field-parity:smoke] OK');

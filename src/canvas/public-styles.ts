@@ -23,6 +23,8 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
   font-size: 14px;
   line-height: 1.5;
@@ -51,6 +53,7 @@ html, body {
   margin: 0 auto;
   background: var(--opencanvas-kit-bg, var(--kit-bg, #0c0c0d));
   color: var(--opencanvas-kit-text, var(--kit-fg, #f6f6f6));
+  max-width: 100%;
 }
 
 .opencanvas-section {

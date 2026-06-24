@@ -990,9 +990,11 @@ function behaviourHydrateParticleField(asset, root) {
       function updatePointer(event) {
         var rect = canvas.getBoundingClientRect();
         var source = event.touches && event.touches[0] ? event.touches[0] : event;
+        var visualWidth = rect.width || canvas.clientWidth || 1;
+        var visualHeight = rect.height || canvas.clientHeight || 1;
         pointer.active = true;
-        pointer.targetX = source.clientX - rect.left;
-        pointer.targetY = source.clientY - rect.top;
+        pointer.targetX = ((source.clientX - rect.left) / visualWidth) * canvas.clientWidth;
+        pointer.targetY = ((source.clientY - rect.top) / visualHeight) * canvas.clientHeight;
       }
       canvas.addEventListener('pointermove', updatePointer, { passive: true });
       canvas.addEventListener('pointerleave', function(){

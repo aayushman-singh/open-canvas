@@ -941,14 +941,13 @@ export function renderCanvasSnapshot(
     : '';
   const behaviourPayloadScript = renderBehaviourPayloadScript(snapshot, assetBasePath);
   const importAnimationInventoryScript = renderImportAnimationInventoryScript(snapshot);
-  const viewportWidthFitScript = renderViewportWidthFitScript();
   const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
   const routeAttrs =
     snapshot.routeTransition?.enabled === true
       ? ` data-opencanvas-route-transition="${escapeAttr(snapshot.routeTransition.id)}" data-opencanvas-route-mode="${escapeAttr(snapshot.routeTransition.mode)}" data-opencanvas-route-duration-ms="${escapeAttr(String(snapshot.routeTransition.durationMs))}" data-opencanvas-route-easing="${escapeAttr(snapshot.routeTransition.easing)}"${snapshot.routeTransition.sharedElements && snapshot.routeTransition.sharedElements.length > 0 ? ` data-opencanvas-route-shared-elements="${escapeAttr(JSON.stringify(snapshot.routeTransition.sharedElements))}"` : ''}${snapshot.routeTransition.outgoingSequence ? ` data-opencanvas-route-outgoing-sequence="${escapeAttr(snapshot.routeTransition.outgoingSequence.id)}"` : ''}${snapshot.routeTransition.incomingSequence ? ` data-opencanvas-route-incoming-sequence="${escapeAttr(snapshot.routeTransition.incomingSequence.id)}"` : ''}`
       : '';
   const smoothScrollAttrs = renderSmoothScrollAttrs(snapshot.scrollBehavior);
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${fontFaceStyle}${scrollStyle}${responsiveStyle}${loadExperienceHtml}${anchorRailsHtml}${playableWidgetsHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${importAnimationInventoryScript}${behaviourPayloadScript}${copyScript}${tabsScript}${viewportWidthFitScript}</main>`;
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${fontFaceStyle}${scrollStyle}${responsiveStyle}${loadExperienceHtml}${anchorRailsHtml}${playableWidgetsHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${importAnimationInventoryScript}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
 }
 
 /**
@@ -1135,10 +1134,4 @@ function renderBehaviourPayloadScript(
   const payload = buildBehaviourPayload(snapshot, assetBasePath);
   if (!payload) return '';
   return `<script type="application/json" data-opencanvas-behaviour-payload>${serializeBehaviourPayload(payload)}</script>`;
-}
-
-function renderViewportWidthFitScript(): string {
-  const script =
-    "(function(){function fitViewportWidth(){var site=document.querySelector('.opencanvas-site');if(!site)return;var page=site.querySelector('.opencanvas-page');if(!page)return;var styleWidth=page.style.width||'';var designWidth=parseFloat(styleWidth);if(!isFinite(designWidth)||designWidth<=0)designWidth=page.getBoundingClientRect().width||0;if(!(designWidth>0))return;var vw=document.documentElement.clientWidth||window.innerWidth||designWidth;if(vw<=designWidth+1){site.style.transform='';site.style.width='';site.style.marginBottom='';return;}var scale=vw/designWidth;site.style.width=designWidth+'px';site.style.margin='0 auto';site.style.transform='scale('+scale+')';site.style.transformOrigin='top center';site.style.marginBottom=((site.offsetHeight*scale)-site.offsetHeight)+'px';}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fitViewportWidth);else fitViewportWidth();window.addEventListener('resize',fitViewportWidth);})();";
-  return `<script data-opencanvas-viewport-fit>${script}</script>`;
 }
