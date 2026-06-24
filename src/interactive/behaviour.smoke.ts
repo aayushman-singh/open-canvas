@@ -62,6 +62,8 @@ class StubElement {
   style = new StubStyle();
   clientWidth = 320;
   clientHeight = 240;
+  width = 0;
+  height = 0;
   scrollHeight = 2400;
   scrollTop = 0;
   animations: Array<{ keyframes: unknown; options: unknown }> = [];
@@ -163,8 +165,26 @@ class StubElement {
     this.animations.push({ keyframes, options });
     return { cancel: () => undefined };
   }
-  getContext(): { clearRect: () => void; drawImage: () => void } {
-    return { clearRect: () => undefined, drawImage: () => undefined };
+  getContext(): {
+    clearRect: () => void;
+    drawImage: () => void;
+    setTransform: () => void;
+    fillText: () => void;
+    font: string;
+    textBaseline: string;
+    textAlign: string;
+    fillStyle: string;
+  } {
+    return {
+      clearRect: () => undefined,
+      drawImage: () => undefined,
+      setTransform: () => undefined,
+      fillText: () => undefined,
+      font: '',
+      textBaseline: 'middle',
+      textAlign: 'center',
+      fillStyle: '',
+    };
   }
 }
 
@@ -233,6 +253,7 @@ class StubSessionStorage {
 }
 
 class StubWindow {
+  location = { pathname: '/' };
   scrollY = 0;
   innerHeight = 900;
   scrollToCalls = 0;
@@ -324,6 +345,13 @@ class StubImage {
 
   get src(): string {
     return this._src;
+  }
+}
+
+class FailingStubImage extends StubImage {
+  override set src(value: string) {
+    this['_src'] = value;
+    if (this.onerror) this.onerror(new Error('frame load failed'));
   }
 }
 
@@ -1415,6 +1443,83 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   );
 }
 
+// (9) dashboard preview ignores page-enter sequences whose page target is intentionally absent
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  win.location.pathname = '/dashboard/templates/raydotsh-portfolio/preview';
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'page-enter-preview-sequence',
+        trigger: { type: 'page-enter', pageId: 'page-detail' },
+        steps: [
+          {
+            id: 'page-enter-preview-step',
+            target: { type: 'site' },
+            to: { opacity: 1 },
+            durationMs: 1,
+          },
+        ],
+      },
+    ],
+    scrollScenes: [],
+    richMotionAssets: [],
+  });
+  doc.body.appendChild(script);
+  let threw = false;
+  try {
+    runBehaviour(doc, win, StubImage);
+  } catch {
+    threw = true;
+  }
+  assert(threw === false, 'dashboard preview must skip missing page-enter targets');
+}
+
+// (10) dashboard preview tolerates image-sequence frame preload failures and keeps the poster/static preview
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  win.location.pathname = '/dashboard/templates/velocity-athlete/preview';
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [],
+    scrollScenes: [],
+    richMotionAssets: [
+      {
+        id: 'preview-sequence',
+        kind: 'image-sequence',
+        posterAssetId: 'seed-frame-00',
+        alt: 'Preview sequence',
+        frameAssetIds: ['seed-frame-00'],
+        frameUrls: ['/assets/seed-frame-00'],
+        posterUrl: '/assets/seed-frame-00',
+        playback: { driver: 'load', fps: 12, loop: false },
+      },
+    ],
+  });
+  doc.body.appendChild(script);
+  const richMotion = new StubElement('div');
+  richMotion.setAttribute('data-opencanvas-rich-motion', 'preview-sequence');
+  richMotion.setAttribute('data-rich-motion-asset-ref', 'preview-sequence');
+  const canvas = new StubElement('canvas');
+  canvas.setAttribute('data-opencanvas-rich-motion-canvas', 'preview-sequence');
+  richMotion.appendChild(canvas);
+  doc.body.appendChild(richMotion);
+  let threw = false;
+  try {
+    runBehaviour(doc, win, FailingStubImage);
+  } catch {
+    threw = true;
+  }
+  assert(threw === false, 'dashboard preview must not throw when image-sequence frames fail to preload');
+}
+
 // (6) layout transition toggles same-page source/detail elements through View Transition API
 // (6) Rive input bindings drive state-machine inputs through schema-owned events
 {
@@ -1669,6 +1774,73 @@ assert(
 assert(
   injectInteractiveRuntime('<main></main>', baseSnapshot()).includes('hydrateBehaviour'),
   'behaviour snapshots must inject runtime containing hydrateBehaviour',
+);
+
+// (11) particle field renders and reacts to pointer events
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [],
+    scrollScenes: [],
+    richMotionAssets: [
+      {
+        id: 'raydotsh-ascii-portrait',
+        kind: 'particle-field',
+        mode: 'ascii-portrait',
+        alt: 'ASCII particle portrait of Rehana',
+        color: '#64ffda',
+        fontFamily: 'NTR',
+        fontSize: 7,
+        charset: ' .:-=+*#%@',
+        pointSets: [
+          {
+            breakpoint: 'desktop',
+            canvasSize: 400,
+            points: [
+              { x: 100, y: 100, char: '@', alpha: 0.9 },
+            ],
+          },
+        ],
+        pointer: { radiusRatio: 0.2, force: 4 },
+        reducedMotion: 'settled',
+      },
+    ],
+  });
+  doc.body.appendChild(script);
+  const richMotion = new StubElement('div');
+  richMotion.setAttribute('data-opencanvas-rich-motion', 'raydotsh-ascii-portrait');
+  richMotion.setAttribute('data-rich-motion-asset-ref', 'raydotsh-ascii-portrait');
+  const canvas = new StubElement('canvas');
+  canvas.setAttribute('data-opencanvas-rich-motion-canvas', 'raydotsh-ascii-portrait');
+  richMotion.appendChild(canvas);
+  doc.body.appendChild(richMotion);
+
+  let threw = false;
+  try {
+    runBehaviour(doc, win, StubImage);
+  } catch (err) {
+    threw = true;
+    console.error(err);
+  }
+  assert(!threw, 'particle field must hydrate without throwing');
+  assert(
+    richMotion.getAttribute('data-opencanvas-rich-motion-hydrated') === 'particle-field',
+    'particle field element must be marked hydrated',
+  );
+}
+
+// (12) ascii portrait runtime keeps raydotsh source physics constants
+assert(
+  BEHAVIOUR_RUNTIME_SRC.includes('behaviourParticleScatterSpread'),
+  'behaviour runtime must centralize the source 400px scatter spread',
+);
+assert(
+  BEHAVIOUR_RUNTIME_SRC.includes('behaviourParticlePointerConfig'),
+  'behaviour runtime must read ascii portrait pointer config from the asset payload',
 );
 
 console.log('[behaviour-runtime:smoke] OK');

@@ -38,6 +38,7 @@ html, body {
 
 .opencanvas-site {
   display: block;
+  min-height: 100vh;
   background: var(--opencanvas-kit-bg, var(--kit-bg, #0c0c0d));
   color: var(--opencanvas-kit-text, var(--kit-fg, #f6f6f6));
   font-family: var(--opencanvas-kit-font-body, 'IBM Plex Sans', system-ui, sans-serif);
@@ -1855,6 +1856,11 @@ html[data-opencanvas-route-view-mode="mask"]::view-transition-new(opencanvas-sit
 }
 [data-opencanvas-motion-effect="blur"][data-opencanvas-motion-running="true"] {
   filter: blur(8px);
+}
+
+@keyframes opencanvas-caret-blink {
+  from, to { opacity: 1; }
+  50% { opacity: 0; }
 }
 `;
 

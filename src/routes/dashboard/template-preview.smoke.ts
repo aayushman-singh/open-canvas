@@ -2,8 +2,13 @@ import {
   renderBuiltInTemplatePreviewAssetResponse,
   renderBuiltInTemplatePreviewBodyHtml,
 } from './templates.js';
+import { canvasPublishedStyles } from '../../canvas/public-styles.js';
+import { buildStyleKitCss } from '../../canvas/style-kits.js';
+import { getTemplateSeed } from '../../templates/registry.js';
 import { getSeedAsset } from '../../canvas/seed-assets.js';
 import { allTemplateSeeds } from '../../templates/registry.js';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[template-preview:smoke] ${message}`);
@@ -47,6 +52,24 @@ for (const marker of [
   );
 }
 
+const templatesRouteSource = readFileSync(
+  path.join(process.cwd(), 'src/routes/dashboard/templates.tsx'),
+  'utf8',
+);
+assert(
+  !/html,\s*body\s*\{\s*margin:\s*0;\s*overflow:\s*hidden;/.test(templatesRouteSource),
+  'standalone template preview route must not lock document scrolling',
+);
+assert(
+  templatesRouteSource.includes('window.__opencanvasRuntimeOptions={reducedMotion:"no-preference"}'),
+  'template preview route must force motion-on runtime options for fidelity previews',
+);
+assert(
+  templatesRouteSource.includes('ENTRANCE_ANIMATION_CSS') &&
+    templatesRouteSource.includes('ENTRANCE_OBSERVER_SCRIPT'),
+  'template preview route must include entrance animation CSS and observer script',
+);
+
 const pycasterSeed = getSeedAsset('seed-raydotsh-pycaster');
 assert(pycasterSeed !== null, 'Raydotsh pycaster source image must be registered');
 let requestedPreviewAssetKey = '';
@@ -79,5 +102,23 @@ for (const token of forbidden) {
     `preview HTML must not leak forbidden token ${token}`,
   );
 }
+
+// Test that `.opencanvas-site` has `min-height: 100vh` in published styles to fill the viewport on wide screens
+assert(
+  /\.opencanvas-site\s*\{[^}]*min-height:\s*100vh/.test(canvasPublishedStyles),
+  'canvasPublishedStyles must include min-height: 100vh on .opencanvas-site',
+);
+
+// Test that the Raydotsh custom style kit defines the correct background color
+const raydotshSeed = getTemplateSeed('raydotsh-portfolio');
+assert(raydotshSeed !== null, 'raydotsh-portfolio must be registered');
+assert(raydotshSeed.styleKit === 'custom', 'Raydotsh must use custom style kit');
+assert(raydotshSeed.customStyleKit !== undefined, 'Raydotsh must define customStyleKit');
+
+const raydotshCss = buildStyleKitCss('custom', raydotshSeed.customStyleKit);
+assert(
+  raydotshCss.includes('--opencanvas-kit-bg: #0a192f') || raydotshCss.includes('--opencanvas-kit-bg:#0a192f'),
+  'Raydotsh custom style kit CSS must define --opencanvas-kit-bg: #0a192f',
+);
 
 console.log('[template-preview:smoke] OK');

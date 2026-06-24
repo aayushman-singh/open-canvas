@@ -175,6 +175,8 @@ export interface ElementRenderCtx {
    * absolute positioning; Flow Item owns placement.
    */
   renderHostedElement: (element: CanvasElement, ctx: ElementRenderCtx) => string;
+  /** True when an element body is rendering inside a Flow Item host context. */
+  flowHosted?: boolean;
 }
 
 /**
@@ -267,6 +269,7 @@ export const RENDER_DISPATCH: RenderDispatch = {
   'flow-container': (el, ctx) =>
     renderFlowContainer(el, {
       renderHostedElement: (child) => ctx.renderHostedElement(child, ctx),
+      hosted: ctx.flowHosted === true,
     }),
 };
 

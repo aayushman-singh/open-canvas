@@ -210,6 +210,10 @@ function renderHtml(state: EditableSite): string {
       !html.includes('flex-wrap'),
     `stack style did not render expected vertical grammar: ${html}`,
   );
+  assert(
+    html.includes('data-opencanvas-flow-item="stack-copy"') && html.includes('width:100%'),
+    `stack items with stretch alignment should fill available width: ${html}`,
+  );
 }
 
 // Renderer: row mode keeps wrapping explicit for both wrap and no-wrap cases.
@@ -311,10 +315,82 @@ function renderHtml(state: EditableSite): string {
     style.includes('position:relative'),
     `hosted child should anchor body with relative positioning: ${style}`,
   );
+  assert(
+    style.includes('height:auto'),
+    `text hosted child should size to content height inside flow items: ${style}`,
+  );
   assert(html.includes('Flow headline'), `hosted text body did not render: ${html}`);
   assert(
     html.includes('data-opencanvas-copy-handler'),
     `copy action nested in Flow Item must still trigger visitor runtime injection: ${html}`,
+  );
+}
+
+// Renderer: nested flow cards inside stack items must keep content-driven height.
+{
+  const nestedCard = {
+    id: 'nested-card',
+    type: 'flow-container',
+    box: { x: 0, y: 0, w: 0, h: 0, z: 0 },
+    layout: {
+      mode: 'stack',
+      gap: { row: 12, column: 0 },
+      padding: { top: 16, right: 16, bottom: 16, left: 16 },
+      align: 'stretch',
+      justify: 'start',
+    },
+    items: [
+      {
+        id: 'nested-card-copy',
+        element: textElement({ id: 'nested-card-copy' }),
+      },
+      {
+        id: 'nested-card-cta',
+        element: copyAction(),
+      },
+    ],
+  } as unknown as CanvasElement;
+  const html = renderHtml(
+    siteWith([
+      flowElement({
+        id: 'flow-stack-hosted-card',
+        layout: {
+          mode: 'stack',
+          gap: { row: 20, column: 0 },
+          padding: { top: 0, right: 0, bottom: 0, left: 0 },
+          align: 'stretch',
+          justify: 'start',
+        },
+        items: [{ id: 'hosted-card', element: nestedCard }],
+      }),
+    ]),
+  );
+  const nestedCardMatch = html.match(
+    /<div class="opencanvas-element opencanvas-flow-content"[^>]*data-opencanvas-element="nested-card"[^>]*style="([^"]*)"/,
+  );
+  assert(nestedCardMatch !== null, `missing nested hosted flow card wrapper: ${html}`);
+  const nestedCardStyle = nestedCardMatch[1] ?? '';
+  assert(
+    nestedCardStyle.includes('height:auto'),
+    `nested flow card wrapper should not force full-height inside stack items: ${nestedCardStyle}`,
+  );
+  const nestedFlowRootMatch = html.match(
+    /<div class="opencanvas-flow-container" data-opencanvas-flow-container="nested-card"[^>]*style="([^"]*)"/,
+  );
+  assert(nestedFlowRootMatch !== null, `missing nested flow container root: ${html}`);
+  const nestedFlowRootStyle = nestedFlowRootMatch[1] ?? '';
+  assert(
+    nestedFlowRootStyle.includes('height:auto'),
+    `nested flow container body should size to content height when hosted: ${nestedFlowRootStyle}`,
+  );
+  const nestedCopyMatch = html.match(
+    /<div class="opencanvas-element opencanvas-flow-content"[^>]*data-opencanvas-element="nested-card-copy"[^>]*style="([^"]*)"/,
+  );
+  assert(nestedCopyMatch !== null, `missing nested hosted text wrapper: ${html}`);
+  const nestedCopyStyle = nestedCopyMatch[1] ?? '';
+  assert(
+    nestedCopyStyle.includes('height:auto'),
+    `nested hosted text should keep content-driven height inside hosted cards: ${nestedCopyStyle}`,
   );
 }
 

@@ -80,6 +80,7 @@ export interface FlowContainerElement extends BaseElement {
 
 export interface FlowContainerRenderCtx {
   renderHostedElement: (element: CanvasElement) => string;
+  hosted?: boolean;
 }
 
 function alignToCss(value: FlowAlign): string {
@@ -94,11 +95,10 @@ function justifyToCss(value: FlowJustify): string {
   return value;
 }
 
-function renderLayoutStyle(layout: FlowLayout): string {
+function renderLayoutStyle(layout: FlowLayout, hosted = false): string {
   const entries: Array<[string, string]> = [
     ['box-sizing', 'border-box'],
     ['width', '100%'],
-    ['height', '100%'],
     ['gap', `${String(layout.gap.row)}px ${String(layout.gap.column)}px`],
     [
       'padding',
@@ -108,6 +108,7 @@ function renderLayoutStyle(layout: FlowLayout): string {
     ],
     ['overflow', 'hidden'],
   ];
+  entries.push(['height', hosted ? 'auto' : '100%']);
 
   if (layout.mode === 'grid') {
     entries.push(
@@ -137,6 +138,10 @@ function renderFlowItem(item: FlowItem, layout: FlowLayout, ctx: FlowContainerRe
     ['min-width', '0'],
     ['min-height', '0'],
   ];
+  const itemAlign = item.align ?? layout.align;
+  if (layout.mode === 'stack' && itemAlign === 'stretch') {
+    entries.push(['width', '100%']);
+  }
   if (layout.mode === 'grid' && item.span !== undefined) {
     entries.push(['grid-column', `span ${String(item.span)}`]);
   }
@@ -231,7 +236,7 @@ export function renderFlowContainer(
   element: FlowContainerElement,
   ctx: FlowContainerRenderCtx,
 ): string {
-  const style = renderLayoutStyle(element.layout);
+  const style = renderLayoutStyle(element.layout, ctx.hosted === true);
   const itemsHtml = element.items.map((item) => renderFlowItem(item, element.layout, ctx)).join('');
   const responsiveCss = renderFlowResponsiveCss(element);
   return `${responsiveCss}<div class="opencanvas-flow-container" data-opencanvas-flow-container="${escapeAttr(element.id)}" data-flow-layout-mode="${escapeAttr(element.layout.mode)}" style="${style}">${itemsHtml}</div>`;

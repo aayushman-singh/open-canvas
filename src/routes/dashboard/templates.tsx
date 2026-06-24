@@ -5,6 +5,10 @@ import { clerkAuth } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
+import {
+  ENTRANCE_ANIMATION_CSS,
+  ENTRANCE_OBSERVER_SCRIPT,
+} from '../../canvas/entrance-animation';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
@@ -13,6 +17,7 @@ import {
   renderBuiltInTemplatePreviewAssetResponse,
   renderBuiltInTemplatePreviewBodyHtml,
 } from '../../templates/built-in-preview';
+import { buildStyleKitCss } from '../../canvas/style-kits.js';
 import {
   allTemplateSeeds,
   getTemplateSeed,
@@ -23,6 +28,7 @@ import { DashboardShell } from './shell';
 import { Button, readThemeCookie } from '../../ui';
 import type { Theme } from '../../ui';
 import { publicHostSuffix, type HostConfigEnv } from '../../host-config';
+import { ensureCustomTemplateDraftSchema } from '../api/custom-templates';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -310,7 +316,7 @@ const pageStyles = `
 `;
 
 const previewStyles = `
-  html, body { margin: 0; overflow: hidden; background: var(--paper); }
+  html, body { margin: 0; background: var(--paper); }
 `;
 
 export { renderBuiltInTemplatePreviewAssetResponse, renderBuiltInTemplatePreviewBodyHtml };
@@ -323,6 +329,12 @@ function PreviewPage({
   turnstileSiteKey: string;
 }) {
   const html = renderBuiltInTemplatePreviewBodyHtml(template.id, { turnstileSiteKey });
+  const customKitCss =
+    template.styleKit === 'custom' && template.customStyleKit
+      ? `\n${buildStyleKitCss('custom', template.customStyleKit)}`
+      : '';
+  const previewRuntimeOptionsScript =
+    '<script>window.__opencanvasRuntimeOptions={reducedMotion:"no-preference"};</script>';
 
   return (
     <html lang="en">
@@ -330,10 +342,14 @@ function PreviewPage({
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{template.name} preview</title>
-        <style>{raw(canvasPublishedStyles)}</style>
+        <style>{raw(canvasPublishedStyles)}{raw(customKitCss)}{raw(`\n${ENTRANCE_ANIMATION_CSS}`)}</style>
         <style>{raw(previewStyles)}</style>
       </head>
-      <body>{raw(html)}</body>
+      <body>
+        {raw(previewRuntimeOptionsScript)}
+        {raw(html)}
+        {raw(ENTRANCE_OBSERVER_SCRIPT)}
+      </body>
     </html>
   );
 }
@@ -552,6 +568,7 @@ templatesRoute.get('/', async (c) => {
   let siteLimitErrorMessage: string | null = null;
   if (auth.userId) {
     const database = db(c.env);
+    await ensureCustomTemplateDraftSchema(database);
     // clerkAuth() middleware already loaded the customer row.
     const customerRecord = c.get('customer');
     if (!customerRecord) {

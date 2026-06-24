@@ -36,6 +36,10 @@ import { siteCollaborator } from '../db/schema';
 import { canvasPublishedStyles } from '../canvas/public-styles';
 import { renderCanvasSnapshot } from '../canvas/render';
 import { snapshotHasMotionPresetFields } from '../canvas/behaviour-payload';
+import {
+  ENTRANCE_ANIMATION_CSS,
+  ENTRANCE_OBSERVER_SCRIPT,
+} from '../canvas/entrance-animation';
 import { requireTurnstileSiteKey } from '../canvas/elements/form';
 import type { PublishedSnapshot } from '../canvas/schema';
 import { buildStyleKitCss } from '../canvas/style-kits';
@@ -143,35 +147,6 @@ const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 // baked in as an integer literal (see `buildVisitorLiveScript`). Stale or
 // duplicate broadcasts (payload.version <= currentVersion) are ignored, so a
 // late-arriving republish from before a full page reload cannot overwrite a
-// freshly-loaded snapshot.
-// Scroll-entrance animation: IntersectionObserver watches [data-entrance]
-// elements and stamps data-visible when they cross the viewport threshold.
-// The CSS transition (below, injected into the <style> block) handles the
-// visual reveal. Observer unobserves after firing — animate once.
-const ENTRANCE_OBSERVER_SCRIPT = String.raw`
-(function(){
-  if(!("IntersectionObserver" in window))return;
-  var els=document.querySelectorAll("[data-entrance],[data-entrance-animation][data-scroll-trigger=\"on-scroll\"]");
-  if(!els.length)return;
-  var io=new IntersectionObserver(function(entries){
-    for(var i=0;i<entries.length;i++){
-      if(entries[i].isIntersecting){
-        entries[i].target.setAttribute("data-visible","");
-        var pagePreset=entries[i].target.getAttribute("data-entrance-animation");
-        if(pagePreset)entries[i].target.setAttribute("data-motion-preset",pagePreset);
-        io.unobserve(entries[i].target);
-      }
-    }
-  },{threshold:0.15});
-  for(var j=0;j<els.length;j++)io.observe(els[j]);
-})();
-`;
-
-const ENTRANCE_ANIMATION_CSS = [
-  '[data-entrance]{opacity:0;transition:opacity var(--motion-duration,0.6s) var(--motion-easing,ease),transform var(--motion-duration,0.6s) var(--motion-easing,ease);}',
-  '[data-entrance][data-visible]{opacity:1;transform:none;}',
-].join('\n');
-
 function buildVisitorLiveScript(snapshotVersion: number): string {
   // Refuse non-integer/non-finite versions loudly — the caller is supposed to
   // have already validated the snapshot, but the visitor script's stale

@@ -73,6 +73,14 @@
         "align": "left",
         "pinnedStyle": {
           "color": "#ccd6f6"
+        },
+        "responsive": {
+          "phone": {
+            "x": 34,
+            "y": 48,
+            "w": 214,
+            "h": 56
+          }
         }
       },
       {
@@ -89,6 +97,14 @@
         "pinnedStyle": {
           "background": "#233554",
           "--opencanvas-kit-shape-fill": "#233554"
+        },
+        "responsive": {
+          "phone": {
+            "x": 188,
+            "y": 84,
+            "w": 112,
+            "h": 1
+          }
         }
       },
       {
@@ -120,6 +136,14 @@
           "paddingX": 0,
           "paddingY": 0,
           "iconGap": 6
+        },
+        "responsive": {
+          "phone": {
+            "x": 246,
+            "y": 52,
+            "w": 110,
+            "h": 40
+          }
         }
       },
       {
@@ -143,6 +167,14 @@
         "align": "left",
         "pinnedStyle": {
           "color": "#8892b0"
+        },
+        "responsive": {
+          "phone": {
+            "x": 34,
+            "y": 114,
+            "w": 180,
+            "h": 28
+          }
         }
       },
       {
@@ -689,6 +721,14 @@
           "align": "stretch",
           "justify": "start"
         },
+        "responsive": {
+          "phone": {
+            "x": 34,
+            "y": 170,
+            "w": 322,
+            "h": 950
+          }
+        },
         "items": [
           {
             "id": "raydotsh-mobile-pycaster-item",
@@ -1164,7 +1204,12 @@
           }
         ]
       }
-    ]
+    ],
+    "responsive": {
+      "phone": {
+        "h": 1160
+      }
+    }
   },
   "assetManifest": [],
   "originTemplateId": "raydotsh-portfolio"

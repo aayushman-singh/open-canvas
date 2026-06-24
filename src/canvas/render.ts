@@ -204,11 +204,39 @@ function buildHostedElementWrapperStyle(element: CanvasElement, assetBasePath: s
   const entries: Array<[string, string]> = [
     ['position', 'relative'],
     ['width', '100%'],
-    ['height', '100%'],
     ['box-sizing', 'border-box'],
   ];
+  if (hostedElementFillsParentHeight(element)) {
+    entries.push(['height', '100%']);
+  } else {
+    entries.push(['height', 'auto']);
+  }
   appendAuthoredElementStyleEntries(entries, element, assetBasePath);
   return styleFromEntries(entries);
+}
+
+function hostedElementFillsParentHeight(element: CanvasElement): boolean {
+  switch (element.type) {
+    case 'media':
+    case 'embed':
+    case 'code':
+    case 'nav':
+    case 'chart':
+    case 'rich-motion':
+      return true;
+    case 'text':
+    case 'action':
+    case 'shape':
+    case 'container':
+    case 'form':
+    case 'accordion':
+    case 'carousel':
+    case 'table':
+    case 'tabs':
+    case 'collection':
+    case 'flow-container':
+      return false;
+  }
 }
 
 // Decorative-by-default invariant: shape and surface (container) wrappers are
@@ -476,7 +504,7 @@ function resolveCollectionMarqueeText(
 }
 
 function renderHostedElement(element: CanvasElement, ctx: ElementRenderCtx): string {
-  const inner = renderElementBody(element, ctx, 'flow-hosted');
+  const inner = renderElementBody(element, { ...ctx, flowHosted: true }, 'flow-hosted');
   let wrapperStyle = buildHostedElementWrapperStyle(element, ctx.assetBasePath);
   const tinted = applyContainerTint(element, ctx, wrapperStyle);
   wrapperStyle = tinted.wrapperStyle;
@@ -889,7 +917,11 @@ export function renderCanvasSnapshot(
     renderElement,
     renderHostedElement,
   };
-  const pagesToRender = opts.renderPages ?? snapshot.pages;
+  const pagesToRender =
+    opts.renderPages ??
+    (snapshot.routeTransition?.enabled === true
+      ? snapshot.pages.slice(0, 1)
+      : snapshot.pages);
   const pagesHtml = pagesToRender
     .map((page) => renderPage(page, baseCtx, snapshot.header, snapshot.footer))
     .join('');

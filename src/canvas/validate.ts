@@ -4465,14 +4465,24 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
             if (!isRecord(asset.pointer)) {
               errors.push(`${assetPath}.pointer must be an object when present`);
             } else {
-              if (!isFiniteNumber(asset.pointer.radius) || asset.pointer.radius < 0 || asset.pointer.radius > 500) {
+              if (
+                asset.pointer.radiusRatio !== undefined &&
+                (!isFiniteNumber(asset.pointer.radiusRatio) ||
+                  asset.pointer.radiusRatio <= 0 ||
+                  asset.pointer.radiusRatio > 1)
+              ) {
                 errors.push(
-                  `${assetPath}.pointer.radius must be a finite number in [0, 500] when present`,
+                  `${assetPath}.pointer.radiusRatio must be a finite number in (0, 1] when present`,
                 );
               }
-              if (!isFiniteNumber(asset.pointer.force) || asset.pointer.force < 0 || asset.pointer.force > 1000) {
+              if (
+                asset.pointer.force !== undefined &&
+                (!isFiniteNumber(asset.pointer.force) ||
+                  asset.pointer.force <= 0 ||
+                  asset.pointer.force > 100)
+              ) {
                 errors.push(
-                  `${assetPath}.pointer.force must be a finite number in [0, 1000] when present`,
+                  `${assetPath}.pointer.force must be a finite number in (0, 100] when present`,
                 );
               }
             }

@@ -1069,7 +1069,7 @@ export const raydotshPortfolioTemplate: TemplateSeed = {
       fontSize: 7,
       charset: ' .:-=+*#%@',
       pointSets: RAYDOTSH_ASCII_POINT_SETS,
-      pointer: { radius: 72, force: 44 },
+      pointer: { radiusRatio: 0.2, force: 4 },
       reducedMotion: 'settled',
     },
   ],

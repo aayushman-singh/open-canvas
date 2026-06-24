@@ -91,7 +91,6 @@ export interface TabsRenderCtx {
 
 export function renderTabs(el: TabsElement, ctx: TabsRenderCtx): string {
   const barHeight = el.tabBarHeight ?? TABS_DEFAULT_BAR_HEIGHT;
-  const panelWidth = el.box.w;
   const panelHeight = Math.max(0, el.box.h - barHeight);
 
   const barButtonsHtml = el.tabs
@@ -108,7 +107,7 @@ export function renderTabs(el: TabsElement, ctx: TabsRenderCtx): string {
 
   const panelStyleEntries: [string, string][] = [
     ['position', 'relative'],
-    ['width', `${String(panelWidth)}px`],
+    ['width', '100%'],
     ['height', `${String(panelHeight)}px`],
   ];
   const panelStyle = styleFromEntries(panelStyleEntries);

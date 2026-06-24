@@ -49,6 +49,14 @@
         "align": "left",
         "pinnedStyle": {
           "color": "#ccd6f6"
+        },
+        "responsive": {
+          "phone": {
+            "x": 34,
+            "y": 48,
+            "w": 220,
+            "h": 56
+          }
         }
       },
       {
@@ -65,6 +73,14 @@
         "pinnedStyle": {
           "background": "#233554",
           "--opencanvas-kit-shape-fill": "#233554"
+        },
+        "responsive": {
+          "phone": {
+            "x": 210,
+            "y": 84,
+            "w": 146,
+            "h": 1
+          }
         }
       },
       {
@@ -90,6 +106,14 @@
           "tabFontWeight": "medium",
           "activeTabFontWeight": "bold",
           "panelBackgroundColor": "transparent"
+        },
+        "responsive": {
+          "phone": {
+            "x": 34,
+            "y": 132,
+            "w": 322,
+            "h": 438
+          }
         },
         "tabs": [
           {
@@ -121,6 +145,14 @@
                 "align": "left",
                 "pinnedStyle": {
                   "color": "#ccd6f6"
+                },
+                "responsive": {
+                  "phone": {
+                    "x": 0,
+                    "y": 18,
+                    "w": 296,
+                    "h": 72
+                  }
                 }
               },
               {
@@ -145,6 +177,14 @@
                 "letterSpacing": "0.08em",
                 "pinnedStyle": {
                   "color": "#8892b0"
+                },
+                "responsive": {
+                  "phone": {
+                    "x": 0,
+                    "y": 96,
+                    "w": 220,
+                    "h": 28
+                  }
                 }
               },
               {
@@ -170,6 +210,14 @@
                 "pinnedStyle": {
                   "color": "#8892b0",
                   "white-space": "pre-line"
+                },
+                "responsive": {
+                  "phone": {
+                    "x": 0,
+                    "y": 140,
+                    "w": 296,
+                    "h": 212
+                  }
                 }
               }
             ]
@@ -215,6 +263,14 @@
                 "align": "left",
                 "pinnedStyle": {
                   "color": "#ccd6f6"
+                },
+                "responsive": {
+                  "phone": {
+                    "x": 0,
+                    "y": 18,
+                    "w": 296,
+                    "h": 72
+                  }
                 }
               },
               {
@@ -239,6 +295,14 @@
                 "letterSpacing": "0.08em",
                 "pinnedStyle": {
                   "color": "#8892b0"
+                },
+                "responsive": {
+                  "phone": {
+                    "x": 0,
+                    "y": 96,
+                    "w": 220,
+                    "h": 28
+                  }
                 }
               },
               {
@@ -264,13 +328,26 @@
                 "pinnedStyle": {
                   "color": "#8892b0",
                   "white-space": "pre-line"
+                },
+                "responsive": {
+                  "phone": {
+                    "x": 0,
+                    "y": 140,
+                    "w": 296,
+                    "h": 164
+                  }
                 }
               }
             ]
           }
         ]
       }
-    ]
+    ],
+    "responsive": {
+      "phone": {
+        "h": 640
+      }
+    }
   },
   "assetManifest": [],
   "originTemplateId": "raydotsh-portfolio"
