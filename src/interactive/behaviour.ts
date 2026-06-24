@@ -24,7 +24,19 @@ function behaviourPrefersReducedMotion() {
 
 function behaviourIsTemplatePreview() {
   if (typeof window === 'undefined' || !window.location || typeof window.location.pathname !== 'string') return false;
-  return /^(\/dashboard\/templates\/[^/]+\/preview|\/api\/(?:admin\/)?custom-templates\/[^/]+\/preview)$/.test(window.location.pathname);
+  return /^(\/dashboard\/(?:templates\/[^/]+\/preview|admin\/template-source\/preview\/[^/]+)|\/api\/(?:admin\/)?custom-templates\/[^/]+\/preview)$/.test(window.location.pathname);
+}
+
+function behaviourEnterTargetIsVisible(target) {
+  if (!target || typeof target.getBoundingClientRect !== 'function') return false;
+  var rect = target.getBoundingClientRect();
+  var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+  return rect.height > 0 && rect.top < vh && rect.bottom > 0;
+}
+
+function behaviourShouldRunEnterImmediately(target) {
+  if (behaviourIsTemplatePreview()) return true;
+  return behaviourEnterTargetIsVisible(target);
 }
 
 function parseBehaviourPayload() {
@@ -210,6 +222,8 @@ function behaviourAnimateTextEffect(node, effect, delay, duration, direction) {
   if (typeof requestAnimationFrame !== 'function') {
     behaviourFailure('motion-sequence-text-effect-raf-missing', { textEffect: effect }, new Error('requestAnimationFrame unavailable'));
   }
+  var initialProgress = direction === 'reverse' ? 1 : 0;
+  behaviourApplyTextEffect(node, effect, initialProgress);
   var start = 0;
   var started = false;
   var total = Math.max(0, Number(duration) || 0);
@@ -454,8 +468,12 @@ function behaviourApplyStepFromStates(sequence, root) {
     var step = steps[i];
     var targets = behaviourResolveTarget(step.target, root, { sequenceId: sequence.id, stepId: step.id });
     var from = step.from || {};
+    var textEffect = behaviourMotionTextEffect(step);
     for (var j = 0; j < targets.length; j++) {
       behaviourApplyProps(targets[j], from);
+      if (textEffect === 'typewriter') {
+        behaviourApplyTextEffect(targets[j], textEffect, 0);
+      }
     }
   }
 }
@@ -472,16 +490,23 @@ function behaviourSetupSectionEnter(sequence, root) {
     behaviourFailure('behaviour-intersection-observer-missing', { sequenceId: sequence.id }, new Error('IntersectionObserver unavailable'));
   }
   var fired = false;
-  var observer = new IntersectionObserver(function (entries) {
+  var observer = null;
+  function runEnterOnce() {
+    if (fired) return;
+    fired = true;
+    behaviourRunSequence(sequence, root, reducedMode);
+    if (observer) observer.disconnect();
+  }
+  observer = new IntersectionObserver(function (entries) {
     for (var i = 0; i < entries.length; i++) {
-      if (entries[i].isIntersecting && !fired) {
-        fired = true;
-        behaviourRunSequence(sequence, root, reducedMode);
-        observer.disconnect();
-      }
+      if (entries[i].isIntersecting) runEnterOnce();
     }
   }, { threshold: 0.12 });
   observer.observe(section);
+  if (behaviourShouldRunEnterImmediately(section)) {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(runEnterOnce);
+    else runEnterOnce();
+  }
 }
 
 function behaviourSetupPageEnter(sequence, root) {
@@ -497,16 +522,23 @@ function behaviourSetupPageEnter(sequence, root) {
     behaviourFailure('behaviour-intersection-observer-missing', { sequenceId: sequence.id }, new Error('IntersectionObserver unavailable'));
   }
   var fired = false;
-  var observer = new IntersectionObserver(function (entries) {
+  var observer = null;
+  function runEnterOnce() {
+    if (fired) return;
+    fired = true;
+    behaviourRunSequence(sequence, root, reducedMode);
+    if (observer) observer.disconnect();
+  }
+  observer = new IntersectionObserver(function (entries) {
     for (var i = 0; i < entries.length; i++) {
-      if (entries[i].isIntersecting && !fired) {
-        fired = true;
-        behaviourRunSequence(sequence, root, reducedMode);
-        observer.disconnect();
-      }
+      if (entries[i].isIntersecting) runEnterOnce();
     }
   }, { threshold: 0.12 });
   observer.observe(page);
+  if (behaviourShouldRunEnterImmediately(page)) {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(runEnterOnce);
+    else runEnterOnce();
+  }
 }
 
 function behaviourSceneProgress(scene, section) {

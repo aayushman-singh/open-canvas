@@ -488,6 +488,10 @@ assert(
   'rendered template should ship the shared blinking caret keyframes',
 );
 assert(
+  html.includes('data-opencanvas-viewport-fit'),
+  'rendered template should ship viewport width fit script for wide screens',
+);
+assert(
   html.includes('[data-opencanvas-element="raydotsh-freelance-title"]') &&
     html.includes('[data-opencanvas-element="raydotsh-newsletter-points"]'),
   'rendered template should emit responsive CSS rules for nested experience tab content',

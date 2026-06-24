@@ -941,13 +941,14 @@ export function renderCanvasSnapshot(
     : '';
   const behaviourPayloadScript = renderBehaviourPayloadScript(snapshot, assetBasePath);
   const importAnimationInventoryScript = renderImportAnimationInventoryScript(snapshot);
+  const viewportWidthFitScript = renderViewportWidthFitScript();
   const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
   const routeAttrs =
     snapshot.routeTransition?.enabled === true
       ? ` data-opencanvas-route-transition="${escapeAttr(snapshot.routeTransition.id)}" data-opencanvas-route-mode="${escapeAttr(snapshot.routeTransition.mode)}" data-opencanvas-route-duration-ms="${escapeAttr(String(snapshot.routeTransition.durationMs))}" data-opencanvas-route-easing="${escapeAttr(snapshot.routeTransition.easing)}"${snapshot.routeTransition.sharedElements && snapshot.routeTransition.sharedElements.length > 0 ? ` data-opencanvas-route-shared-elements="${escapeAttr(JSON.stringify(snapshot.routeTransition.sharedElements))}"` : ''}${snapshot.routeTransition.outgoingSequence ? ` data-opencanvas-route-outgoing-sequence="${escapeAttr(snapshot.routeTransition.outgoingSequence.id)}"` : ''}${snapshot.routeTransition.incomingSequence ? ` data-opencanvas-route-incoming-sequence="${escapeAttr(snapshot.routeTransition.incomingSequence.id)}"` : ''}`
       : '';
   const smoothScrollAttrs = renderSmoothScrollAttrs(snapshot.scrollBehavior);
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${fontFaceStyle}${scrollStyle}${responsiveStyle}${loadExperienceHtml}${anchorRailsHtml}${playableWidgetsHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${importAnimationInventoryScript}${behaviourPayloadScript}${copyScript}${tabsScript}</main>`;
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" data-opencanvas-route-container${routeAttrs}${smoothScrollAttrs} style="${escapeAttr(rootStyle)}">${fontFaceStyle}${scrollStyle}${responsiveStyle}${loadExperienceHtml}${anchorRailsHtml}${playableWidgetsHtml}${pagesHtml}${snapshot.routeTransition ? `${renderMotionSequenceLite(snapshot.routeTransition.outgoingSequence)}${renderMotionSequenceLite(snapshot.routeTransition.incomingSequence)}` : ''}${renderOverlays(snapshot, baseCtx, pagesToRender)}${renderLoadExperience(snapshot)}${importAnimationInventoryScript}${behaviourPayloadScript}${copyScript}${tabsScript}${viewportWidthFitScript}</main>`;
 }
 
 /**
@@ -1134,4 +1135,10 @@ function renderBehaviourPayloadScript(
   const payload = buildBehaviourPayload(snapshot, assetBasePath);
   if (!payload) return '';
   return `<script type="application/json" data-opencanvas-behaviour-payload>${serializeBehaviourPayload(payload)}</script>`;
+}
+
+function renderViewportWidthFitScript(): string {
+  const script =
+    "(function(){function fitViewportWidth(){var site=document.querySelector('.opencanvas-site');if(!site)return;var pages=site.querySelectorAll('.opencanvas-page');for(var i=0;i<pages.length;i++){var page=pages[i];var styleWidth=page.style.width||'';var designWidth=parseFloat(styleWidth);if(!isFinite(designWidth)||designWidth<=0)designWidth=page.getBoundingClientRect().width||0;if(!(designWidth>0))continue;var vw=document.documentElement.clientWidth||window.innerWidth||designWidth;if(vw<=designWidth+1){page.style.transform='';page.style.marginBottom='';continue;}var scale=vw/designWidth;page.style.transform='scale('+scale+')';page.style.transformOrigin='top center';page.style.marginBottom=((page.offsetHeight*scale)-page.offsetHeight)+'px';}}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fitViewportWidth);else fitViewportWidth();window.addEventListener('resize',fitViewportWidth);})();";
+  return `<script data-opencanvas-viewport-fit>${script}</script>`;
 }

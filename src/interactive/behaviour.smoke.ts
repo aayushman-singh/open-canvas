@@ -1257,6 +1257,61 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(spans[0]!.textContent === 'reh', 'typewriter text effect must reveal text in order');
 }
 
+// (8b) page-enter typewriter starts empty before the sequence runs on template preview
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  win.location.pathname = '/dashboard/admin/template-source/preview/raydotsh-portfolio';
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'page-enter-typewriter',
+        trigger: { type: 'page-enter', pageId: 'page-raydotsh-home' },
+        steps: [
+          {
+            id: 'page-enter-typewriter-step',
+            target: { type: 'text-split', elementId: 'raydotsh-hero-heading', unit: 'char' },
+            textEffect: 'typewriter',
+            from: { opacity: 1 },
+            to: { opacity: 1 },
+            durationMs: 240,
+            staggerMs: 45,
+          },
+        ],
+      },
+    ],
+    scrollScenes: [],
+    richMotionAssets: [],
+  });
+  doc.body.appendChild(script);
+  const page = new StubElement('article');
+  page.setAttribute('data-opencanvas-page', 'page-raydotsh-home');
+  page.getBoundingClientRect = (): { top: number; left: number; width: number; height: number } => ({
+    top: 0,
+    left: 0,
+    width: 1440,
+    height: 3200,
+  });
+  const heading = new StubElement('div');
+  heading.setAttribute('data-opencanvas-element', 'raydotsh-hero-heading');
+  const headingText = new StubElement('div');
+  headingText.className = 'opencanvas-text';
+  headingText.textContent = 'rehana';
+  heading.appendChild(headingText);
+  page.appendChild(heading);
+  doc.body.appendChild(page);
+  runBehaviour(doc, win, StubImage);
+  const spans = heading.querySelectorAll('.opencanvas-text-split');
+  assert(spans.length === 6, 'page-enter typewriter must split the hero heading into characters');
+  assert(
+    spans[0]!.textContent === '',
+    'page-enter typewriter must start with empty split spans before animation runs',
+  );
+}
+
 // (9) scroll scene horizontal track translates with scene progress
 {
   const doc = new StubDocument();
