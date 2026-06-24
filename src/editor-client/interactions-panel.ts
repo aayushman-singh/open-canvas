@@ -2984,6 +2984,21 @@ function renderMotionSequenceTriggerDetail(
     });
     card.appendChild(field('Section', sectionInput));
   }
+  if (trigger.type === 'page-enter') {
+    const pageIds = ctx.state?.pages.map((page) => page.id) ?? [];
+    const pageInput = selectInput(
+      pageIds,
+      pageIds.includes(trigger.pageId) ? trigger.pageId : pageIds[0] ?? trigger.pageId,
+    );
+    pageInput.addEventListener('change', () => {
+      mutate(ctx, () => {
+        updateMotionSequence(ctx, sequence.id, {
+          trigger: { type: 'page-enter', pageId: pageInput.value },
+        });
+      });
+    });
+    card.appendChild(field('Page', pageInput));
+  }
   if (trigger.type === 'scroll-scene') {
     const sceneIds = (ctx.state?.scrollScenes ?? []).map((scene) => scene.id);
     if (sceneIds.length > 0) {
@@ -3381,6 +3396,10 @@ function motionSequenceWithPatch(sequence: MotionSequence, patch: MotionSequence
 
 function defaultMotionSequenceTrigger(ctx: InteractionsPanelContext, type: string): MotionSequence['trigger'] {
   if (type === 'load-enter') return { type: 'load-enter' };
+  if (type === 'page-enter') {
+    const pageId = activePageId(ctx) ?? ctx.state?.pages[0]?.id ?? '';
+    return { type: 'page-enter', pageId };
+  }
   if (type === 'scroll-scene') return { type: 'scroll-scene', scrollSceneId: ctx.state?.scrollScenes?.[0]?.id ?? '' };
   return { type: 'section-enter', sectionId: activePageSections(ctx)[0]?.id ?? '' };
 }

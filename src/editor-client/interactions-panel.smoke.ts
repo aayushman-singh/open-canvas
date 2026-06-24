@@ -307,6 +307,8 @@ assert(
   'panel must block layout transitions without a target element',
 );
 assert(panelSrc.includes('MOTION_SEQUENCE_TRIGGER_TYPES'), 'panel must use schema trigger types');
+assert(panelSrc.includes("type: 'page-enter', pageId"), 'panel must default page-enter triggers to a page id');
+assert(panelSrc.includes("trigger.type === 'page-enter'"), 'panel must render page-enter trigger detail');
 assert(panelSrc.includes('MOTION_SEQUENCE_TEXT_EFFECTS'), 'panel must use schema text effect types');
 assert(
   behaviourPrimitivesSrc.includes("'mask-reveal'"),

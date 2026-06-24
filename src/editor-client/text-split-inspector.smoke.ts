@@ -15,6 +15,9 @@ assert(inspectorSrc.includes('TEXT_SPLIT_UNITS'), 'text split controls must use 
 assert(inspectorSrc.includes("target: { type: 'text-split'"), 'inspector must write text-split targets');
 assert(inspectorSrc.includes("trigger: { type: 'section-enter'"), 'inspector must create section-enter sequence');
 assert(inspectorSrc.includes('Scroll-progress text preset'), 'inspector must expose a scroll-progress text preset');
+assert(inspectorSrc.includes('Page-enter typewriter preset'), 'inspector must expose a page-enter typewriter preset');
+assert(inspectorSrc.includes('MOTION_SEQUENCE_TEXT_EFFECTS'), 'inspector must expose text effect controls');
+assert(inspectorSrc.includes("trigger: { type: 'page-enter'"), 'inspector must create page-enter typewriter sequences');
 assert(inspectorSrc.includes('scrollScenes'), 'scroll-progress text preset must write scroll scene state');
 assert(inspectorSrc.includes("trigger: { type: 'scroll-scene'"), 'scroll-progress text preset must create scroll-scene sequence');
 assert(inspectorSrc.includes('sequenceId'), 'scroll-progress text preset must link scene and sequence IDs');

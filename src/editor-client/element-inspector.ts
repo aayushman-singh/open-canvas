@@ -52,6 +52,7 @@ import {
   type PointerFxTouchActivationMode,
 } from '../canvas/schema.js';
 import {
+  MOTION_SEQUENCE_TEXT_EFFECTS,
   TEXT_SPLIT_UNITS,
   type MotionSequence,
   type MotionSequenceStep,
@@ -92,6 +93,8 @@ import { renderPageInspector, replayAnimations } from './page-inspector.js';
 import { field, selectInput } from './dom-builders.js';
 import { mountComponentStyle } from './inspector-component-style.js';
 import { buildColorRow, buildKitSummary } from './inspector-leaf-builders.js';
+
+type MotionSequenceTextEffect = (typeof MOTION_SEQUENCE_TEXT_EFFECTS)[number];
 
 export function renderInspector(ctx: EditorContext): void {
   if (!ctx.inspector) return;
@@ -1154,11 +1157,50 @@ function renderTextSplitInspector(
   });
   ctx.inspector.appendChild(field('Split unit', unitSelect));
 
+  if (currentUnit !== 'off' && current) {
+    const effectSelect = selectInput(
+      [...MOTION_SEQUENCE_TEXT_EFFECTS],
+      current.step.textEffect ?? 'none',
+    );
+    effectSelect.addEventListener('change', () => {
+      ctx.captureForUndo();
+      const next = effectSelect.value as MotionSequenceTextEffect;
+      if (next === 'none') {
+        delete current.step.textEffect;
+      } else {
+        current.step.textEffect = next;
+      }
+      ctx.setStatus('Text effect updated', 'ok');
+      ctx.renderInspector();
+      ctx.scheduleSave();
+    });
+    ctx.inspector.appendChild(field('Text effect', effectSelect));
+  }
+
   const note = document.createElement('p');
   note.className = 'opencanvas-section-picker-empty';
   note.textContent =
     'Creates a schema-owned Motion Sequence target. Runtime split spans are aria-hidden and the text host keeps the full aria-label.';
   ctx.inspector.appendChild(note);
+
+  const presetRow = document.createElement('div');
+  presetRow.className = 'opencanvas-zorder-buttons';
+
+  const typewriterPreset = document.createElement('button');
+  typewriterPreset.type = 'button';
+  typewriterPreset.textContent = 'Page-enter typewriter preset';
+  typewriterPreset.addEventListener('click', () => {
+    ctx.captureForUndo();
+    const unit =
+      unitSelect.value === 'off'
+        ? 'char'
+        : (unitSelect.value as (typeof TEXT_SPLIT_UNITS)[number]);
+    upsertPageEnterTypewriterPreset(ctx, elementId, unit);
+    ctx.setStatus('Page-enter typewriter preset enabled', 'ok');
+    ctx.renderInspector();
+    ctx.scheduleSave();
+  });
+  presetRow.appendChild(typewriterPreset);
 
   const scrollPreset = document.createElement('button');
   scrollPreset.type = 'button';
@@ -1174,7 +1216,8 @@ function renderTextSplitInspector(
     ctx.renderInspector();
     ctx.scheduleSave();
   });
-  ctx.inspector.appendChild(scrollPreset);
+  presetRow.appendChild(scrollPreset);
+  ctx.inspector.appendChild(presetRow);
 }
 
 function findTextSplitStep(
@@ -1207,6 +1250,27 @@ function uniqueScrollSceneId(scenes: ScrollScene[], base: string): string {
   return base + '-' + String(index);
 }
 
+function editorActivePageId(ctx: EditorContext): string {
+  return ctx.activePageId ?? ctx.state?.pages[0]?.id ?? '';
+}
+
+function typewriterPageEnterStep(
+  sequenceId: string,
+  elementId: string,
+  unit: (typeof TEXT_SPLIT_UNITS)[number],
+): MotionSequenceStep {
+  return {
+    id: sequenceId + '-typewriter-step',
+    target: { type: 'text-split', elementId, unit },
+    textEffect: 'typewriter',
+    from: { opacity: 1 },
+    to: { opacity: 1 },
+    durationMs: 240,
+    staggerMs: unit === 'char' ? 45 : unit === 'word' ? 80 : 120,
+    easing: 'linear',
+  };
+}
+
 function scrollTextSplitStep(
   sequenceId: string,
   elementId: string,
@@ -1222,6 +1286,41 @@ function scrollTextSplitStep(
     staggerMs: unit === 'char' ? 18 : unit === 'word' ? 40 : 80,
     easing: 'linear',
   };
+}
+
+function upsertPageEnterTypewriterPreset(
+  ctx: EditorContext,
+  elementId: string,
+  unit: (typeof TEXT_SPLIT_UNITS)[number],
+): void {
+  if (!ctx.state) return;
+  const sequences = ctx.state.motionSequences ?? [];
+  const pageId = editorActivePageId(ctx);
+  const existing = findTextSplitStep(sequences, elementId);
+  const sequenceId = existing?.sequence.id ?? uniqueSequenceId(sequences, 'text-split-typewriter-' + elementId);
+  const step = typewriterPageEnterStep(sequenceId, elementId, unit);
+
+  if (existing) {
+    existing.sequence.trigger = { type: 'page-enter', pageId };
+    existing.sequence.reducedMotion = 'final-state';
+    delete existing.sequence.repeat;
+    delete existing.sequence.playbackDirection;
+    existing.sequence.steps = existing.sequence.steps.map((candidate) =>
+      candidate.id === existing.step.id ? { ...step, id: existing.step.id } : candidate,
+    );
+    ctx.state.motionSequences = sequences;
+    return;
+  }
+
+  ctx.state.motionSequences = [
+    ...sequences,
+    {
+      id: sequenceId,
+      trigger: { type: 'page-enter', pageId },
+      reducedMotion: 'final-state',
+      steps: [step],
+    },
+  ];
 }
 
 function upsertTextSplitScrollPreset(
