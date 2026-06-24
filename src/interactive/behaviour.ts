@@ -39,6 +39,22 @@ function behaviourShouldRunEnterImmediately(target) {
   return behaviourEnterTargetIsVisible(target);
 }
 
+function behaviourIsPartialRouteRender(root) {
+  var scope = root && root.querySelector ? root : document;
+  var container = scope.querySelector('[data-opencanvas-route-container]');
+  return !!(container && container.getAttribute('data-opencanvas-route-transition'));
+}
+
+function behaviourSkipMissingEnterTarget(sequence, targetId, targetLabel) {
+  if (behaviourIsTemplatePreview() || behaviourIsPartialRouteRender(document)) return true;
+  behaviourFailure(
+    'behaviour-target-missing',
+    { sequenceId: sequence.id, [targetLabel]: targetId },
+    new Error(targetLabel + ' not found'),
+  );
+  return false;
+}
+
 function parseBehaviourPayload() {
   var node = document.querySelector('script[data-opencanvas-behaviour-payload]');
   if (!node) return null;
@@ -482,7 +498,7 @@ function behaviourSetupSectionEnter(sequence, root) {
   if (sequence.trigger.type !== 'section-enter') return;
   var section = root.querySelector('[data-opencanvas-section="' + sequence.trigger.sectionId + '"]');
   if (!section) {
-    behaviourFailure('behaviour-target-missing', { sequenceId: sequence.id, sectionId: sequence.trigger.sectionId }, new Error('section-enter section not found'));
+    if (behaviourSkipMissingEnterTarget(sequence, sequence.trigger.sectionId, 'sectionId')) return;
   }
   behaviourApplyStepFromStates(sequence, root);
   var reducedMode = behaviourPrefersReducedMotion() ? (sequence.reducedMotion || 'skip') : null;
@@ -513,8 +529,7 @@ function behaviourSetupPageEnter(sequence, root) {
   if (sequence.trigger.type !== 'page-enter') return;
   var page = root.querySelector('[data-opencanvas-page="' + sequence.trigger.pageId + '"]');
   if (!page) {
-    if (behaviourIsTemplatePreview()) return;
-    behaviourFailure('behaviour-target-missing', { sequenceId: sequence.id, pageId: sequence.trigger.pageId }, new Error('page-enter page not found'));
+    if (behaviourSkipMissingEnterTarget(sequence, sequence.trigger.pageId, 'pageId')) return;
   }
   behaviourApplyStepFromStates(sequence, root);
   var reducedMode = behaviourPrefersReducedMotion() ? (sequence.reducedMotion || 'skip') : null;
@@ -864,7 +879,7 @@ function behaviourConfigureParticleCanvas(canvas, ctx) {
 
 function behaviourDrawParticleField(canvas, ctx, asset, pointSet, particles, pointer, elapsedSeconds) {
   var canvasSize = behaviourConfigureParticleCanvas(canvas, ctx);
-  if (!canvasSize) return;
+  if (!canvasSize) return false;
   var width = canvasSize.width;
   var height = canvasSize.height;
   var size = Number(pointSet.canvasSize) || Math.max(width, height);
@@ -931,6 +946,7 @@ function behaviourDrawParticleField(canvas, ctx, asset, pointSet, particles, poi
     ctx.fillStyle = 'rgba(' + p.rgb + ',' + p.currentAlpha.toFixed(3) + ')';
     ctx.fillText(p.char, p.x, p.y);
   }
+  return true;
 }
 
 function behaviourHexToRgbString(hex) {
@@ -994,6 +1010,7 @@ function behaviourHydrateParticleField(asset, root) {
         pointer.targetY = -1000;
       }, { passive: true });
       var started = Date.now();
+      var hydrated = false;
       function frame() {
         pointSet = behaviourParticlePointSet(asset, canvas);
         var nextPointSetKey = pointSet.breakpoint + ':' + String(pointSet.points.length);
@@ -1008,10 +1025,13 @@ function behaviourHydrateParticleField(asset, root) {
           );
         }
         var elapsedSeconds = reduced ? 10 : (Date.now() - started) / 1000;
-        behaviourDrawParticleField(canvas, ctx, asset, pointSet, particles, pointer, elapsedSeconds);
+        var drew = behaviourDrawParticleField(canvas, ctx, asset, pointSet, particles, pointer, elapsedSeconds);
+        if (!hydrated && drew !== false) {
+          hydrated = true;
+          node.setAttribute('data-opencanvas-rich-motion-hydrated', 'particle-field');
+        }
         requestAnimationFrame(frame);
       }
-      node.setAttribute('data-opencanvas-rich-motion-hydrated', 'particle-field');
       frame();
     })(nodes[n]);
   }

@@ -1534,6 +1534,45 @@ function mountRenderedHtml(doc: StubDocument, html: string): void {
   assert(threw === false, 'dashboard preview must skip missing page-enter targets');
 }
 
+// (9b) route-transition partial render skips section-enter targets on absent pages
+{
+  const doc = new StubDocument();
+  const win = new StubWindow();
+  const script = new StubElement('script');
+  script.setAttribute('type', 'application/json');
+  script.setAttribute('data-opencanvas-behaviour-payload', '');
+  script.textContent = serializeBehaviourPayload({
+    motionSequences: [
+      {
+        id: 'section-enter-missing',
+        trigger: { type: 'section-enter', sectionId: 'raydotsh-books-gallery' },
+        steps: [
+          {
+            id: 'section-enter-missing-step',
+            target: { type: 'site' },
+            to: { opacity: 1 },
+            durationMs: 1,
+          },
+        ],
+      },
+    ],
+    scrollScenes: [],
+    richMotionAssets: [],
+  });
+  doc.body.appendChild(script);
+  const main = new StubElement('main');
+  main.setAttribute('data-opencanvas-route-container', '');
+  main.setAttribute('data-opencanvas-route-transition', 'raydotsh-route-transition');
+  doc.body.appendChild(main);
+  let threw = false;
+  try {
+    runBehaviour(doc, win, StubImage);
+  } catch {
+    threw = true;
+  }
+  assert(threw === false, 'partial route render must skip missing section-enter targets');
+}
+
 // (10) dashboard preview tolerates image-sequence frame preload failures and keeps the poster/static preview
 {
   const doc = new StubDocument();
