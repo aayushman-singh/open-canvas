@@ -7,7 +7,7 @@ import type { ClerkAuthVariables } from '../../auth/middleware';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import {
   ENTRANCE_ANIMATION_CSS,
-  ENTRANCE_OBSERVER_SCRIPT,
+  renderEntranceObserverScriptTag,
 } from '../../canvas/entrance-animation';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
@@ -316,7 +316,7 @@ const pageStyles = `
 `;
 
 const previewStyles = `
-  html, body { margin: 0; background: var(--paper); }
+  html, body { margin: 0; width: 100%; min-height: 100%; overflow-x: hidden; background: var(--paper); }
 `;
 
 export { renderBuiltInTemplatePreviewAssetResponse, renderBuiltInTemplatePreviewBodyHtml };
@@ -348,7 +348,7 @@ function PreviewPage({
       <body>
         {raw(previewRuntimeOptionsScript)}
         {raw(html)}
-        {raw(ENTRANCE_OBSERVER_SCRIPT)}
+        {raw(renderEntranceObserverScriptTag())}
       </body>
     </html>
   );

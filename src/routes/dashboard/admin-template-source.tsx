@@ -7,7 +7,10 @@ import type { ClerkAuthVariables } from '../../auth/middleware';
 import { isTemplateSourceAdminCustomer } from '../../auth/db-admin';
 import { requireAuth } from '../../auth/require-auth';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
-import { ENTRANCE_ANIMATION_CSS, ENTRANCE_OBSERVER_SCRIPT } from '../../canvas/entrance-animation';
+import {
+  ENTRANCE_ANIMATION_CSS,
+  renderEntranceObserverScriptTag,
+} from '../../canvas/entrance-animation';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { renderBuiltInTemplatePreviewBodyHtml } from '../../templates/built-in-preview';
 import { getTemplateSeed } from '../../templates/registry';
@@ -277,8 +280,9 @@ function renderPreviewPage(templateId: string, turnstileSiteKey: string): string
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${template.name} preview</title>
   <style>${canvasPublishedStyles}\n${ENTRANCE_ANIMATION_CSS}</style>
+  <style>html,body{margin:0;width:100%;min-height:100%;overflow-x:hidden;}</style>
 </head>
-<body style="margin:0;overflow-x:hidden;background:var(--paper)"><script>window.__opencanvasRuntimeOptions={reducedMotion:"no-preference"};</script>${html}${ENTRANCE_OBSERVER_SCRIPT}</body>
+<body style="margin:0;overflow-x:hidden;background:var(--paper)"><script>window.__opencanvasRuntimeOptions={reducedMotion:"no-preference"};</script>${html}${renderEntranceObserverScriptTag()}</body>
 </html>`;
 }
 

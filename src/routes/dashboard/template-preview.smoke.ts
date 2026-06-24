@@ -7,6 +7,7 @@ import { buildStyleKitCss } from '../../canvas/style-kits.js';
 import { getTemplateSeed } from '../../templates/registry.js';
 import { getSeedAsset } from '../../canvas/seed-assets.js';
 import { allTemplateSeeds } from '../../templates/registry.js';
+import { renderEntranceObserverScriptTag } from '../../canvas/entrance-animation.js';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -66,8 +67,13 @@ assert(
 );
 assert(
   templatesRouteSource.includes('ENTRANCE_ANIMATION_CSS') &&
-    templatesRouteSource.includes('ENTRANCE_OBSERVER_SCRIPT'),
+    templatesRouteSource.includes('renderEntranceObserverScriptTag'),
   'template preview route must include entrance animation CSS and observer script',
+);
+assert(
+  renderEntranceObserverScriptTag().startsWith('<script data-opencanvas-entrance-observer>') &&
+    renderEntranceObserverScriptTag().endsWith('</script>'),
+  'entrance observer must render as an executable script tag',
 );
 
 const pycasterSeed = getSeedAsset('seed-raydotsh-pycaster');

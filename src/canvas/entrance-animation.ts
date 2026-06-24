@@ -15,7 +15,12 @@ export const ENTRANCE_OBSERVER_SCRIPT = String.raw`
   },{threshold:0.15});
   for(var j=0;j<els.length;j++)io.observe(els[j]);
 })();
-`;
+`.trim();
+
+/** Inline script tag for string-built preview HTML envelopes. */
+export function renderEntranceObserverScriptTag(): string {
+  return `<script data-opencanvas-entrance-observer>${ENTRANCE_OBSERVER_SCRIPT}</script>`;
+}
 
 export const ENTRANCE_ANIMATION_CSS = [
   '[data-entrance]{opacity:0;transition:opacity var(--motion-duration,0.6s) var(--motion-easing,ease),transform var(--motion-duration,0.6s) var(--motion-easing,ease);}',

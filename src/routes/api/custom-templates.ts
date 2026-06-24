@@ -23,7 +23,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import {
   ENTRANCE_ANIMATION_CSS,
-  ENTRANCE_OBSERVER_SCRIPT,
+  renderEntranceObserverScriptTag,
 } from '../../canvas/entrance-animation.js';
 import { canvasPublishedStyles } from '../../canvas/public-styles.js';
 import { renderCanvasSnapshot } from '../../canvas/render.js';
@@ -439,7 +439,7 @@ customTemplatesOwner.get('/:id/preview', async (c) => {
     '<script>window.__opencanvasRuntimeOptions={reducedMotion:"no-preference"};</script>';
 
   return c.html(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtmlText(tmpl.name)} preview</title><style>${canvasPublishedStyles}${customKitCss}\n${ENTRANCE_ANIMATION_CSS}</style><style>${previewStyles}</style></head><body>${previewRuntimeOptionsScript}${html}${ENTRANCE_OBSERVER_SCRIPT}</body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtmlText(tmpl.name)} preview</title><style>${canvasPublishedStyles}${customKitCss}\n${ENTRANCE_ANIMATION_CSS}</style><style>${previewStyles}</style></head><body>${previewRuntimeOptionsScript}${html}${renderEntranceObserverScriptTag()}</body></html>`,
   );
 });
 
