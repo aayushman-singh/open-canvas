@@ -93,7 +93,7 @@
     "dashboard-shell:smoke": "bun run src/routes/dashboard/shell.smoke.ts",
     "template-preview:smoke": "bun run src/routes/dashboard/template-preview.smoke.ts",
     "template-source-admin:smoke": "bun run src/templates/source-admin.smoke.ts && bun run src/templates/source-admin-dashboard.smoke.ts && bun run src/templates/source-admin-github.smoke.ts && bun run src/routes/dashboard/admin-template-source.smoke.ts",
-    "visual-template-admin:smoke": "bun run src/routes/api/custom-templates-publication.smoke.ts && bun run src/routes/dashboard/admin-templates.smoke.ts && bun run src/editor-client/template-mode.smoke.ts",
+    "visual-template-admin:smoke": "bun run src/routes/api/custom-templates-publication.smoke.ts && bun run src/routes/dashboard/admin-templates.smoke.ts && bun run src/editor-client/template-mode.smoke.ts && bun run src/templates/built-in-template-override.smoke.ts",
     "replica-package:smoke": "bun run src/templates/replica-package/load.smoke.ts && bun run src/templates/replica-package/assets.smoke.ts && bun run src/templates/replica-package/compiler.smoke.ts && bun run src/templates/replica-package/verify.smoke.ts && bun run src/templates/tiny-replica.replica.smoke.ts",
     "responsive:smoke": "bun run src/canvas/responsive/smoke.ts",
     "version:smoke": "bun run src/version/smoke.ts",

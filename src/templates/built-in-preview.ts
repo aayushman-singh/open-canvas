@@ -1,39 +1,64 @@
 import { renderCanvasSnapshot } from '../canvas/render.js';
 import { getSeedAsset } from '../canvas/seed-assets.js';
-import type { PublishedSnapshot } from '../canvas/schema.js';
+import type { EditableSite, PublishedSnapshot } from '../canvas/schema.js';
 import { injectInteractiveRuntime } from '../interactive/inject.js';
+import { resolveStyleKitWithCustom } from '../themes/custom-resolve.js';
+import { buildStyleKitCss } from '../canvas/style-kits.js';
 import { instantiateTemplate } from './registry.js';
 
 const builtInTemplatePreviewPublishedAt = '2026-05-22T00:00:00.000Z';
+
+function snapshotFromState(state: EditableSite): PublishedSnapshot {
+  return {
+    ...state,
+    version: 1,
+    publishedAt: builtInTemplatePreviewPublishedAt,
+  };
+}
+
+function renderPreviewBodyHtmlFromState(
+  state: EditableSite,
+  options: { turnstileSiteKey: string; assetBasePath: string },
+): string {
+  const snapshot = snapshotFromState(state);
+  return injectInteractiveRuntime(
+    renderCanvasSnapshot(snapshot, options.assetBasePath, '__template-preview__', {
+      turnstileSiteKey: options.turnstileSiteKey,
+    }),
+    snapshot,
+  );
+}
 
 /** Body HTML for built-in template picker iframes — full snapshot + interactive runtime. */
 export function renderBuiltInTemplatePreviewBodyHtml(
   templateId: string,
   options: { turnstileSiteKey: string; assetBasePath?: string },
 ): string {
-  // ADR 0061 Phase D — instantiate the composition to get an EditableSite
-  // shape the snapshot renderer accepts. Each preview re-materialises, so
-  // pool edits between deploys surface on the next preview render.
   const state = instantiateTemplate(templateId);
-  const snapshot: PublishedSnapshot = {
-    ...state,
-    version: 1,
-    publishedAt: builtInTemplatePreviewPublishedAt,
-  };
-  // Template previews have no backing site yet — forms inside a preview
-  // cannot submit to a real /__opencanvas/forms/<siteId>/<formId> endpoint. Pass
-  // an explicit synthetic id so the renderer's siteId check still passes and
-  // any accidental form POST hits a 404 against the forms router instead of
-  // a silent double-slash URL.
-  return injectInteractiveRuntime(
-    renderCanvasSnapshot(
-      snapshot,
-      options.assetBasePath ?? `/dashboard/templates/${templateId}/assets`,
-      '__template-preview__',
-      { turnstileSiteKey: options.turnstileSiteKey },
-    ),
-    snapshot,
-  );
+  return renderPreviewBodyHtmlFromState(state, {
+    turnstileSiteKey: options.turnstileSiteKey,
+    assetBasePath: options.assetBasePath ?? `/dashboard/templates/${templateId}/assets`,
+  });
+}
+
+/**
+ * Body HTML + custom-kit CSS for a built-in seed preview. DB-free: renders
+ * straight from the code-defined composition (Option B made the picker read
+ * published templates from the DB, so seed previews never resolve overrides).
+ */
+export function renderBuiltInTemplatePreview(
+  templateId: string,
+  options: { turnstileSiteKey: string; assetBasePath?: string },
+): { html: string; customKitCss: string } {
+  const assetBasePath = options.assetBasePath ?? `/dashboard/templates/${templateId}/assets`;
+  const state = instantiateTemplate(templateId);
+  const html = renderPreviewBodyHtmlFromState(state, {
+    turnstileSiteKey: options.turnstileSiteKey,
+    assetBasePath,
+  });
+  const customKitCss =
+    state.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolveStyleKitWithCustom(state))}` : '';
+  return { html, customKitCss };
 }
 
 export async function renderBuiltInTemplatePreviewAssetResponse(

@@ -12,6 +12,7 @@ const schemaSource = readFileSync('src/db/schema.ts', 'utf8');
 assert(schemaSource.includes("site_kind"), 'site table must carry site_kind');
 assert(schemaSource.includes("publication_status"), 'custom_template must carry publication_status');
 assert(schemaSource.includes("template_draft_site_id"), 'custom_template must link to one draft site');
+assert(schemaSource.includes('source_template_id'), 'custom_template must carry source_template_id for seed overrides');
 
 assert(
   schemaSource.includes("templateDraftSiteIdUnique: uniqueIndex('custom_template_template_draft_site_id_unique')") &&
@@ -96,10 +97,12 @@ for (const marker of [
   assert(customTemplatesRouteSource.includes(marker), `admin route missing ${marker}`);
 }
 
-// 1. Publication status checks for global templates in owner-facing routes
+// 1. Publication status checks for global templates in owner-facing routes.
+// Option B — seed-derived rows are normal templates now, so the catalog no
+// longer filters them out; it only gates on published global visibility.
 assert(
-  customTemplatesRouteSource.includes("and(eq(customTemplate.visibility, 'global'), eq(customTemplate.publicationStatus, 'published'))"),
-  "GET /api/custom-templates must check publicationStatus for global templates"
+  customTemplatesRouteSource.includes("eq(customTemplate.publicationStatus, 'published')"),
+  'GET /api/custom-templates must check publicationStatus for global templates',
 );
 
 assert(

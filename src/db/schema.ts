@@ -572,6 +572,11 @@ export const customTemplate = pgTable(
     templateDraftSiteId: text('template_draft_site_id').references(() => site.id, {
       onDelete: 'set null',
     }),
+    // When set, this curated global template overrides the built-in Template
+    // Seed with the same id (e.g. raydotsh-portfolio). Only one row may bind
+    // to a given seed id; publish makes the override selectable via the seed
+    // card while keeping the code seed as fallback when unpublished.
+    sourceTemplateId: text('source_template_id'),
     name: text('name').notNull(),
     tagline: text('tagline').notNull().default(''),
     styleKit: text('style_kit').notNull(),
@@ -584,6 +589,9 @@ export const customTemplate = pgTable(
     templateDraftSiteIdUnique: uniqueIndex('custom_template_template_draft_site_id_unique')
       .on(table.templateDraftSiteId)
       .where(sql`template_draft_site_id IS NOT NULL`),
+    sourceTemplateIdUnique: uniqueIndex('custom_template_source_template_id_unique')
+      .on(table.sourceTemplateId)
+      .where(sql`source_template_id IS NOT NULL`),
   })
 );
 

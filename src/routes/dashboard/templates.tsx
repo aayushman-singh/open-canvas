@@ -16,13 +16,14 @@ import { customTemplate, site } from '../../db/schema';
 import {
   renderBuiltInTemplatePreviewAssetResponse,
   renderBuiltInTemplatePreviewBodyHtml,
+  renderBuiltInTemplatePreview,
 } from '../../templates/built-in-preview';
-import { buildStyleKitCss } from '../../canvas/style-kits.js';
 import {
-  allTemplateSeeds,
   getTemplateSeed,
   type TemplateSeed,
 } from '../../templates/registry';
+import { ensureBuiltInTemplatesSeeded } from '../../templates/seed-bootstrap';
+import { requireTemplateAssetCustodianCustomerId } from '../../templates/curated-admin';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
 import { Button, readThemeCookie } from '../../ui';
@@ -36,6 +37,7 @@ type Bindings = HostConfigEnv & {
   DATABASE_URL: string;
   ASSETS_BUCKET: R2Bucket;
   TURNSTILE_SITE_KEY?: string;
+  TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID?: string;
 };
 
 export const templatesRoute = new Hono<{ Bindings: Bindings; Variables: ClerkAuthVariables }>();
@@ -323,16 +325,13 @@ export { renderBuiltInTemplatePreviewAssetResponse, renderBuiltInTemplatePreview
 
 function PreviewPage({
   template,
-  turnstileSiteKey,
+  previewHtml,
+  customKitCss,
 }: {
   template: TemplateSeed;
-  turnstileSiteKey: string;
+  previewHtml: string;
+  customKitCss: string;
 }) {
-  const html = renderBuiltInTemplatePreviewBodyHtml(template.id, { turnstileSiteKey });
-  const customKitCss =
-    template.styleKit === 'custom' && template.customStyleKit
-      ? `\n${buildStyleKitCss('custom', template.customStyleKit)}`
-      : '';
   const previewRuntimeOptionsScript =
     '<script>window.__opencanvasRuntimeOptions={reducedMotion:"no-preference"};</script>';
 
@@ -347,7 +346,7 @@ function PreviewPage({
       </head>
       <body>
         {raw(previewRuntimeOptionsScript)}
-        {raw(html)}
+        {raw(previewHtml)}
         {raw(renderEntranceObserverScriptTag())}
       </body>
     </html>
@@ -362,10 +361,10 @@ interface CustomTemplateCard {
   visibility: string;
 }
 
-function CustomTemplateTile({ dt }: { dt: CustomTemplateCard }) {
+function CustomTemplateTile({ dt, checked = false }: { dt: CustomTemplateCard; checked?: boolean }) {
   return (
     <label class="tpl">
-      <input type="radio" name="templateId" value={dt.id} required checked={false} />
+      <input type="radio" name="templateId" value={dt.id} required checked={checked} />
       <span class="tpl-body">
         <span class="tpl-shot">
           <iframe
@@ -403,9 +402,8 @@ function Page({
   theme?: Theme | undefined;
 }) {
   const subdomainPattern = SUBDOMAIN_RE.source;
-  const communityCount = allTemplateSeeds.length + communityCustomTemplates.length;
+  const communityCount = communityCustomTemplates.length;
   const personalCount = personalCustomTemplates.length;
-  const hasAnyCustom = communityCustomTemplates.length + personalCustomTemplates.length > 0;
   return (
     <DashboardShell
       title="Open Canvas — create site"
@@ -431,41 +429,18 @@ function Page({
           </div>
 
           <div class="ttab-panel" data-tab="community">
-            <div class="tpl-grid">
-              {allTemplateSeeds.map((template, idx) => (
-                <label class="tpl">
-                  <input
-                    type="radio"
-                    name="templateId"
-                    value={template.id}
-                    required
-                    checked={idx === 0 && !hasAnyCustom}
-                  />
-                  <span class="tpl-body">
-                    <span class="tpl-shot">
-                      <iframe
-                        src={`/dashboard/templates/${template.id}/preview`}
-                        scrolling="no"
-                        tabindex={-1}
-                        title={`${template.name} preview`}
-                        loading="lazy"
-                        sandbox="allow-scripts"
-                      />
-                    </span>
-                    <span class="tpl-cap">
-                      <b>{template.name}</b>
-                      <p>{template.tagline}</p>
-                      <span class="meta">
-                        <span class="kit">{template.styleKit}</span>
-                      </span>
-                    </span>
-                  </span>
-                </label>
-              ))}
-              {communityCustomTemplates.map((dt) => (
-                <CustomTemplateTile dt={dt} />
-              ))}
-            </div>
+            {communityCustomTemplates.length === 0 ? (
+              <div class="ttab-empty">
+                <strong>No templates published yet</strong>
+                Publish a template from the admin panel to make it selectable here.
+              </div>
+            ) : (
+              <div class="tpl-grid">
+                {communityCustomTemplates.map((dt, idx) => (
+                  <CustomTemplateTile dt={dt} checked={idx === 0} />
+                ))}
+              </div>
+            )}
           </div>
 
           <div class="ttab-panel" data-tab="personal">
@@ -541,8 +516,11 @@ templatesRoute.get('/:templateId/preview', (c) => {
   if (!template) {
     return c.text('template not found', 404);
   }
+  const { html, customKitCss } = renderBuiltInTemplatePreview(template.id, {
+    turnstileSiteKey: requireTurnstileSiteKey(c.env),
+  });
   return c.html(
-    <PreviewPage template={template} turnstileSiteKey={requireTurnstileSiteKey(c.env)} />,
+    <PreviewPage template={template} previewHtml={html} customKitCss={customKitCss} />,
   );
 });
 
@@ -569,6 +547,17 @@ templatesRoute.get('/', async (c) => {
   if (auth.userId) {
     const database = db(c.env);
     await ensureCustomTemplateDraftSchema(database);
+    // Option B — import the code-defined seeds into the DB once so the
+    // picker has templates out of the box. Guarded against config drift:
+    // a missing custodian id must not blank the picker for the user.
+    try {
+      await ensureBuiltInTemplatesSeeded(
+        database,
+        requireTemplateAssetCustodianCustomerId(c.env),
+      );
+    } catch (err) {
+      console.warn('[templates] built-in seed bootstrap skipped', err);
+    }
     // clerkAuth() middleware already loaded the customer row.
     const customerRecord = c.get('customer');
     if (!customerRecord) {

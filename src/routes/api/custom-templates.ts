@@ -87,7 +87,7 @@ async function reconcileCustomTemplateDraftSchema(database: ReturnType<typeof db
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'custom_template'
-      AND column_name IN ('publication_status', 'template_draft_site_id')
+      AND column_name IN ('publication_status', 'template_draft_site_id', 'source_template_id')
   `);
   const existingColumns = new Set(
     executeRows(columnResult).map((row) => row.column_name),
@@ -111,7 +111,10 @@ async function reconcileCustomTemplateDraftSchema(database: ReturnType<typeof db
     FROM pg_indexes
     WHERE schemaname = 'public'
       AND tablename = 'custom_template'
-      AND indexname = 'custom_template_template_draft_site_id_unique'
+      AND indexname IN (
+        'custom_template_template_draft_site_id_unique',
+        'custom_template_source_template_id_unique'
+      )
   `);
   const existingIndexes = new Set(
     executeRows(indexResult).map((row) => row.name),
@@ -164,6 +167,19 @@ async function reconcileCustomTemplateDraftSchema(database: ReturnType<typeof db
       ),
     );
     addedIndexes.push('custom_template_template_draft_site_id_unique');
+  }
+
+  if (!existingColumns.has('source_template_id')) {
+    await database.execute(sql.raw(`ALTER TABLE "custom_template" ADD COLUMN "source_template_id" text`));
+    addedColumns.push('source_template_id');
+  }
+  if (!existingIndexes.has('custom_template_source_template_id_unique')) {
+    await database.execute(
+      sql.raw(
+        `CREATE UNIQUE INDEX "custom_template_source_template_id_unique" ON "custom_template" USING btree ("source_template_id") WHERE "source_template_id" IS NOT NULL`,
+      ),
+    );
+    addedIndexes.push('custom_template_source_template_id_unique');
   }
 
   return { addedColumns, addedConstraints, addedIndexes };
@@ -271,10 +287,16 @@ customTemplatesOwner.get('/', async (c) => {
 
   const whereClause = customerId
     ? or(
-        and(eq(customTemplate.visibility, 'global'), eq(customTemplate.publicationStatus, 'published')),
+        and(
+          eq(customTemplate.visibility, 'global'),
+          eq(customTemplate.publicationStatus, 'published'),
+        ),
         eq(customTemplate.customerId, customerId),
       )
-    : and(eq(customTemplate.visibility, 'global'), eq(customTemplate.publicationStatus, 'published'));
+    : and(
+        eq(customTemplate.visibility, 'global'),
+        eq(customTemplate.publicationStatus, 'published'),
+      );
 
   const rows = await database
     .select({

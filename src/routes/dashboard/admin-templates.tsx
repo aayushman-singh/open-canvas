@@ -4,7 +4,6 @@ import { clerkAuth } from '../../auth/middleware';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { isTemplateSourceAdminCustomer } from '../../auth/db-admin';
 import { requireAuth } from '../../auth/require-auth';
-import { allTemplateSeeds } from '../../templates/registry';
 import { readThemeCookie } from '../../ui';
 import { DashboardShell } from './shell';
 
@@ -250,9 +249,6 @@ const adminScript = `
     renameName: document.getElementById('renameName'),
     renameTagline: document.getElementById('renameTagline'),
     renameBtn: document.getElementById('renameBtn'),
-    seedForm: document.getElementById('seedForm'),
-    customForm: document.getElementById('customForm'),
-    sourceTemplateSelect: document.getElementById('sourceTemplateSelect'),
     statusBanner: document.getElementById('statusBanner'),
   };
 
@@ -276,9 +272,6 @@ const adminScript = `
 
   function renderTemplates() {
     els.curatedList.textContent = '';
-    
-    // Clear select options first
-    els.sourceTemplateSelect.innerHTML = '<option value="">-- Select a custom template --</option>';
 
     if (state.templates.length === 0) {
       els.curatedList.innerHTML = '<div style="color:var(--ink-3);font-size:13px;padding:8px;">No custom templates found.</div>';
@@ -301,17 +294,11 @@ const adminScript = `
       badge.textContent = tmpl.publicationStatus;
       
       const meta = document.createElement('span');
-      meta.textContent = tmpl.id;
+      meta.textContent = tmpl.id + (tmpl.sourceTemplateId ? ' / overrides ' + tmpl.sourceTemplateId : '');
       
       item.append(title, badge, meta);
       item.addEventListener('click', () => selectTemplate(tmpl.id));
       els.curatedList.append(item);
-
-      // Populate clone dropdown (only published custom templates can be cloned/copied)
-      const option = document.createElement('option');
-      option.value = tmpl.id;
-      option.textContent = tmpl.name + ' (' + tmpl.publicationStatus + ')';
-      els.sourceTemplateSelect.append(option);
     }
   }
 
@@ -462,68 +449,6 @@ const adminScript = `
     }
   });
 
-  // Create from Template Seed
-  els.seedForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const data = new FormData(els.seedForm);
-    const body = {
-      name: data.get('name'),
-      tagline: data.get('tagline'),
-      sourceId: data.get('sourceId'),
-    };
-    if (!body.name || !body.sourceId) {
-      showStatus('bad', 'Name and Template Seed selection are required.');
-      return;
-    }
-    setLoading(true);
-    showStatus('', 'Creating curated draft from seed...');
-    try {
-      const result = await api('/drafts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      els.seedForm.reset();
-      showStatus('ok', 'Draft successfully created from seed.');
-      await refresh(result.templateId);
-    } catch (err) {
-      showStatus('bad', err.message);
-    } finally {
-      setLoading(false);
-    }
-  });
-
-  // Create from Curated Custom Template
-  els.customForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const data = new FormData(els.customForm);
-    const body = {
-      name: data.get('name'),
-      tagline: data.get('tagline'),
-      sourceTemplateId: data.get('sourceTemplateId'),
-    };
-    if (!body.name || !body.sourceTemplateId) {
-      showStatus('bad', 'Name and source custom template selection are required.');
-      return;
-    }
-    setLoading(true);
-    showStatus('', 'Creating curated draft from custom template...');
-    try {
-      const result = await api('/drafts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      els.customForm.reset();
-      showStatus('ok', 'Draft successfully created from custom template.');
-      await refresh(result.templateId);
-    } catch (err) {
-      showStatus('bad', err.message);
-    } finally {
-      setLoading(false);
-    }
-  });
-
   async function refresh(targetId = state.selectedTemplateId) {
     const catalog = await api('/');
     state.templates = catalog.templates;
@@ -590,52 +515,10 @@ adminTemplatesRoute.get('/', (c) => {
             </div>
           </div>
 
-          {/* Form 1: Create from Template Seed */}
-          <form id="seedForm" class="creator-form" autocomplete="off">
-            <h3>Create from Template Seed</h3>
-            <div class="field">
-              <label for="seedNameInput">Template Name</label>
-              <input id="seedNameInput" type="text" name="name" required placeholder="e.g. Elegant Portfolio" />
-            </div>
-            <div class="field">
-              <label for="seedTaglineInput">Tagline</label>
-              <input id="seedTaglineInput" type="text" name="tagline" placeholder="e.g. Minimalist layout" />
-            </div>
-            <div class="field">
-              <label for="seedSourceIdSelect">Template Seed</label>
-              <select id="seedSourceIdSelect" name="sourceId" required>
-                <option value="">-- Select a seed --</option>
-                {allTemplateSeeds.map((seed) => (
-                  <option value={seed.id}>{seed.name}</option>
-                ))}
-              </select>
-            </div>
-            <button class="btn btn-primary" type="submit">
-              Create from Template Seed
-            </button>
-          </form>
-
-          {/* Form 2: Create from Curated Custom Template */}
-          <form id="customForm" class="creator-form" autocomplete="off">
-            <h3>Create from Curated Custom Template</h3>
-            <div class="field">
-              <label for="customNameInput">Template Name</label>
-              <input id="customNameInput" type="text" name="name" required placeholder="e.g. Agency Portfolio" />
-            </div>
-            <div class="field">
-              <label for="customTaglineInput">Tagline</label>
-              <input id="customTaglineInput" type="text" name="tagline" placeholder="e.g. Custom tailored layout" />
-            </div>
-            <div class="field">
-              <label for="sourceTemplateSelect">Source Curated Custom Template</label>
-              <select id="sourceTemplateSelect" name="sourceTemplateId" required>
-                <option value="">-- Select a custom template --</option>
-              </select>
-            </div>
-            <button class="btn btn-primary" type="submit">
-              Create from Curated Custom Template
-            </button>
-          </form>
+          <p style="margin: 0; font-size: 12px; color: var(--ink-3); line-height: 1.5;">
+            Built-in templates are imported automatically. Select one to edit and
+            publish, or use <b>Duplicate</b> on any template to spin off a variant.
+          </p>
         </aside>
 
         {/* Detail Panel */}

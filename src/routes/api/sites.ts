@@ -4,7 +4,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import type { EditableSite } from '../../canvas/schema';
-import { prepareSeedAssetsForCustomer, rewriteEditableSiteAssetIds } from '../../templates/seed-asset-materialization.js';
+import { rewriteEditableSiteAssetIds } from '../../templates/seed-asset-materialization.js';
 import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import {
@@ -16,7 +16,6 @@ import {
   type BillingPlan,
 } from '../../db/schema';
 import { canReadScopedLibraryRow } from './library-access';
-import { getTemplateSeed, instantiateTemplate } from '../../templates/registry';
 import { TEMPLATE_SEED_ENTRIES } from '../../templates/portfolio-seed-entries';
 
 type Bindings = {
@@ -196,115 +195,91 @@ sites.post('/', async (c) => {
     }
   }
 
-  let editableState: EditableSite;
+  // Option B — templates are DB rows. Every selectable template (built-in
+  // seeds included) lives in `custom_template`; the seeds are imported there
+  // by seed-bootstrap. `source_template_id` is kept only to re-inject
+  // page-bound collection content (e.g. the portfolio blog) that is not
+  // carried in the EditableSite itself.
   let assetRows: Array<typeof ownerAsset.$inferInsert> = [];
 
-  const seed = getTemplateSeed(templateId);
-  if (seed) {
-    // Pre-fetch the customer's existing asset (contentHash → id) so the seed
-    // materialiser can reuse rows under the `(customer_id, content_hash)`
-    // unique constraint instead of generating a fresh id and getting silently
-    // skipped on insert.
-    const existingAssets = await database
-      .select({ id: ownerAsset.id, contentHash: ownerAsset.contentHash })
-      .from(ownerAsset)
-      .where(eq(ownerAsset.customerId, customerId));
-    const existingByHash = new Map(existingAssets.map((r) => [r.contentHash, r.id]));
-    // ADR 0061 Phase D — materialise the TemplateSeed composition to an
-    // EditableSite once, then feed both the asset-manifest pass and
-    // editableState assignment from the same instance.
-    const seedState = instantiateTemplate(seed.id);
-    const preparedSeedAssets = prepareSeedAssetsForCustomer(customerId, seedState, existingByHash);
-    if (!preparedSeedAssets.ok) {
-      return c.json(
-        {
-          error: 'template seed references invalid asset ids',
-          unknownSeedIds: preparedSeedAssets.unknownSeedIds,
-          assetKindErrors: preparedSeedAssets.assetKindErrors,
-        },
-        500,
-      );
-    }
-    editableState = preparedSeedAssets.editableState;
-    assetRows = preparedSeedAssets.seedRows;
-  } else {
-    const dtRow = await database
-      .select({
-        siteState: customTemplate.siteState,
-        assetManifest: customTemplate.assetManifest,
-        visibility: customTemplate.visibility,
-        customerId: customTemplate.customerId,
-        publicationStatus: customTemplate.publicationStatus,
-      })
-      .from(customTemplate)
-      .where(eq(customTemplate.id, templateId))
-      .limit(1);
-    const dt = dtRow[0];
-    if (!dt) {
-      return c.json({ error: `unknown templateId: ${templateId}` }, 404);
-    }
-    if (dt.visibility === 'global' && dt.publicationStatus !== 'published') {
-      return c.json({ error: `unknown templateId: ${templateId}` }, 404);
-    }
-    if (!canReadScopedLibraryRow(dt, customerId)) {
-      return c.json({ error: `unknown templateId: ${templateId}` }, 404);
-    }
-
-    editableState = structuredClone(dt.siteState);
-
-    const existingAssets = await database
-      .select({ id: ownerAsset.id, contentHash: ownerAsset.contentHash })
-      .from(ownerAsset)
-      .where(eq(ownerAsset.customerId, customerId));
-    const existingByHash = new Map(existingAssets.map((r) => [r.contentHash, r.id]));
-
-    const assetIdMap = new Map<string, string>();
-    const newRows: Array<typeof ownerAsset.$inferInsert> = [];
-
-    for (const entry of dt.assetManifest) {
-      if (assetIdMap.has(entry.assetId)) continue;
-      const existing = existingByHash.get(entry.contentHash);
-      if (existing) {
-        assetIdMap.set(entry.assetId, existing);
-      } else {
-        const freshId = crypto.randomUUID();
-        assetIdMap.set(entry.assetId, freshId);
-        existingByHash.set(entry.contentHash, freshId);
-        newRows.push({
-          id: freshId,
-          customerId,
-          contentHash: entry.contentHash,
-          r2Key: entry.r2Key,
-          mediaType: entry.mediaType,
-          kind: entry.kind,
-          alt: entry.alt,
-          width: entry.width,
-          height: entry.height,
-          byteSize: entry.byteSize,
-        });
-      }
-    }
-
-    const missingTemplateAsset = rewriteEditableSiteAssetIds(editableState, (assetId, path) => {
-      if (assetId === '' || assetId === '__placeholder__') return assetId;
-      const mapped = assetIdMap.get(assetId);
-      if (mapped === undefined) {
-        console.error(`[custom-template] missing cloned asset for ${path}: ${assetId}`);
-        return { missing: assetId };
-      }
-      return mapped;
-    });
-    if (missingTemplateAsset !== null) {
-      return c.json(
-        {
-          error: 'custom template references asset ids missing from its manifest',
-          unknownAssetIds: [missingTemplateAsset],
-        },
-        500,
-      );
-    }
-    assetRows = newRows;
+  const dtRow = await database
+    .select({
+      siteState: customTemplate.siteState,
+      assetManifest: customTemplate.assetManifest,
+      visibility: customTemplate.visibility,
+      customerId: customTemplate.customerId,
+      publicationStatus: customTemplate.publicationStatus,
+      sourceTemplateId: customTemplate.sourceTemplateId,
+    })
+    .from(customTemplate)
+    .where(eq(customTemplate.id, templateId))
+    .limit(1);
+  const dt = dtRow[0];
+  if (!dt) {
+    return c.json({ error: `unknown templateId: ${templateId}` }, 404);
   }
+  if (dt.visibility === 'global' && dt.publicationStatus !== 'published') {
+    return c.json({ error: `unknown templateId: ${templateId}` }, 404);
+  }
+  if (!canReadScopedLibraryRow(dt, customerId)) {
+    return c.json({ error: `unknown templateId: ${templateId}` }, 404);
+  }
+
+  const collectionSeedId = dt.sourceTemplateId ?? templateId;
+  const editableState: EditableSite = structuredClone(dt.siteState);
+
+  const existingAssets = await database
+    .select({ id: ownerAsset.id, contentHash: ownerAsset.contentHash })
+    .from(ownerAsset)
+    .where(eq(ownerAsset.customerId, customerId));
+  const existingByHash = new Map(existingAssets.map((r) => [r.contentHash, r.id]));
+
+  const assetIdMap = new Map<string, string>();
+  const newRows: Array<typeof ownerAsset.$inferInsert> = [];
+
+  for (const entry of dt.assetManifest) {
+    if (assetIdMap.has(entry.assetId)) continue;
+    const existing = existingByHash.get(entry.contentHash);
+    if (existing) {
+      assetIdMap.set(entry.assetId, existing);
+    } else {
+      const freshId = crypto.randomUUID();
+      assetIdMap.set(entry.assetId, freshId);
+      existingByHash.set(entry.contentHash, freshId);
+      newRows.push({
+        id: freshId,
+        customerId,
+        contentHash: entry.contentHash,
+        r2Key: entry.r2Key,
+        mediaType: entry.mediaType,
+        kind: entry.kind,
+        alt: entry.alt,
+        width: entry.width,
+        height: entry.height,
+        byteSize: entry.byteSize,
+      });
+    }
+  }
+
+  const missingTemplateAsset = rewriteEditableSiteAssetIds(editableState, (assetId, path) => {
+    if (assetId === '' || assetId === '__placeholder__') return assetId;
+    const mapped = assetIdMap.get(assetId);
+    if (mapped === undefined) {
+      console.error(`[custom-template] missing cloned asset for ${path}: ${assetId}`);
+      return { missing: assetId };
+    }
+    return mapped;
+  });
+  if (missingTemplateAsset !== null) {
+    return c.json(
+      {
+        error: 'custom template references asset ids missing from its manifest',
+        unknownAssetIds: [missingTemplateAsset],
+      },
+      500,
+    );
+  }
+  assetRows = newRows;
 
   const validation = validateEditableSite(editableState);
   if (!validation.valid) {
@@ -318,7 +293,7 @@ sites.post('/', async (c) => {
   }
 
   const newSiteId = crypto.randomUUID();
-  const seedEntryDefs = TEMPLATE_SEED_ENTRIES[templateId] ?? [];
+  const seedEntryDefs = TEMPLATE_SEED_ENTRIES[collectionSeedId] ?? [];
   const seedEntryRows = seedEntryDefs.map((entry) => ({
     siteId: newSiteId,
     collectionSlug: entry.collectionSlug,

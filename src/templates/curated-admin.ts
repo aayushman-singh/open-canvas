@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { customTemplate, site, ownerAsset } from '../db/schema.js';
 import type { StyleKit, EditableSite } from '../canvas/schema.js';
-import { instantiateTemplate } from './registry.js';
+import { instantiateTemplate, getTemplateSeed } from './registry.js';
 import { validateEditableSite } from '../canvas/validate.js';
 import { buildAssetManifest } from './custom-template-assets.js';
 import { prepareSeedAssetsForCustomer } from './seed-asset-materialization.js';
@@ -14,6 +14,7 @@ export interface CuratedTemplateSummary {
   visibility: 'global' | 'private';
   publicationStatus: 'drafting' | 'published' | 'unpublished';
   templateDraftSiteId: string | null;
+  sourceTemplateId: string | null;
   updatedAt: string;
 }
 
@@ -45,6 +46,7 @@ export async function listCuratedTemplates(database: Db): Promise<CuratedTemplat
       visibility: customTemplate.visibility,
       publicationStatus: customTemplate.publicationStatus,
       templateDraftSiteId: customTemplate.templateDraftSiteId,
+      sourceTemplateId: customTemplate.sourceTemplateId,
       updatedAt: customTemplate.updatedAt,
     })
     .from(customTemplate)
@@ -57,6 +59,7 @@ export async function listCuratedTemplates(database: Db): Promise<CuratedTemplat
     visibility: r.visibility,
     publicationStatus: r.publicationStatus,
     templateDraftSiteId: r.templateDraftSiteId,
+    sourceTemplateId: r.sourceTemplateId,
     updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : String(r.updatedAt),
   }));
 }
@@ -133,8 +136,24 @@ export async function createCuratedTemplateDraft(
   let siteState: EditableSite;
   let styleKit: string;
   let assetRows: Array<typeof ownerAsset.$inferInsert> = [];
+  let seedOverrideId: string | undefined;
 
   if (input.sourceId) {
+    seedOverrideId = input.sourceId;
+    if (!getTemplateSeed(seedOverrideId)) {
+      throw new Error(`curated-template-admin: unknown template seed '${seedOverrideId}'`);
+    }
+    const existingOverride = await deps.database
+      .select({ id: customTemplate.id })
+      .from(customTemplate)
+      .where(eq(customTemplate.sourceTemplateId, seedOverrideId))
+      .limit(1);
+    if (existingOverride[0]) {
+      throw new Error(
+        `curated-template-admin: template seed '${seedOverrideId}' already has a curated override row`,
+      );
+    }
+
     const existingRows = await deps.database
       .select({ id: ownerAsset.id, contentHash: ownerAsset.contentHash })
       .from(ownerAsset)
@@ -204,6 +223,7 @@ export async function createCuratedTemplateDraft(
     visibility: 'global',
     publicationStatus: 'drafting',
     templateDraftSiteId: draftSiteId,
+    ...(seedOverrideId !== undefined ? { sourceTemplateId: seedOverrideId } : {}),
     name: input.name,
     tagline: input.tagline ?? '',
     styleKit,
@@ -386,6 +406,7 @@ export async function duplicateCuratedTemplateDraft(
     visibility: 'global',
     publicationStatus: 'drafting',
     templateDraftSiteId: draftSiteId,
+    sourceTemplateId: null,
     name: `${tmpl.name} (Copy)`,
     tagline: tmpl.tagline,
     styleKit: tmpl.styleKit,
