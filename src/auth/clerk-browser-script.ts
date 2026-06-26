@@ -66,6 +66,16 @@ export function injectClerkBrowserScript() {
     if (!contentType.includes('text/html')) return;
     if (c.req.path.endsWith('/preview')) return;
 
+    // Leave strict-CSP pages completely untouched. The editor
+    // (/dashboard/sites/:id/edit and /dashboard/admin/templates/:id/edit)
+    // ships a nonce-based Content-Security-Policy and self-injects clerk-js
+    // through its own nonce'd inline bootstrap, so the session already stays
+    // fresh there. Our blanket bootstrap carries no nonce and would be
+    // CSP-blocked anyway, so injecting is futile — and buffering then
+    // reconstructing that nonce-gated response only risks perturbing it.
+    // Returning here means the editor response is never read or rebuilt.
+    if (c.res.headers.has('content-security-policy')) return;
+
     // Reading the body consumes the stream, so every branch must rebuild the
     // response from the captured text — even when we skip injection.
     const body = await c.res.text();
