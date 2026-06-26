@@ -117,7 +117,6 @@ app.route('/', landing);
 // before the dashboard mounts so it wraps them; idempotent against pages that
 // already embed clerk-js (dashboard index, editor).
 app.use('/dashboard', injectClerkBrowserScript());
-app.use('/dashboard/*', injectClerkBrowserScript());
 
 app.route('/dashboard/admin/templates', adminTemplatesRoute);
 app.route('/dashboard/admin/template-source', adminTemplateSourceRoute);

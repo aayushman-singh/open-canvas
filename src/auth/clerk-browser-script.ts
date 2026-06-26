@@ -30,6 +30,31 @@ type ClerkScriptEnv = ClerkKeyEnv & { CLERK_FRONTEND_API_URL?: string };
 // that already loads clerk-js (so we never inject twice).
 const CLERK_BUNDLE_MARKER = 'clerk.browser.js';
 
+/** Paths that must bypass this middleware entirely (no body read/rebuild). */
+export function shouldSkipClerkBrowserScriptInjection(path: string): boolean {
+  if (path.endsWith('/preview')) return true;
+  // Editor routes ship strict CSP + nonce'd inline boot/clerk scripts. They
+  // self-inject clerk-js and must never be buffered/rebuilt here — doing so
+  // (especially when this middleware is accidentally registered twice) can
+  // strip or corrupt response headers and leave the canvas client dead.
+  if (/^\/dashboard\/sites\/[^/]+\/edit$/.test(path)) return true;
+  if (/^\/dashboard\/admin\/templates\/[^/]+\/edit$/.test(path)) return true;
+  return false;
+}
+
+function rebuildHtmlResponse(body: string, source: Response): Response {
+  const headers = new Headers(source.headers);
+  // Body was decoded via Response.text(); drop encoding/length from the
+  // source so the rebuilt response is not mislabeled as gzip/etc.
+  headers.delete('content-encoding');
+  headers.delete('content-length');
+  return new Response(body, {
+    status: source.status,
+    statusText: source.statusText,
+    headers,
+  });
+}
+
 /**
  * Build the inline bootstrap `<script>` that loads clerk.browser.js from the
  * server-resolved Clerk frontend host and calls `Clerk.load()`. The host is
@@ -61,29 +86,22 @@ export function buildClerkBrowserScriptTag(env: ClerkScriptEnv): string {
  */
 export function injectClerkBrowserScript() {
   return createMiddleware<{ Bindings: ClerkScriptEnv }>(async (c, next) => {
+    if (shouldSkipClerkBrowserScriptInjection(c.req.path)) {
+      return next();
+    }
     await next();
     const contentType = c.res.headers.get('content-type') ?? '';
     if (!contentType.includes('text/html')) return;
     if (c.req.path.endsWith('/preview')) return;
 
-    // Leave strict-CSP pages completely untouched. The editor
-    // (/dashboard/sites/:id/edit and /dashboard/admin/templates/:id/edit)
-    // ships a nonce-based Content-Security-Policy and self-injects clerk-js
-    // through its own nonce'd inline bootstrap, so the session already stays
-    // fresh there. Our blanket bootstrap carries no nonce and would be
-    // CSP-blocked anyway, so injecting is futile — and buffering then
-    // reconstructing that nonce-gated response only risks perturbing it.
-    // Returning here means the editor response is never read or rebuilt.
-    if (c.res.headers.has('content-security-policy')) return;
-
     // Reading the body consumes the stream, so every branch must rebuild the
     // response from the captured text — even when we skip injection.
     const body = await c.res.text();
     if (body.includes(CLERK_BUNDLE_MARKER) || !body.includes('</head>')) {
-      c.res = new Response(body, c.res);
+      c.res = rebuildHtmlResponse(body, c.res);
       return;
     }
     const tag = buildClerkBrowserScriptTag(c.env);
-    c.res = new Response(body.replace('</head>', tag + '</head>'), c.res);
+    c.res = rebuildHtmlResponse(body.replace('</head>', tag + '</head>'), c.res);
   });
 }
