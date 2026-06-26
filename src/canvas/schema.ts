@@ -87,7 +87,7 @@ export const SURFACE_VARIANTS = [
 ] as const;
 export type SurfaceVariant = (typeof SURFACE_VARIANTS)[number];
 
-export const SHAPE_VARIANTS = ['rect', 'pill', 'circle', 'line', 'badge', 'blob', 'icon'] as const;
+export const SHAPE_VARIANTS = ['rect', 'pill', 'circle', 'line', 'badge', 'blob', 'icon', 'freeform'] as const;
 export type ShapeVariant = (typeof SHAPE_VARIANTS)[number];
 
 export const MOTION_PRESETS = [

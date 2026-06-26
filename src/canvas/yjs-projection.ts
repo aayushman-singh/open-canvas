@@ -455,6 +455,8 @@ function encodeShapeElement(el: ShapeElement): Y.Map<unknown> {
   out.set('variant', el.variant);
   // ADR 0051 dec 2 — variant 'icon' carries an iconKind glyph name.
   setIfDefined(out, 'iconKind', el.iconKind);
+  setIfDefined(out, 'path', el.path);
+  setIfDefined(out, 'freeformRender', el.freeformRender);
   return out;
 }
 
@@ -1450,6 +1452,11 @@ function decodeShapeElement(map: Y.Map<unknown>, base: BaseElement): ShapeElemen
     variant: map.get('variant') as ShapeElement['variant'],
   };
   if (map.has('iconKind')) out.iconKind = map.get('iconKind') as IconName;
+  if (map.has('path')) out.path = map.get('path') as string;
+  if (map.has('freeformRender')) {
+    const render = map.get('freeformRender');
+    if (render === 'fill' || render === 'stroke') out.freeformRender = render;
+  }
   return out;
 }
 

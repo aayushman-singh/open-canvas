@@ -38,7 +38,8 @@ export type SidebarFactoryName =
   | 'table'
   | 'nav'
   | 'tabs'
-  | 'flow-container';
+  | 'flow-container'
+  | 'freeform-shape';
 
 export const SIDEBAR_FACTORIES: Record<SidebarFactoryName, () => SidebarFactoryResult> = {
   text: () => ({
@@ -355,4 +356,8 @@ export const SIDEBAR_FACTORIES: Record<SidebarFactoryName, () => SidebarFactoryR
       ],
     },
   }),
+
+  'freeform-shape': () => {
+    throw new Error('freeform-shape uses enterFreeformDrawMode, not a sidebar factory');
+  },
 };

@@ -78,6 +78,8 @@ export type AttachSaveButtonContext = DomContext &
     | 'saveSiteAsTemplate'
     | 'pendingImport'
     | 'exitPlacementMode'
+    | 'pendingFreeformDraw'
+    | 'exitFreeformDrawMode'
     | 'temporaryPanPreviousMode'
     | 'spaceHeldForPan'
     | 'interactionMode'
@@ -109,6 +111,11 @@ export function attachSaveButtonImpl(ctx: AttachSaveButtonContext): void {
     if (ev.key === 'Escape' && ctx.pendingImport) {
       ev.preventDefault();
       ctx.exitPlacementMode();
+      return;
+    }
+    if (ev.key === 'Escape' && ctx.pendingFreeformDraw) {
+      ev.preventDefault();
+      ctx.exitFreeformDrawMode(true);
       return;
     }
     const mod = ev.ctrlKey || ev.metaKey;
@@ -166,6 +173,18 @@ export function attachSaveButtonImpl(ctx: AttachSaveButtonContext): void {
     ) {
       ctx.clearTemporaryPanState();
       ctx.setInteractionMode('select');
+      return;
+    }
+    if (
+      (ev.key === 'p' || ev.key === 'P') &&
+      !ctx.editingElementId &&
+      !ev.ctrlKey &&
+      !ev.metaKey &&
+      !ev.altKey &&
+      !ctx.isEditableShortcutTarget(ev.target)
+    ) {
+      ev.preventDefault();
+      ctx.setInteractionMode('draw');
       return;
     }
     if (ev.key === 'Delete' || ev.key === 'Backspace') {

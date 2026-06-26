@@ -141,6 +141,12 @@ import {
   setInteractionModeImpl,
 } from './drag-resize.js';
 import {
+  attachFreeformDrawHandlersImpl,
+  enterFreeformDrawModeImpl,
+  exitFreeformDrawModeImpl,
+  setFreeformRenderModeImpl,
+} from './shape-freeform-draw.js';
+import {
   ensureSectionsPanelLoaded,
   enterPlacementModeImpl,
   importPendingSectionAt,
@@ -574,6 +580,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     camera: { x: 0, y: 0, zoom: 1 },
     pagePositions: [],
     pendingImport: null,
+    pendingFreeformDraw: null,
     buildSectionNode: runtimeHelperNotInstalled('buildSectionNode'),
     syncSidebarStyleKitButtons: (buttons) => syncSidebarStyleKitButtonsImpl(ctx, buttons),
     renderPlacementSlots: () => renderPlacementSlotsImpl(ctx),
@@ -632,6 +639,9 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     clearTemporaryPanState: () => clearTemporaryPanStateImpl(ctx),
     endTemporaryPan: () => endTemporaryPanImpl(ctx),
     exitPlacementMode: () => exitPlacementModeImpl(ctx),
+    exitFreeformDrawMode: (cancelled) => exitFreeformDrawModeImpl(ctx, cancelled),
+    enterFreeformDrawMode: (opts) => enterFreeformDrawModeImpl(ctx, opts ?? {}),
+    setFreeformRenderMode: (mode) => setFreeformRenderModeImpl(ctx, mode),
     pointerToCanvas: runtimeHelperNotInstalled('pointerToCanvas'),
     resolveElementWrapperAtPoint: runtimeHelperNotInstalled('resolveElementWrapperAtPoint'),
     onCanvasLinkHover: (ev) => onCanvasLinkHoverImpl(ctx, ev),
@@ -1065,6 +1075,7 @@ export function createEditor(boot: EditorBoot): void {
       if (window.katex && ctx.root) ctx.renderMathInScope(ctx.root);
       ctx.attachRootEvents();
       attachPointerHandlersImpl(ctx);
+      attachFreeformDrawHandlersImpl(ctx);
       mountReel(ctx);
       attachGripHandlersImpl(ctx);
       ctx.attachSidebarTabs();

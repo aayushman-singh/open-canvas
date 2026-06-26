@@ -58,6 +58,11 @@ import type {
   StateContext,
   StatusEmitterContext,
 } from './editor-context.js';
+import {
+  enterFreeformDrawModeImpl,
+  exitFreeformDrawModeImpl,
+  syncFreeformDrawToolbarImpl,
+} from './shape-freeform-draw.js';
 
 /**
  * 8px snap grid applied to free-form element positioning during drag/resize.
@@ -106,7 +111,8 @@ export type AttachPointerHandlersContext = DomContext &
 // the viewport DOM ref (DomContext), and the zoom toolbar ref (not in
 // any canonical alias yet — inline Pick).
 export type SetInteractionModeContext = DomContext &
-  Pick<EditorContext, 'interactionMode' | 'zoomToolbar'>;
+  StatusEmitterContext &
+  Pick<EditorContext, 'interactionMode' | 'zoomToolbar' | 'pendingFreeformDraw'>;
 
 // ADR 0064 — the temporary-pan state machine is two flags plus the
 // recursive call into setInteractionMode. No canonical alias owns the
@@ -138,7 +144,7 @@ export function attachPointerHandlersImpl(ctx: AttachPointerHandlersContext): vo
     ctx.onCanvasLinkHoverLeave(ev);
   });
   root.addEventListener('mousedown', (ev) => {
-    if (ctx.interactionMode === 'pan') return;
+    if (ctx.interactionMode === 'pan' || ctx.interactionMode === 'draw') return;
     if (
       ev.target instanceof Element &&
       (ev.target.closest('[data-element-menu-trigger]') || ev.target.closest('[data-element-menu]'))
@@ -427,22 +433,25 @@ export function beginResizeImpl(
 //   ctx.exitPlacementMode      = ()    => exitPlacementModeImpl(ctx);
 
 export function setInteractionModeImpl(ctx: SetInteractionModeContext, mode: string): void {
+  if (mode === 'draw') {
+    if (ctx.pendingFreeformDraw) {
+      exitFreeformDrawModeImpl(ctx, true);
+    } else {
+      enterFreeformDrawModeImpl(ctx);
+    }
+    return;
+  }
+  if (ctx.pendingFreeformDraw) {
+    exitFreeformDrawModeImpl(ctx, false);
+  }
   if (mode !== 'select' && mode !== 'pan') {
-    throw new Error('setInteractionMode: expected select or pan, got ' + String(mode));
+    throw new Error('setInteractionMode: expected select, pan, or draw, got ' + String(mode));
   }
   ctx.interactionMode = mode;
   if (ctx.viewport) {
     ctx.viewport.setAttribute('data-interaction-mode', mode);
   }
-  if (ctx.zoomToolbar) {
-    const btns = ctx.zoomToolbar.querySelectorAll('[data-mode-action]');
-    for (let i = 0; i < btns.length; i++) {
-      btns[i]!.setAttribute(
-        'aria-pressed',
-        btns[i]!.getAttribute('data-mode-action') === mode ? 'true' : 'false',
-      );
-    }
-  }
+  syncFreeformDrawToolbarImpl(ctx);
 }
 
 export function clearTemporaryPanStateImpl(

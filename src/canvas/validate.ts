@@ -1873,6 +1873,23 @@ function validateElement(
           `${basePath}.iconKind must be one of [${ICON_NAMES.join(', ')}] when present (got ${describe(element.iconKind)})`,
         );
       }
+      if (element.variant === 'freeform') {
+        if (typeof element.path !== 'string' || element.path.trim().length === 0) {
+          errors.push(`${basePath}.path must be a non-empty string when variant is freeform`);
+        }
+        if (element.freeformRender !== undefined) {
+          assertOneOf(
+            element.freeformRender,
+            ['fill', 'stroke'] as const,
+            `${basePath}.freeformRender`,
+            errors,
+          );
+        }
+      } else if (element.path !== undefined) {
+        errors.push(`${basePath}.path is only valid when variant is freeform`);
+      } else if (element.freeformRender !== undefined) {
+        errors.push(`${basePath}.freeformRender is only valid when variant is freeform`);
+      }
       break;
     }
     case 'form': {

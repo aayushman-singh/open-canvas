@@ -40,6 +40,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     box: { x: 0, y: 0, w: 100, h: 100, z: 0 },
     variant: 'icon',
     iconKind: 'check',
+    freeformRender: 'fill',
   },
   container: {
     id: 'fx-container',

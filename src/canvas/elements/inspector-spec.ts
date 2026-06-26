@@ -51,6 +51,8 @@ export interface SelectField {
   options: readonly string[];
   /** Used when the element value is missing or not in `options`. */
   defaultValue?: string;
+  /** Hide unless `element[showWhen.path] === showWhen.equals`. */
+  showWhen?: { path: string; equals: string };
 }
 
 /**

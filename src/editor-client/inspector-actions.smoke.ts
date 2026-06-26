@@ -242,6 +242,10 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     camera: { x: 0, y: 0, zoom: 1 },
     pagePositions: [],
     pendingImport: null,
+    pendingFreeformDraw: null,
+    exitFreeformDrawMode: () => {},
+    enterFreeformDrawMode: () => {},
+    setFreeformRenderMode: () => {},
     buildSectionNode: () => {
       throw new Error('buildSectionNode stub: smoke does not exercise section rendering');
     },

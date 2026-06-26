@@ -298,6 +298,8 @@ export type MountViewportContext = Pick<DomContext, 'root' | 'viewport'> &
     | 'clearTemporaryPanState'
     | 'reducedMotionPreview'
     | 'renderAll'
+    | 'pendingFreeformDraw'
+    | 'setFreeformRenderMode'
   >;
 
 // ADR 0064 — `resolveElementWrapperAtPoint` walks the rendered DOM under
@@ -334,7 +336,7 @@ export type AddElementToContainerContext = StateContext &
 // verbs the dispatcher itself reads.
 export type InsertElementForSidebarCommandContext = ResolveNestedInsertionTargetContext &
   AddElementToContainerContext &
-  Pick<EditorContext, 'SIDEBAR_COMMANDS' | 'defaultBox' | 'addElementToSection'>;
+  Pick<EditorContext, 'SIDEBAR_COMMANDS' | 'defaultBox' | 'addElementToSection' | 'enterFreeformDrawMode'>;
 
 // ADR 0064 — `forceOpenInspector` unsides the inspector panel (clears
 // the `hidden` flag + the `collapsed` class) and resets the toggle
@@ -761,6 +763,10 @@ export function renderInspectorSpecImpl(
   const elementByPath = element as unknown as ElementRecord;
   spec.fields.forEach((f) => {
     if (f.kind === 'select') {
+      if (f.showWhen !== undefined) {
+        const current = elementByPath[f.showWhen.path];
+        if (current !== f.showWhen.equals) return;
+      }
       let cur = elementByPath[f.path];
       if (typeof cur !== 'string' || !f.options.includes(cur)) {
         cur = f.defaultValue || f.options[0];
@@ -1840,6 +1846,7 @@ export function mountViewportImpl(ctx: MountViewportContext): void {
   const modeDefs = [
     { label: '\u2196', title: 'Select (V)', ariaLabel: 'Select mode', action: 'select' },
     { label: '\u270b', title: 'Pan (Space)', ariaLabel: 'Pan mode', action: 'pan' },
+    { label: '\u270E', title: 'Draw freeform shape (P)', ariaLabel: 'Draw freeform shape', action: 'draw' },
   ];
   for (let mi = 0; mi < modeDefs.length; mi++) {
     const def = modeDefs[mi]!;
@@ -1888,8 +1895,34 @@ export function mountViewportImpl(ctx: MountViewportContext): void {
     ctx.reducedMotionPreview === 'reduce' ? 'true' : 'false',
   );
   ctx.zoomToolbar.appendChild(reducedMotionButton);
+
+  const freeformSep = document.createElement('span');
+  freeformSep.className = 'zoom-toolbar-sep';
+  freeformSep.setAttribute('data-freeform-draw-controls', 'true');
+  freeformSep.hidden = true;
+  ctx.zoomToolbar.appendChild(freeformSep);
+  for (const mode of ['fill', 'stroke'] as const) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = mode === 'fill' ? 'Fill' : 'Stroke';
+    btn.title = mode === 'fill' ? 'Filled blob' : 'Ink stroke';
+    btn.setAttribute('data-freeform-render', mode);
+    btn.setAttribute('aria-pressed', mode === 'fill' ? 'true' : 'false');
+    btn.hidden = true;
+    ctx.zoomToolbar.appendChild(btn);
+  }
+
   document.body.appendChild(ctx.zoomToolbar);
   ctx.zoomToolbar.addEventListener('click', (ev) => {
+    const renderTarget =
+      ev.target instanceof Element ? ev.target.closest('[data-freeform-render]') : null;
+    if (renderTarget && ctx.pendingFreeformDraw) {
+      const mode = renderTarget.getAttribute('data-freeform-render');
+      if (mode === 'fill' || mode === 'stroke') {
+        ctx.setFreeformRenderMode(mode);
+      }
+      return;
+    }
     const modeTarget =
       ev.target instanceof Element ? ev.target.closest('button[data-mode-action]') : null;
     if (modeTarget) {
@@ -2128,6 +2161,10 @@ export function insertElementForSidebarCommandImpl(
   section: CanvasSection,
   commandKey: string,
 ): void {
+  if (commandKey === 'freeform') {
+    ctx.enterFreeformDrawMode();
+    return;
+  }
   const command = ctx.SIDEBAR_COMMANDS[commandKey] as SidebarCommandSpec | undefined;
   if (!command) {
     throw new Error(

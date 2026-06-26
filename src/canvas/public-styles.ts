@@ -149,6 +149,16 @@ html, body {
 .opencanvas-shape[data-variant="pill"] { border-radius: 999px; }
 .opencanvas-shape[data-variant="blob"] { border-radius: 36% 64% 60% 40% / 45% 35% 65% 55%; }
 .opencanvas-shape[data-variant="line"] { height: 4px; align-self: center; }
+.opencanvas-shape[data-variant="freeform"] {
+  background: transparent;
+  opacity: 1;
+}
+.opencanvas-shape-freeform {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--opencanvas-kit-shape-fill, var(--opencanvas-kit-accent, var(--kit-accent, currentColor)));
+}
 
 .opencanvas-surface {
   width: 100%;

@@ -27,6 +27,7 @@ import type {
 import type { ActionHref } from '../canvas/elements/action.js';
 import { renderInlineRun } from '../canvas/elements/render-utils.js';
 import { renderIconSvg, isIconName } from '../canvas/icons.js';
+import { renderFreeformShapeInnerSvg } from '../canvas/shape-freeform.js';
 
 import type { EditorContext, StateContext } from './editor-context.js';
 import { isAllowedHref } from './href-utils.js';
@@ -255,6 +256,16 @@ export function buildShapeBodyImpl(ctx: BuildShapeBodyContext, element: ShapeEle
   const node = document.createElement('div');
   node.className = 'opencanvas-shape';
   node.setAttribute('data-variant', element.variant);
+  if (
+    element.variant === 'freeform' &&
+    typeof element.path === 'string' &&
+    element.path.length > 0
+  ) {
+    const render = element.freeformRender ?? 'fill';
+    node.setAttribute('data-freeform-render', render);
+    node.innerHTML = renderFreeformShapeInnerSvg(element.path, render);
+    return node;
+  }
   // ADR 0051 dec 2 — variant 'icon' fills the box with an inline SVG glyph
   // (ICON_SVG_MAP is keyed by IconName; renderIconSvg in src/canvas/icons.ts
   // is the server-side renderer that produced the same markup at build

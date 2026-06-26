@@ -36,6 +36,7 @@ import type {
 } from './modals.js';
 import type { SiteSnapshot } from './persist.js';
 import type { PendingImport, SectionsCatalogEntry } from './sections-picker.js';
+import type { PendingFreeformDraw } from './shape-freeform-draw.js';
 
 /**
  * Shape of the boot payload the editor route emits as
@@ -561,6 +562,9 @@ export interface EditorContext {
    *  camera module's truthiness gate stays valid under the narrower
    *  type. */
   pendingImport: PendingImport | null;
+  /** Active freeform draw session (sidebar / toolbar pencil). Non-null while
+   *  the Owner is drawing a path onto a section. */
+  pendingFreeformDraw: PendingFreeformDraw | null;
   /** Re-render the inline link popover when the camera moves. The IIFE's
    *  inline applyCameraTransform calls this through a `typeof === "function"`
    *  gate because the co-edit cursor layer mounts asynchronously after the
@@ -979,6 +983,14 @@ export interface EditorContext {
    *  reads ctx.pendingImport, calls ctx.setStatus / ctx.renderSectionsPanel
    *  / ctx.renderPlacementSlots. */
   exitPlacementMode(): void;
+  /** Cancel or finish the pending freeform draw session. */
+  exitFreeformDrawMode(cancelled: boolean): void;
+  /** Enter freeform draw mode (fill blob by default). */
+  enterFreeformDrawMode(opts?: {
+    freeformRender?: 'fill' | 'stroke';
+    targetElementId?: string;
+  }): void;
+  setFreeformRenderMode(mode: 'fill' | 'stroke'): void;
   /** Map a browser-coord pointer event into the named frame's local
    *  coordinate space (section / tab-panel / collection-entry). Used by
    *  beginDragImpl + beginResizeImpl to translate mousemove deltas into
