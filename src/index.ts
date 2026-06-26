@@ -43,6 +43,7 @@ import { customTemplatesAdmin } from './routes/api/custom-templates';
 import { ensureSectionLibraryUpserted } from './canvas/section-library';
 import { db } from './db/client';
 import { editTokenAuth } from './auth/middleware';
+import { injectClerkBrowserScript } from './auth/clerk-browser-script';
 import editTokenRefreshRoute from './auth/refresh-route';
 import signOutRoute from './auth/sign-out-route';
 import signInRoute from './auth/sign-in-route';
@@ -107,6 +108,16 @@ app.route('/', apexSeoRouter);
 // The favicon route lives inside `landing` next to the rest of the brand
 // surface (see src/landing/index.tsx).
 app.route('/', landing);
+
+// Keep clerk-js loaded on every dashboard HTML page so the short-lived Clerk
+// `__session` cookie is refreshed by the client heartbeat. Without it, the
+// separately-mounted dashboard sub-apps below (templates, settings, forms, …)
+// shipped no clerk-js and their form POSTs 401'd once the token aged out —
+// that was the "/api/sites unauthorized on create site" bug. Registered
+// before the dashboard mounts so it wraps them; idempotent against pages that
+// already embed clerk-js (dashboard index, editor).
+app.use('/dashboard', injectClerkBrowserScript());
+app.use('/dashboard/*', injectClerkBrowserScript());
 
 app.route('/dashboard/admin/templates', adminTemplatesRoute);
 app.route('/dashboard/admin/template-source', adminTemplateSourceRoute);

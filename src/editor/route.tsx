@@ -494,7 +494,15 @@ export function editorPageJsx(opts: EditorPageOptions) {
                   data-sidebar-add-section="blank"
                   title="Add a new empty section to the page"
                 >
-                  Blank section
+                  <img
+                    class="opencanvas-sidebar-command-icon"
+                    src="/editor-thumbnails/blank-section.png"
+                    alt=""
+                    width={128}
+                    height={128}
+                    loading="lazy"
+                  />
+                  <span>Blank section</span>
                 </button>
               </section>
               <section class="opencanvas-sidebar-group">
@@ -527,7 +535,15 @@ export function editorPageJsx(opts: EditorPageOptions) {
                         data-sidebar-add-component={cmd.key}
                         title={cmd.sidebarTip}
                       >
-                        {cmd.sidebarLabel}
+                        <img
+                          class="opencanvas-sidebar-command-icon"
+                          src={`/editor-thumbnails/${cmd.key}.png`}
+                          alt=""
+                          width={128}
+                          height={128}
+                          loading="lazy"
+                        />
+                        <span>{cmd.sidebarLabel}</span>
                       </button>
                     ))}
                 </div>

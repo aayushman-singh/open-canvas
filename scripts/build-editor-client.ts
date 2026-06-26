@@ -31,7 +31,7 @@
 // precedent in this repo. The output URL prefix is /_assets/ (matching
 // the Wrangler [assets] binding from ADR 0015 decision 7).
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { canvasEditorStyles } from '../src/editor-client/styles-build.js';
 import { writeManifest } from './manifest-helpers.js';
@@ -48,6 +48,11 @@ const isDev = process.argv.includes('--dev');
 async function main(): Promise<void> {
   mkdirSync(OUT_DIR, { recursive: true });
   mkdirSync(resolve(ROOT, 'src/_assets'), { recursive: true });
+  cpSync(
+    resolve(ROOT, 'src/editor/assets/thumbnails'),
+    resolve(ROOT, 'dist/editor-thumbnails'),
+    { recursive: true },
+  );
 
   // Phase 1: resolve the TS-built CSS string to a file Bun.build can pick
   // up via the index.ts `import './styles.css'` statement. The file is a

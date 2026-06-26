@@ -173,6 +173,14 @@ COOKIE_NAME_PREFIX = "__opencanvas_"
 EMAIL_FROM = "Open Canvas <noreply@opencanvas.aayushman.dev>"
 TEMPLATE_SOURCE_GITHUB_REPOSITORY = "aayushman-singh/open-canvas"
 TEMPLATE_SOURCE_GITHUB_BASE_BRANCH = "main"
+# Customer id that owns the built-in template seeds + their materialized
+# assets. The /dashboard/templates seed bootstrap (ensureBuiltInTemplatesSeeded)
+# requires this; when unset, requireTemplateAssetCustodianCustomerId throws,
+# the bootstrap is skipped, and the Community templates tab renders empty. It
+# is a plain DB id (not a secret), so it lives in [vars] to survive every
+# `wrangler deploy` — a missing value here was why Community templates were
+# blank in production. A fork sets this to its own custodian customer id.
+TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID = "1ef1a6fa-9b3e-407a-875d-b66d2d01a403"
 
 # Cron triggers. The `scheduled` handler in src/scheduled.ts branches on
 # event.cron to dispatch per-feature work:

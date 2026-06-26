@@ -2056,6 +2056,23 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   transition: border-color 0.14s, background-color 0.14s, color 0.14s, transform 0.1s;
 }
 
+.opencanvas-sidebar-command {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.opencanvas-sidebar-command-icon {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  max-height: 96px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 .opencanvas-sidebar-command:hover,
 .opencanvas-sidebar-kit-grid button:hover {
   border-color: var(--red-line);

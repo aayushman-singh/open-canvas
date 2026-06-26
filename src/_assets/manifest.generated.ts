@@ -9,7 +9,7 @@
 
 export const EDITOR_CLIENT_MANIFEST = {
   canvasClientUrl: "/_assets/index-j611y859.js",
-  canvasStylesUrl: "/_assets/index-45q6ms4d.css",
+  canvasStylesUrl: "/_assets/index-zma3fde0.css",
   coEditUrl: "/_assets/co-edit-pgx2fexx.js",
   dashboardClientUrl: "/_assets/dashboard-9xbjjk2w.js",
 } as const;
