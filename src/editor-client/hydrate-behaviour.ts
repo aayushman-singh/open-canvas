@@ -5,6 +5,7 @@
 // same hydration contract.
 
 import {
+  type BehaviourPayload,
   buildBehaviourPayload,
   serializeBehaviourPayload,
   snapshotHasBehaviourPrimitives,
@@ -41,6 +42,20 @@ function getBehaviourRuntime(): BehaviourRunner {
   return runBehaviourRuntime;
 }
 
+function omitLoadExperienceForCanvasPreview(payload: BehaviourPayload): BehaviourPayload {
+  // Published pages render a matching `[data-opencanvas-load-experience]`
+  // shell before hydrating the visitor behaviour runtime. The editor's normal
+  // canvas render does not: load experience preview is an explicit toolbar /
+  // interactions-panel action that creates a temporary shell first. If the
+  // boot-time canvas payload includes loadExperience, the visitor runtime
+  // throws "load experience node not found" during renderAll(), leaving the
+  // canvas visible but inert because root/sidebar click handlers attach only
+  // after renderAll returns.
+  if (payload.loadExperience === undefined) return payload;
+  const { loadExperience: _loadExperience, ...withoutLoadExperience } = payload;
+  return withoutLoadExperience;
+}
+
 export function hydrateBehaviourPreview(
   _root: ParentNode,
   state: EditableSite,
@@ -50,6 +65,7 @@ export function hydrateBehaviourPreview(
   if (!snapshotHasBehaviourPrimitives(state)) return;
   const payload = buildBehaviourPayload(state, assetBasePath);
   if (!payload) return;
+  const canvasPayload = omitLoadExperienceForCanvasPreview(payload);
 
   let script = document.querySelector('script[data-opencanvas-behaviour-payload]');
   if (!(script instanceof HTMLScriptElement)) {
@@ -59,7 +75,7 @@ export function hydrateBehaviourPreview(
     document.body.appendChild(created);
     script = created;
   }
-  script.textContent = serializeBehaviourPayload(payload);
+  script.textContent = serializeBehaviourPayload(canvasPayload);
 
   document.documentElement.removeAttribute('data-opencanvas-behaviour-hydrated');
   getBehaviourRuntime()(document, reducedMotion);
