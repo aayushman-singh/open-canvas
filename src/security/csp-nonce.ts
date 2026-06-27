@@ -44,11 +44,18 @@ export function generateNonce(): string {
  * `style-src` keeps `'unsafe-inline'` because the editor still emits
  * inline `<style>` blocks (bell styles, conditional preview CSS, etc.) —
  * a separate ADR addresses inline-style removal.
+ *
+ * `script-src` carries `'unsafe-eval'` because behaviour/rich-motion preview
+ * (src/editor-client/hydrate-behaviour.ts) executes the shared visitor
+ * runtime source verbatim via `new Function`, so preview runs byte-identical
+ * code to what ships on the published page. This is scoped to the
+ * authenticated, owner-only editor route — the public site CSP is built
+ * elsewhere and stays eval-free.
  */
 export function buildEditorCSP(nonce: string): string {
   return [
     `default-src 'none'`,
-    `script-src 'nonce-${nonce}' 'self' https:`,
+    `script-src 'nonce-${nonce}' 'self' 'unsafe-eval' https:`,
     `style-src 'self' 'unsafe-inline' https:`,
     `img-src 'self' data: blob: https:`,
     `font-src 'self' data: https:`,

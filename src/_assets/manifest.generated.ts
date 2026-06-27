@@ -8,7 +8,7 @@
 // hash across builds, so the manifest is byte-stable when source is.
 
 export const EDITOR_CLIENT_MANIFEST = {
-  canvasClientUrl: "/_assets/index-m4c07vas.js",
+  canvasClientUrl: "/_assets/index-yy351x18.js",
   canvasStylesUrl: "/_assets/index-zma3fde0.css",
   coEditUrl: "/_assets/co-edit-pgx2fexx.js",
   dashboardClientUrl: "/_assets/dashboard-epez57d7.js",
