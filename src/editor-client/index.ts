@@ -1287,7 +1287,16 @@ declare global {
   }
 }
 
+// Asset cache-buster. Cloudflare Workers Static Assets got into a stuck
+// state where this bundle's prior hash was registered as uploaded (so
+// wrangler skipped re-pushing it) yet 404'd at the edge — the editor shell
+// loaded but the `<script type="module">` canvas client never executed, so
+// the canvas stayed blank. Bumping this string changes the content hash,
+// forcing wrangler to upload genuinely-new bytes. Bump again only if the
+// same stuck-asset symptom recurs.
+const OC_EDITOR_BUILD_TAG = '20260627a';
 if (typeof window !== 'undefined') {
+  document.documentElement.setAttribute('data-oc-editor-build', OC_EDITOR_BUILD_TAG);
   const opencanvasBoot = window.__opencanvasEditorBoot;
   if (opencanvasBoot) {
     createEditor(opencanvasBoot);

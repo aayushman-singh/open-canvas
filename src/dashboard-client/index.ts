@@ -82,6 +82,17 @@ function run(): void {
   mount();
 }
 
+// Asset cache-buster. Cloudflare Workers Static Assets got into a stuck
+// state where the prior dashboard bundle hash was registered as uploaded
+// (so wrangler skipped re-pushing it) yet 404'd at the edge, killing all
+// dashboard-client interactivity. Bumping this string changes the bundle's
+// content hash, forcing wrangler to upload genuinely-new bytes. Bump again
+// only if the same stuck-asset symptom recurs.
+const OC_DASHBOARD_BUILD_TAG = '20260627a';
+if (typeof document !== 'undefined') {
+  document.documentElement.setAttribute('data-oc-dashboard-build', OC_DASHBOARD_BUILD_TAG);
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', run, { once: true });
 } else {
