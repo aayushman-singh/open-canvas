@@ -140,6 +140,13 @@ const authPageStyles = `
     margin-top: 20px;
     line-height: 1.55;
   }
+  /* ---- mini editor mock: a tiny live Open Canvas session shown on the
+     brand panel. Mirrors the real product chrome — browser/HUD bar with
+     collaborator avatars, multiplayer cursors, a selected element with
+     resize handles, and an agentic assistant chip — so the auth page
+     advertises what the editor actually does. Purely decorative
+     (aria-hidden). Two collaborator accents: blue (#4C9AFF) and teal
+     (#21C2A6); brand red stays reserved for product CTAs. */
   .mini-canvas {
     margin-top: 34px;
     background: var(--surface);
@@ -148,11 +155,97 @@ const authPageStyles = `
     overflow: hidden;
     width: 320px;
   }
+
+  /* HUD / browser bar */
+  .mini-canvas .mc-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .mini-canvas .mc-traffic { display: flex; gap: 4px; }
+  .mini-canvas .mc-traffic i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--surface-3);
+  }
+  .mini-canvas .mc-url {
+    flex: 1;
+    font-family: var(--sans);
+    font-size: 9.5px;
+    color: var(--ink-3);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 99px;
+    padding: 3px 9px;
+    text-align: center;
+  }
+  .mini-canvas .mc-avatars { display: flex; }
+  .mini-canvas .mc-av {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    font-family: var(--sans);
+    font-size: 8px;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--surface);
+    margin-left: -5px;
+  }
+  .mini-canvas .mc-av:first-child { margin-left: 0; }
+  .mini-canvas .mc-av.a { background: #4C9AFF; }
+  .mini-canvas .mc-av.b { background: #21C2A6; }
+  .mini-canvas .mc-av.more { background: var(--ink-3); font-size: 7px; }
+
+  /* canvas stage (positioned host for overlays) */
+  .mini-canvas .mc-stage { position: relative; }
+
   .mini-canvas .ph {
+    position: relative;
     height: 70px;
     background: linear-gradient(135deg, #E9837A, #E84D4A 60%, #C5332F);
   }
-  .mini-canvas .bd { padding: 14px 16px 18px; }
+  /* selection box on the hero (Maya / blue has it selected) */
+  .mini-canvas .mc-sel {
+    position: absolute;
+    inset: 8px;
+    border: 1.5px solid #4C9AFF;
+    border-radius: 6px;
+  }
+  .mini-canvas .mc-sel-tag {
+    position: absolute;
+    top: -9px;
+    left: -1px;
+    background: #4C9AFF;
+    color: #fff;
+    font-family: var(--sans);
+    font-size: 8.5px;
+    font-weight: 700;
+    line-height: 1.4;
+    padding: 0 5px;
+    border-radius: 4px;
+    border-bottom-left-radius: 0;
+  }
+  .mini-canvas .mc-h {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #fff;
+    border: 1.5px solid #4C9AFF;
+    border-radius: 1px;
+  }
+  .mini-canvas .mc-h.tl { top: -3px; left: -3px; }
+  .mini-canvas .mc-h.tr { top: -3px; right: -3px; }
+  .mini-canvas .mc-h.bl { bottom: -3px; left: -3px; }
+  .mini-canvas .mc-h.br { bottom: -3px; right: -3px; }
+
+  .mini-canvas .bd { padding: 14px 16px 48px; }
   .mini-canvas .h {
     font-family: var(--display);
     font-weight: 700;
@@ -174,6 +267,87 @@ const authPageStyles = `
     color: #fff;
     font-size: 11px;
     font-weight: 650;
+  }
+
+  /* multiplayer cursors */
+  .mini-canvas .mc-cursor {
+    position: absolute;
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 2px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+    pointer-events: none;
+  }
+  .mini-canvas .mc-cursor svg { display: block; flex: none; }
+  .mini-canvas .mc-cursor-tag {
+    font-family: var(--sans);
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.5;
+    padding: 0 6px;
+    border-radius: 6px;
+    border-top-left-radius: 1px;
+    white-space: nowrap;
+  }
+  .mini-canvas .mc-cursor.one { top: 82px; left: 116px; color: #4C9AFF; }
+  .mini-canvas .mc-cursor.one .mc-cursor-tag { background: #4C9AFF; }
+  .mini-canvas .mc-cursor.two { top: 150px; left: 54px; color: #21C2A6; }
+  .mini-canvas .mc-cursor.two .mc-cursor-tag { background: #21C2A6; }
+
+  /* agentic assistant chip */
+  .mini-canvas .mc-agent {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(20, 18, 16, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.5);
+  }
+  .mini-canvas .mc-spark {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #E9837A, #E84D4A);
+    color: #fff;
+    font-size: 10px;
+    line-height: 1;
+  }
+  .mini-canvas .mc-agent-txt {
+    flex: 1;
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 650;
+    color: #fff;
+    letter-spacing: 0.005em;
+  }
+  .mini-canvas .mc-typing { display: inline-flex; gap: 3px; }
+  .mini-canvas .mc-typing i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #fff;
+    opacity: 0.4;
+    animation: mc-blink 1.1s infinite ease-in-out;
+  }
+  .mini-canvas .mc-typing i:nth-child(2) { animation-delay: 0.18s; }
+  .mini-canvas .mc-typing i:nth-child(3) { animation-delay: 0.36s; }
+  @keyframes mc-blink {
+    0%, 100% { opacity: 0.25; transform: translateY(0); }
+    50% { opacity: 1; transform: translateY(-1.5px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mini-canvas .mc-typing i { animation: none; opacity: 0.7; }
   }
   .brandside .quote {
     position: relative;
@@ -606,12 +780,70 @@ function Page({
                 assistant ready to help.
               </p>
               <div class="mini-canvas" aria-hidden="true">
-                <div class="ph" />
-                <div class="bd">
-                  <div class="h">Bloom &amp; Co.</div>
-                  <div class="l" style="width:90%" />
-                  <div class="l" style="width:70%" />
-                  <span class="cta">Order flowers</span>
+                <div class="mc-bar">
+                  <div class="mc-traffic">
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                  <div class="mc-url">bloomandco.com</div>
+                  <div class="mc-avatars">
+                    <span class="mc-av a">M</span>
+                    <span class="mc-av b">S</span>
+                    <span class="mc-av more">+3</span>
+                  </div>
+                </div>
+                <div class="mc-stage">
+                  <div class="ph">
+                    <div class="mc-sel">
+                      <span class="mc-sel-tag">Hero</span>
+                      <i class="mc-h tl" />
+                      <i class="mc-h tr" />
+                      <i class="mc-h bl" />
+                      <i class="mc-h br" />
+                    </div>
+                  </div>
+                  <div class="bd">
+                    <div class="h">Bloom &amp; Co.</div>
+                    <div class="l" style="width:90%" />
+                    <div class="l" style="width:70%" />
+                    <span class="cta">Order flowers</span>
+                  </div>
+
+                  <div class="mc-cursor one">
+                    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M4 3 L4 18 L8.4 13.6 L11.2 20 L13.8 18.9 L11 12.6 L17 12.6 Z"
+                        fill="currentColor"
+                        stroke="#fff"
+                        stroke-width="1.1"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    <span class="mc-cursor-tag">Maya</span>
+                  </div>
+                  <div class="mc-cursor two">
+                    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M4 3 L4 18 L8.4 13.6 L11.2 20 L13.8 18.9 L11 12.6 L17 12.6 Z"
+                        fill="currentColor"
+                        stroke="#fff"
+                        stroke-width="1.1"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    <span class="mc-cursor-tag">Sam</span>
+                  </div>
+
+                  <div class="mc-agent">
+                    <span class="mc-spark">✦</span>
+                    <span class="mc-agent-txt">Assistant is adding a contact form</span>
+                    <span class="mc-typing">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
