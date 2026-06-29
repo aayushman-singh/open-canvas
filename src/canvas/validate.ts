@@ -4420,6 +4420,13 @@ function validateBehaviourPrimitives(state: Record<string, unknown>, errors: str
             }
           }
           assertNonEmptyString(asset.charset, `${assetPath}.charset`, errors);
+          if (asset.sourceAssetId !== undefined) {
+            if (!isAssetIdLike(asset.sourceAssetId)) {
+              errors.push(
+                `${assetPath}.sourceAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ (got ${describe(asset.sourceAssetId)})`,
+              );
+            }
+          }
           if (!Array.isArray(asset.pointSets) || asset.pointSets.length === 0) {
             errors.push(`${assetPath}.pointSets must be a non-empty array`);
           } else {

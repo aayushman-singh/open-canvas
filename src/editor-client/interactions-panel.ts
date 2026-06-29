@@ -43,6 +43,7 @@ import type {
   Model3DRichMotionAsset,
   MotionSequence,
   MotionSequenceStep,
+  ParticleFieldRichMotionAsset,
   RichMotionAsset,
   RiveInputBinding,
   RiveRichMotionAsset,
@@ -61,6 +62,7 @@ import {
   MOTION_SEQUENCE_REPEAT_MODES,
   MOTION_SEQUENCE_TEXT_EFFECTS,
   MOTION_SEQUENCE_TRIGGER_TYPES,
+  PARTICLE_FIELD_REDUCED_MOTION_MODES,
   RIVE_INPUT_EVENTS,
   RIVE_INPUT_TYPES,
   SHADER_SCENE_PRESETS,
@@ -96,6 +98,10 @@ import type {
   StatusEmitterContext,
 } from './editor-context.js';
 import { field, selectInput } from './dom-builders.js';
+import {
+  regenerateParticleFieldPointSetsFromSource,
+  uploadParticleFieldPortrait,
+} from './particle-field-portrait-upload.js';
 
 export type InteractionsPanelContext = StateContext &
   PersistContext &
@@ -111,6 +117,8 @@ export type InteractionsPanelContext = StateContext &
     | 'previewLoadExperience'
     | 'previewRouteTransition'
     | 'useSelectedElementAsOverlayTrigger'
+    | 'postAssetUpload'
+    | 'siteBase'
   >;
 
 type SequenceSlot =
@@ -554,6 +562,20 @@ function isVideoStreamAsset(asset: RichMotionAsset): asset is VideoStreamRichMot
   return asset.kind === 'video-stream';
 }
 
+function isParticleFieldAsset(asset: RichMotionAsset): asset is ParticleFieldRichMotionAsset {
+  return asset.kind === 'particle-field';
+}
+
+function findParticleFieldAsset(
+  ctx: InteractionsPanelContext,
+  assetId: string,
+): ParticleFieldRichMotionAsset | undefined {
+  return (ctx.state?.richMotionAssets ?? []).find(
+    (item): item is ParticleFieldRichMotionAsset =>
+      item.id === assetId && item.kind === 'particle-field',
+  );
+}
+
 function replaceRichMotionAsset(
   ctx: InteractionsPanelContext,
   assetId: string,
@@ -771,6 +793,12 @@ function renderRichMotionAssetCard(
 
   if (isVideoStreamAsset(asset)) {
     renderVideoStreamAssetFields(ctx, card, asset);
+    host.appendChild(card);
+    return;
+  }
+
+  if (isParticleFieldAsset(asset)) {
+    renderParticleFieldAssetFields(ctx, card, asset);
     host.appendChild(card);
     return;
   }
@@ -1305,6 +1333,168 @@ function renderVideoStreamAssetFields(
         ? {
             ...current,
             reducedMotion: reduced.value as VideoStreamReducedMotionMode,
+          }
+        : current,
+    ),
+  );
+  card.appendChild(field('Reduced motion', reduced));
+}
+
+function renderParticleFieldAssetFields(
+  ctx: InteractionsPanelContext,
+  card: HTMLElement,
+  asset: ParticleFieldRichMotionAsset,
+): void {
+  const portraitRow = row('style-row');
+  const uploadBtn = compactButton('Upload portrait', 'Upload a portrait image for the ASCII particle field');
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.style.display = 'none';
+  uploadBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+    if (!file) return;
+    const live = findParticleFieldAsset(ctx, asset.id);
+    if (!live) return;
+    ctx.setStatus('Uploading portrait…', 'ok');
+    void uploadParticleFieldPortrait(ctx, live, file)
+      .then((result) => {
+        replaceRichMotionAsset(ctx, asset.id, (current) =>
+          isParticleFieldAsset(current)
+            ? {
+                ...current,
+                sourceAssetId: result.sourceAssetId,
+                pointSets: result.pointSets,
+              }
+            : current,
+        );
+        ctx.setStatus('Portrait updated', 'ok');
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Portrait upload failed';
+        ctx.setStatus(message, 'error');
+      });
+  });
+  portraitRow.appendChild(uploadBtn);
+
+  const regenerateBtn = compactButton(
+    'Regenerate',
+    'Rebuild ASCII points from the uploaded portrait using the current charset',
+  );
+  regenerateBtn.addEventListener('click', () => {
+    const live = findParticleFieldAsset(ctx, asset.id);
+    if (!live?.sourceAssetId) {
+      ctx.setStatus('Upload a portrait image first', 'error');
+      return;
+    }
+    ctx.setStatus('Regenerating ASCII portrait…', 'ok');
+    void regenerateParticleFieldPointSetsFromSource(ctx, live, live.sourceAssetId)
+      .then((pointSets) => {
+        replaceRichMotionAsset(ctx, asset.id, (current) =>
+          isParticleFieldAsset(current) ? { ...current, pointSets } : current,
+        );
+        ctx.setStatus('Portrait regenerated', 'ok');
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Portrait regeneration failed';
+        ctx.setStatus(message, 'error');
+      });
+  });
+  portraitRow.appendChild(regenerateBtn);
+  card.appendChild(field('Portrait image', portraitRow));
+  card.appendChild(fileInput);
+
+  if (asset.sourceAssetId) {
+    const sourceMeta = document.createElement('p');
+    sourceMeta.className = 'opencanvas-section-picker-empty';
+    sourceMeta.textContent = 'Source asset: ' + asset.sourceAssetId;
+    card.appendChild(sourceMeta);
+  }
+
+  const alt = textInput(asset.alt, 'Accessible portrait label');
+  alt.addEventListener('change', () => {
+    const next = alt.value.trim();
+    if (!next) {
+      alt.value = asset.alt;
+      ctx.setStatus('Portrait alt text is required', 'error');
+      return;
+    }
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isParticleFieldAsset(current) ? { ...current, alt: next } : current,
+    );
+  });
+  card.appendChild(field('Alt text', alt));
+
+  const color = textInput(asset.color, '#64ffda');
+  color.addEventListener('change', () => {
+    const next = color.value.trim();
+    if (!next) {
+      color.value = asset.color;
+      ctx.setStatus('Portrait colour is required', 'error');
+      return;
+    }
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isParticleFieldAsset(current) ? { ...current, color: next } : current,
+    );
+  });
+  card.appendChild(field('Particle colour', color));
+
+  const charset = textInput(asset.charset, ' .:-=+*#%@');
+  charset.addEventListener('change', () => {
+    const next = charset.value.trim();
+    if (!next) {
+      charset.value = asset.charset;
+      ctx.setStatus('Portrait charset is required', 'error');
+      return;
+    }
+    const live = findParticleFieldAsset(ctx, asset.id);
+    if (!live) return;
+    if (!live.sourceAssetId) {
+      replaceRichMotionAsset(ctx, asset.id, (current) =>
+        isParticleFieldAsset(current) ? { ...current, charset: next } : current,
+      );
+      return;
+    }
+    const nextAsset = { ...live, charset: next };
+    ctx.setStatus('Regenerating ASCII portrait…', 'ok');
+    void regenerateParticleFieldPointSetsFromSource(ctx, nextAsset, live.sourceAssetId)
+      .then((pointSets) => {
+        replaceRichMotionAsset(ctx, asset.id, (current) =>
+          isParticleFieldAsset(current) ? { ...current, charset: next, pointSets } : current,
+        );
+        ctx.setStatus('Charset updated and portrait regenerated', 'ok');
+      })
+      .catch((error: unknown) => {
+        charset.value = live.charset;
+        const message = error instanceof Error ? error.message : 'Portrait regeneration failed';
+        ctx.setStatus(message, 'error');
+      });
+  });
+  card.appendChild(field('Charset', charset));
+
+  const fontSize = numberInput(asset.fontSize ?? 7, 4, 64, 1);
+  fontSize.addEventListener('change', () => {
+    const next = validNumber(fontSize, 4, 64);
+    if (next === null) {
+      fontSize.value = String(asset.fontSize ?? 7);
+      ctx.setStatus('Portrait font size must be between 4 and 64', 'error');
+      return;
+    }
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isParticleFieldAsset(current) ? { ...current, fontSize: next } : current,
+    );
+  });
+  card.appendChild(field('Font size', fontSize));
+
+  const reduced = selectInput([...PARTICLE_FIELD_REDUCED_MOTION_MODES], asset.reducedMotion);
+  reduced.addEventListener('change', () =>
+    replaceRichMotionAsset(ctx, asset.id, (current) =>
+      isParticleFieldAsset(current)
+        ? {
+            ...current,
+            reducedMotion: reduced.value as ParticleFieldRichMotionAsset['reducedMotion'],
           }
         : current,
     ),

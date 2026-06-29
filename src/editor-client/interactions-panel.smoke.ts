@@ -331,6 +331,10 @@ assert(panelSrc.includes('MOTION_SEQUENCE_LITE_EFFECTS'), 'panel must use motion
 assert(panelSrc.includes('MOTION_SEQUENCE_LITE_TARGET_TYPES'), 'panel must use motion targets');
 assert(panelSrc.includes('renderSequenceLiteEditor'), 'panel must render sequence editor');
 assert(panelSrc.includes('Snap points'), 'panel must expose Scroll Scene snap point controls');
+assert(panelSrc.includes('renderParticleFieldAssetFields'), 'panel must render particle-field asset controls');
+assert(panelSrc.includes('Upload portrait'), 'panel must expose ASCII portrait upload');
+assert(panelSrc.includes('uploadParticleFieldPortrait'), 'panel must use shared portrait upload helper');
+assert(panelSrc.includes('findParticleFieldAsset'), 'panel must read live particle-field assets before regenerate');
 
 const stylesCssSrc = await Bun.file(new URL('./styles.css', import.meta.url)).text();
 const stylesBuildSrc = await Bun.file(new URL('./styles-build.ts', import.meta.url)).text();

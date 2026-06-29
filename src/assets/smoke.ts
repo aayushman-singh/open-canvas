@@ -705,6 +705,41 @@ function runReferenceWalkTests(): void {
       }
     }
   }
+
+  {
+    const particleFieldSite: AssetReferenceRoot = {
+      pages: [],
+      richMotionAssets: [
+        {
+          id: 'ascii-portrait',
+          kind: 'particle-field',
+          mode: 'ascii-portrait',
+          alt: 'Custom portrait',
+          color: '#64ffda',
+          charset: ' .:-=+*#%@',
+          sourceAssetId: 'portrait-source-id',
+          pointSets: [
+            {
+              breakpoint: 'desktop',
+              canvasSize: 400,
+              points: [{ x: 10, y: 10, char: '@', alpha: 0.9 }],
+            },
+          ],
+          reducedMotion: 'settled',
+        },
+      ],
+    };
+    const portraitRefs = collectReferencedAssets(particleFieldSite);
+    assert(
+      portraitRefs.some(
+        (ref) =>
+          ref.assetId === 'portrait-source-id' &&
+          ref.expectedKind === 'image' &&
+          ref.role === 'rich-motion-portrait',
+      ),
+      'expected collectReferencedAssets to include particle-field sourceAssetId as a portrait image reference',
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

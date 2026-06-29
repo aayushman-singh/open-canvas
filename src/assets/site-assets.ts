@@ -17,6 +17,7 @@ import type {
   MediaKind,
   PublishedSnapshot,
 } from '../canvas/schema.js';
+import type { RichMotionAsset } from '../canvas/behaviour-primitives.js';
 
 export interface ReferencedAsset {
   assetId: string;
@@ -29,7 +30,11 @@ export interface ReferencedAsset {
     | 'background-video'
     | 'nav-logo'
     | 'carousel-slide'
-    | 'element-bg-image';
+    | 'element-bg-image'
+    | 'rich-motion-frame'
+    | 'rich-motion-poster'
+    | 'rich-motion-portrait'
+    | 'rich-motion-asset';
   path: string;
   mediaElementId?: string;
 }
@@ -55,6 +60,7 @@ export interface AssetReferenceRoot {
   faviconAssetId?: string;
   header?: CanvasSection;
   footer?: CanvasSection;
+  richMotionAssets?: RichMotionAsset[];
 }
 
 export type AssetReferenceSource =
@@ -125,11 +131,14 @@ function siteFaviconAssetId(
 function referenceRootFrom(source: AssetReferenceSource): AssetReferenceRoot {
   if (Array.isArray(source)) return { pages: source };
   const favicon = siteFaviconAssetId(source);
+  const richMotionAssets =
+    'richMotionAssets' in source ? source.richMotionAssets : undefined;
   return {
     pages: source.pages,
     ...(source.header !== undefined ? { header: source.header } : {}),
     ...(source.footer !== undefined ? { footer: source.footer } : {}),
     ...(favicon !== undefined ? { faviconAssetId: favicon } : {}),
+    ...(richMotionAssets !== undefined ? { richMotionAssets } : {}),
   };
 }
 
@@ -281,6 +290,65 @@ function collectSectionReferences(
   }
 }
 
+function collectRichMotionAssetReferences(
+  richMotionAssets: RichMotionAsset[] | undefined,
+  out: ReferencedAsset[],
+): void {
+  if (richMotionAssets === undefined) return;
+  richMotionAssets.forEach((asset, assetIdx) => {
+    const basePath = `richMotionAssets[${String(assetIdx)}]`;
+    if (asset.kind === 'image-sequence') {
+      asset.frameAssetIds.forEach((frameAssetId, frameIdx) => {
+        pushReference(
+          out,
+          frameAssetId,
+          'image',
+          'rich-motion-frame',
+          `${basePath}.frameAssetIds[${String(frameIdx)}]`,
+        );
+      });
+      pushReference(
+        out,
+        asset.posterAssetId,
+        'image',
+        'rich-motion-poster',
+        `${basePath}.posterAssetId`,
+      );
+      return;
+    }
+    if (asset.kind === 'video-stream') {
+      pushReference(out, asset.assetId, 'video', 'rich-motion-asset', `${basePath}.assetId`);
+      pushReference(
+        out,
+        asset.posterAssetId,
+        'image',
+        'rich-motion-poster',
+        `${basePath}.posterAssetId`,
+      );
+      return;
+    }
+    if (asset.kind === 'model-3d') {
+      pushReference(
+        out,
+        asset.posterAssetId,
+        'image',
+        'rich-motion-poster',
+        `${basePath}.posterAssetId`,
+      );
+      return;
+    }
+    if (asset.kind === 'particle-field' && asset.sourceAssetId !== undefined) {
+      pushReference(
+        out,
+        asset.sourceAssetId,
+        'image',
+        'rich-motion-portrait',
+        `${basePath}.sourceAssetId`,
+      );
+    }
+  });
+}
+
 /**
  * Walk a snapshot or editable site and return every referenced Owner Asset.
  * Passing a bare CanvasPage[] is still supported for older callers, but new
@@ -315,6 +383,7 @@ export function collectReferencedAssets(source: AssetReferenceSource): Reference
   }
   if (root.header !== undefined) collectSectionReferences(root.header, 'header', out);
   if (root.footer !== undefined) collectSectionReferences(root.footer, 'footer', out);
+  collectRichMotionAssetReferences(root.richMotionAssets, out);
   return out;
 }
 

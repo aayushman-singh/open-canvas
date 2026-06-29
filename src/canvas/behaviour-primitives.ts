@@ -241,6 +241,8 @@ export interface ParticleFieldRichMotionAsset {
   fontFamily?: string;
   fontSize?: number;
   charset: string;
+  /** Uploaded portrait image used to bake `pointSets` and for publish reachability. */
+  sourceAssetId?: string;
   pointSets: ParticleFieldPointSet[];
   pointer?: {
     radiusRatio?: number;

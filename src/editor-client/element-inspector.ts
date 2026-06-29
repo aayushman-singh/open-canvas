@@ -91,6 +91,7 @@ import { templateHasAnyPlaceholder } from '../canvas/elements/collection-materia
 import { renderSectionInspector } from './section-inspector.js';
 import { renderPageInspector, replayAnimations } from './page-inspector.js';
 import { field, selectInput } from './dom-builders.js';
+import { uploadParticleFieldPortrait } from './particle-field-portrait-upload.js';
 import { mountComponentStyle } from './inspector-component-style.js';
 import { buildColorRow, buildKitSummary } from './inspector-leaf-builders.js';
 
@@ -697,8 +698,77 @@ function renderRichMotionAssetPicker(
   } else {
     const selected = assets.find((asset) => asset.id === element.assetRefId);
     meta.textContent = selected ? 'Selected kind: ' + selected.kind : '';
+    if (selected?.kind === 'particle-field') {
+      renderParticleFieldPortraitUpload(ctx, selected, element.id);
+    }
   }
   ctx.inspector.appendChild(meta);
+}
+
+function renderParticleFieldPortraitUpload(
+  ctx: EditorContext,
+  asset: Extract<import('../canvas/behaviour-primitives.js').RichMotionAsset, { kind: 'particle-field' }>,
+  elementId: string,
+): void {
+  if (!ctx.inspector) return;
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'ASCII portrait';
+  heading.className = 'inspector-section-heading';
+  ctx.inspector.appendChild(heading);
+
+  const uploadBtn = document.createElement('button');
+  uploadBtn.type = 'button';
+  uploadBtn.className = 'opencanvas-replay-btn';
+  uploadBtn.textContent = 'Upload portrait';
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.style.display = 'none';
+  uploadBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+    if (!file || !ctx.state) return;
+    const liveAsset = (ctx.state.richMotionAssets ?? []).find(
+      (item): item is Extract<typeof item, { kind: 'particle-field' }> =>
+        item.id === asset.id && item.kind === 'particle-field',
+    );
+    if (!liveAsset) return;
+    ctx.setStatus('Uploading portrait…', 'ok');
+    void uploadParticleFieldPortrait(ctx, liveAsset, file)
+      .then((result) => {
+        ctx.captureForUndo();
+        const motionAssets = ctx.state!.richMotionAssets ?? [];
+        ctx.state!.richMotionAssets = motionAssets.map((item) =>
+          item.id === asset.id
+            ? {
+                ...item,
+                sourceAssetId: result.sourceAssetId,
+                pointSets: result.pointSets,
+              }
+            : item,
+        );
+        ctx.renderAll();
+        ctx.rebuildElement(elementId);
+        renderInspector(ctx);
+        ctx.scheduleSave();
+        ctx.setStatus('Portrait updated', 'ok');
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Portrait upload failed';
+        ctx.setStatus(message, 'error');
+      });
+  });
+  ctx.inspector.appendChild(uploadBtn);
+  ctx.inspector.appendChild(fileInput);
+
+  if (asset.sourceAssetId) {
+    const sourceMeta = document.createElement('div');
+    sourceMeta.className = 'meta';
+    sourceMeta.textContent = 'Portrait source: ' + asset.sourceAssetId;
+    ctx.inspector.appendChild(sourceMeta);
+  }
 }
 
 function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): void {

@@ -224,6 +224,58 @@ export function rewriteEditableSiteAssetIds(
     if (typeof mapped !== 'string') return mapped.missing;
     editableState.faviconAssetId = mapped;
   }
+  return rewriteRichMotionAssetIds(editableState, resolveAssetId);
+}
+
+function rewriteRichMotionAssetIds(
+  editableState: EditableSite,
+  resolveAssetId: AssetIdResolver,
+): string | null {
+  const richMotionAssets = editableState.richMotionAssets;
+  if (richMotionAssets === undefined) return null;
+  for (let assetIdx = 0; assetIdx < richMotionAssets.length; assetIdx++) {
+    const asset = richMotionAssets[assetIdx];
+    if (!asset) continue;
+    const basePath = `richMotionAssets[${String(assetIdx)}]`;
+    if (asset.kind === 'image-sequence') {
+      for (let frameIdx = 0; frameIdx < asset.frameAssetIds.length; frameIdx++) {
+        const mapped = resolveAssetId(
+          asset.frameAssetIds[frameIdx]!,
+          `${basePath}.frameAssetIds[${String(frameIdx)}]`,
+        );
+        if (typeof mapped !== 'string') return mapped.missing;
+        asset.frameAssetIds[frameIdx] = mapped;
+      }
+      const poster = resolveAssetId(asset.posterAssetId, `${basePath}.posterAssetId`);
+      if (typeof poster !== 'string') return poster.missing;
+      asset.posterAssetId = poster;
+      continue;
+    }
+    if (asset.kind === 'video-stream') {
+      const mapped = resolveAssetId(asset.assetId, `${basePath}.assetId`);
+      if (typeof mapped !== 'string') return mapped.missing;
+      asset.assetId = mapped;
+      if (asset.posterAssetId !== undefined) {
+        const poster = resolveAssetId(asset.posterAssetId, `${basePath}.posterAssetId`);
+        if (typeof poster !== 'string') return poster.missing;
+        asset.posterAssetId = poster;
+      }
+      continue;
+    }
+    if (asset.kind === 'model-3d') {
+      if (asset.posterAssetId !== undefined) {
+        const poster = resolveAssetId(asset.posterAssetId, `${basePath}.posterAssetId`);
+        if (typeof poster !== 'string') return poster.missing;
+        asset.posterAssetId = poster;
+      }
+      continue;
+    }
+    if (asset.kind === 'particle-field' && asset.sourceAssetId !== undefined) {
+      const mapped = resolveAssetId(asset.sourceAssetId, `${basePath}.sourceAssetId`);
+      if (typeof mapped !== 'string') return mapped.missing;
+      asset.sourceAssetId = mapped;
+    }
+  }
   return null;
 }
 

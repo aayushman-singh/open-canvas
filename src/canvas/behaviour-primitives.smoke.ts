@@ -490,4 +490,26 @@ expectInvalid(
   'children-of reduced motion guard',
 );
 
+const particleFieldWithSource = structuredClone(validState);
+(particleFieldWithSource as { richMotionAssets: unknown[] }).richMotionAssets = [
+  {
+    id: 'ascii-portrait',
+    kind: 'particle-field',
+    mode: 'ascii-portrait',
+    alt: 'Portrait',
+    color: '#64ffda',
+    charset: ' .:-=+*#%@',
+    sourceAssetId: 'portrait-upload-1',
+    pointSets: [
+      {
+        breakpoint: 'desktop',
+        canvasSize: 400,
+        points: [{ x: 1, y: 1, char: '@', alpha: 0.9 }],
+      },
+    ],
+    reducedMotion: 'settled',
+  },
+];
+expectValid(particleFieldWithSource, 'particle-field with sourceAssetId');
+
 console.log('[behaviour-primitives:smoke] OK');
