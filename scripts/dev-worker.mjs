@@ -7,10 +7,10 @@ const children = new Set();
 let shutdownStarted = false;
 let exitCode = 0;
 
-function start(name, command, args) {
+function start(name, command, args, { shell = isWindows } = {}) {
   const child = spawn(command, args, {
     stdio: 'inherit',
-    shell: isWindows,
+    shell,
   });
 
   children.add(child);
@@ -68,7 +68,10 @@ for (const script of preBuilds) {
 }
 
 // Hyperdrive local dev reaches laptop Postgres through Access + tunnel.
-start('db-tunnel', process.execPath, ['scripts/start-db-tunnel.mjs']);
+// process.execPath is a real binary (e.g. "C:\Program Files\nodejs\node.exe")
+// whose path contains spaces — spawn it without a shell so the path isn't
+// split on the space. The shell is only needed for the .cmd shims below.
+start('db-tunnel', process.execPath, ['scripts/start-db-tunnel.mjs'], { shell: false });
 
 setTimeout(() => {
   if (!shutdownStarted) {

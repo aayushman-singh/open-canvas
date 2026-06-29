@@ -298,11 +298,30 @@ const authPageStyles = `
   .oc-clerk-badge a { color: var(--ink-3) !important; }
   .oc-clerk-header,
   .oc-clerk-header-title,
-  .oc-clerk-header-subtitle {
-    /* Title + lead are rendered by us above the Clerk widget — hide the
-       widget's own header so we don't double-stack. */
+  .oc-clerk-header-subtitle,
+  .oc-clerk-logo-box {
+    /* Title + lead are rendered by us above the Clerk widget, and we surface
+       the app logo in .form-brand above the heading — so hide the widget's
+       own header AND its logoBox link (a sibling of the header that sits
+       above the social buttons) to avoid double-stacking. The logoBox image
+       still loads under display:none, so syncLogo() can read its URL. */
     display: none;
   }
+
+  /* App-logo slot above the "Welcome back" heading. Clerk renders the logo
+     inside its widget (below our heading); rather than move Clerk's own node
+     out of its React tree (which breaks its unmount cleanup), the bootstrap
+     script copies the logo image URL into this slot. Scaled ~2x. */
+  .formcard .form-brand {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .formcard .form-brand img {
+    height: 112px;
+    width: auto;
+  }
+  .formcard .form-brand:empty { display: none; }
   .oc-clerk-social-buttons {
     display: flex;
     flex-direction: column;
@@ -401,6 +420,8 @@ const clerkAppearanceJson = JSON.stringify({
     header: 'oc-clerk-header',
     headerTitle: 'oc-clerk-header-title',
     headerSubtitle: 'oc-clerk-header-subtitle',
+    logoBox: 'oc-clerk-logo-box',
+    logoImage: 'oc-clerk-logo-image',
     socialButtons: 'oc-clerk-social-buttons',
     socialButtonsBlockButton: 'btn btn-outline oc-clerk-social-button',
     socialButtonsBlockButtonText: 'oc-clerk-social-button-text',
@@ -503,10 +524,32 @@ function Page({
           wrapper.classList.add("oc-clerk-badge");
         }
       }
-      var badgeObserver=new MutationObserver(function(){relocateBadge();});
+      // Copy Clerk's app-logo image URL into our slot above the heading.
+      // Clerk's own header (logo included) is hidden via CSS; we read the
+      // still-loaded <img> and mirror it into #oc-logo-slot rather than
+      // relocating Clerk's node (moving it breaks Clerk's unmount cleanup).
+      function syncLogo(){
+        var slot=document.getElementById("oc-logo-slot");
+        if(!slot)return;
+        var img=host.querySelector("img.oc-clerk-logo-image, .cl-logoImage, .cl-logoBox img");
+        if(!img)return;
+        var src=img.getAttribute("src")||img.currentSrc;
+        if(!src)return;
+        if(slot.getAttribute("data-logo-src")===src)return;
+        slot.setAttribute("data-logo-src",src);
+        var clone=document.createElement("img");
+        clone.crossOrigin="anonymous";
+        clone.alt="Open Canvas";
+        var srcset=img.getAttribute("srcset");
+        if(srcset)clone.setAttribute("srcset",srcset);
+        clone.src=src;
+        slot.replaceChildren(clone);
+      }
+      var badgeObserver=new MutationObserver(function(){relocateBadge();syncLogo();});
       badgeObserver.observe(host,{childList:true,subtree:true});
       mount();
       relocateBadge();
+      syncLogo();
       var tabSi=document.getElementById("tab-signin");
       var tabSu=document.getElementById("tab-signup");
       var title=document.getElementById("auth-title");
@@ -609,6 +652,7 @@ function Page({
             </div>
             <div class="formwrap">
               <div class="formcard">
+                <div class="form-brand" id="oc-logo-slot" aria-hidden="true" />
                 <h2 id="auth-title">
                   {initialMode === 'signup' ? 'Create your account' : 'Welcome back'}
                 </h2>
