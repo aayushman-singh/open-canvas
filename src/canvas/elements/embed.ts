@@ -55,6 +55,7 @@ export interface EmbedElement extends BaseElement {
 
 export interface EmbedRenderCtx {
   styleKit: string;
+  staticPreview?: boolean;
 }
 
 /**
@@ -71,11 +72,6 @@ export const EMBED_IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-popup
 export const DEFAULT_EMBED_ASPECT_RATIO = 16 / 9;
 
 export function renderEmbed(el: EmbedElement, ctx: EmbedRenderCtx): string {
-  // ctx.styleKit is part of the shared render context shape; this element
-  // doesn't read kit tokens because the iframe content is third-party. We
-  // explicitly void it so the unused-parameter lint stays quiet and the
-  // signature stays uniform with the other element renderers.
-  void ctx;
   const resolved = resolveEmbed(el.url);
 
   if (resolved.providerName === 'invalid') {
@@ -96,6 +92,14 @@ export function renderEmbed(el: EmbedElement, ctx: EmbedRenderCtx): string {
     typeof el.aspectRatio === 'number' && Number.isFinite(el.aspectRatio) && el.aspectRatio > 0
       ? ` data-aspect-ratio="${escapeAttr(String(el.aspectRatio))}"`
       : ` data-aspect-ratio="${escapeAttr(String(DEFAULT_EMBED_ASPECT_RATIO))}"`;
+
+  if (ctx.staticPreview === true) {
+    return (
+      `<div class="opencanvas-embed opencanvas-embed-static-preview" ` +
+      `data-opencanvas-embed-provider="${escapeAttr(resolved.providerName)}"${aspectAttr} ` +
+      `role="img" aria-label="${titleAttr}"></div>`
+    );
+  }
 
   // The iframe src is the resolver's `embedUrl`. For known providers the
   // resolver already URL-encoded any user-supplied components; for the

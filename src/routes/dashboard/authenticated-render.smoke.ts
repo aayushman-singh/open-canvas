@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
 import type { createClerkClient, User } from '@clerk/backend';
+import { eq } from 'drizzle-orm';
 import { dashboard } from './index';
 import { db, runWithDbRequestScope } from '../../db/client';
-import { customer } from '../../db/schema';
+import { customer, site } from '../../db/schema';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -18,6 +19,12 @@ const rows = await runWithDbRequestScope(async () => {
 });
 const customerRecord = rows[0];
 assert(customerRecord, 'expected at least one customer row');
+const siteRows = await runWithDbRequestScope(async () => {
+  const database = db({ DATABASE_URL: databaseUrl });
+  return await database.select({ id: site.id }).from(site).where(eq(site.customerId, customerRecord.id)).limit(1);
+});
+const siteRecord = siteRows[0];
+assert(siteRecord, 'expected at least one site row');
 
 const env = {
   DATABASE_URL: databaseUrl,
@@ -31,6 +38,7 @@ const env = {
     process.env['CLERK_FRONTEND_API_URL'] ?? 'https://clerk.opencanvas.aayushman.dev',
   COOKIE_NAME_PREFIX: process.env['COOKIE_NAME_PREFIX'] ?? '__opencanvas_',
   EMAIL_FROM: process.env['EMAIL_FROM'] ?? 'Open Canvas <noreply@example.com>',
+  TURNSTILE_SITE_KEY: process.env['TURNSTILE_SITE_KEY'] ?? 'turnstile-test-key',
 };
 
 const app = new Hono<{ Variables: ClerkAuthVariables }>();
@@ -58,5 +66,11 @@ assert(response.status === 200, `expected 200 dashboard response, got ${String(r
 const html = await response.text();
 assert(html.includes('Your sites'), 'expected dashboard heading');
 assert(html.includes('+ New site') || html.includes('Upgrade to add sites'), 'expected create-site action');
+
+const thumbResponse = await app.request(`/dashboard/thumbs/${siteRecord.id}`, undefined, env);
+assert(thumbResponse.status === 200, `expected 200 thumbnail response, got ${String(thumbResponse.status)}`);
+const thumbHtml = await thumbResponse.text();
+assert(!thumbHtml.includes('@clerk/clerk-js'), 'thumbnail HTML must not inject Clerk browser runtime');
+assert(!thumbHtml.includes('<script'), 'thumbnail HTML must be an inert static preview');
 
 console.log('[dashboard-authenticated-render:smoke] OK');

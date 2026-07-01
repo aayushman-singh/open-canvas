@@ -139,6 +139,7 @@ export interface FormRenderCtx {
   siteId: string;
   pageSlug: string;
   styleKit: string;
+  staticPreview?: boolean;
   /**
    * Cloudflare Turnstile public site key. Always non-empty; resolved by the
    * caller from env. Missing env at the boundary throws via
@@ -245,13 +246,15 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
       ? ` data-opencanvas-pointer-fx="${escapeAttr(pointerFx)}" data-opencanvas-pointer-fx-reduced-motion="allow"`
       : '';
 
-  // Turnstile widget. The Cloudflare-managed JS loader script is emitted next
-  // to the widget; the Cloudflare CDN caches it so multiple forms on the same
-  // page share a single network fetch.
-  const turnstileBlock = [
-    `<div class="cf-turnstile" data-sitekey="${escapeAttr(ctx.turnstileSiteKey)}"></div>`,
-    `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`,
-  ].join('');
+  // Turnstile widget. Static previews preserve form geometry but stay inert,
+  // so they intentionally omit Turnstile and submit runtime scripts.
+  const turnstileBlock =
+    ctx.staticPreview === true
+      ? ''
+      : [
+          `<div class="cf-turnstile" data-sitekey="${escapeAttr(ctx.turnstileSiteKey)}"></div>`,
+          `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`,
+        ].join('');
 
   // AJAX handler — fetch POST the form, show inline success/error without
   // a full page reload. The script is idempotent (guarded by
@@ -259,7 +262,10 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
   // one wire-up. We progressively enhance: forms still POST normally if
   // JS is blocked (the server's 303 redirect with ?form-ok= keeps
   // working as the no-JS fallback).
-  const ajaxScript = `<script>
+  const ajaxScript =
+    ctx.staticPreview === true
+      ? ''
+      : `<script>
 (function(){
   if (window.__opencanvasFormHandlerWired) return;
   window.__opencanvasFormHandlerWired = true;

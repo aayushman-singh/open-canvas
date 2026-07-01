@@ -5,7 +5,7 @@ import {
 } from './behaviour-payload.js';
 import { compileMotionPresetSequences } from './compile-motion-presets.js';
 import { renderCanvasSnapshot } from './render.js';
-import type { PublishedSnapshot } from './schema.js';
+import type { EditableSite, PublishedSnapshot } from './schema.js';
 import { validateEditableSite } from './validate.js';
 import { snapshotNeedsInteractiveRuntime } from '../interactive/inject.js';
 
@@ -164,7 +164,7 @@ assert.ok(
   'overlay content element motion delay must keep legacy data-motion-delay-ms attrs',
 );
 
-const invalidPresetSite = {
+const invalidPresetSite: EditableSite = {
   styleKit: 'charcoal',
   pages: [
     {
@@ -197,7 +197,7 @@ const invalidPresetSite = {
       ],
     },
   ],
-} as const;
+};
 const invalidPresetValidation = validateEditableSite(invalidPresetSite);
 assert.equal(invalidPresetValidation.valid, false);
 for (const path of [
@@ -210,5 +210,88 @@ for (const path of [
     `unrepresentable compiled motion preset validation must mention ${path}; got ${invalidPresetValidation.errors.join('; ')}`,
   );
 }
+
+const staticPreviewHtml = renderCanvasSnapshot(
+  {
+    version: 1,
+    publishedAt: '2026-06-19T00:00:00.000Z',
+    ...invalidPresetSite,
+  } satisfies PublishedSnapshot,
+  '/assets',
+  'legacy-motion-preview',
+  {
+    turnstileSiteKey: 'turnstile-test-key',
+    includeBehaviourRuntime: false,
+  },
+);
+assert.ok(
+  !staticPreviewHtml.includes('data-opencanvas-behaviour-payload'),
+  'static previews must not emit the compiled behaviour payload',
+);
+assert.ok(
+  staticPreviewHtml.includes('data-motion-preset="bounce-in"'),
+  'static previews must preserve legacy motion preset attrs for CSS-only thumbnail rendering',
+);
+
+const inertPreviewHtml = renderCanvasSnapshot(
+  {
+    version: 1,
+    publishedAt: '2026-06-19T00:00:00.000Z',
+    styleKit: 'charcoal',
+    importAnimationInventory: { sourceUrl: 'https://example.com/source', items: [] },
+    pages: [
+      {
+        id: 'page-inert-preview',
+        slug: 'inert-preview',
+        title: 'Inert preview',
+        width: 1440,
+        sections: [
+          {
+            id: 'section-inert-preview',
+            recipeId: 'custom',
+            name: 'Inert preview',
+            height: 400,
+            elements: [
+              {
+                id: 'embed-preview',
+                type: 'embed',
+                box: { x: 40, y: 40, w: 640, h: 360, z: 1 },
+                url: 'https://www.youtube.com/watch?v=bp4_7T9J6Fg',
+                title: 'Preview video',
+              },
+              {
+                id: 'form-preview',
+                type: 'form',
+                box: { x: 720, y: 40, w: 400, h: 300, z: 2 },
+                fields: [
+                  {
+                    id: 'email',
+                    kind: 'email',
+                    label: 'Email',
+                    required: true,
+                  },
+                ],
+                submitLabel: 'Send',
+                successMessage: 'Sent',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  } satisfies PublishedSnapshot,
+  '/assets',
+  'inert-preview',
+  {
+    turnstileSiteKey: 'turnstile-test-key',
+    includeBehaviourRuntime: false,
+  },
+);
+assert.ok(!inertPreviewHtml.includes('<script'), 'static previews must not emit scripts');
+assert.ok(!inertPreviewHtml.includes('<iframe'), 'static previews must not emit nested iframes');
+assert.ok(
+  inertPreviewHtml.includes('opencanvas-embed-static-preview'),
+  'static previews must preserve embed geometry with an inert placeholder',
+);
 
 console.log('[motion-preset-compile:smoke] OK');

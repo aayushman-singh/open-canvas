@@ -152,6 +152,8 @@ export interface ElementRenderCtx {
   pageSlug: string;
   /** When true, MotionPreset fields compile into behaviour payload sequences. */
   motionPresetsCompiled?: boolean;
+  /** When true, render non-interactive thumbnail-safe element bodies. */
+  staticPreview?: boolean;
   /** All pages in the snapshot — needed by action element to resolve page links. */
   pages: CanvasPage[];
   /**
@@ -230,8 +232,13 @@ export const RENDER_DISPATCH: RenderDispatch = {
       pageSlug: ctx.pageSlug,
       styleKit: ctx.styleKit,
       turnstileSiteKey: ctx.turnstileSiteKey,
+      ...(ctx.staticPreview === undefined ? {} : { staticPreview: ctx.staticPreview }),
     }),
-  embed: (el, ctx) => renderEmbed(el, { styleKit: ctx.styleKit }),
+  embed: (el, ctx) =>
+    renderEmbed(el, {
+      styleKit: ctx.styleKit,
+      ...(ctx.staticPreview === undefined ? {} : { staticPreview: ctx.staticPreview }),
+    }),
   chart: (el, ctx) =>
     renderChart(el, {
       styleKit: ctx.styleKit,

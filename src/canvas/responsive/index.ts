@@ -58,16 +58,23 @@ export type {
 // will never hold references across requests.
 const responsiveCssCache = new WeakMap<PublishedSnapshot, string>();
 
-export function renderResponsiveCss(snapshot: PublishedSnapshot): string {
+export function renderResponsiveCss(
+  snapshot: PublishedSnapshot,
+  opts: { includeVariantRuntime?: boolean } = {},
+): string {
   const cached = responsiveCssCache.get(snapshot);
-  if (cached !== undefined) return cached;
+  if (opts.includeVariantRuntime !== false && cached !== undefined) return cached;
   const layouts = resolveSnapshotLayout(snapshot);
   const hasOverride = snapshotHasResponsiveOverride(snapshot);
   const hasVariants = snapshotHasResponsiveLayoutVariants(snapshot);
   const variantCss = hasVariants ? buildResponsiveVariantCssBody() : '';
   const body = buildResponsiveCssBody(layouts, hasOverride, variantCss);
-  const result = wrapInStyleBlock(body) + (hasVariants ? renderResponsiveVariantRuntimeScript() : '');
-  responsiveCssCache.set(snapshot, result);
+  const result =
+    wrapInStyleBlock(body) +
+    (hasVariants && opts.includeVariantRuntime !== false
+      ? renderResponsiveVariantRuntimeScript()
+      : '');
+  if (opts.includeVariantRuntime !== false) responsiveCssCache.set(snapshot, result);
   return result;
 }
 
