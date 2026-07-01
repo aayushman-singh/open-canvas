@@ -762,6 +762,11 @@ export interface RenderSnapshotOptions {
    * `<article>` list is narrowed.
    */
   renderPages?: CanvasPage[];
+  /**
+   * When false, render a static preview that keeps authored motion preset
+   * attributes and omits the compiled behaviour runtime payload.
+   */
+  includeBehaviourRuntime?: boolean;
 }
 
 function cssString(value: string): string {
@@ -932,6 +937,7 @@ export function renderCanvasSnapshot(
       ? resolveStyleKitWithCustom(snapshot)
       : getStyleKitPreset(snapshot.styleKit);
   const customPreset: StyleKitPreset | null = snapshot.styleKit === 'custom' ? preset : null;
+  const includeBehaviourRuntime = opts.includeBehaviourRuntime !== false;
   const baseCtx: Omit<ElementRenderCtx, 'pageSlug'> = {
     assetBasePath,
     styleKit: snapshot.styleKit,
@@ -939,7 +945,8 @@ export function renderCanvasSnapshot(
     siteId,
     pages: snapshot.pages,
     turnstileSiteKey: opts.turnstileSiteKey,
-    motionPresetsCompiled: snapshotHasMotionPresetFields(snapshot),
+    motionPresetsCompiled: includeBehaviourRuntime && snapshotHasMotionPresetFields(snapshot),
+    staticPreview: !includeBehaviourRuntime,
     renderElement,
     renderHostedElement,
   };
@@ -954,19 +961,25 @@ export function renderCanvasSnapshot(
   const fontFaceStyle = renderFontFaces(snapshot);
   const anchorRailsHtml = renderAnchorRails(snapshot);
   const playableWidgetsHtml = renderPlayableWidgets(snapshot);
-  const responsiveStyle = renderResponsiveCss(snapshot);
+  const responsiveStyle = renderResponsiveCss(snapshot, {
+    includeVariantRuntime: includeBehaviourRuntime,
+  });
   const scrollStyle = renderScrollBehaviourCss(snapshot.scrollBehavior);
-  const copyScript = renderCopyHandlerScript(snapshot);
-  const tabsScript = renderTabsHandlerScript(snapshot);
+  const copyScript = includeBehaviourRuntime ? renderCopyHandlerScript(snapshot) : '';
+  const tabsScript = includeBehaviourRuntime ? renderTabsHandlerScript(snapshot) : '';
   const behaviourLoadExperience =
-    snapshot.loadExperience && 'sequenceId' in snapshot.loadExperience
+    includeBehaviourRuntime && snapshot.loadExperience && 'sequenceId' in snapshot.loadExperience
       ? snapshot.loadExperience
       : undefined;
   const loadExperienceHtml = behaviourLoadExperience
     ? renderLoadExperienceChrome(behaviourLoadExperience, assetBasePath)
     : '';
-  const behaviourPayloadScript = renderBehaviourPayloadScript(snapshot, assetBasePath);
-  const importAnimationInventoryScript = renderImportAnimationInventoryScript(snapshot);
+  const behaviourPayloadScript = includeBehaviourRuntime
+    ? renderBehaviourPayloadScript(snapshot, assetBasePath)
+    : '';
+  const importAnimationInventoryScript = includeBehaviourRuntime
+    ? renderImportAnimationInventoryScript(snapshot)
+    : '';
   const siteBackground = resolvePublishedSiteBackground(pagesToRender);
   const rootStyle = [
     `--opencanvas-kit-accent:${preset.accent}`,

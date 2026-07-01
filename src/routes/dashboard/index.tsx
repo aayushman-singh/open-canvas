@@ -18,7 +18,7 @@ import { buildStyleKitCss } from '../../canvas/style-kits';
 import { resolveStyleKitWithCustom } from '../../themes/custom-resolve';
 import { pickStyleKitField } from '../../canvas/schema';
 import type { PublishedSnapshot, EditableSite } from '../../canvas/schema';
-import { appDomain, type HostConfigEnv } from '../../host-config';
+import { appDomain, resolveDevPublicOrigin, type HostConfigEnv } from '../../host-config';
 import { Timings } from '../../server-timing';
 
 type Bindings = HostConfigEnv & {
@@ -42,6 +42,7 @@ dashboard.use('*', async (c, next) => {
   const ct = c.res.headers.get('content-type') ?? '';
   if (!ct.includes('text/html')) return;
   if (c.req.path.endsWith('/preview')) return;
+  if (c.req.path.startsWith('/dashboard/thumbs/')) return;
   const { publishableKey } = resolveClerkKeys(c.env);
   // Host resolved server-side (see `clerkFrontendApiHost`) so the clerk-js
   // bundle URL doesn't depend on the publishable key's encoded host — which
@@ -63,6 +64,26 @@ dashboard.use('*', async (c, next) => {
 });
 
 const THUMB_SCALE = 0.24;
+const THUMB_HTML_CACHE_VERSION = 'static-preview-v3';
+
+type DashboardThumbOriginEnv = HostConfigEnv & {
+  CLERK_TEST_PUBLISHABLE_KEY?: string;
+  CLERK_TEST_SECRET_KEY?: string;
+};
+
+export function dashboardThumbOrigin(env: DashboardThumbOriginEnv, requestUrl: string): string {
+  if (env.CLERK_TEST_PUBLISHABLE_KEY === '' || env.CLERK_TEST_SECRET_KEY === '') {
+    throw new Error('Clerk test keys must be non-empty when configured');
+  }
+  const hasTestPublishableKey = typeof env.CLERK_TEST_PUBLISHABLE_KEY === 'string';
+  const hasTestSecretKey = typeof env.CLERK_TEST_SECRET_KEY === 'string';
+  if (hasTestPublishableKey !== hasTestSecretKey) {
+    throw new Error(
+      'CLERK_TEST_PUBLISHABLE_KEY and CLERK_TEST_SECRET_KEY must be configured together',
+    );
+  }
+  return hasTestPublishableKey ? resolveDevPublicOrigin(env) : new URL(requestUrl).origin;
+}
 
 function formatDate(d: Date): string {
   const months = [
@@ -107,6 +128,7 @@ function buildThumbHtml(
     state.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolveStyleKitWithCustom(state))}` : '';
   const canvasHtml = renderCanvasSnapshot(snapshot, `/api/canvas/sites/${siteId}/assets`, siteId, {
     turnstileSiteKey,
+    includeBehaviourRuntime: false,
   });
   return [
     '<!DOCTYPE html><html><head>',
@@ -129,7 +151,7 @@ function buildThumbHtml(
 const thumbHtmlCache = new Map<string, string>();
 
 function thumbCacheKey(siteId: string, updatedAt: Date): string {
-  return `${siteId}:${updatedAt.getTime()}`;
+  return `${THUMB_HTML_CACHE_VERSION}:${siteId}:${updatedAt.getTime()}`;
 }
 
 function getCachedThumbHtml(siteId: string, updatedAt: Date): string | undefined {
@@ -139,7 +161,7 @@ function getCachedThumbHtml(siteId: string, updatedAt: Date): string | undefined
 function setCachedThumbHtml(siteId: string, updatedAt: Date, html: string): void {
   // Drop stale entries for this site so repeated edits don't grow the map
   // unbounded over a long-lived isolate.
-  const prefix = `${siteId}:`;
+  const prefix = `${THUMB_HTML_CACHE_VERSION}:${siteId}:`;
   for (const key of thumbHtmlCache.keys()) {
     if (key.startsWith(prefix)) thumbHtmlCache.delete(key);
   }
@@ -1553,7 +1575,7 @@ dashboard.get('/thumbs/:siteId', async (c) => {
         .limit(1),
     );
     if (!fullRow) return c.notFound();
-    const origin = new URL(c.req.url).origin;
+    const origin = dashboardThumbOrigin(c.env, c.req.url);
     const stopRender = t.start('render');
     try {
       html = buildThumbHtml(
