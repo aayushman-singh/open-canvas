@@ -184,12 +184,8 @@ TEMPLATE_ASSET_CUSTODIAN_CUSTOMER_ID = "1ef1a6fa-9b3e-407a-875d-b66d2d01a403"
 
 # Cron triggers. The `scheduled` handler in src/scheduled.ts branches on
 # event.cron to dispatch per-feature work:
-#   - "*/5 * * * *"   Wave 1 #5 (custom domains, plan 05). Polls Cloudflare
-#                     for pending / verifying custom hostnames and reconciles
-#                     `status` + `certIssuedAt` per row. 30-minute-stuck
-#                     rows flip to `failed` without hitting CF.
 #   - "0 3 * * *"     ADR 0043 notification retention. Once per day at 03:00
 #                     UTC; soft-deletes notification + notification_read
 #                     rows older than NOTIFICATION_RETENTION_DAYS (90d).
 [triggers]
-crons = ["*/5 * * * *", "0 3 * * *"]
+crons = ["0 3 * * *"]

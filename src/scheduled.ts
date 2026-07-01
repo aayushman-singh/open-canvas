@@ -5,12 +5,9 @@
 // knowledge.
 //
 // Cron map (kept in sync with wrangler.toml):
-//   "*/5 * * * *"   → src/custom-domain/cron.ts (every 5 minutes)
 //   "0 3 * * *"     → src/notifications/retention.ts (daily at 03:00 UTC)
 
-import { scheduled as customDomainScheduled } from './custom-domain/cron';
 import { runNotificationRetention, type RetentionEnv } from './notifications/retention';
-import type { PollEnv } from './custom-domain/poll';
 
 interface ScheduledEventLike {
   cron: string;
@@ -21,19 +18,28 @@ interface ExecutionContextLike {
   waitUntil(promise: Promise<unknown>): void;
 }
 
-type CronEnv = PollEnv & RetentionEnv;
-
 export function scheduled(
   event: ScheduledEventLike,
-  env: CronEnv,
+  env: unknown,
   ctx: ExecutionContextLike,
 ): void {
   if (event.cron === '0 3 * * *') {
-    ctx.waitUntil(runRetention(env));
+    ctx.waitUntil(runRetention(requireRetentionEnv(env)));
     return;
   }
-  // Default: custom-domain status poller (every 5 minutes).
-  customDomainScheduled(event, env, ctx);
+  throw new Error(`Unsupported scheduled cron: ${event.cron}`);
+}
+
+function requireRetentionEnv(env: unknown): RetentionEnv {
+  if (
+    env === null ||
+    typeof env !== 'object' ||
+    typeof (env as { DATABASE_URL?: unknown }).DATABASE_URL !== 'string' ||
+    (env as { DATABASE_URL: string }).DATABASE_URL.length === 0
+  ) {
+    throw new Error('DATABASE_URL is required for notification retention cron.');
+  }
+  return env as RetentionEnv;
 }
 
 async function runRetention(env: RetentionEnv): Promise<void> {
