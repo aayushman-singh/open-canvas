@@ -1,4 +1,18 @@
-# Follow Ups
+# Follow-ups
+
+## Revenue Evaluation - Non-Enterprise Users
+
+Verdict: Open Canvas can generate non-enterprise revenue, but not in the current public build. The product surface is credible; checkout, subscription state, and billing webhooks are missing.
+
+- Position narrowly: AI-assisted live canvas publishing for indie founders, freelancers, creators, consultants, portfolios, and small local businesses.
+- Do not market it as a generic website builder; Wix, Squarespace, Framer, and Webflow already own that broad lane.
+- Wire real billing before calling Pro/Team paid: checkout, subscription state, webhook reconciliation, failed-payment handling, and plan-change UX.
+- Keep the initial paid offer simple:
+  - Free: 1-3 sites, Open Canvas subdomain, limited AI.
+  - Pro: custom domain, higher AI/storage limits, forms/export, analytics, no Open Canvas branding.
+  - Studio: multiple client sites, collaborators, saved templates, custom scripts.
+- Strongest wedge: AI edits + free-form canvas + instant publishing + clean HTML output.
+- Biggest risk: charging for "more sites/storage" alone is weak; the paid plan needs a user-visible outcome competitors do not make easy.
 
 ## Production Template Source Admin
 
@@ -17,7 +31,7 @@ Status: implemented 2026-06-22; deploy requires `TEMPLATE_SOURCE_GITHUB_TOKEN`.
 - Do not make the Worker write repository files directly; production Workers do
   not have a repo filesystem to mutate.
 
-### Resolution — 2026-06-22
+### Resolution - 2026-06-22
 
 - Implemented the GitHub-backed path at `/dashboard/admin/templates`.
 - Production admins can load code-defined template section JSON, edit it, and
@@ -28,7 +42,7 @@ Status: implemented 2026-06-22; deploy requires `TEMPLATE_SOURCE_GITHUB_TOKEN`.
   `TEMPLATE_SOURCE_GITHUB_TOKEN` remains a required Worker secret and fails
   loudly if missing.
 
-## Resolution — 2026-06-21
+## Resolution - 2026-06-21
 
 - Raydotsh Fidelity Track is implemented on `feat/raydotsh-next-fidelity` in
   `0ecb37ad feat: reauthor raydotsh project primitives`.
