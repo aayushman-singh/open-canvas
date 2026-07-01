@@ -377,13 +377,25 @@ export function buildHostedElementNodeImpl(
 function applyCommonElementWrapperAttrs(wrapper: HTMLElement, element: CanvasElement): void {
   wrapper.setAttribute('data-opencanvas-element', element.id);
   wrapper.setAttribute('data-element-type', element.type);
-  // Mirror the public renderer: stamp data-variant for action/shape/
-  // container and data-role for text so kit CSS selectors of the form
+  // Mirror the public renderer: stamp data-variant for variant-bearing
+  // elements and data-role for text so kit CSS selectors of the form
   // [data-style-kit="X"] [data-element-type="action"][data-variant="Y"]
   // match in the editor preview exactly like they do in the published HTML.
-  if (element.type === 'action' || element.type === 'shape' || element.type === 'container') {
+  if (
+    element.type === 'action' ||
+    element.type === 'shape' ||
+    element.type === 'container' ||
+    element.type === 'form' ||
+    element.type === 'accordion' ||
+    element.type === 'carousel' ||
+    element.type === 'tabs'
+  ) {
     if (typeof element.variant === 'string') {
       wrapper.setAttribute('data-variant', element.variant);
+    } else if (element.type === 'form' || element.type === 'carousel' || element.type === 'tabs') {
+      wrapper.setAttribute('data-variant', 'classic');
+    } else if (element.type === 'accordion') {
+      wrapper.setAttribute('data-variant', 'list');
     }
   } else if (element.type === 'text') {
     if (typeof element.role === 'string') {

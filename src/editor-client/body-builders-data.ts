@@ -79,10 +79,10 @@ export type BuildEmbedBodyContext = Pick<EditorContext, never>;
 // `element.source`. Empty Pick keeps the dispatcher signature uniform.
 export type BuildCodeBodyContext = Pick<EditorContext, never>;
 
-// ADR 0064 — accordion preview ignores ctx; <details>/<summary> markup
-// is driven entirely off `element.items`. Empty Pick keeps the
-// dispatcher signature uniform.
-export type BuildAccordionBodyContext = Pick<EditorContext, never>;
+// ADR 0064 — accordion preview mirrors the published DOM and forwards rich
+// text body runs through `ctx.buildRunNode`, matching TextElement's mark
+// rendering surface.
+export type BuildAccordionBodyContext = Pick<EditorContext, 'buildRunNode'>;
 
 // ADR 0064 — carousel preview composes per-slide image URLs from
 // `ctx.siteBase`; the local hydrate-preview helper only mutates the
@@ -372,30 +372,55 @@ export function buildCodeBodyImpl(_ctx: BuildCodeBodyContext, element: CodeEleme
 }
 
 export function buildAccordionBodyImpl(
-  _ctx: BuildAccordionBodyContext,
+  ctx: BuildAccordionBodyContext,
   element: AccordionElement,
 ): HTMLElement {
   const node = document.createElement('div');
-  node.className = 'opencanvas-accordion-preview';
-  node.setAttribute('data-variant', element.variant ?? 'list'); // ADR 0066
+  node.className = 'opencanvas-accordion';
+  node.setAttribute('data-opencanvas-interactive', 'accordion');
+  node.setAttribute('data-variant', element.variant ?? 'list');
+  node.setAttribute(
+    'data-opencanvas-allow-multi-open',
+    element.allowMultipleOpen ? 'true' : 'false',
+  );
+  node.setAttribute('role', 'group');
   const items = Array.isArray(element.items) ? element.items : [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     if (!item) continue;
-    const details = document.createElement('details');
-    if (i === 0) details.open = true;
-    const summary = document.createElement('summary');
-    summary.textContent = item.title || 'Item';
-    details.appendChild(summary);
+
+    const itemNode = document.createElement('div');
+    itemNode.className = 'opencanvas-accordion-item';
+    itemNode.setAttribute('data-opencanvas-acc-item', item.id);
+    const isOpen = i === 0;
+    if (isOpen) itemNode.setAttribute('data-opencanvas-acc-open', 'true');
+
+    const headerId = 'opencanvas-acc-header-' + element.id + '-' + item.id;
+    const bodyId = 'opencanvas-acc-body-' + element.id + '-' + item.id;
+    const header = document.createElement('button');
+    header.type = 'button';
+    header.className = 'opencanvas-accordion-header';
+    header.id = headerId;
+    header.setAttribute('data-opencanvas-acc-toggle', item.id);
+    header.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    header.setAttribute('aria-controls', bodyId);
+    header.textContent = item.title || 'Item';
+    itemNode.appendChild(header);
+
     const body = document.createElement('div');
+    body.className = 'opencanvas-accordion-body';
+    body.id = bodyId;
+    body.setAttribute('role', 'region');
+    body.setAttribute('aria-labelledby', headerId);
+    body.setAttribute('data-opencanvas-acc-body', item.id);
+    body.hidden = !isOpen;
     const runs = Array.isArray(item.body) ? item.body : [];
-    body.textContent = runs
-      .map(function (run) {
-        return run && typeof run.text === 'string' ? run.text : '';
-      })
-      .join('');
-    details.appendChild(body);
-    node.appendChild(details);
+    for (let r = 0; r < runs.length; r++) {
+      const run = runs[r];
+      if (run !== undefined) body.appendChild(ctx.buildRunNode(run));
+    }
+    itemNode.appendChild(body);
+    node.appendChild(itemNode);
   }
   return node;
 }

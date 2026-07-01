@@ -24,6 +24,7 @@
 // panels, selection handles, and modal — all theme-token driven.
 
 import { buildAllStyleKitsCss } from '../canvas/style-kits.js';
+import { canvasComponentVariantStyles } from '../canvas/public-styles.js';
 import { componentsCss, themeCss } from '../ui/theme.js';
 
 const kitCss = buildAllStyleKitsCss();
@@ -4524,11 +4525,12 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 }
 `;
 
-// Concatenate Open Canvas tokens + chrome CSS + shared kit CSS. theme.css
+// Concatenate Open Canvas tokens + chrome CSS + shared component/preset CSS.
+// theme.css
 // (themeCss) goes FIRST so its --opencanvas-* alias block re-points the
 // chrome's variable names onto the Open Canvas palette before any chrome
-// rule reads them. The kit CSS lives in src/canvas/style-kits.ts and is
-// the single source of truth shared with the public renderer
-// (src/canvas/public-styles.ts) — it is UNTOUCHED by the rebrand to
-// preserve byte-identical visitor output.
-export const canvasEditorStyles = `${themeCss}\n${componentsCss}\n${chromeCss}\n${kitCss}`;
+// rule reads them. Kit CSS lives in src/canvas/style-kits.ts; component
+// variant CSS lives in src/canvas/public-styles.ts. Both are shared with the
+// public renderer so editor preview and published output consume the same
+// visual contracts.
+export const canvasEditorStyles = `${themeCss}\n${componentsCss}\n${chromeCss}\n${canvasComponentVariantStyles}\n${kitCss}`;

@@ -381,7 +381,7 @@ body {
 /* Body-scroll editor shell: the editor chrome (header / left dock / right
    dock / status bar / zoom toolbar / AI panel / modal) is fixed-positioned
    so the canvas area sits in normal document flow. The browser's native
-   body scrollbar is the ONLY scrollbar \u2014 no inner cells scroll. This means
+   body scrollbar is the ONLY scrollbar — no inner cells scroll. This means
    the canvas page is horizontally centered between the docks and vertical
    overflow (when zoomed in) scrolls at the browser viewport edge. */
 .opencanvas-editor {
@@ -394,14 +394,14 @@ body.opencanvas-modal-open {
   overflow: hidden;
 }
 /* Kit token blocks for the editor preview wrapper come from
-   buildAllStyleKitsCss() \u2014 see the bottom of this file. The
+   buildAllStyleKitsCss() — see the bottom of this file. The
    [data-style-kit="X"] selector matches both <main class="opencanvas-editor"> and
    the inner <main class="opencanvas-site">, so the editor preview and the
    published render share the same tokens. */
 
-/* Topbar (.ebar in editor.html) \u2014 sits at z-index:200 above the docks;
+/* Topbar (.ebar in editor.html) — sits at z-index:200 above the docks;
    surface + hairline + sticky so it stays visible while the body scrolls.
-   Switched from mono \u2192 sans for the chrome (the address chip below keeps
+   Switched from mono → sans for the chrome (the address chip below keeps
    mono since the URL is data, not chrome). */
 .opencanvas-editor-header {
   position: sticky;
@@ -434,7 +434,7 @@ body.opencanvas-modal-open {
   color: var(--ink);
   font-weight: 650;
 }
-/* Page chip \u2014 switches the active page via a popover. Same weight as .here
+/* Page chip — switches the active page via a popover. Same weight as .here
    so the breadcrumb reads as one continuous trail. */
 .opencanvas-editor-header .crumb-page-switcher {
   display: inline-flex;
@@ -460,7 +460,7 @@ body.opencanvas-modal-open {
   color: var(--ink-3);
   font-size: 10px;
 }
-/* Page-switcher popover \u2014 rendered to document.body so it escapes the
+/* Page-switcher popover — rendered to document.body so it escapes the
    header's overflow clip. Position is set inline via the client. */
 .opencanvas-crumb-menu {
   z-index: 200;
@@ -510,7 +510,7 @@ body.opencanvas-modal-open {
   font-size: 11px;
 }
 
-/* Address chip \u2014 pill, mono so the URL reads as data. */
+/* Address chip — pill, mono so the URL reads as data. */
 .opencanvas-editor-header .address {
   margin-left: 4px;
   padding: 5px 12px;
@@ -528,7 +528,7 @@ body.opencanvas-modal-open {
   flex: 1 1 auto;
 }
 
-/* Header action buttons \u2014 outline pill so the topbar reads as one row. */
+/* Header action buttons — outline pill so the topbar reads as one row. */
 .opencanvas-editor-header #canvas-save,
 .opencanvas-editor-header #canvas-save-template,
 .opencanvas-editor-header #canvas-settings-link {
@@ -592,7 +592,7 @@ body.opencanvas-modal-open {
   transform: none;
 }
 
-/* Version badge \u2014 small persistent indicator of the live version, clickable
+/* Version badge — small persistent indicator of the live version, clickable
    to open the social-preview pill. Greyer than Publish so it reads as a
    passive status surface rather than a primary action. */
 .opencanvas-editor-header #canvas-version {
@@ -618,7 +618,7 @@ body.opencanvas-modal-open {
   color: var(--ink-3);
 }
 
-/* Social-preview pill \u2014 anchored below the version badge, mirrors what
+/* Social-preview pill — anchored below the version badge, mirrors what
    src/seo/meta-emit.ts will emit for og:title / og:description / og:image. */
 .opencanvas-version-pill {
   width: 320px;
@@ -708,7 +708,7 @@ body.opencanvas-modal-open {
   text-decoration: underline;
 }
 
-/* AI Chat toggle \u2014 soft red surface + red ink, hints AI affordance. */
+/* AI Chat toggle — soft red surface + red ink, hints AI affordance. */
 .opencanvas-editor-header #canvas-chat-toggle {
   appearance: none;
   border: 1.5px solid var(--red-line);
@@ -733,7 +733,7 @@ body.opencanvas-modal-open {
   border-color: var(--red);
 }
 
-/* Chat slide-out panel \u2014 mirrors editor.html .ai-panel: surface + hairline
+/* Chat slide-out panel — mirrors editor.html .ai-panel: surface + hairline
    left border + shadow-lg so it visually peels off the right dock. The
    chat bubbles follow the same .ai-msg pattern (user = ink chip, assistant
    = surface-2 chip). */
@@ -913,8 +913,8 @@ body.opencanvas-modal-open {
   border-radius: var(--r-sm);
 }
 
-/* Generic spinner pill \u2014 one CSS class, applied wherever we used to
-   render a bare "Loading\u2026" string. Sized via font-size so callers can
+/* Generic spinner pill — one CSS class, applied wherever we used to
+   render a bare "Loading…" string. Sized via font-size so callers can
    tune it inline (status pill gets the line-height equivalent;
    inspector buttons get a small inline glyph). Brand red by default so
    it matches the rest of the editor without per-call-site colour
@@ -940,7 +940,7 @@ body.opencanvas-modal-open {
 
 /* Chat "thinking" bubble shown immediately on submit, removed when the
    first user-visible SSE event lands (text token, op-preview, error, or
-   stream done \u2014 tool-call events do NOT clear it). Lightbulb + label so
+   stream done — tool-call events do NOT clear it). Lightbulb + label so
    the user can tell the model is processing rather than the panel
    sitting dead. */
 .opencanvas-chat-thinking {
@@ -969,7 +969,7 @@ body.opencanvas-modal-open {
   50% { opacity: 1; transform: scale(1.12); }
 }
 
-/* AI chat suggestion card \u2014 replaces the old "Proposed: rewriteText"
+/* AI chat suggestion card — replaces the old "Proposed: rewriteText"
    one-liner. Each pending op gets a card with a human-readable
    description, accept/reject buttons, and a click target that focuses
    the canvas on the affected element. The card sticks to its accepted
@@ -1069,7 +1069,7 @@ body.opencanvas-modal-open {
 }
 
 /* Accept-all banner pinned to the chat panel bottom (above the input)
-   when \u22651 suggestion is still pending. One-click drops every pending op
+   when ≥1 suggestion is still pending. One-click drops every pending op
    onto the canvas through a single /apply round-trip after the owner
    confirms via the summary overlay. */
 .opencanvas-chat-accept-all {
@@ -1166,7 +1166,7 @@ body.opencanvas-modal-open {
 }
 
 /* Pulse fired by focusCanvasOnId when the owner clicks a chat
-   suggestion \u2014 flashes a soft ring around the focused element so the
+   suggestion — flashes a soft ring around the focused element so the
    eye finds it after the camera pan. */
 .opencanvas-element.opencanvas-ai-focus-pulse,
 .opencanvas-section.opencanvas-ai-focus-pulse {
@@ -1177,7 +1177,7 @@ body.opencanvas-modal-open {
   100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
 }
 
-/* Ghost-section preview \u2014 wraps the resolved CanvasSection the agent
+/* Ghost-section preview — wraps the resolved CanvasSection the agent
    proposes (insertSection / designSection / duplicateSection) so the
    owner sees the new content rendered in place between the existing
    sections at lower opacity, with a dashed accent outline and a small
@@ -1215,7 +1215,7 @@ body.opencanvas-modal-open {
   to { opacity: 0.42; transform: translateY(0); }
 }
 
-/* Accept-all confirmation overlay \u2014 modal dialog listing every pending
+/* Accept-all confirmation overlay — modal dialog listing every pending
    op as a single bullet list so the owner can re-read what they're
    about to land before committing. Reuses the existing modal-backdrop
    pattern from the link / confirm modals. */
@@ -1328,9 +1328,9 @@ body.opencanvas-modal-open {
   background: var(--red);
 }
 
-/* Left sidebar (.lpanel in editor.html) \u2014 surface + right hairline.
+/* Left sidebar (.lpanel in editor.html) — surface + right hairline.
    Width unchanged (320 is the existing rev01 dock width; editor.html uses
-   284 but the editor's grids/buttons are sized for 320 \u2014 keeping the rev01
+   284 but the editor's grids/buttons are sized for 320 — keeping the rev01
    dimension preserves canvas-client.ts positioning). */
 .opencanvas-editor-sidebar {
   position: fixed;
@@ -1351,7 +1351,7 @@ body.opencanvas-modal-open {
   overflow: visible;
   border-right: none;
 }
-/* Keep the sidebar contents themselves clipped while collapsed \u2014 only
+/* Keep the sidebar contents themselves clipped while collapsed — only
    the .sidebar-toggle (position: fixed, escapes the sidebar's overflow)
    should remain visible so the user can re-open the sidebar. */
 .opencanvas-editor-sidebar.collapsed > :not(.sidebar-toggle) {
@@ -1359,7 +1359,7 @@ body.opencanvas-modal-open {
 }
 /* The .sidebar-toggle is position:fixed rather than absolute-inside the
    sidebar because the sidebar uses overflow-x:hidden to clip its own
-   contents during scroll \u2014 that overflow rule would also clip a toggle
+   contents during scroll — that overflow rule would also clip a toggle
    positioned at right:-20px, so the toggle would only be visible while
    the sidebar was already collapsed (overflow:visible). Mirroring the
    right-side .inspector-toggle pattern, the toggle now lives at the
@@ -1396,23 +1396,23 @@ body.opencanvas-modal-open {
 .opencanvas-viewport.sidebar-collapsed { margin-left: 0; }
 /* When the sidebar collapses, the viewport reclaims the 340px gutter
    and the zoom toolbar would otherwise float ~380px from the screen
-   edge \u2014 looking lost on the canvas. Pin it close to the new viewport
+   edge — looking lost on the canvas. Pin it close to the new viewport
    edge so it tracks the sidebar collapse. */
 .opencanvas-editor:has(.opencanvas-editor-sidebar.collapsed) .opencanvas-zoom-toolbar {
   left: 16px;
 }
 /* When the inspector is collapsed or hidden, the viewport reclaims the
-   320px right gutter \u2014 otherwise the body's --opencanvas-bg shows through
+   320px right gutter — otherwise the body's --opencanvas-bg shows through
    that strip and reads as a persistent white panel residue against the
    canvas. Driven by :has() (not a viewport class) because inspector
    hidden/collapsed state flips from many call sites in canvas-client.ts
-   \u2014 letting CSS observe the inspector directly avoids drift. */
+   — letting CSS observe the inspector directly avoids drift. */
 .opencanvas-editor:has(#canvas-inspector[hidden]) .opencanvas-viewport,
 .opencanvas-editor:has(#canvas-inspector.collapsed) .opencanvas-viewport {
   margin-right: 0;
 }
 
-/* Sidebar tabs (.tabs in editor.html) \u2014 flat row, underline-on-active
+/* Sidebar tabs (.tabs in editor.html) — flat row, underline-on-active
    in brand red. Sans not mono so the tab labels feel like nav, not data. */
 .opencanvas-sidebar-tabs {
   display: flex;
@@ -1461,8 +1461,8 @@ body.opencanvas-modal-open {
 .opencanvas-sidebar-panel {
   display: grid;
   /* Cap the single column at the panel width (minmax(0,1fr) instead of the
-     implicit max-content track) so wide children \u2014 e.g. the sections picker's
-     control row \u2014 can't push the grid past the 360px sidebar and get clipped
+     implicit max-content track) so wide children — e.g. the sections picker's
+     control row — can't push the grid past the 360px sidebar and get clipped
      by its overflow-x. */
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
@@ -1473,7 +1473,7 @@ body.opencanvas-modal-open {
   display: none;
 }
 
-/* Dashed "add" action \u2014 used for "+ New Page" etc. Outline pill so it
+/* Dashed "add" action — used for "+ New Page" etc. Outline pill so it
    reads as a low-affordance helper next to the firmer command tiles. */
 .opencanvas-sidebar-action {
   appearance: none;
@@ -1527,7 +1527,7 @@ body.opencanvas-modal-open {
   background: var(--opencanvas-bg-raised, var(--opencanvas-bg-panel));
   border-color: var(--opencanvas-accent);
 }
-/* Wrap the title across multiple lines instead of ellipsing \u2014 owners
+/* Wrap the title across multiple lines instead of ellipsing — owners
    with long page titles ("Enterprise solutions and pricing") used to
    see a truncated row that gave no hint at the full title, and the
    ellipsis sometimes clipped before the sidebar's right edge so the
@@ -1554,7 +1554,7 @@ body.opencanvas-modal-open {
   color: var(--opencanvas-fg-mute);
 }
 /* Actions are absolute-positioned on top of the row so they never compete
-   with the title / slug for inline space \u2014 that meant Del was getting
+   with the title / slug for inline space — that meant Del was getting
    clipped on narrow sidebar widths. Hidden by default; the row's hover
    reveals them and paints a backdrop so the underlying title doesn't
    read through. */
@@ -1744,7 +1744,7 @@ body.opencanvas-modal-open {
   border-color: transparent;
 }
 
-/* Placement-mode drop slots \u2014 drawn between sections while pendingImport is
+/* Placement-mode drop slots — drawn between sections while pendingImport is
    set. Slots are invisible until hover/focus by default; while
    data-placement-active is set on <body> they stay fully visible so the
    Owner can clearly see every available insert position. */
@@ -2035,7 +2035,7 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   gap: 8px;
 }
 
-/* Element tiles (.el in editor.html) \u2014 square cards with hover-warm
+/* Element tiles (.el in editor.html) — square cards with hover-warm
    to red-tint + lift, conveying drag affordance. */
 .opencanvas-sidebar-command,
 .opencanvas-sidebar-kit-grid button {
@@ -2090,7 +2090,7 @@ body[data-placement-active="true"] .opencanvas-section-slot {
 
 /* Viewport wraps #canvas-root. The camera object drives all positioning:
    translate(cam.x, cam.y) scale(cam.zoom) on #canvas-root. The viewport
-   has overflow:hidden \u2014 no body scroll, the camera handles everything.
+   has overflow:hidden — no body scroll, the camera handles everything.
    Left/right margins clear the fixed sidebar + inspector docks. */
 /* Viewport (the wrapper around #canvas-root, where the artboard floats).
    Mirrors editor.html .cstage: warm surface-2 with a subtle dot grid so
@@ -2119,7 +2119,7 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   left: 0;
 }
 
-/* Zoom toolbar (.zoom in editor.html) \u2014 pinned bottom-left of the canvas
+/* Zoom toolbar (.zoom in editor.html) — pinned bottom-left of the canvas
    area as a pill above the warm wallpaper. Buttons are borderless circles
    inside the pill, mode-action buttons fill with red when pressed. */
 .opencanvas-zoom-toolbar {
@@ -2233,19 +2233,19 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 .opencanvas-artboard[data-active="false"] {
   opacity: 0.7;
   /* pointer-events stay enabled so a click ANYWHERE on an inactive
-     artboard activates it via attachRootEvents \u2192 setActivePage. The
+     artboard activates it via attachRootEvents → setActivePage. The
      click handler intercepts inactive-artboard clicks before any
      element/section resolution, so this never accidentally selects
      a widget on a backgrounded page. Previously this rule set
      pointer-events to none and the only way to activate an inactive
-     page was to click its small label \u2014 the body of the page swallowed
+     page was to click its small label — the body of the page swallowed
      clicks straight to the canvas background. */
 }
 .opencanvas-artboard[data-active="true"] {
   opacity: 1;
 }
 /* Blank-canvas-click clears the dim on every artboard so no page reads
-   as the "selected" one. The active page keeps rendering \u2014 only the
+   as the "selected" one. The active page keeps rendering — only the
    visual highlight goes away. Cleared as soon as an artboard or label
    is clicked again. */
 #canvas-root.canvas-pages-deselected .opencanvas-artboard[data-active="false"] {
@@ -2402,12 +2402,12 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
    wins: when it emits inline overflow:visible on the wrapper, the inline
    declaration outranks this stylesheet rule. During inline edit the
    wrapper carries data-editing="true" so the caret never gets clipped by
-   the box while the Owner is typing \u2014 beginTextEditImpl adds the flag and
+   the box while the Owner is typing — beginTextEditImpl adds the flag and
    finish() removes it. */
 .opencanvas-element[data-element-type="text"]:not([data-editing="true"]) {
   overflow: hidden;
 }
-/* Selection (.selbox in editor.html) \u2014 2px red outline + slight inset so
+/* Selection (.selbox in editor.html) — 2px red outline + slight inset so
    it reads as a frame around the element, not a stroke. */
 .opencanvas-element[data-selected="true"] {
   outline: 2px solid var(--red);
@@ -2426,7 +2426,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
    events before they bubble to the editor's root click handler, so the
    parent .opencanvas-section was being selected instead of the element the Owner
    was actually trying to pick. A transparent ::after pseudo-element on the
-   wrapper catches the click at the wrapper level \u2014 pseudo-elements report
+   wrapper catches the click at the wrapper level — pseudo-elements report
    their host as the event target, so the existing root handler's
    target.closest('.opencanvas-element') still resolves to the right wrapper.
    The shield disables itself once the element is selected, so a second
@@ -2445,7 +2445,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   cursor: pointer;
   background: transparent;
 }
-/* Pass-7 retest showed only chart was actually selectable via the shield \u2014
+/* Pass-7 retest showed only chart was actually selectable via the shield —
    the other four widgets render content that creates its own stacking
    context (form's input, table's td, code's syntax highlighter spans,
    carousel's transform-positioned slides). Those descendants stack above
@@ -2469,7 +2469,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   pointer-events: auto;
 }
 
-/* Resize handles \u2014 small white squares with red border, mirrors .selbox .h. */
+/* Resize handles — small white squares with red border, mirrors .selbox .h. */
 .opencanvas-element .resize-handle {
   position: absolute;
   width: 9px;
@@ -2657,7 +2657,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   border-radius: 8px;
 }
 
-/* Element style override resets \u2014 editor preview mirrors public-styles.ts */
+/* Element style override resets — editor preview mirrors public-styles.ts */
 .opencanvas-element[data-es-bg] > .opencanvas-surface,
 .opencanvas-element[data-es-bg] > .opencanvas-action,
 .opencanvas-element[data-es-bg] > .opencanvas-shape { background: transparent; }
@@ -2685,7 +2685,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   color: var(--opencanvas-fg-mute);
 }
 
-/* Nav element preview \u2014 mirrors src/canvas/public-styles.ts nav block so
+/* Nav element preview — mirrors src/canvas/public-styles.ts nav block so
    layout=left-right / left-center-right, siteTitle, primaryAction, and logo
    all reflect live in the editor canvas. Without these rules the slot divs
    would stack at default block flow and layout changes would do nothing
@@ -2863,7 +2863,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   scroll-snap-align: start;
 }
 
-/* Inspector dock (.ipanel in editor.html) \u2014 surface + left hairline,
+/* Inspector dock (.ipanel in editor.html) — surface + left hairline,
    sans body. Field labels keep mono ONLY for the .meta debug strip; the
    form labels themselves switch to sans-bold per Open Canvas. */
 #canvas-inspector {
@@ -2894,7 +2894,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 /* The inspector-toggle lives as a sibling of #canvas-inspector (outside
    the clipped box) so it stays reachable when the inspector is
    collapsed to 0 width OR is hidden entirely. */
-/* Inspector toggle \u2014 fixed-positioned sibling of #canvas-inspector so it
+/* Inspector toggle — fixed-positioned sibling of #canvas-inspector so it
    stays reachable when the inspector is collapsed (width:0) or hidden.
    Sits visually attached to the inspector's left edge in both states;
    the sibling combinator below moves it flush to the viewport edge once
@@ -3046,12 +3046,12 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 }
 /* Default styling for any <button> that lives inside the inspector dock
    without its own class. The mount* functions (carousel slides, form
-   fields, table rows, accordion items, links list, \u2026) create their
-   action buttons with createElement("button") and never set a class \u2014
+   fields, table rows, accordion items, links list, …) create their
+   action buttons with createElement("button") and never set a class —
    browser-default chrome looked broken against the rest of the panel.
    :where() strips the ID's specificity so every existing class-based
    button selector inside the inspector (.opencanvas-section-inspector-grid
-   button, .picker-current-actions button, .inspector-close, \u2026) still
+   button, .picker-current-actions button, .inspector-close, …) still
    wins via normal cascade. */
 :where(#canvas-inspector) button {
   appearance: none;
@@ -3078,7 +3078,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 
 /* Add / remove affordances for compound element inspectors (nav links,
    carousel slides, accordion items, form fields, table rows/cols).
-   Default buttons read as "field actions" \u2014 too quiet to invite the
+   Default buttons read as "field actions" — too quiet to invite the
    owner to add a new sibling, and the per-item Remove button was the
    same shape as the field below it. These two classes give those
    actions a louder, more discoverable shape. */
@@ -3259,7 +3259,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   width: 70px;
   padding: 7px 10px;
 }
-/* Range slider (.slider in editor.html) \u2014 track is surface-3, thumb is
+/* Range slider (.slider in editor.html) — track is surface-3, thumb is
    the brand red disk. Both the WebKit + Moz selectors are stamped so the
    appearance matches across engines. */
 #canvas-inspector .style-row input[type="range"],
@@ -3448,7 +3448,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 }
 /* Inspector close button + header layout (c9d761f).
    The base #canvas-inspector and h3 rules above this block already
-   come from the Open Canvas rebrand \u2014 only the inspector-header
+   come from the Open Canvas rebrand — only the inspector-header
    row + inspector-close button are added here. */
 #canvas-inspector .inspector-header {
   display: flex;
@@ -3662,7 +3662,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   box-shadow: 0 0 4px var(--opencanvas-accent);
 }
 
-/* Status bar (.status in editor.html) \u2014 surface + top hairline at the
+/* Status bar (.status in editor.html) — surface + top hairline at the
    bottom of the chrome, sans-faint typography so it reads as ambient state. */
 .opencanvas-editor-status {
   position: fixed;
@@ -3732,11 +3732,11 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   cursor: text;
 }
 
-/* Inline mark toolbar \u2014 only present in the DOM while a text element is in
+/* Inline mark toolbar — only present in the DOM while a text element is in
    edit mode. Appended to document.body and pinned via position: fixed by
    the client so it stays anchored above the text element regardless of
    body scroll. */
-/* Inline mark toolbar \u2014 floats above contenteditable text. Surface chip
+/* Inline mark toolbar — floats above contenteditable text. Surface chip
    with brand-red hover, mirrors the zoom toolbar's pill aesthetic. */
 .opencanvas-mark-toolbar {
   position: fixed;
@@ -3813,7 +3813,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   outline: 2px solid var(--red);
   outline-offset: 1px;
 }
-/* Alignment buttons \u2014 pressed state mirrors the active alignment. */
+/* Alignment buttons — pressed state mirrors the active alignment. */
 .opencanvas-mark-toolbar .opencanvas-mark-align svg {
   display: block;
   pointer-events: none;
@@ -3823,7 +3823,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   background: var(--surface-2);
   color: var(--ink);
 }
-/* Text color \u2014 color-wheel SVG with a centered dot showing the active color.
+/* Text color — color-wheel SVG with a centered dot showing the active color.
    Native <input type="color"> is hidden behind the button so clicking the
    wheel opens the OS color picker. The wheel's six colored segments make
    "change text colour" obvious at a glance; the center dot fill mirrors the
@@ -3849,7 +3849,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   border: 0;
   padding: 0;
 }
-/* AI rewrite button \u2014 accent emphasis, mirrors inspector aiBtn styling. */
+/* AI rewrite button — accent emphasis, mirrors inspector aiBtn styling. */
 .opencanvas-mark-toolbar .opencanvas-mark-ai {
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -3860,12 +3860,12 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   background: var(--accent-soft, var(--surface-2));
 }
 
-/* Link popover \u2014 singleton floating bar shown when the mouse enters or the
+/* Link popover — singleton floating bar shown when the mouse enters or the
    caret enters an <a> inside the text element currently in edit mode. Two
    trigger modes are visually indicated by data-opencanvas-link-popover-pinned.
    Positioned below (or above) the link via position: fixed. Z-index above
    the mark toolbar (180). */
-/* Link popover \u2014 floating chip above an inline link inside a text element
+/* Link popover — floating chip above an inline link inside a text element
    in edit mode. Same warm-surface chip language as the mark toolbar. */
 .opencanvas-link-popover {
   position: fixed;
@@ -4018,7 +4018,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 
 /* Inspector compact button group: flex-row of small uniform buttons.
    Used by the collection custom-template controls (Edit / Done /
-   Reset) \u2014 historically called z-order-buttons because the inspector
+   Reset) — historically called z-order-buttons because the inspector
    exposed bring-forward / send-back rows here; those moved to the
    element menu (refactor/element-inspector-dedupe-block-menu), but
    the class lives on as a generic compact-button-group container. */
@@ -4043,7 +4043,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   border-color: var(--opencanvas-accent);
 }
 
-/* Inline link mark \u2014 both editor preview and published renderer use this
+/* Inline link mark — both editor preview and published renderer use this
    class so the visual treatment stays in sync. */
 .opencanvas-inline-link {
   color: inherit;
@@ -4055,7 +4055,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   color: var(--kit-accent, currentColor);
 }
 
-/* AI preview panel \u2014 transient overlay that appears after the canvas-agent
+/* AI preview panel — transient overlay that appears after the canvas-agent
    preview endpoint returns. Mirrors editor.html .ai-op (the "operation"
    card inside .ai-panel): soft red surface with red-line border so the
    suggestion reads as a brand-coloured pending action. */
@@ -4124,7 +4124,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   color: #fff;
 }
 
-/* Animation replay \u2014 owner-only control surfaced over an element while
+/* Animation replay — owner-only control surfaced over an element while
    selected so they can re-trigger entrance/scroll animations without
    reloading the preview. */
 .opencanvas-replay-btn {
@@ -4189,7 +4189,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   background: var(--opencanvas-bg-hover);
 }
 
-/* Modal overlay \u2014 replaces window.prompt() for the link/AI dialogs. Single
+/* Modal overlay — replaces window.prompt() for the link/AI dialogs. Single
    modal stack only; the JS throws if two are opened at once. Mirrors the
    Open Canvas component primitives: surface card + rounded corners +
    shadow-lg, brand-red pill on the primary action. */
@@ -4334,7 +4334,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   transform: translateY(-1px);
 }
 
-/* AI trigger buttons \u2014 inspector + section toolbar both stamp these.
+/* AI trigger buttons — inspector + section toolbar both stamp these.
    Soft red surface with red-line border, mirrors .btn-ai in editor.html. */
 [data-ai-button] {
   appearance: none;
@@ -4355,7 +4355,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 }
 [data-ai-button]:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Inspector kit summary \u2014 a small read-only readout of the active kit's
+/* Inspector kit summary — a small read-only readout of the active kit's
    accent / display font / motion duration. Helps the Owner see at a glance
    which kit they're editing without having to scroll the header. */
 .opencanvas-kit-summary {
@@ -4403,7 +4403,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 /* Remote-cursor overlay layer. Position:fixed at the viewport so each
    caret can be placed straight from a getBoundingClientRect result with
    no scroll-offset math. pointer-events:none keeps the caret/label
-   ornamental \u2014 local interaction always passes through to the canvas
+   ornamental — local interaction always passes through to the canvas
    beneath. */
 .opencanvas-presence-layer {
   position: fixed;
@@ -4441,7 +4441,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 }
 
 /* -------------------------------------------------------------------------
-   Media picker \u2014 inspector widget for media elements. Three rows:
+   Media picker — inspector widget for media elements. Three rows:
    current-row (thumb + upload + AI + alt), history-row (MRU thumbs),
    gallery-grid (all owner assets of matching kind).
    ------------------------------------------------------------------------- */
@@ -4497,7 +4497,7 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   flex-wrap: nowrap;
   align-items: center;
   /* Reserve a row's worth of height so the slot never collapses to zero
-     while a refresh is in flight \u2014 keeps the labels below from jumping. */
+     while a refresh is in flight — keeps the labels below from jumping. */
   min-height: 60px;
 }
 
@@ -4850,6 +4850,735 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 .opencanvas-version-pill::-webkit-scrollbar-corner,
 .opencanvas-modal::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+
+/* ===== ADR 0066 variant-preset layer ================================== */
+
+/* ---- Accordion: parameterise overridable inner-part values ----------- */
+.opencanvas-accordion { gap: var(--opencanvas-accordion-gap, 8px); }
+.opencanvas-accordion-item {
+  background: var(--opencanvas-accordion-item-bg, var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06)));
+  border: var(--opencanvas-accordion-item-border, var(--opencanvas-accordion-item-border-width, 1px) solid var(--opencanvas-accordion-item-border-color, var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18))));
+  border-radius: var(--opencanvas-accordion-item-radius, var(--opencanvas-kit-radius, 8px));
+  box-shadow: var(--opencanvas-accordion-item-shadow, none);
+}
+.opencanvas-accordion-header {
+  padding: var(--opencanvas-accordion-header-pad-y, 12px) var(--opencanvas-accordion-header-pad-x, 16px);
+  background: var(--opencanvas-accordion-header-bg, transparent);
+  color: var(--opencanvas-accordion-header-color, inherit);
+}
+.opencanvas-accordion-body {
+  padding: var(--opencanvas-accordion-body-pad-y, 0) var(--opencanvas-accordion-body-pad-x, 16px) var(--opencanvas-accordion-body-pad-y, 14px);
+  color: var(--opencanvas-accordion-body-color, inherit);
+  font-size: var(--opencanvas-accordion-body-font-size, 14px);
+  line-height: var(--opencanvas-accordion-body-line-height, 1.55);
+}
+/* list = current look (all fallbacks). VAR-SETTING arms live on the OUTER
+   .opencanvas-element wrapper — the same element pinnedStyle lands on — so an
+   inline pinnedStyle override of a --opencanvas-accordion-* property beats the
+   stylesheet arm (kit < variant < granular). Setting the vars on a child arm
+   would lose to pinnedStyle's wrapper value only by proximity, so the wrapper is
+   the correct host. Structural arm rules (no granular contract) stay on inner. */
+.opencanvas-element[data-element-type="accordion"][data-variant="bordered"] {
+  --opencanvas-accordion-gap: 0;
+  --opencanvas-accordion-item-bg: transparent;
+  --opencanvas-accordion-item-radius: 0;
+  --opencanvas-accordion-item-border-width: 0;
+}
+.opencanvas-accordion[data-variant="bordered"] .opencanvas-accordion-item {
+  border-bottom: 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
+}
+.opencanvas-element[data-element-type="accordion"][data-variant="cards"] {
+  --opencanvas-accordion-gap: 12px;
+  --opencanvas-accordion-item-radius: 12px;
+  --opencanvas-accordion-item-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.opencanvas-element[data-element-type="accordion"][data-variant="filled"] {
+  --opencanvas-accordion-header-bg: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.1));
+}
+.opencanvas-accordion[data-variant="filled"] .opencanvas-accordion-header[aria-expanded="true"] {
+  background: var(--opencanvas-kit-accent, #7dd3fc);
+  color: var(--opencanvas-kit-bg, #0c0c0d);
+}
+
+/* ---- Tabs: classic = current look (filled active-tab pill, untouched). Arms
+   set component vars on the wrapper where a modeled override must be able to
+   beat them; structural layout nudges stay on the inner root. */
+.opencanvas-tab-bar {
+  gap: var(--opencanvas-tabs-bar-gap, 8px);
+  background: var(--opencanvas-tabs-bar-bg, transparent);
+  border: var(--opencanvas-tabs-bar-border-width, 0) solid var(--opencanvas-tabs-bar-border-color, transparent);
+  border-bottom-width: var(--opencanvas-tabs-bar-border-width, 1px);
+  border-bottom-color: var(--opencanvas-tabs-bar-border-color, var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18)));
+  border-radius: var(--opencanvas-tabs-bar-radius, 0);
+}
+.opencanvas-tab {
+  border-radius: var(--opencanvas-tabs-tab-radius, var(--opencanvas-kit-radius, 8px));
+  color: var(--opencanvas-tabs-tab-color, var(--opencanvas-kit-muted, #9ca3af));
+  padding: var(--opencanvas-tabs-tab-pad-y, 0) var(--opencanvas-tabs-tab-pad-x, 18px);
+  font-weight: var(--opencanvas-tabs-tab-font-weight, 600);
+}
+.opencanvas-tab[data-tab-active] {
+  background: var(--opencanvas-tabs-active-tab-bg, var(--opencanvas-kit-accent, #7dd3fc));
+  color: var(--opencanvas-tabs-active-tab-color, var(--opencanvas-kit-bg, #0c0c0d));
+  font-weight: var(--opencanvas-tabs-active-tab-font-weight, var(--opencanvas-tabs-tab-font-weight, 600));
+  box-shadow: inset 0 -2px 0 0 var(--opencanvas-tabs-active-indicator-color, transparent);
+}
+.opencanvas-tab-panel {
+  background: var(--opencanvas-tabs-panel-bg, transparent);
+  border: var(--opencanvas-tabs-panel-border-width, 0) solid var(--opencanvas-tabs-panel-border-color, transparent);
+  border-radius: var(--opencanvas-tabs-panel-radius, 0);
+}
+.opencanvas-element[data-element-type="tabs"][data-variant="underline"] {
+  --opencanvas-tabs-active-tab-bg: transparent;
+  --opencanvas-tabs-active-tab-color: var(--opencanvas-kit-accent, #7dd3fc);
+  --opencanvas-tabs-tab-radius: 0;
+  --opencanvas-tabs-active-indicator-color: var(--opencanvas-kit-accent, #7dd3fc);
+}
+.opencanvas-tabs[data-variant="underline"] .opencanvas-tab[data-tab-active] {
+  border-radius: 0;
+}
+.opencanvas-element[data-element-type="tabs"][data-variant="pill"] {
+  --opencanvas-tabs-tab-radius: 9999px;
+}
+.opencanvas-tabs[data-variant="pill"] .opencanvas-tab { border-radius: var(--opencanvas-tabs-tab-radius, 9999px); }
+.opencanvas-element[data-element-type="tabs"][data-variant="segmented"] {
+  --opencanvas-tabs-bar-gap: 0;
+  --opencanvas-tabs-bar-bg: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  --opencanvas-tabs-bar-border-width: 1px;
+  --opencanvas-tabs-bar-border-color: var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
+  --opencanvas-tabs-bar-radius: 9999px;
+  --opencanvas-tabs-tab-radius: 9999px;
+}
+.opencanvas-tabs[data-variant="segmented"] .opencanvas-tab-bar {
+  padding: 4px;
+  width: max-content;
+}
+.opencanvas-tabs[data-variant="segmented"] .opencanvas-tab { border-radius: var(--opencanvas-tabs-tab-radius, 9999px); }
+
+/* ---- Carousel: classic = current look. The other arms repaint slides. */
+.opencanvas-carousel[data-variant="ken-burns"] .opencanvas-carousel-image {
+  animation: opencanvas-ken-burns 14s ease-in-out infinite alternate;
+}
+.opencanvas-element[data-element-type="carousel"][data-variant="editorial"] {
+  --opencanvas-carousel-caption-pad-y: 28px;
+  --opencanvas-carousel-caption-pad-x: 32px;
+  --opencanvas-carousel-caption-font-size: 18px;
+  --opencanvas-carousel-caption-font-weight: 600;
+  --opencanvas-carousel-caption-bg: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0));
+}
+/* coverflow: the carousel runtime publishes --opencanvas-slide-offset (signed
+   distance to the active slide) per slide; CSS positions/scales/dims from it.
+   PAGINATE MODE ONLY — scroll-snap already lays slides out as a relative flex
+   rail, and stacking coverflow on top of it is incompatible, so the arm is
+   scoped out of scroll-snap. --opencanvas-coverflow-depth is |offset| CLAMPED to
+   [0,3] so scale stays in [0.52,1] and opacity in [0.1,1] — never negative for
+   far slides. Runtime publishes state, CSS paints — no DOM branch (ADR dec 3). */
+.opencanvas-carousel[data-variant="coverflow"]:not([data-opencanvas-carousel-mode="scroll-snap"]) {
+  overflow: visible;
+}
+.opencanvas-carousel[data-variant="coverflow"]:not([data-opencanvas-carousel-mode="scroll-snap"]) .opencanvas-carousel-slide {
+  --opencanvas-coverflow-depth: min(3, max(var(--opencanvas-slide-offset, 0), var(--opencanvas-slide-offset, 0) * -1));
+  opacity: calc(1 - 0.3 * var(--opencanvas-coverflow-depth));
+  visibility: visible;
+  transform: translateX(calc(var(--opencanvas-slide-offset, 0) * 56%))
+    scale(calc(1 - 0.16 * var(--opencanvas-coverflow-depth)));
+  transition: transform 320ms ease, opacity 320ms ease;
+  z-index: calc(10 - var(--opencanvas-coverflow-depth));
+}
+@keyframes opencanvas-ken-burns {
+  from { transform: scale(1); }
+  to { transform: scale(1.12); }
+}
+
+/* ---- Form: classic = current. Each arm SETS --opencanvas-form-* custom
+   properties on the OUTER wrapper, so typed formStyle emitted inline on that
+   wrapper can override modeled values without proximity games. Direct
+   descendant declarations are used only for unmodeled structural treatments
+   (the underline bottom-rule, brutalist offset shadow, and spotlight layout). */
+.opencanvas-element[data-element-type="form"][data-variant="underline"] {
+  --opencanvas-form-input-border-width: 0;
+  --opencanvas-form-input-radius: 0;
+  --opencanvas-form-input-pad-x: 0;
+}
+.opencanvas-form[data-variant="underline"] .opencanvas-form-input,
+.opencanvas-form[data-variant="underline"] .opencanvas-form select {
+  border-bottom: 1px solid var(--opencanvas-form-input-border-color, var(--opencanvas-hairline));
+  background: transparent;
+}
+.opencanvas-element[data-element-type="form"][data-variant="card"] {
+  --opencanvas-form-field-surface-pad-y: 14px;
+  --opencanvas-form-field-surface-pad-x: 16px;
+  --opencanvas-form-field-surface-radius: var(--opencanvas-kit-radius, 10px);
+  --opencanvas-form-field-surface-bg: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  --opencanvas-form-field-surface-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+}
+.opencanvas-element[data-element-type="form"][data-variant="brutalist"] {
+  --opencanvas-form-input-border-width: 2px;
+  --opencanvas-form-input-border-color: currentColor;
+  --opencanvas-form-input-radius: 0;
+  --opencanvas-form-submit-radius: 0;
+}
+.opencanvas-form[data-variant="brutalist"] .opencanvas-form-input,
+.opencanvas-form[data-variant="brutalist"] .opencanvas-form select {
+  box-shadow: 4px 4px 0 0 currentColor;
+}
+.opencanvas-form[data-variant="brutalist"] .opencanvas-form-label {
+  font-family: var(--opencanvas-kit-font-mono, ui-monospace, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.opencanvas-form[data-variant="brutalist"] .opencanvas-form-submit { border-radius: 0; box-shadow: 4px 4px 0 0 currentColor; }
+/* spotlight: the card look + a pointer-follow radial glow. The glow centre is
+   --opencanvas-ptr-x/y (published by the pointer-fx runtime); when the runtime
+   has not run the 50%/50% fallbacks render a deliberate, authored centred glow
+   (ADR dec 6 — the static base is a shippable look, not a silent fallback). */
+.opencanvas-form[data-variant="spotlight"] {
+  padding: 20px;
+  border-radius: var(--opencanvas-kit-radius, 12px);
+  background:
+    radial-gradient(
+      var(--opencanvas-form-spotlight-glow-size, 240px) circle at var(--opencanvas-ptr-x, 50%) var(--opencanvas-ptr-y, 50%),
+      color-mix(in oklab, var(--opencanvas-form-spotlight-glow-color, var(--opencanvas-kit-accent, #7dd3fc)) calc(var(--opencanvas-form-spotlight-glow-opacity, 0.22) * 100%), transparent),
+      transparent 70%
+    ),
+    var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+}
+
+/* ---- pointer-fx: generic CSS hooks any element with the attribute uses.
+   spotlight publishes --opencanvas-ptr-x/y (consumed per-variant above);
+   tilt publishes --opencanvas-tilt-x/y, applied generically here;
+   magnetic publishes --opencanvas-magnetic-x/y, applied generically here;
+   cursor-follow publishes --opencanvas-cursor-follow-x/y, applied here;
+   reveal-mask publishes --opencanvas-reveal-x/y, applied here;
+   pointer-parallax publishes --opencanvas-parallax-x/y, applied here;
+   cursor-trail appends .opencanvas-pointer-trail spans rendered here;
+   image-follow appends .opencanvas-pointer-image-follow rendered here;
+   drag-inertia publishes --opencanvas-drag-x/y and a dragging state. */
+.opencanvas-element[data-opencanvas-pointer-fx="spotlight"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      220px circle at var(--opencanvas-ptr-x, 50%) var(--opencanvas-ptr-y, 50%),
+      color-mix(in oklab, var(--opencanvas-kit-accent, currentColor) 24%, transparent),
+      transparent 70%
+    );
+  opacity: 0.7;
+}
+
+[data-opencanvas-pointer-fx="reveal-mask"] {
+  clip-path: circle(180px at var(--opencanvas-reveal-x, 50%) var(--opencanvas-reveal-y, 50%));
+  overflow: hidden;
+  transition: clip-path 120ms ease-out;
+  will-change: clip-path;
+}
+
+[data-opencanvas-pointer-fx="tilt"] {
+  transform: perspective(700px)
+    rotateX(var(--opencanvas-tilt-y, 0deg))
+    rotateY(var(--opencanvas-tilt-x, 0deg));
+  transition: transform 120ms ease;
+  transform-style: preserve-3d;
+}
+
+[data-opencanvas-pointer-fx="magnetic"] {
+  transform: translate3d(
+    var(--opencanvas-magnetic-x, 0px),
+    var(--opencanvas-magnetic-y, 0px),
+    0
+  );
+  transition: transform 160ms ease-out;
+  will-change: transform;
+}
+
+[data-opencanvas-pointer-fx="cursor-follow"] {
+  transform: translate3d(
+    var(--opencanvas-cursor-follow-x, 0px),
+    var(--opencanvas-cursor-follow-y, 0px),
+    0
+  );
+  transition: transform 90ms linear;
+  will-change: transform;
+}
+
+[data-opencanvas-pointer-fx="pointer-parallax"] {
+  transform: translate3d(
+    var(--opencanvas-parallax-x, 0px),
+    var(--opencanvas-parallax-y, 0px),
+    0
+  );
+  transition: transform 180ms ease-out;
+  will-change: transform;
+}
+
+[data-opencanvas-pointer-fx="cursor-trail"] {
+  overflow: hidden;
+}
+
+.opencanvas-pointer-trail {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: color-mix(in oklab, var(--opencanvas-kit-accent, currentColor) 42%, transparent);
+  transform: translate(-50%, -50%) scale(0.65);
+  animation: opencanvas-pointer-trail 560ms ease-out forwards;
+}
+
+.opencanvas-pointer-image-follow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(180px, 42%);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 18px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.92);
+  transition:
+    opacity 140ms ease-out,
+    transform 140ms ease-out,
+    left 90ms linear,
+    top 90ms linear;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.opencanvas-pointer-image-follow[data-opencanvas-pointer-image-follow-active="true"] {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+[data-opencanvas-pointer-fx="drag-inertia"] {
+  transform: translate3d(
+    var(--opencanvas-drag-x, 0px),
+    var(--opencanvas-drag-y, 0px),
+    0
+  );
+  transition: transform 120ms ease-out;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+}
+
+[data-opencanvas-pointer-fx="drag-inertia"][data-opencanvas-pointer-fx-dragging="true"] {
+  cursor: grabbing;
+  transition: none;
+}
+
+@keyframes opencanvas-pointer-trail {
+  0% {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(0.65);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.4);
+  }
+}
+
+[data-opencanvas-route-container] {
+  view-transition-name: opencanvas-site;
+}
+[data-opencanvas-route-state="outgoing"] {
+  pointer-events: none;
+}
+[data-opencanvas-route-mode="fade"][data-opencanvas-route-state="outgoing"] {
+  opacity: 0;
+}
+[data-opencanvas-route-mode="slide"][data-opencanvas-route-state="outgoing"] {
+  transform: translateX(-24px);
+  opacity: 0;
+}
+[data-opencanvas-route-mode="wipe"][data-opencanvas-route-state="outgoing"] {
+  clip-path: inset(0 100% 0 0);
+}
+html[data-opencanvas-route-view-mode="crossfade"]::view-transition-old(opencanvas-site),
+html[data-opencanvas-route-view-mode="crossfade"]::view-transition-new(opencanvas-site) {
+  animation-duration: var(--opencanvas-route-duration, 260ms);
+  animation-timing-function: var(--opencanvas-route-easing, ease-in-out);
+}
+html[data-opencanvas-route-view-mode="crossfade"]::view-transition-old(opencanvas-site) {
+  animation-name: opencanvas-route-crossfade-out;
+}
+html[data-opencanvas-route-view-mode="crossfade"]::view-transition-new(opencanvas-site) {
+  animation-name: opencanvas-route-crossfade-in;
+}
+html[data-opencanvas-route-view-mode="mask"]::view-transition-old(opencanvas-site),
+html[data-opencanvas-route-view-mode="mask"]::view-transition-new(opencanvas-site) {
+  animation-duration: var(--opencanvas-route-duration, 320ms);
+  animation-timing-function: var(--opencanvas-route-easing, cubic-bezier(.76,0,.24,1));
+}
+html[data-opencanvas-route-view-mode="mask"]::view-transition-old(opencanvas-site) {
+  animation-name: opencanvas-route-mask-out;
+}
+html[data-opencanvas-route-view-mode="mask"]::view-transition-new(opencanvas-site) {
+  animation-name: opencanvas-route-mask-in;
+}
+@keyframes opencanvas-route-crossfade-out {
+  from { opacity: 1; filter: blur(0); }
+  to { opacity: 0; filter: blur(10px); }
+}
+@keyframes opencanvas-route-crossfade-in {
+  from { opacity: 0; filter: blur(10px); }
+  to { opacity: 1; filter: blur(0); }
+}
+@keyframes opencanvas-route-mask-out {
+  from { clip-path: inset(0 0 0 0 round 0); opacity: 1; }
+  to { clip-path: inset(0 0 0 100% round 28px); opacity: 0.72; }
+}
+@keyframes opencanvas-route-mask-in {
+  from { clip-path: inset(0 100% 0 0 round 28px); opacity: 0.72; }
+  to { clip-path: inset(0 0 0 0 round 0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-opencanvas-route-view-mode]::view-transition-old(opencanvas-site),
+  html[data-opencanvas-route-view-mode]::view-transition-new(opencanvas-site) {
+    animation-duration: 1ms;
+    animation-name: opencanvas-route-crossfade-in;
+  }
+}
+
+[data-opencanvas-overlays-root] {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100000;
+}
+.opencanvas-overlay[hidden] {
+  display: none;
+}
+.opencanvas-overlay[data-opencanvas-overlay-open] {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+}
+.opencanvas-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.56);
+}
+.opencanvas-overlay[data-opencanvas-overlay-backdrop-style="blur"] .opencanvas-overlay-backdrop {
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(18px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-backdrop-style="solid"] .opencanvas-overlay-backdrop {
+  background: var(--opencanvas-kit-bg, #0c0c0d);
+}
+.opencanvas-overlay-surface {
+  position: relative;
+  z-index: 1;
+  max-width: min(92vw, 960px);
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--opencanvas-kit-bg, #0c0c0d);
+  color: var(--opencanvas-kit-text, #f6f6f6);
+}
+.opencanvas-overlay[data-opencanvas-overlay-chrome="glass-panel"] .opencanvas-overlay-surface {
+  border: 1px solid color-mix(in oklab, currentColor 18%, transparent);
+  border-radius: 28px;
+  background: color-mix(in oklab, var(--opencanvas-kit-bg, #0c0c0d) 76%, transparent);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(24px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-chrome="editorial-frame"] .opencanvas-overlay-surface {
+  border: 1px solid color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 44%, transparent);
+  border-radius: 0;
+  box-shadow: inset 0 0 0 10px color-mix(in oklab, var(--opencanvas-kit-bg, #0c0c0d) 84%, transparent);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="fullscreen-menu"][data-opencanvas-overlay-open] {
+  place-items: stretch;
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="fullscreen-menu"] .opencanvas-overlay-backdrop {
+  background: var(--opencanvas-kit-bg, #0c0c0d);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="fullscreen-menu"] .opencanvas-overlay-surface {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 12% 18%, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 22%, transparent), transparent 34%),
+    var(--opencanvas-kit-bg, #0c0c0d);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="lightbox"][data-opencanvas-overlay-open] {
+  place-items: center;
+  padding: min(6vw, 56px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="lightbox"] .opencanvas-overlay-backdrop {
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(10px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="lightbox"] .opencanvas-overlay-surface {
+  width: min(94vw, 1180px);
+  max-height: min(92vh, 860px);
+  border-radius: 18px;
+  background: #050505;
+  box-shadow: 0 32px 120px rgba(0, 0, 0, 0.58);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="command-palette"][data-opencanvas-overlay-open] {
+  place-items: start center;
+  padding: min(14vh, 96px) min(5vw, 48px) 32px;
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="command-palette"] .opencanvas-overlay-backdrop {
+  background: rgba(4, 5, 8, 0.48);
+  backdrop-filter: blur(14px) saturate(1.25);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="command-palette"] .opencanvas-overlay-surface {
+  width: min(92vw, 720px);
+  max-height: min(72vh, 720px);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--opencanvas-kit-panel, #ffffff) 96%, transparent), color-mix(in oklab, var(--opencanvas-kit-panel, #ffffff) 88%, var(--opencanvas-kit-bg, #0c0c0d))),
+    var(--opencanvas-kit-panel, #ffffff);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38), 0 0 0 1px color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 22%, transparent);
+  overflow: hidden;
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="product-tour"][data-opencanvas-overlay-open] {
+  place-items: end center;
+  padding: 32px min(5vw, 48px) min(9vh, 72px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="product-tour"] .opencanvas-overlay-backdrop {
+  background: rgba(4, 5, 8, 0.34);
+  backdrop-filter: blur(8px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-presentation="product-tour"] .opencanvas-overlay-surface {
+  width: min(92vw, 560px);
+  max-height: min(68vh, 620px);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 18%, transparent), transparent 36%),
+    var(--opencanvas-kit-panel, #ffffff);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32), 0 0 0 1px color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 28%, transparent);
+}
+.opencanvas-overlay[data-opencanvas-overlay-layout="split-rail"][data-opencanvas-overlay-open] {
+  place-items: stretch;
+}
+.opencanvas-overlay[data-opencanvas-overlay-layout="split-rail"] .opencanvas-overlay-surface {
+  width: min(100vw, 1320px);
+  min-height: min(100vh, 860px);
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  overflow: auto;
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 28%, transparent) 0 32%, transparent 32%),
+    radial-gradient(circle at 18% 24%, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 22%, transparent), transparent 34%),
+    var(--opencanvas-kit-bg, #0c0c0d);
+}
+.opencanvas-overlay[data-opencanvas-overlay-layout="mega-menu-grid"][data-opencanvas-overlay-open] {
+  place-items: stretch;
+  padding: clamp(16px, 3vw, 48px);
+}
+.opencanvas-overlay[data-opencanvas-overlay-layout="mega-menu-grid"] .opencanvas-overlay-surface {
+  width: min(100%, 1440px);
+  min-height: min(92vh, 920px);
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  overflow: auto;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--opencanvas-kit-accent, #f97316) 16%, transparent), transparent 42%),
+    linear-gradient(180deg, color-mix(in oklab, var(--opencanvas-kit-bg, #0c0c0d) 92%, transparent), var(--opencanvas-kit-bg, #0c0c0d));
+}
+.opencanvas-overlay--fullscreen-menu .opencanvas-overlay-close {
+  top: 24px;
+  right: 24px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in oklab, currentColor 28%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--opencanvas-kit-bg, #0c0c0d) 72%, transparent);
+  color: inherit;
+}
+.opencanvas-overlay-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+}
+.opencanvas-overlay[data-opencanvas-overlay-close-placement="top-left"] .opencanvas-overlay-close,
+.opencanvas-overlay-close--top-left {
+  left: 12px;
+  right: auto;
+}
+.opencanvas-overlay[data-opencanvas-overlay-close-placement="inside"] .opencanvas-overlay-close,
+.opencanvas-overlay-close--inside {
+  top: 20px;
+  right: 20px;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="stagger-rise"][data-opencanvas-overlay-open] .opencanvas-overlay-surface [data-opencanvas-element] {
+  animation: opencanvas-overlay-stagger-rise 520ms cubic-bezier(.22,1,.36,1) both;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="stagger-rise"][data-opencanvas-overlay-open] .opencanvas-overlay-surface [data-opencanvas-element]:nth-of-type(2) {
+  animation-delay: 70ms;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="stagger-rise"][data-opencanvas-overlay-open] .opencanvas-overlay-surface [data-opencanvas-element]:nth-of-type(3) {
+  animation-delay: 140ms;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="mask-sweep"][data-opencanvas-overlay-open] .opencanvas-overlay-surface {
+  animation: opencanvas-overlay-mask-sweep 620ms cubic-bezier(.76,0,.24,1) both;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="slide-stack"][data-opencanvas-overlay-open] .opencanvas-overlay-surface {
+  animation: opencanvas-overlay-slide-stack 560ms cubic-bezier(.22,1,.36,1) both;
+}
+.opencanvas-overlay[data-opencanvas-overlay-choreography="slide-stack"][data-opencanvas-overlay-open] .opencanvas-overlay-backdrop {
+  animation: opencanvas-overlay-backdrop-rise 560ms ease both;
+}
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="instant"] .opencanvas-overlay-surface,
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="instant"] .opencanvas-overlay-backdrop,
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="instant"] .opencanvas-overlay-surface [data-opencanvas-element] {
+  animation-duration: 1ms !important;
+  animation-delay: 0ms !important;
+}
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="fade"] .opencanvas-overlay-surface,
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="fade"] .opencanvas-overlay-backdrop,
+.opencanvas-overlay[data-opencanvas-overlay-reduced-motion-active="fade"] .opencanvas-overlay-surface [data-opencanvas-element] {
+  animation-name: opencanvas-overlay-reduced-fade !important;
+  animation-duration: 140ms !important;
+  animation-delay: 0ms !important;
+}
+@keyframes opencanvas-overlay-stagger-rise {
+  from { opacity: 0; transform: translateY(34px); filter: blur(10px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@keyframes opencanvas-overlay-mask-sweep {
+  from { clip-path: inset(0 0 100% 0 round 32px); transform: scale(1.02); }
+  to { clip-path: inset(0 0 0 0 round 0); transform: scale(1); }
+}
+@keyframes opencanvas-overlay-slide-stack {
+  from { opacity: 0; transform: translate3d(0, 44px, 0) scale(.96); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes opencanvas-overlay-backdrop-rise {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes opencanvas-overlay-reduced-fade {
+  from { opacity: 0; transform: none; clip-path: none; filter: none; }
+  to { opacity: 1; transform: none; clip-path: none; filter: none; }
+}
+
+.opencanvas-load-experience {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: grid;
+  place-items: center;
+  gap: 18px;
+  background: var(--opencanvas-kit-bg, #0c0c0d);
+  color: var(--opencanvas-kit-text, #f6f6f6);
+}
+.opencanvas-load-experience[data-opencanvas-load-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+.opencanvas-load-logo-draw {
+  width: min(420px, 78vw);
+  height: auto;
+  overflow: visible;
+}
+.opencanvas-load-logo-draw text {
+  font: 700 72px/1 var(--opencanvas-kit-heading-font, inherit);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.opencanvas-load-progress {
+  width: min(260px, 60vw);
+  height: 3px;
+  background: rgba(127, 127, 127, 0.25);
+  overflow: hidden;
+}
+.opencanvas-load-progress > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: translateX(-100%);
+  background: var(--opencanvas-kit-accent, currentColor);
+  animation: opencanvas-load-progress 1200ms ease-in-out infinite;
+}
+.opencanvas-load-progress[data-opencanvas-load-progress] {
+  display: grid;
+  gap: 8px;
+  width: min(280px, 64vw);
+  height: auto;
+  background: transparent;
+  overflow: visible;
+}
+.opencanvas-load-progress[data-opencanvas-load-progress] .opencanvas-load-progress-label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+.opencanvas-load-progress[data-opencanvas-load-progress] .opencanvas-load-progress-bar {
+  display: block;
+  width: 100%;
+  height: 3px;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: currentColor;
+  animation: none;
+}
+.opencanvas-load-progress[data-opencanvas-load-progress] .opencanvas-load-progress-number {
+  display: block;
+  width: auto;
+  height: auto;
+  transform: none;
+  background: transparent;
+  animation: none;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+@keyframes opencanvas-load-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+.opencanvas-load-error[hidden] {
+  display: none;
+}
+
+[data-opencanvas-motion-running="true"] {
+  transition:
+    opacity var(--opencanvas-motion-lite-duration, 180ms) var(--opencanvas-motion-lite-easing, ease) var(--opencanvas-motion-lite-delay, 0ms),
+    transform var(--opencanvas-motion-lite-duration, 180ms) var(--opencanvas-motion-lite-easing, ease) var(--opencanvas-motion-lite-delay, 0ms),
+    filter var(--opencanvas-motion-lite-duration, 180ms) var(--opencanvas-motion-lite-easing, ease) var(--opencanvas-motion-lite-delay, 0ms),
+    clip-path var(--opencanvas-motion-lite-duration, 180ms) var(--opencanvas-motion-lite-easing, ease) var(--opencanvas-motion-lite-delay, 0ms);
+}
+[data-opencanvas-motion-effect="fade"][data-opencanvas-motion-running="true"] {
+  opacity: 0;
+}
+[data-opencanvas-motion-effect="slide"][data-opencanvas-motion-running="true"] {
+  transform: translateY(16px);
+}
+[data-opencanvas-motion-effect="scale"][data-opencanvas-motion-running="true"] {
+  transform: scale(0.96);
+}
+[data-opencanvas-motion-effect="wipe"][data-opencanvas-motion-running="true"] {
+  clip-path: inset(0 100% 0 0);
+}
+[data-opencanvas-motion-effect="blur"][data-opencanvas-motion-running="true"] {
+  filter: blur(8px);
+}
+
+@keyframes opencanvas-caret-blink {
+  from, to { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.opencanvas-element[data-opencanvas-element$="-cursor"] {
+  display: inline-block;
 }
 
 @keyframes opencanvas-charcoal-fade-up { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: var(--opencanvas-element-opacity, 1); } }

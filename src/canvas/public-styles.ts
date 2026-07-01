@@ -1153,7 +1153,7 @@ const carouselActiveCss = (() => {
 // rules where a look needs more than a token swap — never a DOM branch). An
 // Owner override via `pinnedStyle` on the root sets the same property inline and
 // wins over the stylesheet arm: kit-token < variant < granular.
-const variantCss = String.raw`
+export const canvasComponentVariantStyles = String.raw`
 /* ===== ADR 0066 variant-preset layer ================================== */
 
 /* ---- Accordion: parameterise overridable inner-part values ----------- */
@@ -1883,4 +1883,4 @@ html[data-opencanvas-route-view-mode="mask"]::view-transition-new(opencanvas-sit
 }
 `;
 
-export const canvasPublishedStyles = `${baseCss}\n${carouselActiveCss}\n${variantCss}\n${kitCss}`;
+export const canvasPublishedStyles = `${baseCss}\n${carouselActiveCss}\n${canvasComponentVariantStyles}\n${kitCss}`;
