@@ -41,7 +41,7 @@ import profileApi from './routes/api/profile';
 import { librarySectionsAdmin } from './routes/api/library-sections';
 import { customTemplatesAdmin } from './routes/api/custom-templates';
 import { ensureSectionLibraryUpserted } from './canvas/section-library';
-import { db } from './db/client';
+import { db, runWithDbRequestScope } from './db/client';
 import { editTokenAuth } from './auth/middleware';
 import { injectClerkBrowserScript } from './auth/clerk-browser-script';
 import editTokenRefreshRoute from './auth/refresh-route';
@@ -53,6 +53,10 @@ import inviteRedirectRoute from './auth/invite-redirect-route';
 import socketRoute from './live/socket-route';
 
 const app = new Hono<PublicEnv>();
+
+app.use('*', async (_c, next) => {
+  await runWithDbRequestScope(next);
+});
 
 // Public host router runs FIRST. If the request host belongs to a Published
 // Site (a subdomain under the configured apex, minus the app host itself),
@@ -74,7 +78,9 @@ app.use('*', async (c, next) => {
 // and never reach here, so the upsert never piggybacks on visitor
 // traffic — only owner/dashboard/api requests trigger it.
 app.use('*', async (c, next) => {
-  c.executionCtx.waitUntil(ensureSectionLibraryUpserted(db(c.env)));
+  c.executionCtx.waitUntil(
+    runWithDbRequestScope(async () => ensureSectionLibraryUpserted(db(c.env))),
+  );
   await next();
 });
 
