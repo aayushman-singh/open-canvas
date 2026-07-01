@@ -1,66 +1,85 @@
-// Database client factory. Production (the deployed Cloudflare Worker)
-// connects through the Hyperdrive binding — postgres.js opens a TCP
-// Postgres connection that Hyperdrive routes to Neon via its globally-warm
-// pool, caching prepared statements colo-side so subsequent queries skip
-// most of the ~240ms Neon RTT we used to pay per request.
+// Database client factory. Production, local development, smokes, migrations,
+// and scripts all connect through DATABASE_URL. The URL should point at the
+// Neon Postgres database that owns Open Canvas state.
 //
-// Smokes, migrations, and any caller running outside the Worker runtime
-// pass DATABASE_URL instead — same postgres.js driver, just dialled
-// straight at the database with no Hyperdrive in front. That keeps the
-// integration smokes and drizzle-kit migration tooling working without a
-// second dialect.
+// Cloudflare Workers bind socket/WebSocket I/O to the request that created it.
+// A module-scope Postgres client works in Node, but in Workers it eventually
+// reuses a prior request's Writable and fails with:
+// "Cannot perform I/O on behalf of a different request."
 //
-// The two paths share the drizzle/postgres-js dialect so query types and
-// SQL behaviour are identical regardless of which env shape called in.
-//
-// CRITICAL: the postgres() client is memoised in module scope so the
-// connection pool + prepared-statement cache survive across requests in
-// the same Worker isolate. Creating a fresh client per request (the naive
-// `db(env)` shape) opens a new TLS connection every time, defeats
-// Hyperdrive's whole reason for existing, and measured 2x SLOWER than
-// the @neondatabase/serverless HTTP driver we replaced. Module-scope
-// memoisation makes Hyperdrive's pool work as designed.
+// Keep the Drizzle handle request-scoped instead: reused within one request,
+// closed before that request scope exits, and never shared across requests.
 
-import postgres from 'postgres';
-import { drizzle } from 'drizzle-orm/postgres-js';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { Pool } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
 import * as schema from './schema';
 
 export type DbEnv = {
-  /** Cloudflare Hyperdrive binding from wrangler.toml. Preferred in prod. */
-  HYPERDRIVE?: Hyperdrive;
-  /** Raw Postgres connection string. Used by smokes + migration tooling. */
+  /** Neon Postgres connection string. Required in every runtime. */
   DATABASE_URL?: string;
 };
 
 function resolveConnectionString(env: DbEnv): string {
-  // Prefer HYPERDRIVE. Briefly flipped this to DATABASE_URL on d9271dd to
-  // test bypassing Hyperdrive — that turned out 4x SLOWER (~2100ms per
-  // query) because postgres.js's per-request client pays the full TLS +
-  // SCRAM handshake on every direct connection to Neon's pooled endpoint.
-  // Hyperdrive is masking that handshake cost with its colo-warm pool;
-  // skipping Hyperdrive exposed it. Keep HYPERDRIVE as the primary path.
-  if (env.HYPERDRIVE) return env.HYPERDRIVE.connectionString;
-  if (env.DATABASE_URL) return env.DATABASE_URL;
-  throw new Error(
-    'db(): neither HYPERDRIVE binding nor DATABASE_URL is set. ' +
-      'Wire HYPERDRIVE in wrangler.toml for the Worker, or pass DATABASE_URL ' +
-      'for smokes / migrations.',
-  );
+  const value = env.DATABASE_URL;
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error('DATABASE_URL is required for database access.');
+  }
+  return value;
+}
+
+type Database = ReturnType<typeof drizzle<typeof schema>>;
+
+type ScopedClient = {
+  database: Database;
+  pool: Pool;
+};
+
+type DbScope = {
+  clients: Map<string, ScopedClient>;
+};
+
+const dbScope = new AsyncLocalStorage<DbScope>();
+
+async function closeScope(scope: DbScope): Promise<void> {
+  const clients = [...scope.clients.values()];
+  await Promise.all(clients.map(({ pool }) => pool.end()));
+}
+
+export async function runWithDbRequestScope<T>(fn: () => T | Promise<T>): Promise<T> {
+  const scope: DbScope = { clients: new Map() };
+  return await dbScope.run(scope, async () => {
+    try {
+      return await fn();
+    } finally {
+      await closeScope(scope);
+    }
+  });
+}
+
+function createClient(connectionString: string): ScopedClient {
+  const pool = new Pool({
+    connectionString,
+    max: 5,
+    allowExitOnIdle: true,
+  });
+  const database = drizzle({ client: pool, schema });
+  return { database, pool };
 }
 
 export function db(env: DbEnv) {
-  const sql = postgres(resolveConnectionString(env), {
-    max: 5,
-    fetch_types: false,
-    // Tried prepare:true with Hyperdrive — every per-request postgres()
-    // client still paid the PREPARE+EXECUTE 2-RTT cycle because Hyperdrive's
-    // statement cache isn't surfacing across short-lived TCP connections in
-    // our config. Disabling prepare drops it to a single round-trip per
-    // query. Per Cloudflare docs this means Hyperdrive can't cache anything,
-    // but caching wasn't happening anyway in our measurements.
-    prepare: false,
-  });
-  return drizzle(sql, { schema });
+  const connectionString = resolveConnectionString(env);
+  const scope = dbScope.getStore();
+  if (scope === undefined) {
+    return createClient(connectionString).database;
+  }
+
+  const existing = scope.clients.get(connectionString);
+  if (existing) return existing.database;
+
+  const client = createClient(connectionString);
+  scope.clients.set(connectionString, client);
+  return client.database;
 }
 
 export type Db = ReturnType<typeof db>;
