@@ -21,7 +21,7 @@ export default defineConfig({
   ],
   ...(!process.env.BASE_URL && {
     webServer: {
-      command: 'npx wrangler dev',
+      command: 'npx wrangler dev --var SMOKE:1',
       url: 'http://127.0.0.1:8787/health',
       reuseExistingServer: true,
       timeout: 30_000,

@@ -63,7 +63,11 @@ export type ClerkKeyEnv = {
 };
 
 type ClerkBindings = HostConfigEnv &
-  ClerkKeyEnv;
+  ClerkKeyEnv & {
+    // Test-only auth bypass. Honoured only when env.SMOKE === "1" and
+    // x-smoke-customer-id is present; production never sets this binding.
+    SMOKE?: string;
+  };
 
 export type ClerkAuthVariables = {
   auth: AuthState;
@@ -86,6 +90,19 @@ type ClerkKeyPair = {
 
 function isNonEmptyString(value: string | undefined): value is string {
   return typeof value === 'string' && value.length > 0;
+}
+
+function smokeClerkClient(): ReturnType<typeof createClerkClient> {
+  return new Proxy(
+    {},
+    {
+      get(_target, property) {
+        throw new Error(
+          `smoke auth bypass does not provide a Clerk client; attempted to read clerk.${String(property)}`,
+        );
+      },
+    },
+  ) as ReturnType<typeof createClerkClient>;
 }
 
 // Module-scope cache for the `clerkUserId → customer` row lookup. Lives in
@@ -305,6 +322,40 @@ export function clerkAuth() {
       }
     } catch {
       // c.get('auth') throws if the variable was never set — continue to Clerk.
+    }
+
+    if (c.env.SMOKE === '1') {
+      const smokeCustomerId = c.req.header('x-smoke-customer-id');
+      if (smokeCustomerId && smokeCustomerId.length > 0) {
+        const rows = await db(c.env)
+          .select()
+          .from(customer)
+          .where(eq(customer.id, smokeCustomerId))
+          .limit(1);
+        const customerRow = rows[0];
+        if (!customerRow) {
+          return c.json({ error: 'smoke customer not found' }, 401);
+        }
+        console.warn('[smoke-auth] using x-smoke-customer-id bypass', {
+          customerId: customerRow.id,
+          clerkUserId: customerRow.clerkUserId,
+          path: new URL(c.req.url).pathname,
+        });
+        c.set('auth', {
+          userId: customerRow.clerkUserId,
+          sessionId: 'sess_smoke',
+          getToken: null,
+        });
+        c.set('user', {
+          id: customerRow.clerkUserId,
+          firstName: customerRow.displayName ?? customerRow.email,
+          imageUrl: '',
+        } as User);
+        c.set('clerk', smokeClerkClient());
+        c.set('customer', customerRow);
+        await next();
+        return;
+      }
     }
 
     const keys = resolveClerkKeys(c.env);
