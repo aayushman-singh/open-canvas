@@ -1194,6 +1194,7 @@ html[data-signed-in] .auth-signed-in.auth-state-wrap { display: contents; }
 
 @media (max-width: 720px) {
   .nav .wrap { gap: 10px; }
+  .nav .right .auth-signed-out .btn-ghost { display: none; }
   .hero-cta { flex-direction: column; align-items: stretch; }
 }
 `;

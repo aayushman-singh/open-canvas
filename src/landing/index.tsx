@@ -110,8 +110,8 @@ function buildAuthDetectScript(publishableKey: string, frontendApiHost: string):
     `},{once:true});` +
     `}` +
     `}` +
-    `}).catch(function(err){` +
-    `console.error("[landing] Clerk.load failed",err);` +
+    `}).catch(function(){` +
+    `document.documentElement.removeAttribute("data-signed-in");` +
     `});` +
     `};` +
     `document.head.appendChild(s);` +

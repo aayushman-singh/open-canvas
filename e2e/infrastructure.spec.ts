@@ -31,7 +31,8 @@ test.describe('Favicon & branding', () => {
 
     const body = await resp.text();
     expect(body).toContain('<svg');
-    expect(body).toContain('r1');
+    expect(body).toContain('#E84D4A');
+    expect(body).toContain('<circle');
   });
 
   test('favicon has CDN-friendly cache headers', async ({ request }) => {
@@ -51,9 +52,9 @@ test.describe('Error handling', () => {
   });
 
   const visitorRoutes = [
-    { name: 'search', method: 'GET' as const, path: '/__rev01/search?q=hello' },
-    { name: 'form submit', method: 'POST' as const, path: '/__rev01/forms/fake-site/fake-form' },
-    { name: 'unlock', method: 'POST' as const, path: '/__rev01/unlock' },
+    { name: 'search', method: 'GET' as const, path: '/__opencanvas/search?q=hello' },
+    { name: 'form submit', method: 'POST' as const, path: '/__opencanvas/forms/fake-site/fake-form' },
+    { name: 'unlock', method: 'POST' as const, path: '/__opencanvas/unlock' },
   ];
 
   for (const { name, method, path } of visitorRoutes) {

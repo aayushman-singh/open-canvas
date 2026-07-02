@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // An unauthenticated user tries to access protected pages and APIs.
-// Every gate should be clear: either a redirect to sign-in (for pages)
+// Every gate should be clear: either a redirect to auth/sign-in (for pages)
 // or a clean JSON error (for APIs). Never a 500, never a blank page,
 // never an HTML error page for an API route.
 
@@ -19,10 +19,11 @@ test.describe('Unauthenticated user — page redirects', () => {
   for (const { name, path } of protectedPages) {
     test(`${name} redirects to sign-in — not a 500 or blank page`, async ({ request }) => {
       const resp = await request.get(path, { maxRedirects: 0 });
-      // Should be a redirect (302) to Clerk sign-in, not a server error
+      // Should be a redirect (302) to the auth surface, not a server error.
       expect(resp.status()).toBe(302);
       const location = resp.headers()['location'] ?? '';
-      expect(location).toContain('sign-in');
+      expect(location).toMatch(/\/auth|sign-in/i);
+      expect(location).toContain('redirect_url=');
     });
   }
 

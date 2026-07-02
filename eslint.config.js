@@ -6,6 +6,9 @@ export default tseslint.config(
     ignores: [
       'dist/',
       'dist-test/',
+      '.cache/',
+      'playwright-report/',
+      'test-results/',
       '.wrangler/',
       '.worktrees/',
       '.claude/',

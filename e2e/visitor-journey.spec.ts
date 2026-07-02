@@ -42,11 +42,10 @@ test.describe('First-time visitor journey', () => {
   });
 
   test('hero section gives a visual preview of the product', async ({ page }) => {
-    const hero = page.getByLabel(/hero/i);
+    const hero = page.getByLabel(/build your website/i);
     await expect(hero).toBeVisible();
-    // The hero should contain multiple panels showing the product
-    const panels = hero.locator('.hero-grid > *');
-    expect(await panels.count()).toBeGreaterThanOrEqual(2);
+    await expect(hero.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.locator('.demo-window')).toBeVisible();
   });
 
   test('visitor can find a primary call-to-action above the fold', async ({ page }) => {
@@ -66,7 +65,7 @@ test.describe('First-time visitor journey', () => {
     const cta = page.getByRole('link', { name: /start building|launch dashboard/i }).first();
     await expect(cta).toBeVisible();
     const href = await cta.getAttribute('href');
-    expect(href).toContain('/dashboard');
+    expect(href).toMatch(/^\/auth|\/dashboard/);
 
     // Click and verify we leave the landing page (either redirect to sign-in or dashboard)
     await cta.click();
@@ -75,7 +74,7 @@ test.describe('First-time visitor journey', () => {
   });
 
   test('visitor sees differentiated value props — not just one blank section', async ({ page }) => {
-    const features = page.getByLabel(/differentiator/i);
+    const features = page.getByLabel(/why people love it/i);
     await expect(features).toBeVisible();
 
     const cards = features.getByRole('article');
@@ -92,7 +91,7 @@ test.describe('First-time visitor journey', () => {
   });
 
   test('footer has a secondary CTA and useful links', async ({ page }) => {
-    const footer = page.getByLabel('footer');
+    const footer = page.getByLabel(/site footer/i);
     await expect(footer).toBeVisible();
 
     // Should have at least one link to get started
@@ -105,18 +104,18 @@ test.describe('First-time visitor journey', () => {
   });
 
   test('navigation bar has brand, docs link, and dashboard shortcut', async ({ page }) => {
-    const nav = page.getByLabel(/rev01 navigation/i);
+    const nav = page.getByLabel(/Open Canvas navigation/i);
     await expect(nav).toBeVisible();
 
     // Brand name visible
-    await expect(nav.locator('.brand-name')).toHaveText('rev01');
+    await expect(nav.getByLabel(/Open Canvas.*home/i)).toBeVisible();
 
     // Docs link exists
-    const docsLink = nav.getByRole('link', { name: /docs/i });
-    await expect(docsLink).toBeVisible();
+    const githubLink = nav.getByRole('link', { name: /github/i });
+    await expect(githubLink).toBeVisible();
 
     // Dashboard shortcut
-    const dashLink = nav.getByRole('link', { name: /dashboard|launch/i });
+    const dashLink = nav.getByRole('link', { name: /^Dashboard$/i });
     await expect(dashLink).toBeVisible();
   });
 
@@ -149,7 +148,7 @@ test.describe('First-time visitor journey', () => {
   });
 
   test('page is keyboard-navigable — tab reaches CTA', async ({ page }) => {
-    // Start from top, tab through the page, verify we can reach a dashboard link
+    // Start from top, tab through the page, verify we can reach a start link.
     await page.keyboard.press('Tab');
     let found = false;
     for (let i = 0; i < 20; i++) {
@@ -157,7 +156,7 @@ test.describe('First-time visitor journey', () => {
         const el = document.activeElement;
         return el?.tagName === 'A' ? (el as HTMLAnchorElement).href : null;
       });
-      if (focused && focused.includes('/dashboard')) {
+      if (focused && (focused.includes('/auth') || focused.includes('/dashboard'))) {
         found = true;
         break;
       }

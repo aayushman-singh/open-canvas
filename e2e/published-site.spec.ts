@@ -123,7 +123,7 @@ test.describe('Published site — visitor experience', () => {
   });
 
   test('published site search works when available', async ({ request }) => {
-    const resp = await request.get(`${siteUrl}/__rev01/search?q=test`);
+    const resp = await request.get(`${siteUrl}/__opencanvas/search?q=test`);
     if (resp.status() === 200) {
       const body = await resp.json();
       expect(Array.isArray(body.results ?? body)).toBe(true);
