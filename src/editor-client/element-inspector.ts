@@ -712,7 +712,7 @@ function renderRichMotionAssetPicker(
   select.addEventListener('change', () => {
     const next = select.value.trim();
     if (!assetIds.includes(next)) {
-      ctx.setStatus('Rich Motion asset must reference an existing Rich Motion Asset', 'error');
+      ctx.setStatus('Animation source must match an existing entry from the Interactions panel', 'error');
       select.value = element.assetRefId;
       return;
     }
@@ -721,17 +721,17 @@ function renderRichMotionAssetPicker(
     renderInspector(ctx);
     ctx.scheduleSave();
   });
-  ctx.inspector.appendChild(field('Rich motion asset', select));
+  ctx.inspector.appendChild(field('Animation source', select));
 
   const meta = document.createElement('div');
   meta.className = 'meta';
   if (assetIds.length === 0) {
-    meta.textContent = 'Create a Rich Motion Asset in the Interactions panel before publishing this element.';
+    meta.textContent = 'Create an animation source in the Interactions panel before publishing this element.';
   } else if (!assetIds.includes(element.assetRefId)) {
-    meta.textContent = 'Current asset ref is unresolved and will fail publish validation until changed.';
+    meta.textContent = 'This animation source is missing and will fail publish validation until changed.';
   } else {
     const selected = assets.find((asset) => asset.id === element.assetRefId);
-    meta.textContent = selected ? 'Selected kind: ' + selected.kind : '';
+    meta.textContent = selected ? 'Selected type: ' + selected.kind : '';
     if (selected?.kind === 'particle-field') {
       renderParticleFieldPortraitUpload(ctx, selected, element.id);
     }

@@ -83,7 +83,7 @@ export const SIDEBAR_FACTORIES: Record<SidebarFactoryName, () => SidebarFactoryR
       type: 'rich-motion',
       assetRefId: '__placeholder__',
       fit: 'contain',
-      label: 'Rich motion asset',
+      label: 'Animation',
     },
   }),
 

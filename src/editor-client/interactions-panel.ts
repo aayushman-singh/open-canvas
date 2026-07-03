@@ -645,10 +645,10 @@ function coerceRiveBinding(
 
 function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTMLElement): void {
   if (!ctx.state) return;
-  const wrap = section('Rich Motion Assets');
+  const wrap = section('Animation sources');
   const addImageSequence = actionButton(
-    'Add image sequence asset',
-    'Create schema-owned image-sequence rich motion metadata',
+    'Add frame animation',
+    'Create a frame-by-frame animation source',
   );
   addImageSequence.addEventListener('click', () => {
     mutate(ctx, () => {
@@ -658,21 +658,21 @@ function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTML
         defaultImageSequenceRichMotionAsset(id),
       ];
     });
-    ctx.setStatus('Image sequence asset metadata added', 'ok');
+    ctx.setStatus('Frame animation source added', 'ok');
   });
   wrap.appendChild(addImageSequence);
 
-  const addRive = actionButton('Add Rive asset', 'Create schema-owned Rive rich motion metadata');
+  const addRive = actionButton('Add Rive animation', 'Create a Rive animation source');
   addRive.addEventListener('click', () => {
     mutate(ctx, () => {
       const id = 'rive-asset-' + Date.now();
       ctx.state!.richMotionAssets = [...(ctx.state!.richMotionAssets ?? []), defaultRiveRichMotionAsset(id)];
     });
-    ctx.setStatus('Rive asset metadata added', 'ok');
+    ctx.setStatus('Rive animation source added', 'ok');
   });
   wrap.appendChild(addRive);
 
-  const addLottie = actionButton('Add Lottie asset', 'Create schema-owned Lottie rich motion metadata');
+  const addLottie = actionButton('Add Lottie animation', 'Create a Lottie animation source');
   addLottie.addEventListener('click', () => {
     mutate(ctx, () => {
       const id = 'lottie-asset-' + Date.now();
@@ -681,11 +681,11 @@ function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTML
         defaultLottieRichMotionAsset(id),
       ];
     });
-    ctx.setStatus('Lottie asset metadata added', 'ok');
+    ctx.setStatus('Lottie animation source added', 'ok');
   });
   wrap.appendChild(addLottie);
 
-  const addModel = actionButton('Add model-3d asset', 'Create schema-owned bounded 3D model metadata');
+  const addModel = actionButton('Add 3D animation', 'Create a 3D animation source');
   addModel.addEventListener('click', () => {
     mutate(ctx, () => {
       const id = 'model-3d-' + Date.now();
@@ -694,11 +694,11 @@ function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTML
         defaultModel3DRichMotionAsset(id),
       ];
     });
-    ctx.setStatus('Model-3D asset metadata added', 'ok');
+    ctx.setStatus('3D animation source added', 'ok');
   });
   wrap.appendChild(addModel);
 
-  const addShader = actionButton('Add shader scene asset', 'Create schema-owned bounded shader scene metadata');
+  const addShader = actionButton('Add shader animation', 'Create a shader animation source');
   addShader.addEventListener('click', () => {
     mutate(ctx, () => {
       const id = 'shader-scene-' + Date.now();
@@ -707,11 +707,11 @@ function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTML
         defaultShaderSceneRichMotionAsset(id),
       ];
     });
-    ctx.setStatus('Shader scene asset metadata added', 'ok');
+    ctx.setStatus('Shader animation source added', 'ok');
   });
   wrap.appendChild(addShader);
 
-  const addVideo = actionButton('Add video stream asset', 'Create schema-owned hover/focus video stream metadata');
+  const addVideo = actionButton('Add video animation', 'Create a video animation source');
   addVideo.addEventListener('click', () => {
     mutate(ctx, () => {
       const id = 'video-stream-' + Date.now();
@@ -720,7 +720,7 @@ function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTML
         defaultVideoStreamRichMotionAsset(id),
       ];
     });
-    ctx.setStatus('Video stream asset metadata added', 'ok');
+    ctx.setStatus('Video animation source added', 'ok');
   });
   wrap.appendChild(addVideo);
 
@@ -728,7 +728,7 @@ function renderRichMotionAssetControls(ctx: InteractionsPanelContext, host: HTML
   if (assets.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'opencanvas-section-picker-empty';
-    empty.textContent = 'No rich motion assets yet.';
+    empty.textContent = 'No animation sources yet.';
     wrap.appendChild(empty);
   }
 
@@ -750,12 +750,12 @@ function renderRichMotionAssetCard(
   const title = document.createElement('strong');
   title.textContent = asset.id + ' (' + asset.kind + ')';
   header.appendChild(title);
-  const remove = compactButton('Delete', 'Delete this rich motion asset metadata');
+  const remove = compactButton('Delete', 'Delete this animation source');
   remove.addEventListener('click', () => {
     mutate(ctx, () => {
       ctx.state!.richMotionAssets = (ctx.state!.richMotionAssets ?? []).filter((item) => item.id !== asset.id);
     });
-    ctx.setStatus('Rich motion asset deleted', 'ok');
+    ctx.setStatus('Animation source deleted', 'ok');
   });
   header.appendChild(remove);
   card.appendChild(header);
@@ -807,7 +807,7 @@ function renderRichMotionAssetCard(
     const note = document.createElement('p');
     note.className = 'opencanvas-section-picker-empty';
     note.textContent =
-      'This editor slice exposes image-sequence, Rive, Lottie, model-3d, shader-scene, and video stream asset controls. Other rich motion kinds remain schema-owned.';
+      'This editor slice exposes frame animation, Rive, Lottie, 3D, shader, and video source controls. Other animation source types remain schema-owned.';
     card.appendChild(note);
     host.appendChild(card);
     return;

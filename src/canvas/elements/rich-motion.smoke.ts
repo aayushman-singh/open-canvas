@@ -394,6 +394,19 @@ assert(
   Object.hasOwn(INSPECTOR_DISPATCH, 'rich-motion'),
   'INSPECTOR_DISPATCH must register rich-motion',
 );
+const richMotionInspector = INSPECTOR_DISPATCH['rich-motion'];
+assert(
+  !richMotionInspector.fields.some((field) => 'path' in field && field.path === 'assetRefId'),
+  'rich-motion inspector must not expose the raw assetRefId field to owners',
+);
+assert(
+  richMotionInspector.fields.some((field) => 'path' in field && field.path === 'label'),
+  'rich-motion inspector must keep the accessible label field',
+);
+assert(
+  richMotionInspector.fields.some((field) => 'path' in field && field.path === 'fit'),
+  'rich-motion inspector must keep the visual fit field',
+);
 assert(
   Object.hasOwn(AGENT_TOOL_DISPATCH, 'rich-motion'),
   'AGENT_TOOL_DISPATCH must register rich-motion',
@@ -401,6 +414,15 @@ assert(
 assert(
   Object.hasOwn(SIDEBAR_DISPATCH, 'rich-motion'),
   'SIDEBAR_DISPATCH must register rich-motion',
+);
+const richMotionSidebarCommand = SIDEBAR_DISPATCH['rich-motion'].commands[0]!;
+assert(
+  richMotionSidebarCommand.sidebarLabel === 'Animation',
+  'rich-motion sidebar command must present as Animation to owners',
+);
+assert(
+  richMotionSidebarCommand.toolbarLabel === '+Animation',
+  'rich-motion toolbar command must present as +Animation to owners',
 );
 assert(
   typeof (Y_ENCODE_DISPATCH as Record<string, unknown>)['rich-motion'] === 'function',
@@ -420,6 +442,10 @@ assert(
   'assetRefId' in richMotionFactory.payload &&
     richMotionFactory.payload.assetRefId === '__placeholder__',
   'sidebar factory must seed the placeholder asset ref id',
+);
+assert(
+  'label' in richMotionFactory.payload && richMotionFactory.payload.label === 'Animation',
+  'sidebar factory must seed owner-facing animation label text',
 );
 
 const bodyBuilderSource = readFileSync(
@@ -448,10 +474,17 @@ assert(
   'rich motion picker must read schema-owned richMotionAssets',
 );
 assert(
-  elementInspectorSource.includes('Rich motion asset'),
-  'rich motion picker must label the asset selection control',
+  elementInspectorSource.includes("field('Animation source', select)"),
+  'rich motion picker must present the asset binding as an Animation source',
 );
-
+assert(
+  !elementInspectorSource.includes("field('Rich motion asset', select)"),
+  'rich motion picker must not expose internal Rich Motion Asset wording to owners',
+);
+assert(
+  !elementInspectorSource.includes('Current asset ref is unresolved'),
+  'rich motion picker must not expose raw asset ref terminology in unresolved states',
+);
 const yjsState = {
   styleKit: validState.styleKit,
   pages: validState.pages,

@@ -23,7 +23,6 @@ export function renderRichMotion(element: RichMotionElement): string {
 export const richMotionInspectorSpec: InspectorSpec = {
   fields: [
     { kind: 'text', label: 'Label', path: 'label' },
-    { kind: 'text', label: 'Asset ref', path: 'assetRefId' },
     { kind: 'select', label: 'Fit', path: 'fit', options: ['cover', 'contain'] },
   ],
 };
@@ -32,10 +31,10 @@ export const richMotionSidebarSpec: SidebarSpec = {
   commands: [
     {
       key: 'rich-motion',
-      sidebarLabel: 'Rich Motion',
-      sidebarTip: 'Add a structured motion asset',
-      toolbarLabel: '+Motion',
-      toolbarTip: 'Add rich motion',
+      sidebarLabel: 'Animation',
+      sidebarTip: 'Add an animation source',
+      toolbarLabel: '+Animation',
+      toolbarTip: 'Add animation',
       factoryName: 'rich-motion',
     },
   ],
@@ -43,7 +42,7 @@ export const richMotionSidebarSpec: SidebarSpec = {
 
 export const richMotionAgentToolSpec: AgentToolSpec = {
   patchProperties: {
-    assetRefId: { type: 'string', description: 'Rich Motion Asset id referenced by this element.' },
+    assetRefId: { type: 'string', description: 'Animation source id referenced by this element.' },
     label: { type: 'string', description: 'Accessible label for the motion asset.' },
     fit: {
       type: 'string',
