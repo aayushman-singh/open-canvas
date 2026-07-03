@@ -2436,7 +2436,8 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 .opencanvas-element[data-element-type="table"]:not([data-selected="true"])::after,
 .opencanvas-element[data-element-type="code"]:not([data-selected="true"])::after,
 .opencanvas-element[data-element-type="form"]:not([data-selected="true"])::after,
-.opencanvas-element[data-element-type="carousel"]:not([data-selected="true"])::after {
+.opencanvas-element[data-element-type="carousel"]:not([data-selected="true"])::after,
+.opencanvas-element[data-element-type="rich-motion"]:not([data-selected="true"])::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -2458,14 +2459,16 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
 .opencanvas-element[data-element-type="table"]:not([data-selected="true"]) *,
 .opencanvas-element[data-element-type="code"]:not([data-selected="true"]) *,
 .opencanvas-element[data-element-type="form"]:not([data-selected="true"]) *,
-.opencanvas-element[data-element-type="carousel"]:not([data-selected="true"]) * {
+.opencanvas-element[data-element-type="carousel"]:not([data-selected="true"]) *,
+.opencanvas-element[data-element-type="rich-motion"]:not([data-selected="true"]) * {
   pointer-events: none;
 }
 .opencanvas-element[data-element-type="chart"][data-selected="true"] *,
 .opencanvas-element[data-element-type="table"][data-selected="true"] *,
 .opencanvas-element[data-element-type="code"][data-selected="true"] *,
 .opencanvas-element[data-element-type="form"][data-selected="true"] *,
-.opencanvas-element[data-element-type="carousel"][data-selected="true"] * {
+.opencanvas-element[data-element-type="carousel"][data-selected="true"] *,
+.opencanvas-element[data-element-type="rich-motion"][data-selected="true"] * {
   pointer-events: auto;
 }
 

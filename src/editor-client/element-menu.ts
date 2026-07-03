@@ -41,7 +41,7 @@
 
 import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
 
-import { hydrateInteractives } from './hydrate-interactives.js';
+import { runEditorRuntimeHydrator } from './hydrate-interactives.js';
 
 import { cssEscape } from './css-escape.js';
 import type {
@@ -109,7 +109,12 @@ export type RebuildElementContext = StateContext &
   StatusEmitterContext &
   Pick<
     EditorContext,
-    'activeEditFinish' | 'buildElementNode' | 'buildHostedElementNode' | 'setBoxStyle'
+    | 'activeEditFinish'
+    | 'buildElementNode'
+    | 'buildHostedElementNode'
+    | 'reducedMotionPreview'
+    | 'setBoxStyle'
+    | 'siteBase'
   >;
 
 /**
@@ -454,6 +459,9 @@ export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string
   }
   const found = ctx.findElement(elementId);
   if (!found) return;
+  if (!ctx.state) {
+    throw new Error('rebuildElement: state must be loaded before hydrating rebuilt element ' + elementId);
+  }
   if (!ctx.root) {
     ctx.renderAll();
     return;
@@ -494,20 +502,24 @@ export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string
     }
   }
   // Re-hydrate the visitor interactive runtime against the replaced
-  // wrapper(s). A carousel rebuilt via the inspector (slide added /
-  // removed / reordered) emits a fresh `.opencanvas-carousel` subtree
-  // with no `data-opencanvas-hydrated="true"` flag; without this call
-  // its arrows + dots would render but never advance. `skipPopups: true`
-  // matches the editor's renderAll() contract — popup chrome is visitor-
-  // only. Re-query for the fresh replacement nodes since the references
-  // captured in `existingNodes` above point at the now-detached originals.
+  // wrapper(s). Rebuilds emit fresh carousel / rich-motion / behaviour
+  // preview subtrees; using the same Runtime Hydrator boundary as renderAll
+  // keeps element-local rebuilds from dropping behaviour payload context.
+  // Re-query for the fresh replacement nodes since the references captured
+  // in `existingNodes` above point at the now-detached originals.
   const freshNodes = ctx.root.querySelectorAll(
     '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
   );
   for (let i = 0; i < freshNodes.length; i++) {
     const node = freshNodes[i];
     if (node instanceof HTMLElement) {
-      hydrateInteractives(node, { skipPopups: true });
+      runEditorRuntimeHydrator(node, {
+        reason: 'element-rebuild',
+        skipPopups: true,
+        behaviourState: ctx.state,
+        behaviourAssetBasePath: `${ctx.siteBase}/assets`,
+        reducedMotion: ctx.reducedMotionPreview,
+      });
     }
   }
 }

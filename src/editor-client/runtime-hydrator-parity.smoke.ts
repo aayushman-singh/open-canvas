@@ -18,6 +18,7 @@ function compactSource(value: string): string {
 
 const editorHydrateSrc = await Bun.file(new URL('./hydrate-interactives.ts', import.meta.url)).text();
 const editorRenderSrc = await Bun.file(new URL('./render.ts', import.meta.url)).text();
+const elementMenuSrc = await Bun.file(new URL('./element-menu.ts', import.meta.url)).text();
 const publicRouteSrc = await Bun.file(new URL('../routes/public.ts', import.meta.url)).text();
 const routeTransitionSrc = await Bun.file(new URL('../interactive/route-transition.ts', import.meta.url)).text();
 const packageSrc = await Bun.file(new URL('../../package.json', import.meta.url)).text();
@@ -59,6 +60,14 @@ assert(
   editorRenderSrc.includes('runEditorRuntimeHydrator(ctx.root') &&
     editorRenderSrc.includes("reason: 'editor-render'"),
   'editor render must consume the Runtime Hydrator boundary',
+);
+assert(
+  elementMenuSrc.includes('runEditorRuntimeHydrator(node') &&
+    elementMenuSrc.includes("reason: 'element-rebuild'") &&
+    elementMenuSrc.includes('behaviourState: ctx.state') &&
+    elementMenuSrc.includes("behaviourAssetBasePath: `${ctx.siteBase}/assets`") &&
+    elementMenuSrc.includes('reducedMotion: ctx.reducedMotionPreview'),
+  'single-element rebuild must consume the Runtime Hydrator boundary with behaviour payload options',
 );
 assert(
   publicRouteSrc.includes("hydrate(root, { reason: 'live-publish' })"),

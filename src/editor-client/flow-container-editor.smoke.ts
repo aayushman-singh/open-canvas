@@ -149,6 +149,7 @@ function matchesSelector(node: StubElement, selector: string): boolean {
 }
 
 const globals = globalThis as unknown as Record<string, unknown>;
+globals.window = {};
 globals.document = {
   createElement(tagName: string): StubElement {
     return new StubElement(tagName);
@@ -221,9 +222,24 @@ function buildWrapper(id: string, hosted: boolean): StubElement {
   parent.appendChild(buildWrapper(hosted.id, true));
   const root = new StubElement('div');
   root.appendChild(parent);
+  const state: EditableSite = {
+    styleKit: 'charcoal',
+    pages: [
+      {
+        id: 'page-flow-copy',
+        slug: 'flow-copy',
+        title: 'Flow Copy',
+        width: 1200,
+        sections: [section],
+      },
+    ],
+  };
   let normalBuilds = 0;
   let hostedBuilds = 0;
   const ctx = {
+    state,
+    siteBase: '/sites/test',
+    reducedMotionPreview: 'no-preference',
     selectedElementId: hosted.id,
     editingElementId: null,
     activeEditFinish: null,

@@ -339,7 +339,7 @@ assert(video.pauseCount === 1 && videoPaused(), 'pointerleave must pause the vid
 assert(video.currentTime === 0, 'resetOnExit must rewind the video stream');
 
 const panelSource = readFileSync(join(process.cwd(), 'src', 'editor-client', 'interactions-panel.ts'), 'utf8');
-assert(panelSource.includes('Add video stream asset'), 'Interactions panel must create video stream assets');
+assert(panelSource.includes('Add video animation'), 'Interactions panel must create video animation sources');
 assert(panelSource.includes('renderVideoStreamAssetFields'), 'Interactions panel must expose video stream fields');
 
 console.log('[video-stream-rich-motion:smoke] OK');

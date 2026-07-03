@@ -102,6 +102,28 @@ assert(
   'Flow-hosted element selection must not mount resize handles; Flow Item layout owns placement',
 );
 
+const elementInspector = await source('./element-inspector.ts');
+assert(
+  !elementInspector.includes('buildKitSummary') &&
+    !elementInspector.includes('opencanvas-kit-summary'),
+  'element inspector must not render the read-only style-kit summary card for every selected element',
+);
+
+function assertRichMotionClickShield(sheet: string, label: string): void {
+  assert(
+    sheet.includes('.opencanvas-element[data-element-type="rich-motion"]:not([data-selected="true"])::after'),
+    `${label} must shield unselected rich-motion elements so canvas children do not swallow selection clicks`,
+  );
+  assert(
+    sheet.includes('.opencanvas-element[data-element-type="rich-motion"]:not([data-selected="true"]) *') &&
+      sheet.includes('.opencanvas-element[data-element-type="rich-motion"][data-selected="true"] *'),
+    `${label} must disable rich-motion child pointer events until the wrapper is selected`,
+  );
+}
+
+assertRichMotionClickShield(await source('./styles-build.ts'), 'styles-build.ts');
+assertRichMotionClickShield(await source('./styles.css'), 'styles.css');
+
 const runtimeHelpers = await source('./runtime-helpers.ts');
 assert(
   runtimeHelpers.includes("el.type === 'flow-container'") &&

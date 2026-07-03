@@ -94,7 +94,7 @@ import { renderPageInspector, replayAnimations } from './page-inspector.js';
 import { field, selectInput } from './dom-builders.js';
 import { uploadParticleFieldPortrait } from './particle-field-portrait-upload.js';
 import { mountComponentStyle } from './inspector-component-style.js';
-import { buildColorRow, buildKitSummary } from './inspector-leaf-builders.js';
+import { buildColorRow } from './inspector-leaf-builders.js';
 
 type MotionSequenceTextEffect = (typeof MOTION_SEQUENCE_TEXT_EFFECTS)[number];
 
@@ -178,12 +178,6 @@ export function renderInspector(ctx: EditorContext): void {
   meta.className = 'meta';
   meta.textContent = 'id: ' + element.id;
   ctx.inspector.appendChild(meta);
-
-  // Active style-kit read-only summary. The token values are read directly
-  // off the editor wrapper's computed CSS so the summary stays in sync with
-  // whatever kit is active without the client having to ship a duplicate
-  // copy of STYLE_KIT_PRESETS. Hidden if the wrapper isn't there yet.
-  ctx.inspector.appendChild(buildKitSummary(ctx));
 
   // ADR 0011 Step 1 cutover: INSPECTOR_DISPATCH is now
   // Record<Exclude<ElementType, 'collection'>, InspectorSpec> — every
