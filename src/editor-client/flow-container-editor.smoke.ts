@@ -251,6 +251,7 @@ function buildWrapper(id: string, hosted: boolean): StubElement {
     buildElementBody(): StubElement {
       const body = new StubElement('div');
       body.className = 'opencanvas-text';
+      body.scrollHeight = 120;
       return body;
     },
     renderAll(): void {
@@ -283,6 +284,10 @@ function buildWrapper(id: string, hosted: boolean): StubElement {
   assert(
     replacement?.querySelectorAll(':scope > [data-resize-handle]').length === 0,
     'hosted replacement must not gain resize handles',
+  );
+  assert(
+    hosted.box.h === 0,
+    `Flow-hosted rebuild must not persist measured text height into sentinel box.h (got ${String(hosted.box.h)})`,
   );
 }
 

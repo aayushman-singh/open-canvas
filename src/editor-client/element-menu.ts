@@ -486,9 +486,9 @@ export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string
       const inner = replacement.querySelector('.opencanvas-text');
       if (inner) {
         const textH = inner.scrollHeight;
-        if (textH > found.element.box.h) {
+        if (!hosted && textH > found.element.box.h) {
           found.element.box.h = textH;
-          if (!hosted) ctx.setBoxStyle(replacement, found.element.box);
+          ctx.setBoxStyle(replacement, found.element.box);
         }
       }
     }
