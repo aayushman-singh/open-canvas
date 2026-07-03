@@ -1,5 +1,52 @@
 # Follow-ups
 
+## Project Conclusion Sweep - 2026-07-03
+
+Status: local repo follow-ups are reconciled; remaining work requires external
+operator state rather than code changes in this checkout.
+
+Verified locally:
+
+```powershell
+bun run seed:assets
+bun run migrate-neon:smoke
+bun run src/db/client.smoke.ts
+git status --short
+```
+
+Results:
+
+- `bun run seed:assets` verified 34 bundled seed entries against source bytes in
+  dry-run mode. This proves the checked-in seed registry is coherent; it does
+  not write R2 objects or repair arbitrary stale DB rows.
+- `bun run migrate-neon:smoke` passed.
+- `bun run src/db/client.smoke.ts` passed.
+- `git status --short` printed no changes before this documentation update.
+
+Remaining external inputs:
+
+- **Neon migration ledger:** needs a live DB operator action against the exact
+  target Neon database. The current `package.json` does not contain the older
+  `db:check-schema` or `db:apply-migrations` scripts named below, so do not
+  treat those commands as current repo automation.
+- **Local R2 asset rows:** if Worker logs still report `readOwnerAsset` missing
+  R2 objects, either run an intentional R2 write (`bun run seed:assets --upload`
+  for bundled seeds, plus `--remote` for remote R2) or delete/repair the stale
+  `ownerAsset` rows after inspecting the live DB rows. Keep the read path loud.
+- **Authenticated E2E:** configure `E2E_CLERK_USER_EMAIL`,
+  `E2E_CLERK_USER_PASSWORD`, and `CLERK_TESTING_TOKEN` only if fresh-browser
+  authenticated Playwright runs are required. The current checked-in Playwright
+  coverage is primarily unauthenticated locally unless a production `BASE_URL`
+  is supplied.
+
+Closed:
+
+- Dirty worktree cleanup is complete as of this sweep.
+- Production template source admin is implemented; deployment still requires
+  the `TEMPLATE_SOURCE_GITHUB_TOKEN` Worker secret.
+- Runtime Hydrator Marquee adapter is landed on `main`; Video Hover remains the
+  next optional adapter-reduction project, not a release blocker.
+
 ## Neon + Dashboard Follow-ups - 2026-07-01
 
 Context:
@@ -11,7 +58,7 @@ Context:
 
 ### Database Migration Ledger
 
-Status: schema checks pass, but the Drizzle migration ledger still needs reconciliation.
+Status: needs external Neon operator action; not a local code change.
 
 - `bun run db:check-schema` passed after applying/verifying the Neon schema.
 - Normal `bunx drizzle-kit migrate` was blocked because `drizzle.__drizzle_migrations` is empty while the live schema already contains older migration objects.
@@ -22,12 +69,14 @@ Suggested verification after reconciliation:
 
 ```powershell
 bunx drizzle-kit migrate
-bun run db:check-schema
 ```
+
+Note: `db:check-schema` is not present in the current `package.json`.
 
 ### Local R2 Asset Rows
 
-Status: dashboard thumbnails render, but local Worker logs still show asset 404s.
+Status: local seed registry verifies; any remaining missing R2 objects require
+intentional R2 writes or DB row repair.
 
 - Playwright confirmed no production-origin ORB requests and no thumbnail 500s.
 - The remaining console/Worker noise is from `ownerAsset` rows whose `r2Key` points at missing local R2 objects.
@@ -38,13 +87,15 @@ Suggested starting points:
 
 ```powershell
 bun run seed:assets
+bun run seed:assets --upload
 ```
 
 If remote state is intended to be copied locally, use the existing asset tooling rather than changing the asset read path.
 
 ### Authenticated E2E Config
 
-Status: the repo has Clerk Playwright auth setup, but no local E2E Clerk user env values are configured.
+Status: needs local secret configuration only if authenticated fresh-browser E2E
+is required.
 
 - `E2E_CLERK_USER_EMAIL` is missing locally.
 - `E2E_CLERK_USER_PASSWORD` is missing locally.
@@ -53,17 +104,19 @@ Status: the repo has Clerk Playwright auth setup, but no local E2E Clerk user en
 
 ### Dirty Worktree Cleanup
 
-Status: unrelated local changes remain after the two commits above.
+Status: resolved 2026-07-03.
 
 - The committed fixes intentionally avoided staging unrelated modified/untracked files.
 - Pre-commit hooks were skipped for the two commits because the broad hook path was affected by unrelated dirty work in this checkout; focused verification passed.
 - Follow-up: split the remaining worktree into atomic commits or discard only changes that are confirmed obsolete.
 
-Useful command:
+Verification:
 
 ```powershell
 git status --short
 ```
+
+This printed no changes before the 2026-07-03 documentation update.
 
 ## Revenue Evaluation - Non-Enterprise Users
 
@@ -250,12 +303,12 @@ Cleaned up:
 
    Pushback: do not start Scroll Scene until the remaining duplicated adapter pattern is reduced. Scroll Scene will add enough runtime surface that keeping duplicate adapter sources around will make parity bugs harder to isolate.
 
-3. Keep using Gemini CLI for subagents.
+3. Keep using Cursor Agent for subagents.
 
-   Memory was updated earlier to require:
+   Repository instructions require:
 
    ```powershell
-   gemini -m auto -p "<prompt>"
+   cursor agent --print --model auto --auto-review --trust --workspace "$PWD" "<prompt>"
    ```
 
    Main agent still owns review, integration, and verification.
