@@ -2,8 +2,8 @@
 
 ## Project Conclusion Sweep - 2026-07-03
 
-Status: local repo follow-ups are reconciled; remaining work requires external
-operator state rather than code changes in this checkout.
+Status: local repo follow-ups are reconciled; the live Neon migration ledger is
+also reconciled on the configured `open-canvas` Neon project.
 
 Verified locally:
 
@@ -12,6 +12,7 @@ bun run seed:assets
 bun run migrate-neon:smoke
 bun run src/db/client.smoke.ts
 git status --short
+bunx drizzle-kit migrate
 ```
 
 Results:
@@ -22,13 +23,25 @@ Results:
 - `bun run migrate-neon:smoke` passed.
 - `bun run src/db/client.smoke.ts` passed.
 - `git status --short` printed no changes before this documentation update.
+- `bunx drizzle-kit migrate` exited 0 after reconciling the live Neon Drizzle
+  ledger.
+
+Resolved live Neon ledger:
+
+- Project: `open-canvas` (`dark-snow-47257533`), default branch `production`,
+  database `neondb`.
+- Inserted the 20 `drizzle/meta/_journal.json` entries into
+  `drizzle.__drizzle_migrations`, using Drizzle's SHA-256 hash of each
+  journaled SQL file and the journal `when` timestamp.
+- Verified the live ledger has 20 rows, zero missing expected rows, and zero
+  extra rows.
+- Verified the live schema already contains the objects from checked-in SQL
+  files `0015_collection_entries.sql`, `0021_template_drafts.sql`, and
+  `0022_template_seed_override.sql`, even though those files are not present in
+  the current Drizzle journal.
 
 Remaining external inputs:
 
-- **Neon migration ledger:** needs a live DB operator action against the exact
-  target Neon database. The current `package.json` does not contain the older
-  `db:check-schema` or `db:apply-migrations` scripts named below, so do not
-  treat those commands as current repo automation.
 - **Local R2 asset rows:** if Worker logs still report `readOwnerAsset` missing
   R2 objects, either run an intentional R2 write (`bun run seed:assets --upload`
   for bundled seeds, plus `--remote` for remote R2) or delete/repair the stale
@@ -38,6 +51,14 @@ Remaining external inputs:
   authenticated Playwright runs are required. The current checked-in Playwright
   coverage is primarily unauthenticated locally unless a production `BASE_URL`
   is supplied.
+
+Repository hygiene follow-up:
+
+- If `drizzle-kit migrate` is intended to bootstrap brand-new databases from
+  this repo, reconcile `drizzle/meta/_journal.json` with the checked-in SQL
+  files `0015`, `0021`, and `0022` in a dedicated migration-tooling change. The
+  live Neon target is safe now because its ledger has the current journal's
+  latest timestamp and its schema already contains those objects.
 
 Closed:
 
@@ -58,14 +79,16 @@ Context:
 
 ### Database Migration Ledger
 
-Status: needs external Neon operator action; not a local code change.
+Status: resolved 2026-07-03 on the configured Neon MCP target.
 
 - `bun run db:check-schema` passed after applying/verifying the Neon schema.
 - Normal `bunx drizzle-kit migrate` was blocked because `drizzle.__drizzle_migrations` is empty while the live schema already contains older migration objects.
 - `bun run db:apply-migrations` progressed through existing objects and then stopped at migration `0021` because `site.site_kind` already exists.
-- Follow-up: reconcile `drizzle.__drizzle_migrations` with the live Neon schema instead of re-running migrations blindly. Verify against the exact migration files before inserting ledger rows.
+- Resolution: reconciled `drizzle.__drizzle_migrations` with the exact
+  `drizzle/meta/_journal.json` entries and journaled SQL file hashes via Neon
+  MCP. No schema fallback or re-run path was added.
 
-Suggested verification after reconciliation:
+Verification:
 
 ```powershell
 bunx drizzle-kit migrate
