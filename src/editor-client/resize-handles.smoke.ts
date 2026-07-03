@@ -103,6 +103,26 @@ assert(
   'selection.ts must call mountResizeHandles on the newly-selected wrapper',
 );
 
+const editorStylesSrc = await Bun.file(new URL('./styles-build.ts', import.meta.url)).text();
+assert(
+  editorStylesSrc.includes('.opencanvas-element[data-selected="true"] {\n  overflow: visible !important;'),
+  'selected element wrappers must force overflow visible so resize handles and the element menu are not clipped by text/default/elementStyle overflow',
+);
+assert(
+  editorStylesSrc.includes(
+    '.opencanvas-element[data-element-type="text"]:not([data-editing="true"]):not([data-selected="true"])',
+  ),
+  'text overflow clipping must not apply while selected because selection chrome lives inside the wrapper',
+);
+assert(
+  editorStylesSrc.includes('.opencanvas-element:hover > .element-menu-trigger,'),
+  'element menu trigger must become visible on hover so owners can open it without selecting twice',
+);
+assert(
+  editorStylesSrc.includes('.opencanvas-element > .element-menu-trigger'),
+  'element menu trigger visibility must target direct children only so nested selected elements do not reveal ancestor triggers',
+);
+
 // ---- 2. Minimal element stub for DOM-level checks ----------------------
 //
 // mountResizeHandles only touches:

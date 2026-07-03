@@ -19,9 +19,33 @@ import { validateEditableSite } from '../validate.js';
 import { encodeYDoc, decodeYDoc } from '../yjs-projection.js';
 import { materializeCollections, type MaterializerEntry } from './collection-materializer.js';
 
+declare const Bun: {
+  file(input: URL): { text(): Promise<string> };
+};
+
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(`[text-richtext:smoke] ${message}`);
 }
+
+const editorInspectorSrc = await Bun.file(
+  new URL('../../editor-client/element-inspector.ts', import.meta.url),
+).text();
+const runtimeHelpersSrc = await Bun.file(
+  new URL('../../editor-client/runtime-helpers.ts', import.meta.url),
+).text();
+
+assert(
+  editorInspectorSrc.includes('renderMarkdownTextInspector'),
+  'text inspector must mount a Markdown source editor when isRichText is enabled',
+);
+assert(
+  editorInspectorSrc.includes('Markdown source'),
+  'text inspector Markdown mode must expose a Markdown source textarea',
+);
+assert(
+  runtimeHelpersSrc.includes("if (element.type === 'text' && f.path === 'isRichText')"),
+  'Markdown body toggle must rerender the inspector so the Markdown source editor appears immediately',
+);
 
 function baseText(overrides: Partial<TextElement> = {}): TextElement {
   return {

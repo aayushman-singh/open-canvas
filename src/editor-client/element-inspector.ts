@@ -33,6 +33,7 @@
 import type { EditorContext } from './editor-context.js';
 import type { InspectorSpec } from '../canvas/elements/inspector-spec.js';
 import type { CanvasElement } from '../canvas/schema.js';
+import type { TextElement } from '../canvas/elements/text.js';
 import {
   MARQUEE_DIRECTIONS,
   MARQUEE_COLLECTION_FIELDS,
@@ -96,6 +97,35 @@ import { mountComponentStyle } from './inspector-component-style.js';
 import { buildColorRow, buildKitSummary } from './inspector-leaf-builders.js';
 
 type MotionSequenceTextEffect = (typeof MOTION_SEQUENCE_TEXT_EFFECTS)[number];
+
+function buildToggleField(
+  label: string,
+  checked: boolean,
+  onChange: (checked: boolean) => void,
+): HTMLElement {
+  const toggleField = document.createElement('div');
+  toggleField.className = 'field field--toggle';
+  const toggleLabel = document.createElement('label');
+  toggleLabel.className = 'opencanvas-toggle';
+  const toggleInput = document.createElement('input');
+  toggleInput.type = 'checkbox';
+  toggleInput.className = 'opencanvas-toggle-input';
+  toggleInput.checked = checked;
+  const toggleTrack = document.createElement('span');
+  toggleTrack.className = 'opencanvas-toggle-track';
+  toggleTrack.setAttribute('aria-hidden', 'true');
+  const toggleText = document.createElement('span');
+  toggleText.className = 'opencanvas-toggle-text';
+  toggleText.textContent = label;
+  toggleInput.addEventListener('change', () => {
+    onChange(toggleInput.checked);
+  });
+  toggleLabel.appendChild(toggleInput);
+  toggleLabel.appendChild(toggleTrack);
+  toggleLabel.appendChild(toggleText);
+  toggleField.appendChild(toggleLabel);
+  return toggleField;
+}
 
 export function renderInspector(ctx: EditorContext): void {
   if (!ctx.inspector) return;
@@ -181,6 +211,10 @@ export function renderInspector(ctx: EditorContext): void {
     //    until a third caller exists.
     // Hence the bespoke renderer below.
     renderCollectionInspector(ctx, element);
+  }
+
+  if (element.type === 'text') {
+    renderMarkdownTextInspector(ctx, element);
   }
 
   // -- Element style controls -----------------------------------------------
@@ -778,12 +812,9 @@ function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): v
   heading.className = 'inspector-section-heading';
   ctx.inspector.appendChild(heading);
 
-  const enabled = document.createElement('input');
-  enabled.type = 'checkbox';
-  enabled.checked = element.pointerFx?.enabled === true;
-  enabled.addEventListener('change', () => {
+  ctx.inspector.appendChild(buildToggleField('Enable pointer FX', element.pointerFx?.enabled === true, (checked) => {
     ctx.captureForUndo();
-    if (enabled.checked) {
+    if (checked) {
       element.pointerFx = {
         enabled: true,
         primitive: 'tilt',
@@ -796,8 +827,7 @@ function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): v
     ctx.rebuildElement(element.id);
     renderInspector(ctx);
     ctx.scheduleSave();
-  });
-  ctx.inspector.appendChild(field('Enable pointer FX', enabled));
+  }));
 
   if (element.pointerFx?.enabled !== true) return;
 
@@ -848,16 +878,12 @@ function renderPointerFxInspector(ctx: EditorContext, element: CanvasElement): v
     });
     ctx.inspector.appendChild(field('Drag axis', dragAxis));
 
-    const inertia = document.createElement('input');
-    inertia.type = 'checkbox';
-    inertia.checked = element.pointerFx.inertia !== false;
-    inertia.addEventListener('change', () => {
+    ctx.inspector.appendChild(buildToggleField('Inertia', element.pointerFx.inertia !== false, (checked) => {
       ctx.captureForUndo();
-      element.pointerFx!.inertia = inertia.checked;
+      element.pointerFx!.inertia = checked;
       ctx.rebuildElement(element.id);
       ctx.scheduleSave();
-    });
-    ctx.inspector.appendChild(field('Inertia', inertia));
+    }));
   }
 
   const touchActivation = selectInput(
@@ -896,12 +922,9 @@ function renderMarqueeInspector(
   heading.className = 'inspector-section-heading';
   ctx.inspector.appendChild(heading);
 
-  const enabled = document.createElement('input');
-  enabled.type = 'checkbox';
-  enabled.checked = element.marquee?.enabled === true;
-  enabled.addEventListener('change', () => {
+  ctx.inspector.appendChild(buildToggleField('Enable marquee', element.marquee?.enabled === true, (checked) => {
     ctx.captureForUndo();
-    if (enabled.checked) {
+    if (checked) {
       element.marquee = {
         enabled: true,
         direction: 'left',
@@ -917,8 +940,7 @@ function renderMarqueeInspector(
     ctx.rebuildElement(element.id);
     renderInspector(ctx);
     ctx.scheduleSave();
-  });
-  ctx.inspector.appendChild(field('Enable marquee', enabled));
+  }));
 
   if (element.marquee?.enabled !== true) return;
 
@@ -1152,42 +1174,30 @@ function renderMarqueeInspector(
     }
   }
 
-  const pause = document.createElement('input');
-  pause.type = 'checkbox';
-  pause.checked = element.marquee.pauseOnHover === true;
-  pause.addEventListener('change', () => {
+  ctx.inspector.appendChild(buildToggleField('Pause on hover', element.marquee.pauseOnHover === true, (checked) => {
     ctx.captureForUndo();
-    element.marquee!.pauseOnHover = pause.checked;
-    if (pause.checked) element.marquee!.hoverReverse = false;
+    element.marquee!.pauseOnHover = checked;
+    if (checked) element.marquee!.hoverReverse = false;
     ctx.rebuildElement(element.id);
     renderInspector(ctx);
     ctx.scheduleSave();
-  });
-  ctx.inspector.appendChild(field('Pause on hover', pause));
+  }));
 
-  const hoverReverse = document.createElement('input');
-  hoverReverse.type = 'checkbox';
-  hoverReverse.checked = element.marquee.hoverReverse === true;
-  hoverReverse.addEventListener('change', () => {
+  ctx.inspector.appendChild(buildToggleField('Reverse on hover', element.marquee.hoverReverse === true, (checked) => {
     ctx.captureForUndo();
-    element.marquee!.hoverReverse = hoverReverse.checked;
-    if (hoverReverse.checked) element.marquee!.pauseOnHover = false;
+    element.marquee!.hoverReverse = checked;
+    if (checked) element.marquee!.pauseOnHover = false;
     ctx.rebuildElement(element.id);
     renderInspector(ctx);
     ctx.scheduleSave();
-  });
-  ctx.inspector.appendChild(field('Reverse on hover', hoverReverse));
+  }));
 
-  const edgeFade = document.createElement('input');
-  edgeFade.type = 'checkbox';
-  edgeFade.checked = element.marquee.edgeFade === true;
-  edgeFade.addEventListener('change', () => {
+  ctx.inspector.appendChild(buildToggleField('Edge fade mask', element.marquee.edgeFade === true, (checked) => {
     ctx.captureForUndo();
-    element.marquee!.edgeFade = edgeFade.checked;
+    element.marquee!.edgeFade = checked;
     ctx.rebuildElement(element.id);
     ctx.scheduleSave();
-  });
-  ctx.inspector.appendChild(field('Edge fade mask', edgeFade));
+  }));
 
   const reducedMotion = selectInput(MARQUEE_REDUCED_MOTION_MODES, element.marquee.reducedMotion);
   reducedMotion.addEventListener('change', () => {
@@ -1197,6 +1207,27 @@ function renderMarqueeInspector(
     ctx.scheduleSave();
   });
   ctx.inspector.appendChild(field('Reduced motion', reducedMotion));
+}
+
+function renderMarkdownTextInspector(ctx: EditorContext, element: TextElement): void {
+  if (!ctx.inspector || element.isRichText !== true) return;
+  const heading = document.createElement('h3');
+  heading.textContent = 'Markdown';
+  heading.className = 'inspector-section-heading';
+  ctx.inspector.appendChild(heading);
+
+  const source = document.createElement('textarea');
+  source.rows = 8;
+  source.spellcheck = true;
+  source.value = element.content[0]?.text ?? '';
+  source.placeholder = '# Heading\n\nWrite CommonMark Markdown here.';
+  source.addEventListener('change', () => {
+    ctx.captureForUndo();
+    element.content = [{ text: source.value }];
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+  });
+  ctx.inspector.appendChild(field('Markdown source', source));
 }
 
 function renderTextSplitInspector(

@@ -2400,16 +2400,16 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
    a small text box stops at the wrapper's right edge instead of spilling
    past the declared width/height. The inspector's Overflow control still
    wins: when it emits inline overflow:visible on the wrapper, the inline
-   declaration outranks this stylesheet rule. During inline edit the
-   wrapper carries data-editing="true" so the caret never gets clipped by
-   the box while the Owner is typing — beginTextEditImpl adds the flag and
-   finish() removes it. */
-.opencanvas-element[data-element-type="text"]:not([data-editing="true"]) {
+   declaration outranks this stylesheet rule while unselected. During inline
+   edit or element selection, the wrapper drops this clip so the caret,
+   resize handles, and element menu never get cut off by the element box. */
+.opencanvas-element[data-element-type="text"]:not([data-editing="true"]):not([data-selected="true"]) {
   overflow: hidden;
 }
 /* Selection (.selbox in editor.html) — 2px red outline + slight inset so
    it reads as a frame around the element, not a stroke. */
 .opencanvas-element[data-selected="true"] {
+  overflow: visible !important;
   outline: 2px solid var(--red);
   outline-offset: 2px;
   border-radius: var(--r-xs);
@@ -2511,8 +2511,9 @@ body[data-freeform-draw-active="true"] .opencanvas-section {
   padding: 0;
   letter-spacing: 1px;
 }
-.opencanvas-element[data-selected="true"] .element-menu-trigger,
-.opencanvas-element .element-menu-trigger[data-menu-open="true"] {
+.opencanvas-element:hover > .element-menu-trigger,
+.opencanvas-element[data-selected="true"] > .element-menu-trigger,
+.opencanvas-element > .element-menu-trigger[data-menu-open="true"] {
   display: flex;
 }
 .opencanvas-element .element-menu-trigger:hover {

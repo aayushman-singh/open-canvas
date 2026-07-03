@@ -14,6 +14,22 @@ const hydrateSrc = await Bun.file(new URL('./hydrate-interactives.ts', import.me
 const sharedMarqueeSrc = await Bun.file(new URL('../interactive/marquee.ts', import.meta.url)).text();
 
 assert(inspectorSrc.includes('renderMarqueeInspector'), 'element inspector must render marquee controls');
+assert(
+  inspectorSrc.includes("buildToggleField('Enable marquee'"),
+  'Enable marquee must use the shared toggle-pill DOM, not a raw checkbox field',
+);
+assert(
+  inspectorSrc.includes("buildToggleField('Pause on hover'"),
+  'Pause on hover must use the shared toggle-pill DOM, not a raw checkbox field',
+);
+assert(
+  inspectorSrc.includes("buildToggleField('Reverse on hover'"),
+  'Reverse on hover must use the shared toggle-pill DOM, not a raw checkbox field',
+);
+assert(
+  inspectorSrc.includes("buildToggleField('Edge fade mask'"),
+  'Edge fade mask must use the shared toggle-pill DOM, not a raw checkbox field',
+);
 assert(inspectorSrc.includes('MARQUEE_DIRECTIONS'), 'direction select must use schema directions');
 assert(
   inspectorSrc.includes('MARQUEE_REDUCED_MOTION_MODES'),

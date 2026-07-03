@@ -894,6 +894,9 @@ export function renderInspectorSpecImpl(
       toggleInput.addEventListener('change', () => {
         elementByPath[f.path] = toggleInput.checked;
         ctx.rebuildElement(element.id);
+        if (element.type === 'text' && f.path === 'isRichText') {
+          ctx.renderInspector();
+        }
         ctx.scheduleSave();
       });
       toggleLabel.appendChild(toggleInput);
