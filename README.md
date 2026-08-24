@@ -93,8 +93,8 @@ Bold arrows carry primary data flow; dotted arrows are cross-cutting relationshi
 
 Engineering substance over vanity metrics — every figure below is sourced from the repo or the production database, not estimated.
 
-- **61** architecture decision records · **103** colocated `*.smoke.ts` tests + **4** Playwright e2e journeys · **21** schema migrations
-- **495** TypeScript modules — one Cloudflare Worker plus its separately-built editor and dashboard client bundles
+- **84** architecture decision records · **107** colocated `*.smoke.ts` tests + **7** Playwright e2e journeys · **23** schema migrations
+- **638** TypeScript modules — one Cloudflare Worker plus its separately-built editor and dashboard client bundles
 - Document model exercised in production: **1,090** design primitives across **124** sections / **33** pages, **31** deterministic version snapshots, **3** sites published live
 - Every publish runs a **six-check** accessibility audit (advisory — reports to the dashboard, deliberately non-blocking); an audit crash surfaces as an explicit issue, never a silent skip
 
@@ -132,7 +132,7 @@ Most site builders are *template hosts*: you pick a layout, fill predefined slot
 | **Output** | Framework-rendered pages | Pure HTML — interactive runtime injected only when a section needs it; zero client-framework weight otherwise |
 | **Security** | Edit sessions + headers | Timing-safe crypto, SVG-upload block, `nosniff`, embed-aware CSP, fail-closed rate limiters, atomic custom-domain rollback |
 | **Runtime** | A multi-service stack to operate | One Cloudflare Worker — dashboard, editor, canvas API, agent, snapshot store, and public host in a single deploy unit |
-| **Discipline** | Roadmap docs | 66 architecture decision records, 40+ hermetic smoke tests, 71-area E2E suite, and a single canvas validation write-gate |
+| **Discipline** | Roadmap docs | 84 architecture decision records, 100+ hermetic smoke tests, 7 Playwright e2e journeys, and a single canvas validation write-gate |
 
 The throughline: the previous generation lets you *fill in a layout*. Open Canvas lets you, an agent, and your whole team *design on one live canvas* — and ships the result as clean, accessible, framework-free HTML.
 
@@ -170,7 +170,7 @@ Live at **[opencanvas.aayushman.dev](https://opencanvas.aayushman.dev)** and und
 ## Documentation
 
 - [FEATURES.md](FEATURES.md) — exhaustive feature reference
-- [docs/adr/](docs/adr/) — 66 architecture decision records (the reasoning behind every major choice)
+- [docs/adr/](docs/adr/) — 84 architecture decision records (the reasoning behind every major choice)
 - [CONTEXT.md](CONTEXT.md) — domain language and core concepts
 
 ## Contributing

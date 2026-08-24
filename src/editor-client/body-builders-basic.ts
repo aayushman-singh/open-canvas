@@ -145,7 +145,8 @@ export function buildMediaBodyImpl(ctx: BuildMediaBodyContext, element: MediaEle
       element.mediaKind === 'image' ? '[image — upload to preview]' : '[video — upload to preview]';
     return node;
   }
-  const previewUrl = ctx.siteBase + '/assets/' + encodeURIComponent(assetId);
+  const previewAssetUrl = (id: string): string => ctx.siteBase + '/assets/' + encodeURIComponent(id);
+  const previewUrl = previewAssetUrl(assetId);
   if (element.mediaKind === 'image') {
     const img = document.createElement('img');
     img.setAttribute('src', previewUrl);
@@ -163,10 +164,18 @@ export function buildMediaBodyImpl(ctx: BuildMediaBodyContext, element: MediaEle
   } else {
     const video = document.createElement('video');
     video.setAttribute('src', previewUrl);
+    video.setAttribute('playsinline', '');
     video.style.width = '100%';
     video.style.height = '100%';
     video.style.objectFit = element.fit === 'contain' ? 'contain' : 'cover';
     video.style.display = 'block';
+    if (
+      typeof element.posterAssetId === 'string' &&
+      element.posterAssetId.length > 0 &&
+      element.posterAssetId !== '__placeholder__'
+    ) {
+      video.setAttribute('poster', previewAssetUrl(element.posterAssetId));
+    }
     const playback = element.playback || {};
     // Same enforcement as the public renderer + validator: autoplay forces
     // muted. We set both attributes via setAttribute so the browser's
@@ -175,12 +184,51 @@ export function buildMediaBodyImpl(ctx: BuildMediaBodyContext, element: MediaEle
       video.setAttribute('autoplay', '');
       video.setAttribute('muted', '');
       video.muted = true;
-    } else if (playback.muted) {
+    } else if (playback.muted || element.hoverPlayback?.enabled === true) {
       video.setAttribute('muted', '');
       video.muted = true;
     }
     if (playback.loop) video.setAttribute('loop', '');
     if (playback.controls) video.setAttribute('controls', '');
+    if (element.hoverPlayback?.enabled === true) {
+      video.setAttribute('data-opencanvas-video-hover', 'true');
+      video.setAttribute('data-opencanvas-video-hover-mode', element.hoverPlayback.mode);
+      video.setAttribute(
+        'data-opencanvas-video-hover-scrub',
+        String(element.hoverPlayback.scrubOnHover === true),
+      );
+      if (
+        typeof element.hoverPlayback.streamAssetId === 'string' &&
+        element.hoverPlayback.streamAssetId.length > 0 &&
+        element.hoverPlayback.streamAssetId !== '__placeholder__'
+      ) {
+        video.setAttribute(
+          'data-opencanvas-video-hover-stream-src',
+          previewAssetUrl(element.hoverPlayback.streamAssetId),
+        );
+      }
+      if (
+        typeof element.hoverPlayback.streamPosterAssetId === 'string' &&
+        element.hoverPlayback.streamPosterAssetId.length > 0 &&
+        element.hoverPlayback.streamPosterAssetId !== '__placeholder__'
+      ) {
+        video.setAttribute(
+          'data-opencanvas-video-hover-poster-src',
+          previewAssetUrl(element.hoverPlayback.streamPosterAssetId),
+        );
+      }
+      if (typeof element.hoverPlayback.intentDelayMs === 'number') {
+        video.setAttribute(
+          'data-opencanvas-video-hover-intent-delay-ms',
+          String(element.hoverPlayback.intentDelayMs),
+        );
+      }
+      video.setAttribute(
+        'data-opencanvas-video-hover-reduced-motion',
+        element.hoverPlayback.reducedMotion,
+      );
+      video.setAttribute('preload', 'metadata');
+    }
     node.appendChild(video);
   }
   return node;

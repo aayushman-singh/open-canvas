@@ -544,6 +544,8 @@ export function buildCarouselBodyImpl(
       dot.setAttribute('role', 'tab');
       dot.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
       dot.setAttribute('aria-label', 'Go to slide ' + String(i + 1));
+      const slide = slides[i];
+      if (slide) dot.setAttribute('data-opencanvas-slide-target-id', slide.id);
       dot.style.pointerEvents = 'auto';
       dots.appendChild(dot);
     }
@@ -621,7 +623,7 @@ function buildNavLinkAnchor(
   }
   if (kind === 'external') {
     a.setAttribute('target', '_blank');
-    a.setAttribute('rel', 'noopener');
+    a.setAttribute('rel', 'noopener noreferrer');
   }
   a.textContent = link.label || 'Link';
   const capturedHref = resolvedHref;
@@ -996,6 +998,7 @@ function applyCollectionEntryMetadata(
 export function buildTabsBodyImpl(ctx: BuildTabsBodyContext, element: TabsElement): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-tabs';
+  node.setAttribute('data-opencanvas-tabs', element.id);
   node.setAttribute('data-variant', element.variant ?? 'classic'); // ADR 0066
   node.style.position = 'relative';
   node.style.width = '100%';
@@ -1053,19 +1056,19 @@ export function buildTabsBodyImpl(ctx: BuildTabsBodyContext, element: TabsElemen
   }
   node.appendChild(bar);
 
-  const activeTab = tabs.find(function (t) {
-    return t && t.id === element.activeTabId;
-  });
-  if (activeTab) {
+  for (let ti = 0; ti < tabs.length; ti++) {
+    const tab = tabs[ti];
+    if (!tab) continue;
     const panel = document.createElement('div');
     panel.className = 'opencanvas-tab-panel';
-    panel.setAttribute('data-tab-active', '');
+    panel.setAttribute('data-opencanvas-tab-panel-id', tab.id);
+    if (tab.id === element.activeTabId) panel.setAttribute('data-tab-active', '');
     panel.style.position = 'absolute';
     panel.style.left = '0';
     panel.style.top = barHeight + 'px';
     panel.style.right = '0';
     panel.style.bottom = '0';
-    const children = Array.isArray(activeTab.elements) ? activeTab.elements : [];
+    const children = Array.isArray(tab.elements) ? tab.elements : [];
     for (let i = 0; i < children.length; i++) {
       const child = children[i];
       if (child !== undefined) panel.appendChild(ctx.buildElementNode(child));
