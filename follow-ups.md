@@ -306,8 +306,8 @@ Both exited 0. The smoke suite still prints existing harness warning/log noise, 
 
 Cleaned up:
 
-- Removed worktree `C:/Repo/open-canvas/.worktrees/runtime-hydrator-marquee-adapter`.
-- Removed temporary landing worktree `C:/Repo/open-canvas/.worktrees/main-landing`.
+- Removed worktree `C:/Repo/opencanvas/.worktrees/runtime-hydrator-marquee-adapter`.
+- Removed temporary landing worktree `C:/Repo/opencanvas/.worktrees/main-landing`.
 - Deleted local branch `feat/runtime-hydrator-marquee-adapter` after verifying it was an ancestor of `main`.
 
 ### Next Runtime Hydrator Work
@@ -333,5 +333,7 @@ Cleaned up:
    ```powershell
    cursor agent --print --model auto --auto-review --trust --workspace "$PWD" "<prompt>"
    ```
+
+   For read-only investigation, add `--mode=plan`.
 
    Main agent still owns review, integration, and verification.

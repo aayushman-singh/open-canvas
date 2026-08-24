@@ -58,7 +58,7 @@ const fetchOk = (input: RequestInfo | URL, init?: RequestInit): Promise<Response
   }
   if (method === 'POST' && url.endsWith('/pulls')) {
     return Promise.resolve(
-      Response.json({ html_url: 'https://github.com/aayushman-singh/open-canvas/pull/123' }),
+      Response.json({ html_url: 'https://github.com/aayushman-singh/opencanvas/pull/123' }),
     );
   }
   return Promise.reject(new Error(`unexpected GitHub request ${method} ${url}`));
@@ -83,7 +83,7 @@ changedEntry.name = 'GitHub PR edited starter hero';
 const result = await createTemplateSourcePullRequest(
   {
     token: 'ghs_example',
-    repository: 'aayushman-singh/open-canvas',
+    repository: 'aayushman-singh/opencanvas',
     baseBranch: 'main',
   },
   {
@@ -99,7 +99,7 @@ const result = await createTemplateSourcePullRequest(
 );
 
 assert(
-  result.pullRequestUrl === 'https://github.com/aayushman-singh/open-canvas/pull/123',
+  result.pullRequestUrl === 'https://github.com/aayushman-singh/opencanvas/pull/123',
   'PR creation must return the GitHub PR URL',
 );
 assert(
@@ -133,7 +133,7 @@ try {
   await createTemplateSourcePullRequest(
     {
       token: 'ghs_example',
-      repository: 'aayushman-singh/open-canvas',
+      repository: 'aayushman-singh/opencanvas',
       baseBranch: 'main',
     },
     {

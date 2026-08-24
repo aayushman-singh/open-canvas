@@ -171,7 +171,7 @@ APP_DOMAIN = "opencanvas.aayushman.dev"
 AUTHORIZED_PARTIES = "https://opencanvas.aayushman.dev,http://localhost:8787,http://localhost:8788,http://127.0.0.1:8787,http://127.0.0.1:8788"
 COOKIE_NAME_PREFIX = "__opencanvas_"
 EMAIL_FROM = "Open Canvas <noreply@opencanvas.aayushman.dev>"
-TEMPLATE_SOURCE_GITHUB_REPOSITORY = "aayushman-singh/open-canvas"
+TEMPLATE_SOURCE_GITHUB_REPOSITORY = "aayushman-singh/opencanvas"
 TEMPLATE_SOURCE_GITHUB_BASE_BRANCH = "main"
 # Customer id that owns the built-in template seeds + their materialized
 # assets. The /dashboard/templates seed bootstrap (ensureBuiltInTemplatesSeeded)

@@ -70,7 +70,7 @@ ADMIN_CLERK_USER_IDS=<your-clerk-user-id>
 # `wrangler secret put TEMPLATE_SOURCE_GITHUB_TOKEN`.
 TEMPLATE_SOURCE_GITHUB_TOKEN=<your-github-token>
 # Repository that receives production template source pull requests.
-TEMPLATE_SOURCE_GITHUB_REPOSITORY=aayushman-singh/open-canvas
+TEMPLATE_SOURCE_GITHUB_REPOSITORY=aayushman-singh/opencanvas
 # Base branch for production template source pull requests.
 TEMPLATE_SOURCE_GITHUB_BASE_BRANCH=main
 

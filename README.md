@@ -2,20 +2,17 @@
 
 > A desktop canvas site builder where an Owner starts from one Template Seed, edits positioned design primitives with AI help, switches deterministic Style Kits, and publishes to a real Published Address that updates open Visitor tabs immediately.
 
-[![CI](https://github.com/aayushman-singh/open-canvas/actions/workflows/deploy-worker.yml/badge.svg)](https://github.com/aayushman-singh/open-canvas/actions/workflows/deploy-worker.yml)
+[![CI](https://github.com/aayushman-singh/opencanvas/actions/workflows/deploy-worker.yml/badge.svg)](https://github.com/aayushman-singh/opencanvas/actions/workflows/deploy-worker.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Live](https://img.shields.io/badge/live-opencanvas.aayushman.dev-cyan)](https://opencanvas.aayushman.dev)
 
 ## Demo
 
-▶️ **[Watch the full walkthrough →](https://youtu.be/VIDEO_ID)**  _(replace `VIDEO_ID` with your YouTube video id)_
+The product is live — the demo is the real thing, not a recording:
 
-<!--
-  Hero clip: add a short (~10s) optimized GIF or a GitHub-hosted .mp4 under
-  docs/media/, then uncomment one of these for an inline preview:
-  ![Open Canvas in action](docs/media/demo.gif)
-  [![Watch the demo](docs/media/demo-thumbnail.png)](https://youtu.be/VIDEO_ID)
--->
+- **Try it:** [opencanvas.aayushman.dev](https://opencanvas.aayushman.dev) — sign in, start from a Template Seed, edit on the canvas, publish.
+- **Engineering tour:** [`docs/key-architecture.md`](docs/key-architecture.md) walks the five non-obvious decisions behind it, diagram by diagram.
+
 ## Architecture at a glance
 
 One Cloudflare Worker. Three kinds of human (Owner, Collaborator, Visitor) converge on a single document model; AI mutates it through a validate-gate; publish is a column split, audited on every write by a six-check a11y pass that reports to the Owner (advisory — a deliberate ship-fast call, not a hard gate).
@@ -104,14 +101,6 @@ Engineering substance over vanity metrics — every figure below is sourced from
 ## What it is
 
 Open the dashboard, name a site, and drop into a canvas pre-populated from one Template Seed. Drag positioned design primitives, ask the AI agent for a previewed edit, swap deterministic Style Kits live, and click Publish — the Published Address (`<subdomain>.opencanvas.aayushman.dev`) updates in every open Visitor tab within a few hundred milliseconds. One Cloudflare Worker hosts the dashboard, the editor, the canvas API, the AI agent endpoint, the publish snapshot store, and the public host that serves Visitors.
-
-## Demo
-
-The product is live — the demo is the real thing, not a recording:
-
-- **Try it:** [opencanvas.aayushman.dev](https://opencanvas.aayushman.dev) — sign in, start from a Template Seed, edit on the canvas, publish.
-- **Guided walkthrough:** [`docs/demo/act-1-script.md`](docs/demo/act-1-script.md) scripts the flagship beat — an indie founder rebrands the *Apogee* template into *Briar* and publishes it to a live address.
-- **Engineering tour:** [`docs/key-architecture.md`](docs/key-architecture.md) walks the five non-obvious decisions behind it, diagram by diagram.
 
 ## Stack
 
